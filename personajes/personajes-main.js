@@ -15,20 +15,14 @@ import { renderCatalogo, renderDetalle, renderFormulas, previsualizarFormulaConP
 // ─────────────────────────────────────────────────────────────
 window.onload = async () => {
     await hexAuth.init();
+    // El estado admin viene exclusivamente de hexAuth — no hay toggle manual.
     estadoUI.esAdmin = hexAuth.esAdmin();
 
-    // Badge de sesión
+    // Badge de sesión (dorado/morado desde hex-auth)
     const badge = document.getElementById('hex-session-badge');
     if (badge) badge.innerHTML = hexAuth.renderStatusBadge();
 
-    // Botón OP
-    const btnOP = document.getElementById('btn-op');
-    if (btnOP) {
-        btnOP.textContent   = estadoUI.esAdmin ? 'OP: ON' : 'Acceso OP';
-        btnOP.style.opacity = estadoUI.esAdmin ? '1' : '0.5';
-    }
-
-    const barra = document.getElementById('barra-progreso');
+    const barra  = document.getElementById('barra-progreso');
     const loader = document.getElementById('loader');
 
     const ok = await cargarDatos(barra);
@@ -58,18 +52,12 @@ window.mostrarVista = function(vista) {
     if (vista === 'formulas') renderFormulas();
 };
 
-window.toggleOP = function() {
-    if (hexAuth.esAdmin()) {
-        estadoUI.esAdmin = !estadoUI.esAdmin;
-        const btn = document.getElementById('btn-op');
-        if (btn) {
-            btn.textContent   = estadoUI.esAdmin ? 'OP: ON' : 'OP: OFF';
-            btn.style.opacity = estadoUI.esAdmin ? '1' : '0.5';
-        }
-        renderCatalogo();
-    } else {
-        hexAuth._mostrarModalLogin();
-    }
+// El badge de hex-auth maneja login/logout.
+// cambiarCampaña está disponible desde la nav para volver al selector.
+window.abrirLoginOP = function() { hexAuth._mostrarModalLogin(); };
+window.cambiarCampaña = function() {
+    localStorage.removeItem('hex_selected');
+    window.location.href = '../index.html';
 };
 
 // ─────────────────────────────────────────────────────────────
