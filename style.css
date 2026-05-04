@@ -1,0 +1,354 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+
+/* --- BASES GLOBALES --- */
+:root {
+    --bg-dark: #120024;
+    --gold: #d4af37;
+    --gold-dim: rgba(212, 175, 55, 0.3);
+    --gold-light: #ffd700;
+    --gold-dark: #b8860b;
+}
+
+body { 
+    font-family: 'Cinzel', serif; 
+    background-color: var(--bg-dark); 
+    color: #ffffff; 
+    margin: 0; 
+    padding: 20px; 
+    min-height: 100vh;
+    background-image: radial-gradient(circle at top, #1a0033 0%, #05000a 100%);
+}
+
+h1, h2, h3 { 
+    color: var(--gold-light); 
+    text-shadow: 0 0 15px rgba(212, 175, 55, 0.6); 
+    text-align: center; 
+}
+
+.container-hex { 
+    width: 95%; 
+    margin: 0 auto; 
+    max-width: 1600px; 
+}
+
+/* PORTADA HEXCRAFT (BANNER PRINCIPAL) */
+.hero-section { 
+    padding: 60px 20px; 
+    text-align: center; 
+    border: 2px solid var(--gold-dark); 
+    border-radius: 12px;
+    background-size: cover; 
+    background-position: center; 
+    margin-bottom: 30px;
+    position: relative;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.5);
+    background-color: rgba(10, 0, 20, 0.5); /* Oscurece el fondo si hay imagen */
+    background-blend-mode: overlay;
+}
+
+/* RESUMEN DE LORE (EFECTO CRISTAL) */
+.lore-summary { 
+    background: linear-gradient(145deg, rgba(30, 0, 60, 0.6), rgba(10, 0, 20, 0.8));
+    backdrop-filter: blur(8px);
+    padding: 25px; 
+    border-radius: 6px; 
+    margin-bottom: 40px; 
+    border-left: 4px solid var(--gold-light); 
+    text-align: justify; 
+    line-height: 1.6;
+    font-size: 1.1em;
+    color: #e0e0e0;
+    box-shadow: 0 8px 15px rgba(0,0,0,0.5);
+}
+
+/* BOTONES PRINCIPALES (GRILLA) */
+.main-grid { 
+    display: grid !important; 
+    grid-template-columns: repeat(2, 1fr) !important; 
+    gap: 25px; 
+    max-width: 900px; 
+    margin: 0 auto; 
+}
+
+.grid-item { 
+    background: linear-gradient(145deg, #1f003b, #0a0014); 
+    border: 1px solid var(--gold-dim); 
+    padding: 30px 20px; 
+    text-align: center; 
+    text-decoration: none; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    gap: 15px; 
+    transition: all 0.3s ease; 
+    border-radius: 10px; 
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 5px 10px rgba(0,0,0,0.5);
+}
+
+.grid-item img { 
+    width: 110px; 
+    height: 110px; 
+    object-fit: cover; 
+    border-radius: 50%;
+    border: 2px solid var(--gold-dark);
+    box-shadow: 0 0 15px rgba(0,0,0,0.8);
+    transition: 0.3s ease;
+}
+
+.grid-item span {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-shadow: 2px 2px 4px #000;
+}
+
+.grid-item:hover { 
+    background: linear-gradient(145deg, #2e004f, #150029); 
+    border-color: var(--gold-light);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.7), inset 0 0 20px rgba(212,175,55,0.15); 
+    transform: translateY(-5px); 
+}
+
+.grid-item:hover img {
+    border-color: var(--gold-light);
+    box-shadow: 0 0 20px rgba(212,175,55,0.6);
+}
+
+/* HILOS Y ESCENARIOS (TARJETAS CON BLUR CINEMÁTICO) */
+.direct-access { 
+    display: flex; 
+    gap: 30px; 
+    justify-content: center; 
+    margin-top: 30px; 
+    flex-wrap: wrap; 
+    padding-bottom: 40px; 
+}
+
+.access-card { 
+    position: relative; 
+    width: 340px; 
+    height: 190px; 
+    border: 2px solid var(--gold-dark); 
+    overflow: hidden; 
+    border-radius: 10px; 
+    box-shadow: 0 8px 15px rgba(0,0,0,0.6);
+    transition: 0.4s ease;
+}
+
+.access-card img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    filter: brightness(0.6); 
+    transition: all 0.5s ease; 
+}
+
+.access-card .overlay { 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    background: rgba(0,0,0,0.2);
+    transition: 0.4s ease;
+}
+
+.access-card span { 
+    color: var(--gold-light) !important; 
+    font-weight: bold; 
+    font-size: 1.4em; 
+    text-transform: uppercase; 
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px #000, 0 0 20px rgba(212, 175, 55, 0.8); 
+    opacity: 0.9;
+    transition: 0.3s;
+}
+
+.access-card:hover {
+    border-color: var(--gold-light);
+    box-shadow: 0 12px 25px rgba(212, 175, 55, 0.3);
+    transform: translateY(-3px);
+}
+
+.access-card:hover img { 
+    transform: scale(1.15); 
+    filter: brightness(0.9) blur(4px); 
+}
+
+.access-card:hover .overlay {
+    background: rgba(0,0,0,0.5);
+}
+
+.access-card:hover span {
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+/* TARJETAS BLOQUEADAS */
+.disabled { 
+    opacity: 0.3; 
+    cursor: not-allowed; 
+    filter: grayscale(1); 
+    pointer-events: none; 
+}
+
+/* =======================================================
+   📱 ADAPTACIÓN PARA TELÉFONOS (HOME PAGE)
+   ======================================================= */
+@media (max-width: 768px) { 
+    body {
+        padding: 15px !important;
+    }
+    
+    .hero-section {
+        padding: 40px 15px !important;
+    }
+    
+    /* Los botones principales bajan a 1 sola columna vertical */
+    .main-grid { 
+        grid-template-columns: 1fr !important; 
+        gap: 15px !important;
+    } 
+    
+    .grid-item {
+        padding: 20px 15px !important;
+        flex-direction: row !important; /* En móvil se ven mejor horizontales */
+        justify-content: left;
+        gap: 20px;
+    }
+    
+    .grid-item img {
+        width: 70px !important;
+        height: 70px !important;
+    }
+    
+    /* Las tarjetas con imágenes se ajustan al 100% de la pantalla */
+    .access-card {
+        width: 100% !important;
+        max-width: 380px !important;
+        height: 160px !important;
+    }
+
+    /* Forzar que los enlaces mantengan su estilo y no se pongan azules */
+a.grid-item, a.access-card {
+    text-decoration: none !important;
+    color: inherit !important;
+}
+
+/* Forzar que el texto interno sea blanco/dorado siempre */
+.grid-item span, .access-card span {
+    color: #fff !important; 
+}
+    
+}
+
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════ */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.dash-stat-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+}
+
+.dash-stat {
+    background: rgba(20, 0, 40, 0.7);
+    border: 1px solid var(--gold-dim);
+    border-radius: 10px;
+    padding: 15px 10px;
+    text-align: center;
+    transition: 0.2s;
+}
+.dash-stat:hover { border-color: var(--gold); transform: translateY(-2px); }
+.dash-stat-num { font-size: 2em; font-weight: bold; font-family: 'Cinzel', serif; }
+.dash-stat-lbl { font-size: 0.65em; color: #888; margin-top: 4px; font-family: sans-serif; text-transform: uppercase; letter-spacing: 1px; }
+
+.dash-card {
+    background: linear-gradient(145deg, rgba(20,0,40,0.8), rgba(10,0,20,0.9));
+    border: 1px solid var(--gold-dim);
+    border-radius: 12px;
+    padding: 20px;
+}
+.dash-card-title {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: 1em;
+    font-weight: bold;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--gold-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.dash-link {
+    display: block;
+    margin-top: 15px;
+    color: var(--gold-dim);
+    font-size: 0.8em;
+    font-family: sans-serif;
+    text-decoration: none;
+    text-align: right;
+    transition: 0.2s;
+}
+.dash-link:hover { color: var(--gold); }
+
+/* Party grid */
+.dash-party-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+.dash-player-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 8px;
+    transition: 0.2s;
+    gap: 4px;
+}
+.dash-player-card:hover { border-color: var(--gold); background: rgba(212,175,55,0.07); transform: translateY(-2px); }
+.dash-player-card img { width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--gold-dark); object-fit: cover; }
+.dash-player-name { font-size: 0.7em; color: #d4af37; font-family: 'Cinzel', serif; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.dash-player-hex  { font-size: 0.65em; color: #888; font-family: sans-serif; }
+.dash-vida-bar    { width: 100%; height: 5px; background: #222; border-radius: 3px; overflow: hidden; margin-top: 2px; }
+
+/* Misiones */
+.dash-mision-row {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.dash-mision-row:last-child { border-bottom: none; }
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE DASHBOARD
+═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .dash-stat-row  { grid-template-columns: repeat(3, 1fr); }
+    .dash-party-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 500px) {
+    .dash-stat-row  { grid-template-columns: repeat(2, 1fr); }
+    .dash-party-grid { grid-template-columns: repeat(2, 1fr); }
+}

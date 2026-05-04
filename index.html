@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="doc-title">Cargando Sistema...</title>
+    <link rel="icon" type="image/png" id="dynamic-favicon" href="https://gkscqurkpyteusqyspsu.supabase.co/storage/v1/object/public/imagenes-hex/imginterfaz/icon.png">
+    <link rel="stylesheet" href="style.css?v=3.2">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos para el Selector de Campañas */
+        #hex-selector {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(ellipse at 40% 30%, #1a0033 0%, #05000a 60%, #000000 100%);
+            z-index: 999999; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; overflow-y: auto;
+            padding: 40px 20px; box-sizing: border-box;
+        }
+        #hex-selector h1 {
+            font-size: 2.2em; margin-bottom: 8px; color: #d4af37;
+            font-family: 'Cinzel', serif; letter-spacing: 4px; text-align: center;
+            text-shadow: 0 0 30px rgba(212,175,55,0.5);
+        }
+        #hex-selector .selector-sub {
+            color: #555; font-family: sans-serif; font-size: 0.85em;
+            letter-spacing: 2px; text-transform: uppercase; margin-bottom: 40px; text-align: center;
+        }
+        .hex-campaigns-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+            max-width: 1000px;
+            width: 100%;
+        }
+        .hex-campaign-card {
+            background: linear-gradient(160deg, #110022, #07000f);
+            border: 1px solid #3a1860;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s;
+            overflow: hidden;
+            display: flex; flex-direction: column;
+            position: relative;
+        }
+        .hex-campaign-card:hover {
+            border-color: #d4af37;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(212,175,55,0.2);
+        }
+        .hex-campaign-card:hover .hex-card-overlay { opacity: 1; }
+        .hex-card-img-wrap {
+            width: 100%; height: 120px; overflow: hidden; position: relative;
+            background: #080010;
+        }
+        .hex-card-img-wrap img {
+            width: 100%; height: 100%; object-fit: cover; opacity: 0.7;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .hex-campaign-card:hover .hex-card-img-wrap img { opacity: 0.9; transform: scale(1.05); }
+        .hex-card-icon {
+            position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%);
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 2px solid #3a1860; overflow: hidden; background: #05000a;
+            transition: border-color 0.25s;
+        }
+        .hex-campaign-card:hover .hex-card-icon { border-color: #d4af37; }
+        .hex-card-icon img { width: 100%; height: 100%; object-fit: cover; }
+        .hex-card-body {
+            padding: 28px 16px 16px 16px; text-align: center; flex: 1; display: flex; flex-direction: column;
+        }
+        .hex-card-name {
+            font-family: 'Cinzel', serif; font-size: 0.85em; font-weight: bold;
+            color: #d4af37; letter-spacing: 1px; margin-bottom: 5px; line-height: 1.3;
+        }
+        .hex-card-id {
+            font-family: sans-serif; font-size: 0.62em; color: #5a3a8a;
+            letter-spacing: 3px; text-transform: uppercase; margin-bottom: 4px;
+        }
+        .hex-card-desc {
+            font-family: sans-serif; font-size: 0.72em; color: #666;
+            line-height: 1.4; flex: 1;
+        }
+        .hex-card-badge {
+            display: inline-block; margin-top: 12px; padding: 5px 14px;
+            background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.3);
+            border-radius: 20px; font-family: 'Cinzel', serif; font-size: 0.7em; color: #d4af37;
+            transition: background 0.2s;
+        }
+        .hex-campaign-card:hover .hex-card-badge { background: rgba(212,175,55,0.18); }
+        .hex-card-overlay {
+            position: absolute; inset: 0; background: rgba(212,175,55,0.04);
+            opacity: 0; transition: opacity 0.25s; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="hex-selector" style="display: none;">
+        <h1>⬡ HEXCRAFT</h1>
+        <p class="selector-sub">Selecciona la campaña</p>
+        <div class="hex-campaigns-grid" id="hex-campaigns-grid">
+            <!-- Las campañas se generan dinámicamente desde JS -->
+        </div>
+    </div>
+
+    <div class="container-hex" id="main-content" style="display: none;">
+
+        <div style="display:flex; justify-content:space-between; margin-bottom: 10px;">
+            <button onclick="cambiarCampaña()" style="background:transparent; color:#888; border:1px solid #555; padding:5px 10px; border-radius:4px; cursor:pointer; font-family:'Cinzel';">🔄 Cambiar Campaña</button>
+            <div id="hex-session-badge"></div>
+        </div>
+
+        <header class="hero-section">
+            <h1 id="ui-titulo" style="font-size: 3.5em; margin: 0; text-shadow: 0 0 20px rgba(0,0,0,0.9);">CARGANDO...</h1>
+            <p id="ui-subtitulo" style="color: #fff; margin-top: 10px; letter-spacing: 2px; font-size: 1.2em; text-transform: uppercase;">...</p>
+        </header>
+
+        <section id="ui-lore" class="lore-summary">
+            Cargando registros...
+        </section>
+
+        <h2 style="margin-top: 40px; margin-bottom: 20px;">Sistemas</h2>
+        <div class="main-grid">
+            <a href="objetos/index.html" class="grid-item"><img data-img="objetos.jpg" alt="Objetos"><span>OBJETOS</span></a>
+            <a href="estadisticas/index.html" class="grid-item"><img data-img="estadisticas.jpg" alt="Estadísticas"><span>ESTADÍSTICAS</span></a>
+            <a href="misiones/index.html" class="grid-item"><img data-img="misiones.png" alt="Misiones"><span>MISIONES</span></a>
+            <a href="hechizos/index.html" class="grid-item"><img data-img="hechizos.jpg" alt="Hechizos"><span>HECHIZOS</span></a>
+            <a href="mapa/index.html" class="grid-item"><img data-img="mapa.png" alt="Mapa"><span>MAPA DE HECHIZOS</span></a>
+            <a href="extra/index.html" class="grid-item"><img data-img="extra.png" alt="Extra"><span>IMAGENES</span></a>
+            <a href="region/index.html" class="grid-item"><img data-img="region.png" alt="Region"><span>MAPA REGIONAL</span></a>
+            
+            <a href="panel-de-desarrollo/index.html" class="grid-item" id="btn-panel-dev" style="display: none; border-color: #ff00ff; box-shadow: inset 0 0 15px rgba(255,0,255,0.2);">
+                <img data-img="panel-dev.png" alt="Panel de Desarrollo" style="border-color: #ff00ff;">
+                <span style="color: #ffaaff; text-shadow: 0 0 10px rgba(255,0,255,0.8);">PANEL MÁSTER</span>
+            </a>
+        </div>
+
+        <h2 style="margin-top:40px; margin-bottom:15px;">Estado Actual</h2>
+        <div id="dashboard" class="dashboard-grid">
+            <div class="dash-card" style="grid-column: 1/-1; text-align:center; color:#555; padding:30px;">Cargando datos...</div>
+        </div>
+
+        <h2 style="margin-top: 50px; margin-bottom: 20px;">Hilos Activos</h2>
+        <section class="direct-access">
+            <a id="ui-link-rol" href="#" target="_blank" class="access-card">
+                <img data-img="hex-002.png" alt="Rol Actual">
+                <div class="overlay"><span id="ui-nombre-rol">ROL</span></div>
+            </a>
+            <a id="ui-link-meta" href="#" target="_blank" class="access-card">
+                <img data-img="met-004.png" alt="Meta">
+                <div class="overlay"><span id="ui-nombre-meta">META</span></div>
+            </a>
+        </section>
+
+    </div>
+
+<script type="module">
+    import { hexAuth, currentConfig } from './hex-auth.js';
+    import { db } from './hex-db.js';
+    import { supabase } from './hex-auth.js';
+    import { hexConfigs } from './hex/config.js';
+
+    // Campañas construidas dinámicamente desde hexConfigs (config.js)
+
+    // Funciones globales para los botones
+    window.seleccionarCampaña = (idHex) => {
+        localStorage.setItem('hex_selected', idHex);
+        const origen = sessionStorage.getItem('hex_redirect_after_select');
+        if (origen) {
+            sessionStorage.removeItem('hex_redirect_after_select');
+            window.location.href = origen;
+        } else {
+            window.location.reload();
+        }
+    };
+    
+    window.cambiarCampaña = () => {
+        localStorage.removeItem('hex_selected');
+        window.location.reload();
+    };
+
+    async function iniciar() {
+        // Verificar si hay campaña seleccionada
+        if (!localStorage.getItem('hex_selected')) {
+            document.getElementById('hex-selector').style.display = 'flex';
+            await renderizarSelectorCampañas();
+            return;
+        }
+
+        document.getElementById('main-content').style.display = 'block';
+
+        // 1. Inicializamos la autenticación (ahora sabe a qué BD conectarse)
+        await hexAuth.init();
+
+        // 2. Inyectar textos — primero config.js (fallback), luego override desde Supabase
+        const _cfgUI = currentConfig.ui;
+        document.getElementById('doc-title').innerText    = _cfgUI.titulo;
+        document.getElementById('ui-titulo').innerText    = _cfgUI.titulo;
+        document.getElementById('ui-subtitulo').innerText = _cfgUI.subtitulo;
+        document.getElementById('ui-lore').innerText      = _cfgUI.lore;
+        document.getElementById('ui-link-rol').href       = _cfgUI.linkRol;
+        document.getElementById('ui-nombre-rol').innerText= _cfgUI.nombreRol;
+        document.getElementById('ui-link-meta').href      = _cfgUI.linkMeta;
+        document.getElementById('ui-nombre-meta').innerText= _cfgUI.nombreMeta;
+
+        // Override con config_ui de Supabase (editada desde el panel OP)
+        try {
+            const { data: dbUI } = await supabase
+                .from('config_ui')
+                .select('*')
+                .eq('hex_id', 'default')
+                .single();
+            if (dbUI) {
+                if (dbUI.titulo)      { document.getElementById('doc-title').innerText    = dbUI.titulo;
+                                        document.getElementById('ui-titulo').innerText    = dbUI.titulo; }
+                if (dbUI.subtitulo)     document.getElementById('ui-subtitulo').innerText = dbUI.subtitulo;
+                if (dbUI.lore)          document.getElementById('ui-lore').innerText      = dbUI.lore;
+                if (dbUI.link_rol)      document.getElementById('ui-link-rol').href       = dbUI.link_rol;
+                if (dbUI.nombre_rol)    document.getElementById('ui-nombre-rol').innerText= dbUI.nombre_rol;
+                if (dbUI.link_meta)     document.getElementById('ui-link-meta').href      = dbUI.link_meta;
+                if (dbUI.nombre_meta)   document.getElementById('ui-nombre-meta').innerText= dbUI.nombre_meta;
+            }
+        } catch(e) { /* Si falla, ya está el fallback de config.js cargado arriba */ }
+
+        // 3. Renderizar interfaz
+        const favicon = document.getElementById("dynamic-favicon");
+        if (favicon) favicon.href = db.storage.getUrlInterfaz('icon.png');
+
+        const badge = document.getElementById('hex-session-badge');
+        if (badge) badge.innerHTML = hexAuth.renderStatusBadge();
+
+        if (hexAuth.esAdmin()) {
+            const btnDev = document.getElementById('btn-panel-dev');
+            if (btnDev) btnDev.style.display = 'flex';
+        }
+
+        cargarImagenesNube();
+        await cargarDashboard();
+    }
+
+    function cargarImagenesNube() {
+        const urlIconoNube = db.storage.getUrlInterfaz('icon.png');
+        document.querySelectorAll('img[data-img]').forEach(img => {
+            const nombreLocal = img.getAttribute('data-img');
+            const nuevaUrl = db.storage.getUrlInterfaz(nombreLocal);
+            img.onerror = () => { img.onerror = null; img.src = urlIconoNube; };
+            img.src = nuevaUrl;
+        });
+        const header = document.querySelector('.hero-section');
+        if (header) {
+            const bgUrl = db.storage.getUrlInterfaz('hex-002.png');
+            header.style.backgroundImage = `linear-gradient(rgba(18,0,36,0.7), rgba(18,0,36,0.7)), url('${bgUrl}')`;
+        }
+    }
+
+    async function cargarDashboard() {
+        const dash = document.getElementById('dashboard');
+        try {
+            const [personajesRes, misionesRes, objetosRes, hechizosRes] = await Promise.all([
+                supabase.from('personajes').select('nombre, is_player, is_active, hex, vida_roja_actual, base_vida_roja_max'),
+                supabase.from('misiones').select('titulo, estado, tipo, jugadores'),
+                supabase.from('inventario_objetos').select('cantidad').gt('cantidad', 0),
+                supabase.from('hechizos_inventario').select('hechizo_nombre')
+            ]);
+
+            const personajes = personajesRes.data || [];
+            const misiones   = misionesRes.data   || [];
+            const invItems   = objetosRes.data     || [];
+            const hechizos   = hechizosRes.data    || [];
+
+            const jugadores    = personajes.filter(p => p.is_player && p.is_active);
+            const npcs         = personajes.filter(p => !p.is_player && p.is_active);
+            const misActivas   = misiones.filter(m => m.estado === 1 || m.estado === 2);
+            const misPendiente = misiones.filter(m => m.estado === 1);
+            const misProceso   = misiones.filter(m => m.estado === 2);
+            const totalObjetos = invItems.reduce((acc, r) => acc + (r.cantidad || 0), 0);
+            const hexPromedio  = jugadores.length
+                ? Math.round(jugadores.reduce((a, p) => a + (p.hex || 0), 0) / jugadores.length)
+                : 0;
+
+            // Party: jugadores activos con vida
+            const partyHTML = jugadores.slice(0, 6).map(p => {
+                const norm = (s) => s.toString().trim().toLowerCase()
+                    .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+                    .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
+                    .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+                const vidaMax  = p.base_vida_roja_max || 10;
+                const vidaAct  = Math.min(p.vida_roja_actual || 0, vidaMax);
+                const pct      = Math.round(vidaAct / vidaMax * 100);
+                const barColor = pct > 60 ? '#00cc44' : pct > 30 ? '#ffaa00' : '#cc2200';
+                const iconUrl  = `${db.storage.urlBase}/imgpersonajes/${norm(p.nombre)}icon.png`;
+                const noFound  = `${db.storage.urlBase}/imginterfaz/no_encontrado.png`;
+                return `
+                <a href="estadisticas/index.html?pj=${encodeURIComponent(p.nombre)}" class="dash-player-card" title="${p.nombre} — HEX: ${p.hex}">
+                    <img src="${iconUrl}" onerror="this.onerror=null;this.src='${noFound}'">
+                    <div class="dash-player-name">${p.nombre}</div>
+                    <div class="dash-player-hex">${(p.hex||0).toLocaleString()} HEX</div>
+                    <div class="dash-vida-bar" title="Vida: ${vidaAct}/${vidaMax}">
+                        <div style="height:100%; width:${pct}%; background:${barColor}; border-radius:3px; transition:width 0.5s;"></div>
+                    </div>
+                </a>`;
+            }).join('');
+
+            // Misiones activas
+            const misHTML = misActivas.slice(0, 5).map(m => {
+                const badge = m.estado === 1
+                    ? `<span style="background:#4a3800;color:#ffaa00;padding:1px 6px;border-radius:8px;font-size:0.65em;">Pendiente</span>`
+                    : `<span style="background:#003a4a;color:#00ccff;padding:1px 6px;border-radius:8px;font-size:0.65em;">En Proceso</span>`;
+                const jugHTML = (m.jugadores || []).map(j => `<span style="font-size:0.7em;color:#888;">${j}</span>`).join(', ');
+                return `<div class="dash-mision-row">
+                    <span style="font-weight:bold;color:#d4af37;font-size:0.85em;">${m.titulo}</span>
+                    ${badge}
+                    <div style="color:#666;font-size:0.75em;margin-top:2px;">${jugHTML || 'Sin asignar'}</div>
+                </div>`;
+            }).join('') || '<div style="color:#555;font-size:0.85em;font-style:italic;text-align:center;padding:10px;">No hay misiones activas</div>';
+
+            dash.innerHTML = `
+            <div class="dash-stat-row">
+                <div class="dash-stat">
+                    <div class="dash-stat-num" style="color:#d4af37;">${jugadores.length}</div>
+                    <div class="dash-stat-lbl">Jugadores Activos</div>
+                </div>
+                <div class="dash-stat">
+                    <div class="dash-stat-num" style="color:#00ccff;">${npcs.length}</div>
+                    <div class="dash-stat-lbl">NPCs Activos</div>
+                </div>
+                <div class="dash-stat">
+                    <div class="dash-stat-num" style="color:#ffaa00;">${misActivas.length}</div>
+                    <div class="dash-stat-lbl">Misiones Activas</div>
+                </div>
+                <div class="dash-stat">
+                    <div class="dash-stat-num" style="color:#00ff88;">${totalObjetos}</div>
+                    <div class="dash-stat-lbl">Objetos en Circulación</div>
+                </div>
+                <div class="dash-stat">
+                    <div class="dash-stat-num" style="color:#cc88ff;">${hechizos.length}</div>
+                    <div class="dash-stat-lbl">Hechizos Aprendidos</div>
+                </div>
+                <div class="dash-stat">
+                    <div class="dash-stat-num" style="color:#d4af37;">${hexPromedio.toLocaleString()}</div>
+                    <div class="dash-stat-lbl">HEX Promedio Party</div>
+                </div>
+            </div>
+
+            <div class="dash-card">
+                <div class="dash-card-title">⚔️ Party Activa</div>
+                <div class="dash-party-grid">
+                    ${partyHTML || '<p style="color:#555;font-size:0.85em;font-style:italic;text-align:center;">Sin jugadores activos</p>'}
+                </div>
+                <a href="estadisticas/index.html" class="dash-link">Ver todos →</a>
+            </div>
+
+            <div class="dash-card">
+                <div class="dash-card-title">📜 Misiones en Curso</div>
+                <div style="display:flex;gap:15px;margin-bottom:12px;">
+                    <div style="text-align:center;flex:1;background:rgba(255,170,0,0.1);padding:8px;border-radius:6px;border:1px solid rgba(255,170,0,0.2);">
+                        <div style="font-size:1.6em;font-weight:bold;color:#ffaa00;">${misPendiente.length}</div>
+                        <div style="font-size:0.7em;color:#888;font-family:sans-serif;">Pendientes</div>
+                    </div>
+                    <div style="text-align:center;flex:1;background:rgba(0,204,255,0.1);padding:8px;border-radius:6px;border:1px solid rgba(0,204,255,0.2);">
+                        <div style="font-size:1.6em;font-weight:bold;color:#00ccff;">${misProceso.length}</div>
+                        <div style="font-size:0.7em;color:#888;font-family:sans-serif;">En Proceso</div>
+                    </div>
+                </div>
+                ${misHTML}
+                <a href="misiones/index.html" class="dash-link">Ver tablón →</a>
+            </div>`;
+
+        } catch(e) {
+            console.error('Dashboard error:', e);
+            dash.innerHTML = `<div class="dash-card" style="grid-column:1/-1;text-align:center;color:#ff4444;font-family:sans-serif;">Error cargando el dashboard: ${e.message}</div>`;
+        }
+    }
+
+    async function renderizarSelectorCampañas() {
+        const grid = document.getElementById('hex-campaigns-grid');
+        if (!grid) return;
+
+        const campañas = Object.values(hexConfigs);
+
+        // Render inmediato con datos de config.js
+        grid.innerHTML = campañas.map(cfg => {
+            const base    = cfg.storageUrl || '';
+            const bgSrc   = `${base}/imginterfaz/hex-002.png`;
+            const iconSrc = `${base}/imginterfaz/icon.png`;
+            const nombre  = cfg.ui?.titulo    || cfg.nombreCorto || cfg.id.toUpperCase();
+            const desc    = cfg.ui?.subtitulo || '';
+
+            return `
+            <div class="hex-campaign-card" onclick="seleccionarCampaña('${cfg.id}')">
+                <div class="hex-card-overlay"></div>
+                <div class="hex-card-img-wrap">
+                    <img src="${bgSrc}" onerror="this.style.opacity='0'" alt="${nombre}">
+                    <div class="hex-card-icon">
+                        <img src="${iconSrc}" onerror="this.style.opacity='0'" alt="">
+                    </div>
+                </div>
+                <div class="hex-card-body">
+                    <div class="hex-card-id">${(cfg.nombreCorto || cfg.id).toUpperCase()}</div>
+                    <div class="hex-card-name" id="card-titulo-${cfg.id}">${nombre}</div>
+                    <div class="hex-card-desc" id="card-desc-${cfg.id}">${desc}</div>
+                    <div class="hex-card-badge">ENTRAR →</div>
+                </div>
+            </div>`;
+        }).join('');
+
+        // Override asíncrono: carga título/subtítulo real de Supabase de cada campaña
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+        for (const cfg of campañas) {
+            try {
+                const sb = createClient(cfg.dbUrl, cfg.dbAnonKey);
+                const { data } = await sb.from('config_ui').select('titulo,subtitulo').eq('hex_id','default').single();
+                if (data) {
+                    const elT = document.getElementById(`card-titulo-${cfg.id}`);
+                    const elD = document.getElementById(`card-desc-${cfg.id}`);
+                    if (elT && data.titulo)    elT.textContent = data.titulo;
+                    if (elD && data.subtitulo) elD.textContent = data.subtitulo;
+                }
+            } catch(e) { /* fallback de config.js ya está visible */ }
+        }
+    }
+
+    iniciar();
+</script>
+</body>
+</html>

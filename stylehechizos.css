@@ -1,0 +1,151 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+
+:root {
+    --bg-dark: #120024; --gold: #d4af37; --gold-dim: rgba(212, 175, 55, 0.3);
+    --gold-light: #ffd700; --blue-life: #4a90e2; --purple-magic: #8a2be2;
+    --cyan-magic: #00ffff; --red-alert: #ff4d4d;
+}
+
+body { font-family: 'Cinzel', serif; background-color: var(--bg-dark); color: #ffffff; margin: 0; padding: 20px; min-height: 100vh; background-image: radial-gradient(circle at top, #1a0033 0%, #05000a 100%); text-align: center; }
+h1, h2, h3 { color: var(--gold); text-shadow: 0 0 10px rgba(212, 175, 55, 0.5); }
+.container-hex { width: 95%; margin: 0 auto; max-width: 1600px; }
+.oculto { display: none !important; }
+
+/* NAVEGACIÓN Y FILTROS */
+.nav-bar { display: flex; justify-content: space-between; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--gold-dim); }
+.filter-group { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; width: 100%; }
+button { background: linear-gradient(145deg, #2e004f, #1a0033); color: var(--gold); border: 1px solid var(--gold); padding: 10px 15px; cursor: pointer; font-family: 'Cinzel'; transition: 0.2s ease; border-radius: 4px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.4); }
+button:hover { filter: brightness(1.3); transform: translateY(-2px); }
+.btn-active { background: var(--gold) !important; color: var(--bg-dark) !important; border: 2px solid var(--gold-light); }
+
+.search-bar { width: 85%; max-width: 600px; display: block; margin: 0 auto 20px auto; padding: 15px; border: 1px solid var(--gold); background: rgba(0,0,0,0.5); color: white; text-align: center; border-radius: 6px; font-family: 'Cinzel'; font-size: 1.1em; transition: 0.3s; }
+.search-bar:focus { outline: none; box-shadow: 0 0 15px rgba(212, 175, 55, 0.5); background: #000; }
+select.search-bar { cursor: pointer; appearance: none; text-align: center; width: auto; display: inline-block; margin-right: 10px; }
+
+/* GRILLA PERSONAJES */
+.catalogo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
+.char-card { background: rgba(21, 0, 41, 0.8); border: 1px solid var(--gold-dim); border-radius: 8px; padding: 15px; cursor: pointer; transition: 0.3s; }
+.char-card:hover { transform: scale(1.05); border-color: var(--gold); box-shadow: 0 0 20px rgba(212, 175, 55, 0.3); }
+.char-card img { width: 100px; height: 100px; border-radius: 50%; border: 2px solid var(--gold); object-fit: cover; }
+.char-card h3 { margin: 10px 0 5px 0; font-size: 1.2em; text-transform: uppercase; }
+.char-stats { font-size: 0.85em; color: #ccc; margin: 2px 0; font-family: sans-serif;}
+.player-card { border: 2px solid var(--gold); box-shadow: 0 0 15px rgba(212, 175, 55, 0.4); background: #1e0535; }
+.inactive-card { opacity: 0.4; filter: grayscale(1); }
+
+/* HEADER JUGADOR Y OP */
+.player-header { display: flex; align-items: center; gap: 20px; background: rgba(30, 0, 60, 0.6); padding: 20px; border: 1px solid var(--gold); border-radius: 8px; margin-bottom: 20px; text-align: left; }
+.player-icon { width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--gold); object-fit: cover; background: #000; }
+.toggle-hex { display: flex; align-items: center; justify-content: center; gap: 10px; background: #1a1a00; border: 1px dashed var(--gold); padding: 10px; border-radius: 4px; color: var(--gold); cursor: pointer; margin-bottom: 20px; font-weight: bold;}
+.toggle-hex input { transform: scale(1.5); cursor: pointer; }
+
+/* TARJETAS HECHIZOS (Grid de 4) */
+.grid-inventario { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; max-width: 1300px; margin: 0 auto 40px auto; }
+.spell-card { background: rgba(15, 0, 30, 0.9); border: 1px solid #333; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; transition: 0.3s ease; box-shadow: 0 4px 6px rgba(0,0,0,0.6); text-align: left; border-top: 3px solid var(--gold); }
+.spell-card:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.8); }
+.spell-card h3 { margin: 0 0 10px 0; border-bottom: 1px dashed #444; padding-bottom: 5px; font-size: 1.1em; text-transform: uppercase; }
+
+.spell-tags { margin-bottom: 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+.spell-tag { padding: 2px 6px; border-radius: 2px; font-size: 0.7em; font-weight: bold; background: transparent; border: 1px solid #555; font-family: sans-serif; text-transform: uppercase; }
+.tag-hex { color: var(--gold-light); border-color: var(--gold-light); }
+.tag-clase { color: #aaa; border-color: #888; }
+
+.spell-desc { font-family: sans-serif; font-size: 0.85em; color: #ccc; line-height: 1.4; background: #111; padding: 10px; border-radius: 4px; margin-bottom: 10px; }
+.spell-efecto { font-family: sans-serif; font-size: 0.85em; color: var(--cyan-magic); margin-bottom: 10px; }
+
+/* BOTÓN DETALLES NATIVO */
+details.spell-details { background: #0a0a0a; border: 1px solid #333; border-radius: 4px; margin-bottom: 10px; }
+details.spell-details summary { padding: 8px; font-size: 0.8em; font-weight: bold; color: var(--gold); cursor: pointer; outline: none; list-style: none; text-align: center; font-family: sans-serif; }
+details.spell-details summary::-webkit-details-marker { display: none; }
+details.spell-details summary::after { content: ' ▼'; font-size: 0.8em; }
+details[open].spell-details summary::after { content: ' ▲'; }
+.details-content { padding: 10px; font-family: sans-serif; font-size: 0.8em; color: #bbb; border-top: 1px solid #333; background: #000; }
+.details-content strong { color: var(--purple-magic); }
+
+.tag-origen { font-family: sans-serif; color: #777; margin-top: auto; font-size: 0.75em; text-align: right; padding-top: 10px; border-top: 1px dashed #333; }
+
+.btn-sync-float { position: fixed; bottom: 20px; right: 20px; background: #4a0000; color: #fff; padding: 15px 30px; border: 2px solid #ff4444; border-radius: 30px; font-weight: bold; font-size: 1.1em; z-index: 1000; cursor: pointer; transition: 0.3s; font-family: 'Cinzel'; }
+.btn-sync-float:hover { background: #ff0000; transform: scale(1.05); }
+.req-header { text-align: left; border-bottom: 1px solid var(--gold); margin: 30px 0 10px 0; padding-bottom: 5px; color: var(--gold); font-size: 1.1em; max-width: 1300px; margin-left: auto; margin-right: auto; }
+
+/* --- DISEÑO DE CASTEO DE HECHIZOS --- */
+.casteo-row {
+    display: flex; gap: 15px; align-items: stretch;
+    background: rgba(10, 0, 20, 0.8); border: 1px solid #333;
+    border-radius: 8px; padding: 15px; margin-bottom: 10px;
+    flex-wrap: wrap; transition: border-color 0.3s;
+}
+.casteo-input-group {
+    display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px;
+}
+.casteo-result {
+    flex: 3; min-width: 250px; background: rgba(0,0,0,0.6);
+    border-radius: 6px; border-left: 4px solid #555; padding: 10px;
+    font-size: 0.9em; min-height: 50px; display: flex; flex-direction: column; justify-content: center;
+}
+.dice-btn {
+    background: #111; color: var(--gold); border: 1px solid var(--gold);
+    cursor: pointer; padding: 8px; border-radius: 4px; font-size: 1.2em; font-weight: bold;
+}
+.dice-btn:hover { background: var(--gold); color: black; }
+.input-casteo {
+    background: #000; color: #fff; border: 1px solid var(--cyan-magic);
+    padding: 10px; border-radius: 4px; width: 100%; box-sizing: border-box; font-size: 1em;
+}
+
+/* =======================================================
+   📱 ADAPTACIÓN PARA TELÉFONOS (HECHIZOS)
+   ======================================================= */
+@media (max-width: 768px) {
+    body { padding-bottom: 90px !important; padding-left: 10px !important; padding-right: 10px !important; }
+    .oculto { display: none !important; }
+    
+    .nav-bar {
+        position: fixed !important; bottom: 0 !important; left: 0 !important; width: 100vw !important;
+        background: rgba(10, 0, 20, 0.98) !important; border-top: 2px solid var(--gold) !important;
+        padding: 10px !important; margin: 0 !important;
+        display: flex !important; gap: 8px !important; align-items: stretch !important;
+        box-sizing: border-box !important; z-index: 9999 !important; box-shadow: 0 -5px 20px rgba(0,0,0,0.9);
+    }
+    
+    /* El contenedor izquierdo tomará el espacio necesario de forma simétrica */
+    .nav-bar > div { display: flex !important; flex: 1 !important; gap: 8px !important; }
+    
+    /* Estilo robusto para que los botones tengan buen tamaño y se centren */
+    .btn-nav { 
+        font-size: 0.85em !important; 
+        padding: 12px 10px !important; 
+        flex: 1; 
+        text-align: center; 
+        border-radius: 6px !important;
+        white-space: normal !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* El botón de Acceso OP será igual de ancho que el de Inicio */
+    .nav-bar > button.btn-op { flex: 0.8 !important; margin: 0 !important; }
+
+    /* El botón Verde de conexión será un cuadro perfecto que no estorba (es el tercer hijo) */
+    .nav-bar > div > button:nth-child(3) { 
+        flex: 0 0 45px !important; 
+        padding: 0 !important; 
+        min-width: 45px !important; 
+    }
+
+    .player-header { flex-direction: column !important; text-align: center !important; gap: 15px !important; }
+    .player-header > div { flex-direction: column !important; text-align: center !important; }
+    
+    .filter-group { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+    .filter-group button { width: 100%; padding: 12px !important; font-size: 0.9em !important; }
+    .search-bar { max-width: 100% !important; width: 100% !important; box-sizing: border-box; padding: 12px !important; font-size: 0.9em !important;}
+
+    .catalogo-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+    .char-card img { width: 70px !important; height: 70px !important; }
+    .char-card h3 { font-size: 1em !important; }
+    .char-stats { font-size: 0.75em !important; }
+    
+    .grid-inventario { grid-template-columns: 1fr !important; gap: 15px !important; margin-bottom: 20px !important;}
+    
+    .btn-sync-float { bottom: 85px !important; padding: 14px 20px !important; font-size: 1em !important; width: calc(100% - 40px); left: 20px; text-align: center; box-sizing: border-box; border-radius: 8px !important;}
+}
