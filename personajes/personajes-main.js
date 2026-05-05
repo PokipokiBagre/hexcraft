@@ -4,8 +4,8 @@
 // ============================================================
 
 import { hexAuth } from '../hex-auth.js';
-import { db } from '../hex-db.js';
-import { estadoUI, personajes, formulas, regenConfig, colaCambios, encolarCambio, FORMULAS_DEFAULT, REGEN_DEFAULT, setRegenTicker } from './personajes-state.js';
+import { hexTicker } from '../hex-ticker.js';
+import { estadoUI, personajes, formulas, regenConfig, colaCambios, encolarCambio, FORMULAS_DEFAULT, REGEN_DEFAULT } from './personajes-state.js';
 import { calcularStats, buildContext, evalExpr } from './personajes-logic.js';
 import { cargarDatos, sincronizarCola, guardarFormulasBD, guardarRegenBD, ejecutarRegenBD } from './personajes-data.js';
 import { renderCatalogo, renderDetalle, renderFormulas, previsualizarFormulaConPJ, previsualizarRegenConPJ, renderPreviewCompleto } from './personajes-ui.js';
@@ -32,56 +32,29 @@ window.onload = async () => {
 
     mostrarVista('catalogo');
 
-    // Regeneración cliente: cada 10 segundos aplica regen proporcional
-    const ticker = setInterval(() => {
-        const TICK_SEG = 10;
-        let cambio = false;
-        for (const [nombre, p] of Object.entries(personajes)) {
-            if (!p.isActive) continue;
-            const s = calcularStats(p);
-
-            // VEX: regen_vex por hora → por 10s
-            if (s.vex_max > 0 && p.vex_actual < s.vex_max) {
-                const regenPorTick = s.regen_vex_total / 3600 * TICK_SEG;
-                const nuevo = Math.min(s.vex_max, (p.vex_actual || 0) + regenPorTick);
-                if (nuevo > p.vex_actual + 0.001) {
-                    p._vex_fraccion = (p._vex_fraccion || 0) + regenPorTick;
-                    if (p._vex_fraccion >= 1) {
-                        const entero = Math.floor(p._vex_fraccion);
-                        p.vex_actual = Math.min(s.vex_max, (p.vex_actual || 0) + entero);
-                        p._vex_fraccion -= entero;
-                        encolarCambio(nombre, 'vex_actual', p.vex_actual);
-                        cambio = true;
-                    }
-                }
-            }
-
-            // Guarda: regen_guarda por hora → por 10s
-            if (s.guarda_max > 0 && (p.guarda_actual || 0) < s.guarda_max) {
-                p._guarda_fraccion = (p._guarda_fraccion || 0) + (s.regen_guarda_total / 3600 * TICK_SEG);
-                if (p._guarda_fraccion >= 1) {
-                    const entero = Math.floor(p._guarda_fraccion);
-                    p.guarda_actual = Math.min(s.guarda_max, (p.guarda_actual || 0) + entero);
-                    p._guarda_fraccion -= entero;
-                    encolarCambio(nombre, 'guarda_actual', p.guarda_actual);
-                    cambio = true;
-                }
-            }
-        }
-        if (cambio) {
-            if (estadoUI.panelAbierto && estadoUI.pjSeleccionado) renderDetalle(estadoUI.pjSeleccionado);
+    // ── Iniciar ticker de regeneración en tiempo real ───────────
+    // • Calcula regen en memoria cada 10s
+    // • Persiste vex_actual/guarda_actual a Supabase cada 30s
+    // • Escucha cambios externos via Supabase Realtime
+    hexTicker.iniciar({
+        personajes,
+        calcularStats,
+        onTick: () => {
             renderCatalogo();
-            actualizarBtnSync();
+            if (estadoUI.panelAbierto && estadoUI.pjSeleccionado) {
+                renderDetalle(estadoUI.pjSeleccionado);
+            }
         }
-    }, 10000);
-    setRegenTicker(ticker);
+    });
 };
+
+// Flush antes de salir para no perder regen acumulada en memoria
+window.addEventListener('beforeunload', () => hexTicker.flushAhora());
 
 // ─────────────────────────────────────────────────────────────
 // NAVEGACIÓN
 // ─────────────────────────────────────────────────────────────
 window.mostrarVista = function(vista) {
-    // Pestaña "Crear": solo OP puede crear jugadores; no-OP solo NPCs
     estadoUI.vista = vista;
     document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -93,12 +66,16 @@ window.mostrarVista = function(vista) {
     if (vista === 'catalogo') renderCatalogo();
     if (vista === 'crear')    inicializarFormulario();
     if (vista === 'formulas') {
-        if (!estadoUI.esAdmin) { mostrarToast('Solo el OP puede editar fórmulas', true); window.mostrarVista('catalogo'); return; }
+        if (!estadoUI.esAdmin) {
+            mostrarToast('Solo el OP puede editar fórmulas', true);
+            window.mostrarVista('catalogo');
+            return;
+        }
         renderFormulas();
     }
 };
 
-window.abrirLoginOP = function() { hexAuth._mostrarModalLogin(); };
+window.abrirLoginOP  = function() { hexAuth._mostrarModalLogin(); };
 window.cambiarCampaña = function() {
     localStorage.removeItem('hex_selected');
     window.location.href = '../index.html';
@@ -156,17 +133,17 @@ window.modAfin = function(nombre, afinKey, delta) {
     renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
 };
 
-// Modificar buff (bf) — disponible sin OP para NPCs, con OP para todos
+// Modificar buff (bf)
 window.modBf = function(nombre, afinKey, delta) {
     const p = personajes[nombre]; if (!p) return;
-    if (!estadoUI.esAdmin && p.isPlayer) return; // no-OP no toca jugadores
+    if (!estadoUI.esAdmin && p.isPlayer) return;
     if (!p.afinidadesBf) p.afinidadesBf = {};
     p.afinidadesBf[afinKey] = Math.max(-999, (p.afinidadesBf[afinKey] || 0) + delta);
     encolarCambio(nombre, `bf_${afinKey}`, p.afinidadesBf[afinKey]);
     renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
 };
 
-// Modificar alteración (ef) — mismo permiso que bf
+// Modificar alteración (ef)
 window.modEf = function(nombre, afinKey, delta) {
     const p = personajes[nombre]; if (!p) return;
     if (!estadoUI.esAdmin && p.isPlayer) return;
@@ -176,7 +153,7 @@ window.modEf = function(nombre, afinKey, delta) {
     renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
 };
 
-// Modificar regen bf (buff sobre regen_vex o regen_guarda)
+// Modificar regen buff/alteración
 window.modRegenBf = function(nombre, recurso, delta) {
     const p = personajes[nombre]; if (!p) return;
     if (!estadoUI.esAdmin && p.isPlayer) return;
@@ -185,7 +162,6 @@ window.modRegenBf = function(nombre, recurso, delta) {
     encolarCambio(nombre, campo, p[campo]);
     renderDetalle(nombre); actualizarBtnSync();
 };
-
 window.modRegenEf = function(nombre, recurso, delta) {
     const p = personajes[nombre]; if (!p) return;
     if (!estadoUI.esAdmin && p.isPlayer) return;
@@ -197,7 +173,6 @@ window.modRegenEf = function(nombre, recurso, delta) {
 
 window.editarPersonaje = function(nombre) {
     const p = personajes[nombre];
-    // No-OP solo puede editar NPCs
     if (!estadoUI.esAdmin && p?.isPlayer) {
         mostrarToast('Solo el OP puede editar personajes jugadores', true);
         return;
@@ -210,7 +185,7 @@ window.editarPersonaje = function(nombre) {
 };
 
 // ─────────────────────────────────────────────────────────────
-// FORMULARIO CREAR/EDITAR
+// FORMULARIO CREAR / EDITAR
 // ─────────────────────────────────────────────────────────────
 let fIsJugador = true;
 let fIsActivo  = true;
@@ -219,18 +194,16 @@ function inicializarFormulario() {
     if (estadoUI.formMode === 'crear') {
         estadoUI.pjEditando = null;
         resetFormulario();
-        // No-OP: forzar NPC
         if (!estadoUI.esAdmin) {
             setToggleJugador(false);
-            // Ocultar toggle de tipo jugador/NPC para no-OP
-            const tg = document.getElementById('toggle-jugador');
-            if (tg) tg.style.pointerEvents = 'none';
+            const tg  = document.getElementById('toggle-jugador');
             const lbl = document.getElementById('lbl-jugador');
+            if (tg)  tg.style.pointerEvents = 'none';
             if (lbl) lbl.style.opacity = '0.4';
         } else {
-            const tg = document.getElementById('toggle-jugador');
-            if (tg) tg.style.pointerEvents = '';
+            const tg  = document.getElementById('toggle-jugador');
             const lbl = document.getElementById('lbl-jugador');
+            if (tg)  tg.style.pointerEvents = '';
             if (lbl) lbl.style.opacity = '';
         }
     }
@@ -300,10 +273,7 @@ function setToggleActivo(val) {
     if (t) t.classList.toggle('on', val);
 }
 
-window.toggleJugador = () => {
-    if (!estadoUI.esAdmin) return; // no-OP no puede cambiar a jugador
-    setToggleJugador(!fIsJugador);
-};
+window.toggleJugador = () => { if (!estadoUI.esAdmin) return; setToggleJugador(!fIsJugador); };
 window.toggleActivo  = () => setToggleActivo(!fIsActivo);
 
 window.actualizarPreviewFormulario = function() {
@@ -330,13 +300,10 @@ window.actualizarPreviewFormulario = function() {
 window.guardarPersonaje = function() {
     const nombre = document.getElementById('f-nombre').value.trim();
     if (!nombre) return mostrarToast('El nombre es obligatorio', true);
-
-    // No-OP solo puede crear NPCs
     if (!estadoUI.esAdmin && fIsJugador) {
         mostrarToast('Solo el OP puede crear personajes jugadores', true);
         return;
     }
-
     const afinBase = {};
     ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
         afinBase[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
@@ -366,7 +333,6 @@ window.guardarPersonaje = function() {
         regen_guarda_bf: viejo.regen_guarda_bf || 0,
         regen_guarda_ef: viejo.regen_guarda_ef || 0,
     };
-
     encolarCambio(nombre, '__full__', true);
     actualizarBtnSync();
     mostrarToast(`Personaje "${nombre}" ${estadoUI.formMode === 'crear' ? 'creado' : 'actualizado'}`);
@@ -398,7 +364,6 @@ window.pedirDelete = function(nombre) {
 // FÓRMULAS
 // ─────────────────────────────────────────────────────────────
 let formulaActiva = null;
-
 window.setFormulaActiva = function(key) { formulaActiva = key; };
 
 window.insertarVar = function(varKey) {
@@ -426,8 +391,8 @@ window.previsualizarRegen = function(key) {
     if (pjSel) previsualizarRegenConPJ(key, pjSel);
 };
 
-window.cambiarAplica = function(key, val) { formulas[key].aplica = val; };
-window.cambiarRegenIv = function(key, val) { regenConfig[key].intervalo = parseFloat(val)||12; };
+window.cambiarAplica   = function(key, val) { formulas[key].aplica = val; };
+window.cambiarRegenIv  = function(key, val) { regenConfig[key].intervalo = parseFloat(val)||12; };
 
 window.guardarFormulas = async function() {
     Object.keys(formulas).forEach(key => {
@@ -450,7 +415,7 @@ window.guardarRegen = async function() {
 
 window.resetFormulas = function() {
     Object.entries(FORMULAS_DEFAULT).forEach(([k, v]) => { formulas[k] = { ...v }; });
-    Object.entries(REGEN_DEFAULT).forEach(([k, v]) => { regenConfig[k] = { ...v }; });
+    Object.entries(REGEN_DEFAULT).forEach(([k, v])    => { regenConfig[k] = { ...v }; });
     renderFormulas();
 };
 
@@ -472,7 +437,7 @@ window.actualizarPreviewPJ = function() {
 };
 
 // ─────────────────────────────────────────────────────────────
-// SYNC
+// SYNC (cambios manuales del OP)
 // ─────────────────────────────────────────────────────────────
 function actualizarBtnSync() {
     const btn = document.getElementById('btn-sync');
@@ -483,6 +448,8 @@ function actualizarBtnSync() {
 }
 
 window.ejecutarSync = async function() {
+    // Flush de regen antes de guardar para que los valores en Supabase estén al día
+    await hexTicker.flushAhora();
     const btn = document.getElementById('btn-sync');
     btn.disabled = true; btn.textContent = 'Guardando...';
     const res = await sincronizarCola();
