@@ -327,12 +327,13 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 }
 .det-calc-label { font-size: 0.72em; color: var(--dim); margin-bottom: 4px; }
 .det-calc-xy {
-    display: flex; align-items: center; gap: 5px;
+    display: flex; align-items: center; gap: 4px;
     margin-bottom: 6px;
 }
-.det-xy-x { font-size: 1.25em; font-weight: 600; color: var(--gold); }
-.det-xy-sep { color: var(--dim); font-size: 0.9em; margin: 0 1px; }
-.det-xy-y { color: var(--dim); font-size: 0.9em; }
+.det-xy-x { font-size: 1.2em; font-weight: 500; color: var(--gold); }
+.det-xy-sep { color: var(--dim); }
+.det-xy-y { color: var(--dim); font-size: 0.95em; }
+.det-calc-formula { font-size: 0.65em; color: var(--dim); font-family: monospace; }
 
 .det-regen-row {
     display: flex; justify-content: space-between;
@@ -713,137 +714,6 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .afin-seg-ef   { background: #4ab3e8; }      /* azul alteración */
 .afin-seg-hz   { background: #b06ef0; }      /* violeta hz */
 
-/* ── PANEL: STATS DE VIDA / GUARDA / VEX ────────────────────── */
-
-/* Bloque de un stat (vida roja, guarda, etc.) */
-.det-vida-item {
-    margin-bottom: 14px;
-}
-.det-vida-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 5px;
-    gap: 8px;
-}
-.det-vida-label {
-    font-family: var(--font-display);
-    font-size: 0.82em;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-}
-
-/* Fila de override de máximo */
-.det-max-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 6px 0 2px;
-    flex-wrap: wrap;
-}
-.det-max-label {
-    font-size: 0.72em;
-    color: var(--dim);
-    min-width: 72px;
-}
-.det-max-ctrl {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-.det-max-val {
-    min-width: 32px;
-    text-align: center;
-    font-size: 0.9em;
-    font-weight: 500;
-    color: var(--text);
-}
-.det-max-formula { color: var(--dim); }
-.det-max-manual  { color: var(--gold); }
-.det-max-reset-btn { opacity: 0.6; }
-.det-max-reset-btn:hover { opacity: 1; }
-.det-max-hint {
-    font-size: 0.68em;
-    color: var(--dim);
-    font-style: italic;
-}
-.det-max-hint-manual { color: var(--gold-dim); }
-
-/* Fórmula debajo del stat */
-.det-calc-formula {
-    font-size: 0.63em;
-    color: var(--dim);
-    font-family: monospace;
-    margin-top: 1px;
-    margin-bottom: 10px;
-    opacity: 0.75;
-}
-
-/* Barra de VEX (continua) dentro del panel */
-.seg-vex-bar {
-    height: 6px;
-    background: var(--bg4);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 4px;
-}
-.seg-vex-fill {
-    height: 100%;
-    background: var(--violet);
-    border-radius: 3px;
-    transition: width 0.4s;
-    opacity: 0.85;
-}
-
-/* ── PANEL: HEX ──────────────────────────────────────────────── */
-.det-hex-section {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px;
-    margin-bottom: 20px;
-}
-.det-hex-val {
-    font-family: var(--font-display);
-    font-size: 1.6em;
-    color: var(--gold);
-    margin: 4px 0 12px;
-    letter-spacing: 1px;
-}
-.det-hex-btns {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-.det-hex-btn {
-    padding: 3px 7px;
-    font-size: 0.72em;
-    border-radius: 4px;
-    cursor: pointer;
-    border: 1px solid;
-    transition: all 0.15s;
-}
-.det-hex-neg {
-    background: rgba(180, 60, 60, 0.08);
-    border-color: rgba(180, 60, 60, 0.25);
-    color: #c07070;
-}
-.det-hex-neg:hover {
-    background: rgba(180, 60, 60, 0.18);
-    border-color: rgba(180, 60, 60, 0.5);
-    color: #e08080;
-}
-.det-hex-pos {
-    background: rgba(60, 207, 110, 0.08);
-    border-color: rgba(60, 207, 110, 0.22);
-    color: #4ab870;
-}
-.det-hex-pos:hover {
-    background: rgba(60, 207, 110, 0.18);
-    border-color: rgba(60, 207, 110, 0.45);
-    color: #5dd880;
-}
-
 /* ── PANEL: AFINIDADES CON FUENTES ──────────────────────────── */
 .det-afin-block {
     border: 1px solid var(--border);
@@ -938,96 +808,217 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 
 /* ── SISTEMA PUSH ─────────────────────────────────────────── */
 
+/* Mini indicador en la tarjeta del catálogo */
 .push-mini {
-    display: flex; gap: 6px; margin-bottom: 6px; flex-wrap: wrap;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
 }
 .push-mini-item {
-    font-size: 0.7em; padding: 2px 7px; border-radius: 20px;
-    border: 1px solid; font-variant-numeric: tabular-nums;
+    font-size: 0.72em;
+    padding: 2px 7px;
+    border-radius: 20px;
+    border: 1px solid;
+    font-variant-numeric: tabular-nums;
 }
-.push-mini-vex    { border-color: var(--violet-border); color: #a07fd4; background: var(--violet-faint); }
-.push-mini-guarda { border-color: var(--gold-border);   color: var(--gold-dim); background: var(--gold-faint); }
+.push-mini-vex {
+    border-color: var(--violet-border);
+    color: #a07fd4;
+    background: var(--violet-faint);
+}
+.push-mini-guarda {
+    border-color: var(--gold-border);
+    color: var(--gold-dim);
+    background: var(--gold-faint);
+}
 
+/* Bloque de push en panel lateral */
 .push-bloque {
-    border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 10px 12px; margin-bottom: 8px; background: var(--faint);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: var(--faint);
 }
 .push-bloque-header {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 8px; margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
 }
-.push-bloque-label { font-size: 0.82em; font-weight: 500; color: var(--text); }
+.push-bloque-label {
+    font-size: 0.82em;
+    font-weight: 500;
+    color: var(--text);
+}
 .push-dots {
-    display: flex; align-items: center; gap: 4px;
-    flex: 1; padding: 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    padding: 0 8px;
 }
 .push-dot {
-    display: inline-block; width: 10px; height: 10px;
-    border-radius: 50%; border: 1px solid var(--border); transition: background 0.2s;
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    transition: background 0.2s;
 }
-.push-dot-avail { background: var(--gold-faint);   border-color: var(--gold-border); }
-.push-dot-used  { background: var(--violet);        border-color: var(--violet); opacity: 0.7; }
-.push-counter { font-size: 0.78em; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.push-dot-avail {
+    background: var(--gold-faint);
+    border-color: var(--gold-border);
+}
+.push-dot-used {
+    background: var(--violet);
+    border-color: var(--violet);
+    opacity: 0.7;
+}
+.push-counter {
+    font-size: 0.78em;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
 .push-cd {
-    font-size: 0.72em; color: #c47070;
-    padding: 1px 6px; border: 1px solid rgba(180,60,60,0.3);
-    border-radius: 3px; background: rgba(180,60,60,0.08); white-space: nowrap;
+    font-size: 0.72em;
+    color: #c47070;
+    padding: 1px 6px;
+    border: 1px solid rgba(180,60,60,0.3);
+    border-radius: 3px;
+    background: rgba(180,60,60,0.08);
+    white-space: nowrap;
 }
-.push-bloque-info {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-}
-.push-valor { font-size: 0.78em; color: var(--dim); font-variant-numeric: tabular-nums; }
 
+.push-bloque-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.push-valor {
+    font-size: 0.78em;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Botón de Push */
 .btn-push {
     padding: 5px 16px;
-    background: var(--gold-faint); border: 1px solid var(--gold-border);
-    border-radius: var(--radius); color: var(--gold);
-    font-family: var(--font-display); font-size: 0.75em;
-    cursor: pointer; letter-spacing: 0.3px; transition: all 0.2s; white-space: nowrap;
+    background: var(--gold-faint);
+    border: 1px solid var(--gold-border);
+    border-radius: var(--radius);
+    color: var(--gold);
+    font-family: var(--font-display);
+    font-size: 0.75em;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: all 0.2s;
+    white-space: nowrap;
 }
 .btn-push:hover { background: var(--gold); color: #000; }
 .btn-push-disabled {
-    opacity: 0.35; cursor: not-allowed;
-    background: transparent; color: var(--dim); border-color: var(--border);
+    opacity: 0.35;
+    cursor: not-allowed;
+    background: transparent;
+    color: var(--dim);
+    border-color: var(--border);
 }
 
+/* Fila de admin en bloque push */
 .push-admin-row {
-    display: flex; align-items: center; gap: 5px;
-    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--faint);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--faint);
 }
-.push-admin-label { font-size: 0.7em; color: var(--dim); min-width: 52px; }
-.push-admin-val   { min-width: 24px; text-align: center; font-size: 0.85em; color: var(--text); }
-.push-reset-btn   { margin-left: auto; font-size: 0.7em; border-color: rgba(180,60,60,0.3); color: #c47070; }
-.push-reset-btn:hover { border-color: rgba(180,60,60,0.7); color: #e08080; background: rgba(180,60,60,0.1); }
+.push-admin-label {
+    font-size: 0.7em;
+    color: var(--dim);
+    min-width: 52px;
+}
+.push-admin-val {
+    min-width: 24px;
+    text-align: center;
+    font-size: 0.85em;
+    color: var(--text);
+}
+.push-reset-btn {
+    margin-left: auto;
+    font-size: 0.7em;
+    border-color: rgba(180,60,60,0.3);
+    color: #c47070;
+}
+.push-reset-btn:hover {
+    border-color: rgba(180,60,60,0.7);
+    color: #e08080;
+    background: rgba(180,60,60,0.1);
+}
 
-.push-help { font-size: 0.75em; color: var(--dim); margin-bottom: 12px; line-height: 1.5; }
+.push-help {
+    font-size: 0.75em;
+    color: var(--dim);
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
 
-/* btn-ghost-xs: para botones pequeños en títulos de sección */
-.btn-ghost-xs { padding: 2px 8px; font-size: 0.72em; border-radius: 3px; }
+/* Panel de sección title con botón inline */
+.det-section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.btn-ghost-xs {
+    padding: 2px 8px;
+    font-size: 0.72em;
+    border-radius: 3px;
+}
 
 /* ── FÓRMULAS: Config push ─────────────────────────────────── */
-.formula-item-desc { font-size: 0.75em; color: var(--dim); margin-bottom: 6px; font-style: italic; }
-.push-cooldown-grid { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 6px; }
-.push-cd-field { display: flex; flex-direction: column; gap: 5px; }
-.push-cd-field label { font-size: 0.78em; color: var(--dim); }
-.umbral-help { font-size: 0.72em; color: var(--dim); margin-bottom: 10px; line-height: 1.6; }
-.umbral-row  { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
-.umbral-desc   { flex: 1.5; min-width: 120px; }
-.umbral-cond   { flex: 2; min-width: 160px; }
+
+.formula-item-desc {
+    font-size: 0.75em;
+    color: var(--dim);
+    margin-bottom: 6px;
+    font-style: italic;
+}
+
+/* Cooldown grid */
+.push-cooldown-grid {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+.push-cd-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.push-cd-field label {
+    font-size: 0.78em;
+    color: var(--dim);
+}
+
+/* Umbrales */
+.umbral-help {
+    font-size: 0.72em;
+    color: var(--dim);
+    margin-bottom: 10px;
+    line-height: 1.6;
+}
+.umbral-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+.umbral-desc { flex: 1.5; min-width: 120px; }
+.umbral-cond { flex: 2; min-width: 160px; }
 .umbral-pushes { width: 56px; text-align: center; }
-
-/* ── IMAGEN PERSONAJE ─────────────────────────────────────── */
-/* pj-inicial con imagen */
-.pj-inicial {
-    overflow: hidden;
-    position: relative;
-}
-.pj-inicial img {
-    width: 100%; height: 100%;
-    object-fit: cover; object-position: top;
-    border-radius: 50%;
-}
-
-/* Botón de subir imagen en las acciones de card */
-.icon-btn-img { font-size: 0.75em; }
-.icon-btn-img:hover { border-color: var(--violet-border); color: var(--violet); }

@@ -3,8 +3,10 @@
 // /personajes/personajes-main.js
 // ============================================================
 
-import { hexAuth, supabase, currentConfig } from '../hex-auth.js';
+import { hexAuth } from '../hex-auth.js';
 import { hexConfigs } from '../hex/config.js';
+// Exponer configs globalmente para que hex-guard.js (no-module) pueda leer las campañas
+window.hexConfigs = hexConfigs;
 import { estadoUI, personajes, formulas, pushFormulas, pushUmbrales, pushCooldown,
          colaCambios, encolarCambio, FORMULAS_DEFAULT, PUSH_FORMULAS_DEFAULT,
          PUSH_UMBRALES_DEFAULT, PUSH_COOLDOWN_DEFAULT } from './personajes-state.js';
@@ -15,62 +17,6 @@ import { cargarDatos, sincronizarCola, guardarFormulasBD,
          persistirPush } from './personajes-data.js';
 import { renderCatalogo, renderDetalle, renderFormulas,
          previsualizarFormulaConPJ, renderPreviewCompleto } from './personajes-ui.js';
-
-// Exponer hexConfigs globalmente para que hex-guard.js (no-module) lo lea
-window.hexConfigs = hexConfigs;
-
-// ─────────────────────────────────────────────────────────────
-// TIMER DE COOLDOWN EN VIVO
-// ─────────────────────────────────────────────────────────────
-let _timerInterval = null;
-
-function _iniciarTimerCooldown() {
-    if (_timerInterval) return;
-    _timerInterval = setInterval(() => {
-        if (!estadoUI.panelAbierto || !estadoUI.pjSeleccionado) return;
-        _actualizarCooldownsEnPanel(estadoUI.pjSeleccionado);
-    }, 1000);
-}
-
-function _actualizarCooldownsEnPanel(nombre) {
-    const p = personajes[nombre];
-    if (!p) return;
-    const s = calcularStats(p);
-
-    ['vex', 'guarda'].forEach(recurso => {
-        const el = document.getElementById(`push-cd-display-${recurso}`);
-        if (!el) return;
-        const cd = calcularCooldownPush(p, recurso);
-        if (!cd.disponible) {
-            const min = Math.floor(cd.restaSeg / 60);
-            const seg = cd.restaSeg % 60;
-            el.textContent = `⏳ ${min}m ${String(seg).padStart(2,'0')}s`;
-            el.style.display = '';
-            const btn = document.getElementById(`push-btn-${recurso}`);
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = 'En cooldown';
-                btn.className = 'btn-push btn-push-disabled';
-            }
-        } else {
-            el.style.display = 'none';
-            const btn = document.getElementById(`push-btn-${recurso}`);
-            if (btn) {
-                const usados     = recurso === 'vex' ? (p.push_vex_actual || 0) : (p.push_guarda_actual || 0);
-                const disponibles = calcularPushDisponibles(p, s, recurso);
-                if (usados < disponibles) {
-                    btn.disabled = false;
-                    btn.textContent = `Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}`;
-                    btn.className = 'btn-push';
-                } else {
-                    btn.disabled = true;
-                    btn.textContent = 'Sin pushes';
-                    btn.className = 'btn-push btn-push-disabled';
-                }
-            }
-        }
-    });
-}
 
 // ─────────────────────────────────────────────────────────────
 // INIT
@@ -93,13 +39,6 @@ window.onload = async () => {
     if (loader) loader.style.display = 'none';
 
     mostrarVista('catalogo');
-    _iniciarTimerCooldown();
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const pjParam   = urlParams.get('pj');
-    if (pjParam && personajes[pjParam]) {
-        setTimeout(() => window.abrirDetalle(pjParam), 150);
-    }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -128,11 +67,106 @@ window.mostrarVista = function(vista) {
 
 window.abrirLoginOP   = function() { hexAuth._mostrarModalLogin(); };
 
+// Abre el selector de campaña como modal inline, sin salir de la página
 window.cambiarCampaña = function() {
-    if (typeof window._hexGuardAbrirModal === 'function') {
-        window._hexGuardAbrirModal();
+    // Reutilizar el mismo sistema del guard si está disponible
+    if (typeof window._hexGuardSelect === 'function') {
+        // El guard ya está cargado, forzar su modal
+        _mostrarModalCampaña();
+        return;
     }
+    // Fallback: si por alguna razón el guard no está activo
+    localStorage.removeItem('hex_selected');
+    window.location.reload();
 };
+
+function _mostrarModalCampaña() {
+    // Evitar duplicados
+    let modal = document.getElementById('hex-campana-modal');
+    if (modal) { modal.remove(); return; }
+
+    modal = document.createElement('div');
+    modal.id = 'hex-campana-modal';
+    modal.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.82);
+        backdrop-filter: blur(6px);
+        z-index: 999998;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 20px;
+        font-family: 'Inter', system-ui, sans-serif;
+    `;
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+
+    // Obtener configs
+    const configs = window.hexConfigs || null;
+    const actual  = localStorage.getItem('hex_selected') || 'hex1';
+
+    let cardsHTML = '';
+    if (configs) {
+        cardsHTML = Object.entries(configs).map(([id, cfg]) => {
+            const esActual = id === actual;
+            return `<div onclick="window._hexGuardSelect('${id}')" style="
+                background: ${esActual ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.03)'};
+                border: 1px solid ${esActual ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.07)'};
+                border-radius:10px; padding:18px 16px; cursor:pointer; transition:all 0.2s;
+                display:flex; flex-direction:column; gap:5px;
+            "
+            onmouseover="this.style.borderColor='rgba(212,175,55,0.45)'; this.style.background='rgba(212,175,55,0.08)';"
+            onmouseout="this.style.borderColor='${esActual ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.07)'}'; this.style.background='${esActual ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.03)'}';">
+                <div style="font-size:0.58em; color:#5a3a8a; letter-spacing:3px; text-transform:uppercase;">${id.toUpperCase()}${esActual ? ' · ACTIVA' : ''}</div>
+                <div style="font-family:'Cinzel',serif; font-size:0.88em; color:#d4af37;">${cfg.ui?.titulo || cfg.nombreCorto || id}</div>
+                <div style="font-size:0.72em; color:#5a5a78; line-height:1.4;">${cfg.ui?.lore || cfg.ui?.subtitulo || ''}</div>
+            </div>`;
+        }).join('');
+    } else {
+        cardsHTML = ['hex1','hex2','hex3'].map(id => `
+            <div onclick="window._hexGuardSelect('${id}')" style="
+                background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+                border-radius:10px; padding:18px 16px; cursor:pointer;
+            ">
+                <div style="font-family:'Cinzel',serif; font-size:0.88em; color:#d4af37;">${id.toUpperCase()}</div>
+            </div>
+        `).join('');
+    }
+
+    modal.innerHTML = `
+        <div style="
+            background:#0f0f18;
+            border:1px solid rgba(212,175,55,0.2);
+            border-radius:14px;
+            padding:28px 24px;
+            width:100%;
+            max-width:600px;
+            max-height:90vh;
+            overflow-y:auto;
+        ">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:22px;">
+                <div>
+                    <div style="font-family:'Cinzel',serif; font-size:0.95em; color:#d4af37; letter-spacing:2px; margin-bottom:3px;">CAMBIAR CAMPAÑA</div>
+                    <div style="font-size:0.72em; color:#5a5a78;">La página se recargará con la campaña seleccionada</div>
+                </div>
+                <button onclick="document.getElementById('hex-campana-modal').remove()" style="
+                    background:none; border:none; color:#5a5a78; font-size:1.4em;
+                    cursor:pointer; line-height:1; padding:4px;
+                ">×</button>
+            </div>
+            <div style="
+                display:grid;
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                gap:10px;
+            ">${cardsHTML}</div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+// Exponer para que el guard pueda usarla también
+window._mostrarModalCampaña = _mostrarModalCampaña;
 
 // ─────────────────────────────────────────────────────────────
 // FILTROS
@@ -164,62 +198,16 @@ window.cerrarDetalle = function() {
     document.getElementById('panel-lateral')?.classList.remove('open');
 };
 
-// ─────────────────────────────────────────────────────────────
-// MODIFICAR STATS (actual) — con cap en el máximo efectivo
-// ─────────────────────────────────────────────────────────────
 window.modStat = function(nombre, campo, delta) {
     const p = personajes[nombre]; if (!p) return;
     const s = calcularStats(p);
-    // Solo VEX tiene cap duro. Vida roja, azul y guarda pueden superar el máximo
-    // (p.ej. efecto que otorga vida adicional sobre el límite base)
-    const caps = { vex_actual: s.vex_max };
-    const max = caps[campo] ?? Infinity;
+    const maximos = { vida_roja_actual: s.vida_roja_max, vex_actual: s.vex_max, guarda_actual: s.guarda_max };
+    const max = maximos[campo] ?? Infinity;
     p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
     encolarCambio(nombre, campo, p[campo]);
     renderDetalle(nombre);
     renderCatalogo();
     actualizarBtnSync();
-};
-
-// ─────────────────────────────────────────────────────────────
-// MODIFICAR LÍMITE MÁXIMO (override) — solo OP
-// Para vida_roja_max_override, vida_azul_max_override y guarda_max
-// ─────────────────────────────────────────────────────────────
-window.modStatMax = function(nombre, campo, delta) {
-    if (!estadoUI.esAdmin) return;
-    const p = personajes[nombre]; if (!p) return;
-    const s = calcularStats(p);
-
-    // Si el campo es override y estaba en 0 (usando fórmula),
-    // inicializarlo al valor actual de la fórmula antes de modificar
-    if (campo === 'vida_roja_max_override' && p[campo] === 0) {
-        p[campo] = s.vida_roja_max;
-    } else if (campo === 'vida_azul_max_override' && p[campo] === 0) {
-        p[campo] = s.vida_azul_max;
-    } else if (campo === 'guarda_max' && p[campo] === 0) {
-        // guarda_max === 0 significa "usar fórmula"; al modificar, partir del valor de fórmula
-        const guarda_formula = evalExpr(formulas.guarda_max.expr, s.ctx)
-            + (p.hz_guarda||0) + (p.ef_guarda||0) + (p.bf_guarda||0);
-        p[campo] = guarda_formula;
-    }
-
-    p[campo] = Math.max(0, (p[campo] || 0) + delta);
-    encolarCambio(nombre, campo, p[campo]);
-    renderDetalle(nombre);
-    renderCatalogo();
-    actualizarBtnSync();
-};
-
-// Restaurar un máx a la fórmula (poner override a 0) — solo OP
-window.resetStatMax = function(nombre, campo) {
-    if (!estadoUI.esAdmin) return;
-    const p = personajes[nombre]; if (!p) return;
-    p[campo] = 0;
-    encolarCambio(nombre, campo, 0);
-    renderDetalle(nombre);
-    renderCatalogo();
-    actualizarBtnSync();
-    mostrarToast('Máximo restaurado a fórmula');
 };
 
 window.modAfin = function(nombre, afinKey, delta) {
@@ -265,10 +253,16 @@ window.editarPersonaje = function(nombre) {
 // ─────────────────────────────────────────────────────────────
 // SISTEMA PUSH
 // ─────────────────────────────────────────────────────────────
+
+/**
+ * Ejecuta un push de VEX o Guarda para un personaje.
+ * Verifica cooldown, pushes disponibles, y actualiza estado + DB.
+ */
 window.ejecutarPush = async function(nombre, recurso) {
     const p = personajes[nombre]; if (!p) return;
     const s = calcularStats(p);
 
+    // 1. Cooldown
     const cd = calcularCooldownPush(p, recurso);
     if (!cd.disponible) {
         const min = Math.ceil(cd.restaSeg / 60);
@@ -276,43 +270,61 @@ window.ejecutarPush = async function(nombre, recurso) {
         return;
     }
 
-    const disponibles  = calcularPushDisponibles(p, s, recurso);
-    const actualKey    = recurso === 'vex' ? 'push_vex_actual' : 'push_guarda_actual';
-    const usados       = p[actualKey] || 0;
+    // 2. Pushes disponibles vs. usados
+    const disponibles = calcularPushDisponibles(p, s, recurso);
+    const actualKey   = recurso === 'vex' ? 'push_vex_actual' : 'push_guarda_actual';
+    const usados      = p[actualKey] || 0;
 
     if (usados >= disponibles) {
         mostrarToast(`Sin pushes de ${recurso === 'vex' ? 'VEX' : 'Guarda'} disponibles`, true);
         return;
     }
 
-    const valor      = calcularValorPush(p, recurso);
-    const tsKey      = recurso === 'vex' ? 'push_vex_ts'      : 'push_guarda_ts';
-    const recursoKey = recurso === 'vex' ? 'vex_actual'        : 'guarda_actual';
-    const maxVal     = recurso === 'vex' ? s.vex_max           : s.guarda_max;
+    // 3. Calcular valor y aplicar
+    const valor    = calcularValorPush(p, recurso);
+    const tsKey    = recurso === 'vex' ? 'push_vex_ts' : 'push_guarda_ts';
+    const recursoKey = recurso === 'vex' ? 'vex_actual' : 'guarda_actual';
+    const maxKey   = recurso === 'vex' ? 'vex_max' : 'guarda_max';
+    const maxVal   = recurso === 'vex' ? s.vex_max : s.guarda_max;
 
-    p[recursoKey] = Math.min(maxVal, (p[recursoKey] || 0) + valor);
-    p[actualKey]  = usados + 1;
-    p[tsKey]      = new Date().toISOString();
+    p[recursoKey]  = Math.min(maxVal, (p[recursoKey] || 0) + valor);
+    p[actualKey]   = usados + 1;
+    p[tsKey]       = new Date().toISOString();
 
+    // 4. Persistir directamente a Supabase (no espera sync manual)
     const ok = await persistirPush(nombre, p);
-    mostrarToast(ok
-        ? `✨ Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`
-        : 'Error al guardar push', !ok);
+    if (ok) {
+        mostrarToast(`✨ Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`);
+    } else {
+        mostrarToast('Error al guardar push', true);
+    }
 
     renderDetalle(nombre);
     renderCatalogo();
 };
 
+/**
+ * Reset de pushes del día para un personaje (solo OP, o al inicio del día).
+ */
 window.resetPushes = async function(nombre, recurso) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
-    if (recurso === 'vex'    || recurso === 'ambos') { p.push_vex_actual    = 0; p.push_vex_ts    = null; }
-    if (recurso === 'guarda' || recurso === 'ambos') { p.push_guarda_actual = 0; p.push_guarda_ts = null; }
+    if (recurso === 'vex' || recurso === 'ambos') {
+        p.push_vex_actual = 0;
+        p.push_vex_ts     = null;
+    }
+    if (recurso === 'guarda' || recurso === 'ambos') {
+        p.push_guarda_actual = 0;
+        p.push_guarda_ts     = null;
+    }
     await persistirPush(nombre, p);
     mostrarToast('Pushes reiniciados');
     renderDetalle(nombre);
 };
 
+/**
+ * Modificar el límite extra de pushes asignado manualmente por OP.
+ */
 window.modPushExtra = function(nombre, recurso, delta) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
@@ -398,24 +410,22 @@ function rellenarFormulario(nombre) {
 
 function setToggleJugador(val) {
     fIsJugador = val;
-    const tg = document.getElementById('toggle-jugador');
-    if (tg) tg.classList.toggle('on', val);
-    const npcRow = document.getElementById('npc-tipo-row');
-    const vexRow = document.getElementById('vex-max-row');
-    if (npcRow) npcRow.style.display = val ? 'none' : 'flex';
-    if (vexRow) vexRow.style.display = val ? 'none' : 'flex';
+    const t = document.getElementById('toggle-jugador');
+    if (t) t.classList.toggle('on', val);
     const lbl = document.getElementById('lbl-jugador');
     if (lbl) lbl.textContent = val ? 'Jugador (PC)' : 'NPC';
+    document.getElementById('npc-tipo-row').style.display = val ? 'none' : 'flex';
+    document.getElementById('vex-max-row').style.display  = val ? 'none' : 'flex';
+    actualizarPreviewFormulario();
 }
-
 function setToggleActivo(val) {
     fIsActivo = val;
-    const tg = document.getElementById('toggle-activo');
-    if (tg) tg.classList.toggle('on', val);
+    const t = document.getElementById('toggle-activo');
+    if (t) t.classList.toggle('on', val);
 }
 
-window.toggleJugador = function() { setToggleJugador(!fIsJugador); };
-window.toggleActivo  = function() { setToggleActivo(!fIsActivo); };
+window.toggleJugador = () => { if (!estadoUI.esAdmin) return; setToggleJugador(!fIsJugador); };
+window.toggleActivo  = () => setToggleActivo(!fIsActivo);
 
 window.actualizarPreviewFormulario = function() {
     const vals = {};
@@ -460,10 +470,7 @@ window.guardarPersonaje = function() {
         vex_actual: parseInt(document.getElementById('f-vex-actual').value)||0,
         vex_max:    parseInt(document.getElementById('f-vex-max').value)||0,
         vida_roja_actual: parseInt(document.getElementById('f-vida-roja').value)||10,
-        vida_roja_max_override: viejo.vida_roja_max_override || 0,
-        vida_azul_actual: viejo.vida_azul_actual != null ? viejo.vida_azul_actual : null,
         vida_azul_max:    parseInt(document.getElementById('f-vida-azul').value)||0,
-        vida_azul_max_override: viejo.vida_azul_max_override || 0,
         guarda_actual: parseInt(document.getElementById('f-guarda-act').value)||0,
         guarda_max:    parseInt(document.getElementById('f-guarda-max').value)||0,
         afinidadesBase: afinBase,
@@ -472,6 +479,7 @@ window.guardarPersonaje = function() {
         afinidadesBf: viejo.afinidadesBf || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
         hz_clase1:0, hz_clase2:0, hz_clase3:0, hz_clase4:0, hz_clase5:0,
         estados: viejo.estados || {},
+        // Preservar push state si existía
         push_vex_actual:    viejo.push_vex_actual    || 0,
         push_vex_limit:     viejo.push_vex_limit     || 0,
         push_vex_extra:     viejo.push_vex_extra     || 0,
@@ -509,14 +517,14 @@ window.pedirDelete = function(nombre) {
 };
 
 // ─────────────────────────────────────────────────────────────
-// FÓRMULAS
+// FÓRMULAS (stats)
 // ─────────────────────────────────────────────────────────────
 let formulaActiva = null;
 window.setFormulaActiva = function(key) { formulaActiva = key; };
 
 window.insertarVar = function(varKey) {
     if (!formulaActiva) return;
-    const isPush  = formulaActiva.startsWith('push_') || formulaActiva.startsWith('valor_push');
+    const isPush  = formulaActiva.startsWith('push_');
     const inputId = isPush ? `pinput-${formulaActiva}` : `finput-${formulaActiva}`;
     const input   = document.getElementById(inputId);
     if (!input) return;
@@ -546,7 +554,7 @@ window.previsualizarPushFormula = function(key) {
     el.innerHTML = `<span class="prev-pj">${pjSel}</span> → <strong>${val}</strong> por push`;
 };
 
-window.cambiarAplica  = function(key, val) { formulas[key].aplica = val; };
+window.cambiarAplica = function(key, val) { formulas[key].aplica = val; };
 
 window.guardarFormulas = async function() {
     Object.keys(formulas).forEach(key => {
@@ -572,20 +580,27 @@ window.actualizarPreviewPJ = function() {
     }
 };
 
+// ─────────────────────────────────────────────────────────────
+// FÓRMULAS PUSH (guardado)
+// ─────────────────────────────────────────────────────────────
 window.guardarPushConfig = async function() {
+    // Leer fórmulas push del DOM
     Object.keys(pushFormulas).forEach(key => {
         const el = document.getElementById(`pinput-${key}`);
         if (el) pushFormulas[key].expr = el.value;
     });
+    // Leer cooldowns
     const cdVex    = document.getElementById('push-cooldown-vex');
     const cdGuarda = document.getElementById('push-cooldown-guarda');
     if (cdVex)    pushCooldown.vex    = parseFloat(cdVex.value)    || 60;
     if (cdGuarda) pushCooldown.guarda = parseFloat(cdGuarda.value) || 30;
+
     const ok = await guardarPushFormulasBD();
     mostrarToast(ok ? 'Config de push guardada' : 'Error al guardar', !ok);
 };
 
 window.guardarPushUmbrales = async function() {
+    // Leer umbrales del DOM
     for (const recurso of ['vex', 'guarda']) {
         const cont = document.getElementById(`umbrales-${recurso}`);
         if (!cont) continue;
@@ -620,7 +635,7 @@ window.eliminarUmbral = async function(recurso, idx) {
 };
 
 // ─────────────────────────────────────────────────────────────
-// SYNC
+// SYNC (cambios manuales del OP)
 // ─────────────────────────────────────────────────────────────
 function actualizarBtnSync() {
     const btn = document.getElementById('btn-sync');
@@ -642,132 +657,6 @@ window.ejecutarSync = async function() {
     } else {
         mostrarToast('Error al guardar: ' + res.errores.join(', '), true);
     }
-};
-
-// ─────────────────────────────────────────────────────────────
-// SUBIR IMAGEN
-// ─────────────────────────────────────────────────────────────
-window.abrirSubirImagen = function(nombre) {
-    const p = personajes[nombre];
-    if (!p) return;
-    const puedeSubir = estadoUI.esAdmin || !p.isPlayer;
-    if (!puedeSubir) { mostrarToast('Sin permiso para subir imágenes de jugadores', true); return; }
-
-    const viejo = document.getElementById('hex-img-upload-modal');
-    if (viejo) viejo.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'hex-img-upload-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif;';
-    modal.onclick = e => { if (e.target === modal) modal.remove(); };
-
-    const icono = p.iconoOverride || nombre;
-    const storageBase = currentConfig.storageUrl;
-    const previewUrl  = `${storageBase}/imgpersonajes/${_normImg(icono)}.png`;
-
-    modal.innerHTML = `
-        <div style="background:#0f0f18;border:1px solid rgba(212,175,55,0.25);border-radius:12px;padding:24px;width:100%;max-width:420px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                <div style="font-family:Cinzel,serif;font-size:0.9em;color:#d4af37;letter-spacing:1px;">SUBIR IMAGEN — ${nombre}</div>
-                <button onclick="document.getElementById('hex-img-upload-modal').remove()" style="background:none;border:none;color:#5a5a78;font-size:1.4em;cursor:pointer;line-height:1;">×</button>
-            </div>
-            <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;">
-                <img id="hex-img-preview" src="${previewUrl}" onerror="this.src=''" alt=""
-                     style="width:80px;height:80px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid rgba(212,175,55,0.2);background:#161622;">
-                <div style="flex:1;font-size:0.78em;color:#5a5a78;line-height:1.6;">
-                    Imagen principal del personaje.<br>
-                    Se guardará como <code style="color:#d4af37;">${_normImg(icono)}.png</code><br>
-                    <span style="color:#3a3a52;">Recomendado: PNG cuadrado, mín 200×200px</span>
-                </div>
-            </div>
-            <label style="display:block;margin-bottom:12px;">
-                <div style="font-size:0.75em;color:#5a5a78;margin-bottom:6px;">Seleccionar archivo</div>
-                <input type="file" id="hex-img-file" accept="image/*"
-                       style="width:100%;padding:8px;background:#161622;border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#c4c4d4;font-size:0.82em;cursor:pointer;">
-            </label>
-            <div id="hex-img-status" style="font-size:0.78em;min-height:20px;margin-bottom:14px;"></div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button onclick="document.getElementById('hex-img-upload-modal').remove()"
-                        style="padding:7px 16px;background:transparent;border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#5a5a78;font-size:0.8em;cursor:pointer;">
-                    Cancelar
-                </button>
-                <button id="hex-img-upload-btn" onclick="window._ejecutarSubidaImagen('${nombre}')"
-                        style="padding:7px 18px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:6px;color:#d4af37;font-family:Cinzel,serif;font-size:0.78em;cursor:pointer;letter-spacing:0.5px;">
-                    SUBIR
-                </button>
-            </div>
-        </div>`;
-
-    document.body.appendChild(modal);
-    document.getElementById('hex-img-file').onchange = function() {
-        const file = this.files[0];
-        if (file) {
-            const url = URL.createObjectURL(file);
-            document.getElementById('hex-img-preview').src = url;
-        }
-    };
-};
-
-function _normImg(s) {
-    return s.toString().trim().toLowerCase()
-        .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
-        .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
-        .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
-}
-
-window._ejecutarSubidaImagen = async function(nombre) {
-    const p = personajes[nombre]; if (!p) return;
-    const fileInput = document.getElementById('hex-img-file');
-    const statusEl  = document.getElementById('hex-img-status');
-    const btn       = document.getElementById('hex-img-upload-btn');
-
-    if (!fileInput?.files?.length) {
-        statusEl.style.color = '#c47070';
-        statusEl.textContent = 'Selecciona un archivo primero.';
-        return;
-    }
-
-    const file  = fileInput.files[0];
-    const icono = p.iconoOverride || nombre;
-    const path  = `imgpersonajes/${_normImg(icono)}.png`;
-
-    btn.textContent = 'Subiendo...';
-    btn.disabled = true;
-    statusEl.style.color = '#5a5a78';
-    statusEl.textContent = 'Subiendo imagen…';
-
-    let uploadFile = file;
-    if (!file.type.includes('png')) {
-        try {
-            const bitmap = await createImageBitmap(file);
-            const canvas = document.createElement('canvas');
-            canvas.width  = bitmap.width;
-            canvas.height = bitmap.height;
-            canvas.getContext('2d').drawImage(bitmap, 0, 0);
-            const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-            uploadFile = new File([blob], path, { type: 'image/png' });
-        } catch(e) { /* usar original si falla */ }
-    }
-
-    const { error } = await supabase.storage
-        .from('imagenes-hex')
-        .upload(path, uploadFile, { upsert: true, contentType: 'image/png' });
-
-    if (error) {
-        statusEl.style.color = '#c47070';
-        statusEl.textContent = '❌ Error: ' + error.message;
-        btn.textContent = 'SUBIR';
-        btn.disabled = false;
-        return;
-    }
-
-    statusEl.style.color = '#3ecf6e';
-    statusEl.textContent = '✅ Imagen subida correctamente.';
-    renderCatalogo();
-    if (estadoUI.panelAbierto && estadoUI.pjSeleccionado === nombre) renderDetalle(nombre);
-    setTimeout(() => {
-        document.getElementById('hex-img-upload-modal')?.remove();
-    }, 1500);
 };
 
 // ─────────────────────────────────────────────────────────────
