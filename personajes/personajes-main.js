@@ -170,13 +170,10 @@ window.cerrarDetalle = function() {
 window.modStat = function(nombre, campo, delta) {
     const p = personajes[nombre]; if (!p) return;
     const s = calcularStats(p);
-    const maximos = {
-        vida_roja_actual: s.vida_roja_max,
-        vida_azul_actual: s.vida_azul_max,
-        vex_actual:       s.vex_max,
-        guarda_actual:    s.guarda_max
-    };
-    const max = maximos[campo] ?? Infinity;
+    // Solo VEX tiene cap duro. Vida roja, azul y guarda pueden superar el máximo
+    // (p.ej. efecto que otorga vida adicional sobre el límite base)
+    const caps = { vex_actual: s.vex_max };
+    const max = caps[campo] ?? Infinity;
     p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
     encolarCambio(nombre, campo, p[campo]);
     renderDetalle(nombre);
