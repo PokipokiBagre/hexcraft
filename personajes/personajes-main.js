@@ -5,8 +5,6 @@
 
 import { hexAuth } from '../hex-auth.js';
 import { hexConfigs } from '../hex/config.js';
-// Exponer configs globalmente para que hex-guard.js (no-module) pueda leer las campañas
-window.hexConfigs = hexConfigs;
 import { estadoUI, personajes, formulas, pushFormulas, pushUmbrales, pushCooldown,
          colaCambios, encolarCambio, FORMULAS_DEFAULT, PUSH_FORMULAS_DEFAULT,
          PUSH_UMBRALES_DEFAULT, PUSH_COOLDOWN_DEFAULT } from './personajes-state.js';
@@ -17,6 +15,66 @@ import { cargarDatos, sincronizarCola, guardarFormulasBD,
          persistirPush } from './personajes-data.js';
 import { renderCatalogo, renderDetalle, renderFormulas,
          previsualizarFormulaConPJ, renderPreviewCompleto } from './personajes-ui.js';
+
+// Exponer hexConfigs globalmente para que hex-guard.js (no-module) lo lea
+window.hexConfigs = hexConfigs;
+
+// ─────────────────────────────────────────────────────────────
+// TIMER DE COOLDOWN EN VIVO (actualiza el panel cada segundo)
+// ─────────────────────────────────────────────────────────────
+let _timerInterval = null;
+
+function _iniciarTimerCooldown() {
+    if (_timerInterval) return;
+    _timerInterval = setInterval(() => {
+        if (!estadoUI.panelAbierto || !estadoUI.pjSeleccionado) return;
+        // Re-renderizar solo los bloques de cooldown sin redibujar todo el panel
+        _actualizarCooldownsEnPanel(estadoUI.pjSeleccionado);
+    }, 1000);
+}
+
+function _actualizarCooldownsEnPanel(nombre) {
+    const p = personajes[nombre];
+    if (!p) return;
+    const s = calcularStats(p);
+
+    // Actualizar cada temporizador de cooldown en el DOM
+    ['vex', 'guarda'].forEach(recurso => {
+        const el = document.getElementById(`push-cd-display-${recurso}`);
+        if (!el) return;
+        const cd = calcularCooldownPush(p, recurso);
+        if (!cd.disponible) {
+            const min = Math.floor(cd.restaSeg / 60);
+            const seg = cd.restaSeg % 60;
+            el.textContent = `⏳ ${min}m ${String(seg).padStart(2,'0')}s`;
+            el.style.display = '';
+            // Deshabilitar botón push si está en cooldown
+            const btn = document.getElementById(`push-btn-${recurso}`);
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'En cooldown';
+                btn.className = 'btn-push btn-push-disabled';
+            }
+        } else {
+            el.style.display = 'none';
+            // Rehabilitar botón si hay pushes disponibles
+            const btn = document.getElementById(`push-btn-${recurso}`);
+            if (btn) {
+                const usados     = recurso === 'vex' ? (p.push_vex_actual || 0) : (p.push_guarda_actual || 0);
+                const disponibles = calcularPushDisponibles(p, s, recurso);
+                if (usados < disponibles) {
+                    btn.disabled = false;
+                    btn.textContent = `Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}`;
+                    btn.className = 'btn-push';
+                } else {
+                    btn.disabled = true;
+                    btn.textContent = 'Sin pushes';
+                    btn.className = 'btn-push btn-push-disabled';
+                }
+            }
+        }
+    });
+}
 
 // ─────────────────────────────────────────────────────────────
 // INIT
@@ -39,6 +97,15 @@ window.onload = async () => {
     if (loader) loader.style.display = 'none';
 
     mostrarVista('catalogo');
+    _iniciarTimerCooldown();
+
+    // ── Deep-link: ?pj=NombrePersonaje ──────────────────────────
+    const urlParams = new URLSearchParams(window.location.search);
+    const pjParam   = urlParams.get('pj');
+    if (pjParam && personajes[pjParam]) {
+        // Pequeño delay para que el catálogo renderice primero
+        setTimeout(() => window.abrirDetalle(pjParam), 150);
+    }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -67,106 +134,13 @@ window.mostrarVista = function(vista) {
 
 window.abrirLoginOP   = function() { hexAuth._mostrarModalLogin(); };
 
-// Abre el selector de campaña como modal inline, sin salir de la página
+// "cambiar campaña" lo maneja hex-guard.js inyectado en el nav.
+// Esta función queda como fallback por si se llama desde algún botón viejo en el HTML.
 window.cambiarCampaña = function() {
-    // Reutilizar el mismo sistema del guard si está disponible
-    if (typeof window._hexGuardSelect === 'function') {
-        // El guard ya está cargado, forzar su modal
-        _mostrarModalCampaña();
-        return;
+    if (typeof window._hexGuardAbrirModal === 'function') {
+        window._hexGuardAbrirModal();
     }
-    // Fallback: si por alguna razón el guard no está activo
-    localStorage.removeItem('hex_selected');
-    window.location.reload();
 };
-
-function _mostrarModalCampaña() {
-    // Evitar duplicados
-    let modal = document.getElementById('hex-campana-modal');
-    if (modal) { modal.remove(); return; }
-
-    modal = document.createElement('div');
-    modal.id = 'hex-campana-modal';
-    modal.style.cssText = `
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.82);
-        backdrop-filter: blur(6px);
-        z-index: 999998;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 32px 20px;
-        font-family: 'Inter', system-ui, sans-serif;
-    `;
-    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
-
-    // Obtener configs
-    const configs = window.hexConfigs || null;
-    const actual  = localStorage.getItem('hex_selected') || 'hex1';
-
-    let cardsHTML = '';
-    if (configs) {
-        cardsHTML = Object.entries(configs).map(([id, cfg]) => {
-            const esActual = id === actual;
-            return `<div onclick="window._hexGuardSelect('${id}')" style="
-                background: ${esActual ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.03)'};
-                border: 1px solid ${esActual ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.07)'};
-                border-radius:10px; padding:18px 16px; cursor:pointer; transition:all 0.2s;
-                display:flex; flex-direction:column; gap:5px;
-            "
-            onmouseover="this.style.borderColor='rgba(212,175,55,0.45)'; this.style.background='rgba(212,175,55,0.08)';"
-            onmouseout="this.style.borderColor='${esActual ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.07)'}'; this.style.background='${esActual ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.03)'}';">
-                <div style="font-size:0.58em; color:#5a3a8a; letter-spacing:3px; text-transform:uppercase;">${id.toUpperCase()}${esActual ? ' · ACTIVA' : ''}</div>
-                <div style="font-family:'Cinzel',serif; font-size:0.88em; color:#d4af37;">${cfg.ui?.titulo || cfg.nombreCorto || id}</div>
-                <div style="font-size:0.72em; color:#5a5a78; line-height:1.4;">${cfg.ui?.lore || cfg.ui?.subtitulo || ''}</div>
-            </div>`;
-        }).join('');
-    } else {
-        cardsHTML = ['hex1','hex2','hex3'].map(id => `
-            <div onclick="window._hexGuardSelect('${id}')" style="
-                background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
-                border-radius:10px; padding:18px 16px; cursor:pointer;
-            ">
-                <div style="font-family:'Cinzel',serif; font-size:0.88em; color:#d4af37;">${id.toUpperCase()}</div>
-            </div>
-        `).join('');
-    }
-
-    modal.innerHTML = `
-        <div style="
-            background:#0f0f18;
-            border:1px solid rgba(212,175,55,0.2);
-            border-radius:14px;
-            padding:28px 24px;
-            width:100%;
-            max-width:600px;
-            max-height:90vh;
-            overflow-y:auto;
-        ">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:22px;">
-                <div>
-                    <div style="font-family:'Cinzel',serif; font-size:0.95em; color:#d4af37; letter-spacing:2px; margin-bottom:3px;">CAMBIAR CAMPAÑA</div>
-                    <div style="font-size:0.72em; color:#5a5a78;">La página se recargará con la campaña seleccionada</div>
-                </div>
-                <button onclick="document.getElementById('hex-campana-modal').remove()" style="
-                    background:none; border:none; color:#5a5a78; font-size:1.4em;
-                    cursor:pointer; line-height:1; padding:4px;
-                ">×</button>
-            </div>
-            <div style="
-                display:grid;
-                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-                gap:10px;
-            ">${cardsHTML}</div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-}
-
-// Exponer para que el guard pueda usarla también
-window._mostrarModalCampaña = _mostrarModalCampaña;
 
 // ─────────────────────────────────────────────────────────────
 // FILTROS
@@ -253,16 +227,10 @@ window.editarPersonaje = function(nombre) {
 // ─────────────────────────────────────────────────────────────
 // SISTEMA PUSH
 // ─────────────────────────────────────────────────────────────
-
-/**
- * Ejecuta un push de VEX o Guarda para un personaje.
- * Verifica cooldown, pushes disponibles, y actualiza estado + DB.
- */
 window.ejecutarPush = async function(nombre, recurso) {
     const p = personajes[nombre]; if (!p) return;
     const s = calcularStats(p);
 
-    // 1. Cooldown
     const cd = calcularCooldownPush(p, recurso);
     if (!cd.disponible) {
         const min = Math.ceil(cd.restaSeg / 60);
@@ -270,61 +238,44 @@ window.ejecutarPush = async function(nombre, recurso) {
         return;
     }
 
-    // 2. Pushes disponibles vs. usados
-    const disponibles = calcularPushDisponibles(p, s, recurso);
-    const actualKey   = recurso === 'vex' ? 'push_vex_actual' : 'push_guarda_actual';
-    const usados      = p[actualKey] || 0;
+    const disponibles  = calcularPushDisponibles(p, s, recurso);
+    const actualKey    = recurso === 'vex' ? 'push_vex_actual' : 'push_guarda_actual';
+    const usados       = p[actualKey] || 0;
 
     if (usados >= disponibles) {
         mostrarToast(`Sin pushes de ${recurso === 'vex' ? 'VEX' : 'Guarda'} disponibles`, true);
         return;
     }
 
-    // 3. Calcular valor y aplicar
-    const valor    = calcularValorPush(p, recurso);
-    const tsKey    = recurso === 'vex' ? 'push_vex_ts' : 'push_guarda_ts';
-    const recursoKey = recurso === 'vex' ? 'vex_actual' : 'guarda_actual';
-    const maxKey   = recurso === 'vex' ? 'vex_max' : 'guarda_max';
-    const maxVal   = recurso === 'vex' ? s.vex_max : s.guarda_max;
+    const valor      = calcularValorPush(p, recurso);
+    const tsKey      = recurso === 'vex' ? 'push_vex_ts'      : 'push_guarda_ts';
+    const recursoKey = recurso === 'vex' ? 'vex_actual'        : 'guarda_actual';
+    const maxVal     = recurso === 'vex' ? s.vex_max           : s.guarda_max;
 
-    p[recursoKey]  = Math.min(maxVal, (p[recursoKey] || 0) + valor);
-    p[actualKey]   = usados + 1;
-    p[tsKey]       = new Date().toISOString();
+    p[recursoKey] = Math.min(maxVal, (p[recursoKey] || 0) + valor);
+    p[actualKey]  = usados + 1;
+    p[tsKey]      = new Date().toISOString();
 
-    // 4. Persistir directamente a Supabase (no espera sync manual)
     const ok = await persistirPush(nombre, p);
-    if (ok) {
-        mostrarToast(`✨ Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`);
-    } else {
-        mostrarToast('Error al guardar push', true);
-    }
+    mostrarToast(ok
+        ? `✨ Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`
+        : 'Error al guardar push', !ok);
 
     renderDetalle(nombre);
     renderCatalogo();
 };
 
-/**
- * Reset de pushes del día para un personaje (solo OP, o al inicio del día).
- */
 window.resetPushes = async function(nombre, recurso) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
-    if (recurso === 'vex' || recurso === 'ambos') {
-        p.push_vex_actual = 0;
-        p.push_vex_ts     = null;
-    }
-    if (recurso === 'guarda' || recurso === 'ambos') {
-        p.push_guarda_actual = 0;
-        p.push_guarda_ts     = null;
-    }
+    if (recurso === 'vex'    || recurso === 'ambos') { p.push_vex_actual    = 0; p.push_vex_ts    = null; }
+    if (recurso === 'guarda' || recurso === 'ambos') { p.push_guarda_actual = 0; p.push_guarda_ts = null; }
     await persistirPush(nombre, p);
     mostrarToast('Pushes reiniciados');
     renderDetalle(nombre);
 };
 
-/**
- * Modificar el límite extra de pushes asignado manualmente por OP.
- */
+// Límite extra de pushes asignado manualmente por OP — mínimo 0
 window.modPushExtra = function(nombre, recurso, delta) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
@@ -479,7 +430,6 @@ window.guardarPersonaje = function() {
         afinidadesBf: viejo.afinidadesBf || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
         hz_clase1:0, hz_clase2:0, hz_clase3:0, hz_clase4:0, hz_clase5:0,
         estados: viejo.estados || {},
-        // Preservar push state si existía
         push_vex_actual:    viejo.push_vex_actual    || 0,
         push_vex_limit:     viejo.push_vex_limit     || 0,
         push_vex_extra:     viejo.push_vex_extra     || 0,
@@ -517,14 +467,14 @@ window.pedirDelete = function(nombre) {
 };
 
 // ─────────────────────────────────────────────────────────────
-// FÓRMULAS (stats)
+// FÓRMULAS
 // ─────────────────────────────────────────────────────────────
 let formulaActiva = null;
 window.setFormulaActiva = function(key) { formulaActiva = key; };
 
 window.insertarVar = function(varKey) {
     if (!formulaActiva) return;
-    const isPush  = formulaActiva.startsWith('push_');
+    const isPush  = formulaActiva.startsWith('push_') || formulaActiva.startsWith('valor_push');
     const inputId = isPush ? `pinput-${formulaActiva}` : `finput-${formulaActiva}`;
     const input   = document.getElementById(inputId);
     if (!input) return;
@@ -554,7 +504,7 @@ window.previsualizarPushFormula = function(key) {
     el.innerHTML = `<span class="prev-pj">${pjSel}</span> → <strong>${val}</strong> por push`;
 };
 
-window.cambiarAplica = function(key, val) { formulas[key].aplica = val; };
+window.cambiarAplica  = function(key, val) { formulas[key].aplica = val; };
 
 window.guardarFormulas = async function() {
     Object.keys(formulas).forEach(key => {
@@ -580,27 +530,21 @@ window.actualizarPreviewPJ = function() {
     }
 };
 
-// ─────────────────────────────────────────────────────────────
-// FÓRMULAS PUSH (guardado)
-// ─────────────────────────────────────────────────────────────
+// Push fórmulas
 window.guardarPushConfig = async function() {
-    // Leer fórmulas push del DOM
     Object.keys(pushFormulas).forEach(key => {
         const el = document.getElementById(`pinput-${key}`);
         if (el) pushFormulas[key].expr = el.value;
     });
-    // Leer cooldowns
     const cdVex    = document.getElementById('push-cooldown-vex');
     const cdGuarda = document.getElementById('push-cooldown-guarda');
     if (cdVex)    pushCooldown.vex    = parseFloat(cdVex.value)    || 60;
     if (cdGuarda) pushCooldown.guarda = parseFloat(cdGuarda.value) || 30;
-
     const ok = await guardarPushFormulasBD();
     mostrarToast(ok ? 'Config de push guardada' : 'Error al guardar', !ok);
 };
 
 window.guardarPushUmbrales = async function() {
-    // Leer umbrales del DOM
     for (const recurso of ['vex', 'guarda']) {
         const cont = document.getElementById(`umbrales-${recurso}`);
         if (!cont) continue;
@@ -635,7 +579,7 @@ window.eliminarUmbral = async function(recurso, idx) {
 };
 
 // ─────────────────────────────────────────────────────────────
-// SYNC (cambios manuales del OP)
+// SYNC
 // ─────────────────────────────────────────────────────────────
 function actualizarBtnSync() {
     const btn = document.getElementById('btn-sync');
