@@ -3,9 +3,10 @@
 // /personajes/personajes-ui.js
 // ============================================================
 
-import { AFINIDADES, VARS_FORMULA, personajes, estadoUI, formulas, regenConfig } from './personajes-state.js';
-import { calcularStats, getMayorAfinidad, buildContext, evalExpr } from './personajes-logic.js';
-import { db } from '../hex-db.js';
+import { AFINIDADES, VARS_FORMULA, personajes, estadoUI, formulas,
+         pushFormulas, pushUmbrales, pushCooldown } from './personajes-state.js';
+import { calcularStats, getMayorAfinidad, buildContext, evalExpr,
+         calcularPushDisponibles, calcularValorPush, calcularCooldownPush } from './personajes-logic.js';
 
 // ─────────────────────────────────────────────────────────────
 // CATÁLOGO
@@ -36,10 +37,9 @@ export function renderCatalogo() {
         const pctVex    = s.vex_max > 0 ? Math.min(100, Math.round(p.vex_actual / s.vex_max * 100)) : 0;
         const pctGuarda = s.guarda_max > 0 ? Math.min(100, Math.round((p.guarda_actual||0) / s.guarda_max * 100)) : 0;
 
-        // Barras de afinidad segmentadas por fuente
-        const maxAfin = Math.max(1, ...AFINIDADES.map(a => {
-            return (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0);
-        }));
+        const maxAfin = Math.max(1, ...AFINIDADES.map(a =>
+            (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0)
+        ));
 
         const barras = AFINIDADES.map(a => {
             const base = p.afinidadesBase?.[a.key] || 0;
@@ -48,13 +48,10 @@ export function renderCatalogo() {
             const hz   = p.afinidadesHz?.[a.key]   || 0;
             const total = base + bf + ef + hz;
             const esMayor = mayor && mayor.key === a.key;
-
-            // Porcentajes proporcionales al max
             const pBase = Math.round(base / maxAfin * 100);
             const pBf   = Math.round(bf   / maxAfin * 100);
             const pEf   = Math.round(ef   / maxAfin * 100);
             const pHz   = Math.round(hz   / maxAfin * 100);
-
             return `<div class="afin-bar-row">
                 <span class="afin-bar-label ${esMayor ? 'mayor' : ''}">${a.abr}</span>
                 <div class="afin-bar-track">
@@ -68,9 +65,20 @@ export function renderCatalogo() {
         }).join('');
 
         const esInactivo = !p.isActive;
-        // Botones de acción según rol
-        const canEdit   = estadoUI.esAdmin || !p.isPlayer;
-        const canDelete = estadoUI.esAdmin;
+        const canEdit    = estadoUI.esAdmin || !p.isPlayer;
+        const canDelete  = estadoUI.esAdmin;
+
+        // Mini push indicador en tarjeta
+        const pushVexDisp    = calcularPushDisponibles(p, s, 'vex');
+        const pushGuardaDisp = calcularPushDisponibles(p, s, 'guarda');
+        const pushVexUsados    = p.push_vex_actual    || 0;
+        const pushGuardaUsados = p.push_guarda_actual || 0;
+
+        const pushIndicadores = (s.vex_max > 0 || s.guarda_max > 0) ? `
+            <div class="push-mini">
+                ${s.vex_max > 0 ? `<span class="push-mini-item push-mini-vex" title="Push VEX">⚡ ${pushVexUsados}/${pushVexDisp}</span>` : ''}
+                ${s.guarda_max > 0 ? `<span class="push-mini-item push-mini-guarda" title="Push Guarda">🛡 ${pushGuardaUsados}/${pushGuardaDisp}</span>` : ''}
+            </div>` : '';
 
         return `<div class="pj-card ${esInactivo ? 'pj-inactivo' : ''}" onclick="window.abrirDetalle('${nombre.replace(/'/g,"\\'")}')">
             <div class="pj-card-top">
@@ -113,6 +121,7 @@ export function renderCatalogo() {
                 </div>` : ''}
             </div>
 
+            ${pushIndicadores}
             <div class="afin-section">${barras}</div>
             <div class="pj-hex">HEX ${(p.hex||0).toLocaleString()}</div>
         </div>`;
@@ -128,49 +137,41 @@ export function renderDetalle(nombre) {
     const s = calcularStats(p);
     const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
 
-    // OP puede editar todo; no-OP solo puede editar NPCs
     const canEditPlayer = estadoUI.esAdmin;
     const canEditThis   = estadoUI.esAdmin || !p.isPlayer;
 
-    // ── Filas de afinidades con base/bf/ef editables ──
     const afinRows = AFINIDADES.map(a => {
         const base = p.afinidadesBase?.[a.key] || 0;
         const hz   = p.afinidadesHz?.[a.key]   || 0;
         const ef   = p.afinidadesEf?.[a.key]   || 0;
         const bf   = p.afinidadesBf?.[a.key]   || 0;
         const total = base + hz + ef + bf;
-
         const safeNombre = nombre.replace(/'/g,"\\'");
         const canBase = estadoUI.esAdmin;
         const canMod  = canEditThis;
-
         return `<div class="det-afin-block">
             <div class="det-afin-header">
                 <span class="det-stat-label">${a.label}</span>
                 <span class="det-afin-total">${total}</span>
             </div>
-            <!-- BASE (solo OP) -->
             <div class="det-afin-source">
                 <span class="det-afin-src-label src-base" title="Base">B</span>
                 ${canBase ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modAfin('${safeNombre}','${a.key}',-1)">−</button>` : ''}
                 <span class="det-afin-src-val">${base}</span>
                 ${canBase ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modAfin('${safeNombre}','${a.key}',1)">+</button>` : ''}
             </div>
-            <!-- BUFF -->
             <div class="det-afin-source">
                 <span class="det-afin-src-label src-bf" title="Buff">Bf</span>
                 ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modBf('${safeNombre}','${a.key}',-1)">−</button>` : ''}
                 <span class="det-afin-src-val">${bf > 0 ? '+' : ''}${bf}</span>
                 ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modBf('${safeNombre}','${a.key}',1)">+</button>` : ''}
             </div>
-            <!-- ALTERACIÓN (ef) -->
             <div class="det-afin-source">
                 <span class="det-afin-src-label src-ef" title="Alteración">Alt</span>
                 ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modEf('${safeNombre}','${a.key}',-1)">−</button>` : ''}
                 <span class="det-afin-src-val">${ef > 0 ? '+' : ''}${ef}</span>
                 ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modEf('${safeNombre}','${a.key}',1)">+</button>` : ''}
             </div>
-            <!-- HZ (solo lectura) -->
             ${hz !== 0 ? `<div class="det-afin-source">
                 <span class="det-afin-src-label src-hz" title="Hechizos">Hz</span>
                 <span class="det-afin-src-val">${hz > 0 ? '+' : ''}${hz}</span>
@@ -180,9 +181,12 @@ export function renderDetalle(nombre) {
 
     const safeN = nombre.replace(/'/g,"\\'");
 
+    // ── Sección PUSH ──────────────────────────────────────────
+    const pushHTML = _renderPushSection(p, s, nombre, canEditThis);
+
     document.getElementById('panel-nombre').textContent = nombre;
     document.getElementById('panel-body').innerHTML = `
-        <!-- Stats derivados -->
+        <!-- Stats calculados -->
         <div class="det-section">
             <div class="det-section-title">STATS CALCULADOS</div>
             <div class="det-calc-grid">
@@ -223,56 +227,10 @@ export function renderDetalle(nombre) {
             </div>
         </div>
 
-        <!-- Regeneración con bf/ef editables -->
-        <div class="det-section">
-            <div class="det-section-title">REGENERACIÓN / ${regenConfig.vex.intervalo}H</div>
+        <!-- Sistema Push -->
+        ${pushHTML}
 
-            <!-- VEX regen -->
-            <div class="det-regen-block">
-                <div class="det-regen-row">
-                    <span>VEX</span>
-                    <span class="det-regen-total">+${s.regen_vex_total ?? s.regen_vex} <span class="det-regen-breakdown">(base ${s.regen_vex}${(p.regen_vex_bf||0)!==0?' Bf'+(p.regen_vex_bf>0?'+':'')+p.regen_vex_bf:''}${(p.regen_vex_ef||0)!==0?' Alt'+(p.regen_vex_ef>0?'+':'')+p.regen_vex_ef:''})</span></span>
-                </div>
-                ${canEditThis ? `<div class="det-regen-sources">
-                    <div class="det-afin-source">
-                        <span class="det-afin-src-label src-bf">Bf</span>
-                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenBf('${safeN}','vex',-10)">−10</button>
-                        <span class="det-afin-src-val">${p.regen_vex_bf||0}</span>
-                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenBf('${safeN}','vex',10)">+10</button>
-                    </div>
-                    <div class="det-afin-source">
-                        <span class="det-afin-src-label src-ef">Alt</span>
-                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenEf('${safeN}','vex',-10)">−10</button>
-                        <span class="det-afin-src-val">${p.regen_vex_ef||0}</span>
-                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenEf('${safeN}','vex',10)">+10</button>
-                    </div>
-                </div>` : ''}
-            </div>
-
-            ${s.guarda_max > 0 ? `<!-- Guarda regen -->
-            <div class="det-regen-block">
-                <div class="det-regen-row">
-                    <span>Guarda</span>
-                    <span class="det-regen-total">+${s.regen_guarda_total ?? s.regen_guarda} <span class="det-regen-breakdown">(base ${s.regen_guarda}${(p.regen_guarda_bf||0)!==0?' Bf'+(p.regen_guarda_bf>0?'+':'')+p.regen_guarda_bf:''}${(p.regen_guarda_ef||0)!==0?' Alt'+(p.regen_guarda_ef>0?'+':'')+p.regen_guarda_ef:''})</span></span>
-                </div>
-                ${canEditThis ? `<div class="det-regen-sources">
-                    <div class="det-afin-source">
-                        <span class="det-afin-src-label src-bf">Bf</span>
-                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenBf('${safeN}','guarda',-1)">−</button>
-                        <span class="det-afin-src-val">${p.regen_guarda_bf||0}</span>
-                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenBf('${safeN}','guarda',1)">+</button>
-                    </div>
-                    <div class="det-afin-source">
-                        <span class="det-afin-src-label src-ef">Alt</span>
-                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenEf('${safeN}','guarda',-1)">−</button>
-                        <span class="det-afin-src-val">${p.regen_guarda_ef||0}</span>
-                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenEf('${safeN}','guarda',1)">+</button>
-                    </div>
-                </div>` : ''}
-            </div>` : ''}
-        </div>
-
-        <!-- Afinidades con fuentes -->
+        <!-- Afinidades -->
         <div class="det-section">
             <div class="det-section-title">AFINIDADES
                 <span class="afin-leyenda">
@@ -286,7 +244,7 @@ export function renderDetalle(nombre) {
         </div>
 
         ${canEditThis ? `
-        <!-- RECURSOS -->
+        <!-- Recursos -->
         <div class="det-section">
             <div class="det-section-title">RECURSOS</div>
             <div class="det-stat-row">
@@ -301,8 +259,80 @@ export function renderDetalle(nombre) {
     `;
 }
 
+// ── Render de la sección Push dentro del panel ─────────────────
+function _renderPushSection(p, s, nombre, canEdit) {
+    const safeN = nombre.replace(/'/g,"\\'");
+
+    const _pushBloque = (recurso, label, emoji, hasMax) => {
+        if (!hasMax) return '';
+
+        const disponibles = calcularPushDisponibles(p, s, recurso);
+        const usados      = recurso === 'vex' ? (p.push_vex_actual || 0) : (p.push_guarda_actual || 0);
+        const restantes   = Math.max(0, disponibles - usados);
+        const valorPush   = calcularValorPush(p, recurso);
+        const cd          = calcularCooldownPush(p, recurso);
+        const limitExtra  = recurso === 'vex' ? (p.push_vex_limit || 0) : (p.push_guarda_limit || 0);
+
+        // Indicador visual de pushes (puntos)
+        const dots = Array.from({ length: disponibles }, (_, i) =>
+            `<span class="push-dot ${i < usados ? 'push-dot-used' : 'push-dot-avail'}"></span>`
+        ).join('');
+
+        // Cooldown display
+        let cdInfo = '';
+        if (!cd.disponible) {
+            const min = Math.ceil(cd.restaSeg / 60);
+            const seg = cd.restaSeg % 60;
+            cdInfo = `<span class="push-cd">⏳ ${min}m ${seg}s</span>`;
+        }
+
+        return `<div class="push-bloque">
+            <div class="push-bloque-header">
+                <span class="push-bloque-label">${emoji} ${label}</span>
+                <span class="push-dots">${dots}${cdInfo}</span>
+                <span class="push-counter">${usados}/${disponibles}</span>
+            </div>
+            <div class="push-bloque-info">
+                <span class="push-valor">+${valorPush} por push</span>
+                ${restantes > 0 && cd.disponible ? `
+                    <button class="btn-push ${canEdit ? '' : ''}"
+                        onclick="window.ejecutarPush('${safeN}','${recurso}')">
+                        Push ${label}
+                    </button>` : `
+                    <button class="btn-push btn-push-disabled" disabled>
+                        ${!cd.disponible ? 'En cooldown' : 'Sin pushes'}
+                    </button>`}
+            </div>
+            ${estadoUI.esAdmin ? `
+            <div class="push-admin-row">
+                <span class="push-admin-label">Extra OP</span>
+                <button class="ctrl-btn ctrl-btn-xs" onclick="window.modPushExtra('${safeN}','${recurso}',-1)">−</button>
+                <span class="push-admin-val">${limitExtra}</span>
+                <button class="ctrl-btn ctrl-btn-xs" onclick="window.modPushExtra('${safeN}','${recurso}',1)">+</button>
+                <button class="ctrl-btn ctrl-btn-xs push-reset-btn"
+                    onclick="window.resetPushes('${safeN}','${recurso}')">Reset</button>
+            </div>` : ''}
+        </div>`;
+    };
+
+    const vexHTML    = _pushBloque('vex',    'VEX',    '⚡', s.vex_max > 0);
+    const guardaHTML = _pushBloque('guarda', 'Guarda', '🛡', s.guarda_max > 0);
+
+    if (!vexHTML && !guardaHTML) return '';
+
+    return `<div class="det-section">
+        <div class="det-section-title">PUSHES
+            ${estadoUI.esAdmin ? `<button class="btn-ghost btn-ghost-xs"
+                onclick="window.resetPushes('${safeN}','ambos')">Reset todos</button>` : ''}
+        </div>
+        <div class="push-help">Un push recupera recurso al instante. Los pushes disponibles dependen del estado de vida del personaje.</div>
+        ${vexHTML}
+        ${guardaHTML}
+    </div>`;
+}
+
 // ─────────────────────────────────────────────────────────────
-// VISTA DE FÓRMULAS (solo OP accede)
+// VISTA DE FÓRMULAS (solo OP)
 // ─────────────────────────────────────────────────────────────
 export function renderFormulas() {
     const cont = document.getElementById('formulas-cont');
@@ -343,32 +373,75 @@ export function renderFormulas() {
         </div>
     `).join('');
 
-    const regenHTML = Object.entries(regenConfig).map(([key, r]) => `
+    // ── Push fórmulas ──────────────────────────────────────────
+    const pushFormsHTML = Object.entries(pushFormulas).map(([key, f]) => `
         <div class="formula-item">
             <div class="formula-item-header">
-                <span class="formula-item-label">${r.label}</span>
-                <div style="display:flex;gap:8px;align-items:center;">
-                    <span class="formula-aplica tag tag-dim">cada</span>
-                    <input type="number" id="regen-iv-${key}" value="${r.intervalo}" min="1" max="168"
-                        class="formula-input" style="width:56px;text-align:center;"
-                        oninput="window.cambiarRegenIv('${key}',this.value)">
-                    <span class="formula-aplica tag tag-dim">horas</span>
-                </div>
+                <span class="formula-item-label">${f.label}</span>
             </div>
+            <div class="formula-item-desc">${f.descripcion || ''}</div>
             <div class="formula-input-row">
-                <input class="formula-input" id="rinput-${key}"
-                    value="${r.expr}"
-                    onfocus="window.setFormulaActiva('regen_${key}')"
-                    oninput="window.previsualizarRegen('${key}')">
+                <input class="formula-input" id="pinput-${key}"
+                    value="${f.expr}"
+                    onfocus="window.setFormulaActiva('${key}')"
+                    oninput="window.previsualizarPushFormula('${key}')">
             </div>
-            <div class="formula-preview" id="rprev-${key}"></div>
+            <div class="formula-preview" id="pprev-${key}"></div>
         </div>
     `).join('');
+
+    // ── Cooldowns ──────────────────────────────────────────────
+    const cooldownHTML = `
+        <div class="formula-item">
+            <div class="formula-item-header">
+                <span class="formula-item-label">Cooldowns entre pushes</span>
+            </div>
+            <div class="push-cooldown-grid">
+                <div class="push-cd-field">
+                    <label>VEX (minutos)</label>
+                    <input type="number" id="push-cooldown-vex" class="formula-input" style="width:80px;"
+                        value="${pushCooldown.vex}" min="1">
+                </div>
+                <div class="push-cd-field">
+                    <label>Guarda (minutos)</label>
+                    <input type="number" id="push-cooldown-guarda" class="formula-input" style="width:80px;"
+                        value="${pushCooldown.guarda}" min="1">
+                </div>
+            </div>
+        </div>`;
+
+    // ── Umbrales de push ──────────────────────────────────────
+    const _umbralesHtml = (recurso, label) => `
+        <div class="formula-item">
+            <div class="formula-item-header">
+                <span class="formula-item-label">Umbrales — ${label}</span>
+                <button class="btn-ghost btn-ghost-xs" onclick="window.agregarUmbral('${recurso}')">+ Añadir</button>
+            </div>
+            <div class="umbral-help">
+                Variables disponibles en condición: <code>pct_vida_roja</code> (0–100), <code>vida_azul</code> (valor absoluto máx calculado)
+            </div>
+            <div id="umbrales-${recurso}">
+                ${(pushUmbrales[recurso] || []).map((u, idx) => `
+                    <div class="umbral-row" data-umbral-idx="${idx}">
+                        <input class="formula-input umbral-desc" data-campo="descripcion"
+                            value="${u.descripcion}" placeholder="Descripción">
+                        <input class="formula-input umbral-cond" data-campo="condicion"
+                            value="${u.condicion}" placeholder="condición JS">
+                        <input type="number" class="formula-input umbral-pushes" data-campo="pushes"
+                            value="${u.pushes}" min="1" style="width:56px;" title="Pushes otorgados">
+                        <button class="ctrl-btn ctrl-btn-xs icon-btn-danger"
+                            onclick="window.eliminarUmbral('${recurso}',${idx})">✕</button>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
 
     const pjOptions = Object.keys(personajes).map(n => `<option value="${n}">${n}</option>`).join('');
 
     cont.innerHTML = `
         ${poolHTML}
+
+        <!-- Stats -->
         <div class="formulas-block">
             <div class="formulas-block-title">Stats derivados de afinidades</div>
             ${formulasHTML}
@@ -377,15 +450,37 @@ export function renderFormulas() {
                 <button class="btn-primary" onclick="window.guardarFormulas()">Guardar fórmulas</button>
             </div>
         </div>
+
+        <!-- Push config -->
         <div class="formulas-block">
-            <div class="formulas-block-title">Regeneración automática</div>
-            <p class="formulas-help">Mismas variables de afinidad disponibles. Hz3/Hz4/Hz5 = hechizos clase 3/4/5. La regeneración en cliente corre cada 10 s de forma proporcional.</p>
-            ${regenHTML}
+            <div class="formulas-block-title">Sistema Push — Recuperación activa</div>
+            <p class="formulas-help">
+                Los pushes permiten recuperar VEX o Guarda al instante, con cooldown entre cada uno.
+                El número de pushes disponibles depende del estado de vida del personaje (umbrales configurables abajo).
+                El OP puede además asignar pushes extra individuales desde el panel del personaje.
+            </p>
+            ${pushFormsHTML}
+            ${cooldownHTML}
             <div class="formula-actions">
-                <button class="btn-secondary" onclick="window.ejecutarRegenManual()">Ejecutar ahora (todos los personajes)</button>
-                <button class="btn-primary" onclick="window.guardarRegen()">Guardar regeneración</button>
+                <button class="btn-primary" onclick="window.guardarPushConfig()">Guardar fórmulas push</button>
             </div>
         </div>
+
+        <!-- Umbrales -->
+        <div class="formulas-block">
+            <div class="formulas-block-title">Umbrales de pushes disponibles</div>
+            <p class="formulas-help">
+                Cada umbral otorga N pushes adicionales cuando la condición se cumple.
+                Se evalúan todos y se suman. Un personaje con vida alta obtiene más pushes que uno malherido.
+            </p>
+            ${_umbralesHtml('vex', 'VEX')}
+            ${_umbralesHtml('guarda', 'Guarda Dorada')}
+            <div class="formula-actions">
+                <button class="btn-primary" onclick="window.guardarPushUmbrales()">Guardar umbrales</button>
+            </div>
+        </div>
+
+        <!-- Preview por personaje -->
         <div class="formulas-block">
             <div class="formulas-block-title">Preview por personaje</div>
             <select id="preview-pj-sel" class="input-base" onchange="window.actualizarPreviewPJ()" style="margin-bottom:12px;width:280px;">
@@ -399,7 +494,7 @@ export function renderFormulas() {
     const primero = Object.keys(personajes)[0];
     if (primero) {
         Object.keys(formulas).forEach(key => previsualizarFormulaConPJ(key, primero));
-        Object.keys(regenConfig).forEach(key => previsualizarRegenConPJ(key, primero));
+        Object.keys(pushFormulas).forEach(key => window.previsualizarPushFormula(key));
     }
 }
 
@@ -412,16 +507,6 @@ export function previsualizarFormulaConPJ(key, nombrePJ) {
     const val  = evalExpr(expr, ctx);
     el.innerHTML = `<span class="prev-pj">${nombrePJ}</span> → <strong>${val}</strong>`;
     el.classList.remove('prev-error');
-}
-
-export function previsualizarRegenConPJ(key, nombrePJ) {
-    const pj = personajes[nombrePJ];
-    const el = document.getElementById(`rprev-${key}`);
-    if (!el || !pj) return;
-    const expr = document.getElementById(`rinput-${key}`)?.value || regenConfig[key]?.expr || '';
-    const ctx  = buildContext(pj);
-    const val  = evalExpr(expr, ctx);
-    el.innerHTML = `<span class="prev-pj">${nombrePJ}</span> → <strong>+${val}</strong> / ${regenConfig[key]?.intervalo || 12}h`;
 }
 
 export function renderPreviewCompleto(nombrePJ) {
@@ -438,10 +523,13 @@ export function renderPreviewCompleto(nombrePJ) {
             return `<div class="prev-line"><span class="prev-label">${f.label}</span><span class="prev-val">${v}</span><code class="prev-expr">${f.expr}</code></div>`;
         }),
         `<div class="prev-separator"></div>`,
-        ...Object.entries(regenConfig).map(([k, r]) => {
-            const v = evalExpr(r.expr, ctx);
-            return `<div class="prev-line"><span class="prev-label">${r.label}</span><span class="prev-val">+${v} / ${r.intervalo}h</span><code class="prev-expr">${r.expr}</code></div>`;
-        })
+        ...Object.entries(pushFormulas).map(([k, f]) => {
+            const v = evalExpr(f.expr, ctx);
+            return `<div class="prev-line"><span class="prev-label">${f.label}</span><span class="prev-val">+${v} / push</span><code class="prev-expr">${f.expr}</code></div>`;
+        }),
+        `<div class="prev-separator"></div>`,
+        `<div class="prev-line"><span class="prev-label">Pushes VEX disponibles</span><span class="prev-val">${calcularPushDisponibles(pj, s, 'vex')}</span></div>`,
+        `<div class="prev-line"><span class="prev-label">Pushes Guarda disponibles</span><span class="prev-val">${calcularPushDisponibles(pj, s, 'guarda')}</span></div>`
     ];
 
     el.innerHTML = lineas.join('');

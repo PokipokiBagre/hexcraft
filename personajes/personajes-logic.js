@@ -3,7 +3,7 @@
 // /personajes/personajes-logic.js
 // ============================================================
 
-import { AFINIDADES, formulas, regenConfig, personajes } from './personajes-state.js';
+import { AFINIDADES, formulas, pushFormulas, pushUmbrales, pushCooldown, personajes } from './personajes-state.js';
 
 // ─────────────────────────────────────────────────────────────
 // Contexto de variables para evaluar fórmulas
@@ -52,6 +52,17 @@ export function evalExpr(expr, ctx) {
     } catch { return 0; }
 }
 
+// Evalúa una condición de umbral de push
+// Contexto: pct_vida_roja (0-100), vida_azul (valor absoluto calculado)
+function evalCondicion(condicion, pct_vida_roja, vida_azul) {
+    try {
+        // eslint-disable-next-line no-new-func
+        return new Function('pct_vida_roja', 'vida_azul',
+            `return !!(${condicion});`
+        )(pct_vida_roja, vida_azul);
+    } catch { return false; }
+}
+
 // Calcula todos los stats derivados para un personaje
 export function calcularStats(p) {
     const ctx = buildContext(p);
@@ -76,18 +87,67 @@ export function calcularStats(p) {
     const dano_azul = evalExpr(formulas.dano_azul.expr, ctx)
         + (p.hz_dano_azul||0) + (p.ef_dano_azul||0) + (p.bf_dano_azul||0);
 
-    // Regen por hora
-    const regen_vex    = evalExpr(regenConfig.vex.expr, ctx);
-    const regen_guarda = evalExpr(regenConfig.guarda.expr, ctx);
-
-    const regen_vex_total    = regen_vex    + (p.regen_vex_bf||0)    + (p.regen_vex_ef||0);
-    const regen_guarda_total = regen_guarda + (p.regen_guarda_bf||0) + (p.regen_guarda_ef||0);
-
-    return { vida_roja_max, vida_azul_max, guarda_max, vex_max, dano_rojo, dano_azul,
-             regen_vex, regen_guarda, regen_vex_total, regen_guarda_total, ctx };
+    return { vida_roja_max, vida_azul_max, guarda_max, vex_max, dano_rojo, dano_azul, ctx };
 }
 
-// Devuelve la afinidad con mayor valor total
+// ─────────────────────────────────────────────────────────────
+// SISTEMA PUSH
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Calcula cuántos pushes tiene disponibles un personaje para un recurso.
+ * Evalúa cada umbral y suma los pushes que cumple.
+ * Más el extra que el OP haya asignado directamente en su campo push_X_limit.
+ */
+export function calcularPushDisponibles(p, s, recurso) {
+    const vidaRojaActual = p.vida_roja_actual || 0;
+    const pct_vida_roja = s.vida_roja_max > 0
+        ? Math.round(vidaRojaActual / s.vida_roja_max * 100)
+        : 0;
+    const vida_azul = s.vida_azul_max || 0; // vida azul calculada (máx, no hay "actual" separada)
+
+    const umbrales = pushUmbrales[recurso] || [];
+    let total = 0;
+    for (const u of umbrales) {
+        if (evalCondicion(u.condicion, pct_vida_roja, vida_azul)) {
+            total += u.pushes;
+        }
+    }
+    // Extra asignado directamente por OP
+    const extraKey = recurso === 'vex' ? 'push_vex_limit' : 'push_guarda_limit';
+    total += p[extraKey] || 0;
+    return total;
+}
+
+/**
+ * Calcula el valor recuperado por cada push para un recurso.
+ * Usa la fórmula de pushFormulas correspondiente.
+ */
+export function calcularValorPush(p, recurso) {
+    const ctx = buildContext(p);
+    const fKey = recurso === 'vex' ? 'valor_push_vex' : 'valor_push_guarda';
+    const expr = pushFormulas[fKey]?.expr || '0';
+    return evalExpr(expr, ctx);
+}
+
+/**
+ * Calcula si el cooldown de push ha pasado.
+ * Devuelve { disponible: bool, restaSeg: number }
+ */
+export function calcularCooldownPush(p, recurso) {
+    const tsKey = recurso === 'vex' ? 'push_vex_ts' : 'push_guarda_ts';
+    const ts = p[tsKey];
+    const cooldownMin = pushCooldown[recurso] || 60;
+    if (!ts) return { disponible: true, restaSeg: 0 };
+    const pasadoSeg = (Date.now() - new Date(ts).getTime()) / 1000;
+    const totalSeg  = cooldownMin * 60;
+    if (pasadoSeg >= totalSeg) return { disponible: true, restaSeg: 0 };
+    return { disponible: false, restaSeg: Math.ceil(totalSeg - pasadoSeg) };
+}
+
+/**
+ * Devuelve la afinidad con mayor valor total
+ */
 export function getMayorAfinidad(p) {
     let max = -1, mayor = null;
     AFINIDADES.forEach(a => {
@@ -112,6 +172,16 @@ export function mapPersonaje(row) {
         vida_azul_max:    row.vida_azul_max    || 0,
         guarda_actual: row.guarda_actual || 0,
         guarda_max:    row.guarda_max    || 0,
+        // Push VEX
+        push_vex_actual:  row.push_vex_actual  || 0,
+        push_vex_limit:   row.push_vex_limit   || 0,
+        push_vex_extra:   row.push_vex_extra   || 0,
+        push_vex_ts:      row.push_vex_ts      || null,
+        // Push Guarda
+        push_guarda_actual: row.push_guarda_actual || 0,
+        push_guarda_limit:  row.push_guarda_limit  || 0,
+        push_guarda_extra:  row.push_guarda_extra  || 0,
+        push_guarda_ts:     row.push_guarda_ts     || null,
         afinidadesBase: {
             fisica:     row.af_fisica     || 0,
             energetica: row.af_energetica || 0,
@@ -156,11 +226,7 @@ export function mapPersonaje(row) {
         hz_clase1: row.hz_clase1 || 0, hz_clase2: row.hz_clase2 || 0,
         hz_clase3: row.hz_clase3 || 0, hz_clase4: row.hz_clase4 || 0,
         hz_clase5: row.hz_clase5 || 0,
-        estados: row.estados || {},
-        regen_vex_bf:    row.regen_vex_bf    || 0,
-        regen_vex_ef:    row.regen_vex_ef    || 0,
-        regen_guarda_bf: row.regen_guarda_bf || 0,
-        regen_guarda_ef: row.regen_guarda_ef || 0
+        estados: row.estados || {}
     };
 }
 
@@ -184,6 +250,15 @@ export function serializarPersonaje(nombre, p) {
         vida_azul_max:    p.vida_azul_max    || 0,
         guarda_actual: p.guarda_actual || 0,
         guarda_max:    p.guarda_max    || 0,
+        // Push
+        push_vex_actual:    p.push_vex_actual    || 0,
+        push_vex_limit:     p.push_vex_limit     || 0,
+        push_vex_extra:     p.push_vex_extra     || 0,
+        push_vex_ts:        p.push_vex_ts        || null,
+        push_guarda_actual: p.push_guarda_actual || 0,
+        push_guarda_limit:  p.push_guarda_limit  || 0,
+        push_guarda_extra:  p.push_guarda_extra  || 0,
+        push_guarda_ts:     p.push_guarda_ts     || null,
         af_fisica:    af.fisica     || 0, af_energetica: af.energetica || 0,
         af_espiritual:af.espiritual || 0, af_mando:      af.mando      || 0,
         af_psiquica:  af.psiquica   || 0, af_oscura:     af.oscura     || 0,
@@ -208,10 +283,6 @@ export function serializarPersonaje(nombre, p) {
         hz_clase1: p.hz_clase1||0, hz_clase2: p.hz_clase2||0,
         hz_clase3: p.hz_clase3||0, hz_clase4: p.hz_clase4||0,
         hz_clase5: p.hz_clase5||0,
-        estados: p.estados || {},
-        regen_vex_bf:    p.regen_vex_bf    || 0,
-        regen_vex_ef:    p.regen_vex_ef    || 0,
-        regen_guarda_bf: p.regen_guarda_bf || 0,
-        regen_guarda_ef: p.regen_guarda_ef || 0
+        estados: p.estados || {}
     };
 }
