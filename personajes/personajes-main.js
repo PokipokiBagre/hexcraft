@@ -1,675 +1,1232 @@
 // ============================================================
-// personajes-main.js — Punto de entrada
-// /personajes/personajes-main.js
+// panel-pj.js — Panel lateral de personaje con 5 pestañas
+// Reemplaza la lógica de renderDetalle() en personajes-ui.js
+// Importar y llamar: abrirPanelPJ(nombre) / cerrarPanelPJ()
+//
+// Dependencias (ya en el proyecto):
+//   personajes-state.js  → personajes, estadoUI
+//   personajes-logic.js  → calcularStats, buildContext, evalExpr,
+//                          calcularPushDisponibles, calcularValorPush,
+//                          calcularCooldownPush, getMayorAfinidad
+//   hex-auth.js          → currentConfig (storageUrl)
+//   supabase             → vía hex-auth.js
 // ============================================================
 
-import { hexAuth } from '../hex-auth.js';
-import { hexConfigs } from '../hex/config.js';
-// Exponer configs globalmente para que hex-guard.js (no-module) pueda leer las campañas
-window.hexConfigs = hexConfigs;
-import { estadoUI, personajes, formulas, pushFormulas, pushUmbrales, pushCooldown,
-         colaCambios, encolarCambio, FORMULAS_DEFAULT, PUSH_FORMULAS_DEFAULT,
-         PUSH_UMBRALES_DEFAULT, PUSH_COOLDOWN_DEFAULT } from './personajes-state.js';
-import { calcularStats, buildContext, evalExpr,
-         calcularPushDisponibles, calcularValorPush, calcularCooldownPush } from './personajes-logic.js';
-import { cargarDatos, sincronizarCola, guardarFormulasBD,
-         guardarPushFormulasBD, guardarPushUmbralesBD, eliminarUmbralDB,
-         persistirPush } from './personajes-data.js';
-import { renderCatalogo, renderDetalle, renderFormulas,
-         previsualizarFormulaConPJ, renderPreviewCompleto } from './personajes-ui.js';
+import { personajes, estadoUI, formulas } from './personajes-state.js';
+import {
+    calcularStats, buildContext, evalExpr,
+    calcularPushDisponibles, calcularValorPush, calcularCooldownPush
+} from './personajes-logic.js';
+import { currentConfig, supabase } from '../hex-auth.js';
+import { encolarCambio } from './personajes-state.js';
+
+// ── Helpers ───────────────────────────────────────────────────
+const _sb   = () => currentConfig.storageUrl;
+const _norm = (s) => s ? s.toString().trim().toLowerCase()
+    .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+    .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
+    .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') : '';
+
+const _imgPj   = (icono) => `${_sb()}/imgpersonajes/${_norm(icono)}.png`;
+const _imgIcon = (icono) => `${_sb()}/imgpersonajes/${_norm(icono)}icon.png`;
+const _fallback = () => `${_sb()}/imginterfaz/no_encontrado.png`;
+
+// Tab activo por personaje (persiste al volver)
+const _tabActivo = {};
 
 // ─────────────────────────────────────────────────────────────
-// INIT
+// INYECTAR ESTILOS (una sola vez)
 // ─────────────────────────────────────────────────────────────
-window.onload = async () => {
-    await hexAuth.init();
-    estadoUI.esAdmin = hexAuth.esAdmin();
+function _inyectarEstilos() {
+    if (document.getElementById('panel-pj-styles')) return;
+    const st = document.createElement('style');
+    st.id = 'panel-pj-styles';
+    st.textContent = `
+/* ══ PANEL RAÍZ ══════════════════════════════════════════════ */
+#panel-pj-root {
+    position: fixed;
+    top: 0; right: 0;
+    width: 420px;
+    height: 100vh;
+    background: #08080f;
+    border-left: 1px solid rgba(212,175,55,0.18);
+    display: flex;
+    flex-direction: column;
+    z-index: 1200;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    font-family: 'Inter', system-ui, sans-serif;
+    box-shadow: -8px 0 40px rgba(0,0,0,0.6);
+}
+#panel-pj-root.open { transform: translateX(0); }
 
-    const badge = document.getElementById('hex-session-badge');
-    if (badge) badge.innerHTML = hexAuth.renderStatusBadge();
+#panel-pj-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 1199;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s;
+}
+#panel-pj-overlay.open { opacity: 1; pointer-events: all; }
 
-    const barra  = document.getElementById('barra-progreso');
-    const loader = document.getElementById('loader');
+/* ══ HEADER ══════════════════════════════════════════════════ */
+.ppj-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    min-height: 68px;
+}
+.ppj-avatar {
+    width: 44px; height: 44px;
+    border-radius: 8px;
+    object-fit: cover; object-position: top;
+    border: 1px solid rgba(212,175,55,0.3);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.ppj-avatar:hover { border-color: rgba(212,175,55,0.8); }
+.ppj-header-info { flex: 1; min-width: 0; }
+.ppj-nombre {
+    font-family: 'Cinzel', serif;
+    font-size: 0.95em;
+    color: #e8e8e8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.5px;
+}
+.ppj-tags { display: flex; gap: 5px; margin-top: 3px; flex-wrap: wrap; }
+.ppj-tag {
+    font-size: 0.63em;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+.ppj-tag-jugador   { background: rgba(212,175,55,0.12); color: #d4af37; border: 1px solid rgba(212,175,55,0.25); }
+.ppj-tag-npc       { background: rgba(90,90,120,0.2);   color: #aaa;    border: 1px solid rgba(90,90,120,0.3); }
+.ppj-tag-activo    { background: rgba(62,207,110,0.1);  color: #3ecf6e; border: 1px solid rgba(62,207,110,0.2); }
+.ppj-tag-inactivo  { background: rgba(200,60,60,0.1);   color: #c44;    border: 1px solid rgba(200,60,60,0.2); }
+.ppj-header-btns   { display: flex; gap: 6px; align-items: center; }
+.ppj-btn-icon {
+    background: none; border: none;
+    color: #5a5a78; font-size: 1.05em;
+    cursor: pointer; padding: 4px 6px;
+    border-radius: 5px;
+    transition: color 0.15s, background 0.15s;
+    line-height: 1;
+}
+.ppj-btn-icon:hover { color: #d4af37; background: rgba(212,175,55,0.08); }
+.ppj-close { font-size: 1.3em; }
 
-    const ok = await cargarDatos(barra);
-    if (!ok) {
-        if (loader) loader.innerHTML = '<span style="color:#c44;">Error al cargar datos.</span>';
-        return;
-    }
-    if (loader) loader.style.display = 'none';
+/* ══ TABS ════════════════════════════════════════════════════ */
+.ppj-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    background: #0a0a14;
+}
+.ppj-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #4a4a68;
+    font-size: 0.68em;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 10px 4px 9px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+.ppj-tab:hover  { color: #888; }
+.ppj-tab.active { color: #d4af37; border-bottom-color: #d4af37; }
 
-    mostrarVista('catalogo');
-};
+/* ══ BODY ════════════════════════════════════════════════════ */
+.ppj-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 0 60px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212,175,55,0.2) transparent;
+}
+.ppj-body::-webkit-scrollbar { width: 4px; }
+.ppj-body::-webkit-scrollbar-track { background: transparent; }
+.ppj-body::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.2); border-radius: 2px; }
+
+.ppj-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.ppj-section-title {
+    font-size: 0.62em;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #3a3a58;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+/* ══ TAB HEX ════════════════════════════════════════════════ */
+.ppj-hex-val {
+    font-family: 'Cinzel', serif;
+    font-size: 2.4em;
+    color: #d4af37;
+    text-align: center;
+    padding: 18px 0 10px;
+    letter-spacing: 2px;
+}
+.ppj-hex-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    margin-top: 6px;
+}
+.ppj-hex-btn {
+    background: rgba(212,175,55,0.06);
+    border: 1px solid rgba(212,175,55,0.15);
+    border-radius: 6px;
+    color: #d4af37;
+    font-size: 0.75em;
+    padding: 6px 2px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-weight: 600;
+}
+.ppj-hex-btn:hover { background: rgba(212,175,55,0.15); }
+.ppj-hex-btn.neg { color: #e06060; border-color: rgba(220,80,80,0.2); background: rgba(220,80,80,0.05); }
+.ppj-hex-btn.neg:hover { background: rgba(220,80,80,0.12); }
+.ppj-asistencia {
+    text-align: center;
+    color: #5a5a78;
+    font-size: 0.78em;
+    margin-top: 14px;
+}
+.ppj-asistencia strong { color: #9090b0; }
+
+/* ══ TAB STATS ══════════════════════════════════════════════ */
+.ppj-vida-block { margin-bottom: 12px; }
+.ppj-vida-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.ppj-vida-label { font-size: 0.78em; color: #888; font-weight: 500; }
+.ppj-vida-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ppj-vida-xy {
+    font-size: 0.88em;
+    font-weight: 600;
+    color: #ccc;
+}
+.ppj-vida-xy .actual { color: #e8e8e8; }
+.ppj-vida-xy .sep    { color: #3a3a58; margin: 0 2px; }
+.ppj-vida-xy .maximo { color: #5a5a78; }
+.ppj-ctrl-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    color: #888;
+    width: 22px; height: 22px;
+    font-size: 0.85em;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s;
+}
+.ppj-ctrl-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+
+/* Barras segmentadas */
+.ppj-seg-bar {
+    display: flex;
+    gap: 2px;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+.ppj-seg { height: 100%; border-radius: 1px; transition: background 0.2s; }
+.ppj-seg.on-vida   { background: #d4af37; }
+.ppj-seg.off-vida  { background: rgba(212,175,55,0.12); }
+.ppj-seg.on-azul   { background: #4ab3e8; }
+.ppj-seg.off-azul  { background: rgba(74,179,232,0.1); }
+.ppj-seg.on-guarda { background: #d4af37; opacity: 0.8; }
+.ppj-seg.off-guarda{ background: rgba(212,175,55,0.08); }
+
+/* VEX bar */
+.ppj-vex-bar {
+    height: 6px; border-radius: 3px;
+    background: rgba(160,80,220,0.12);
+    overflow: hidden; margin-top: 5px;
+}
+.ppj-vex-fill { height: 100%; background: #9a50dc; border-radius: 3px; transition: width 0.3s; }
+
+.ppj-formula { font-size: 0.62em; color: #2e2e48; font-family: monospace; margin-top: 3px; }
+
+/* Override máx */
+.ppj-max-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0 8px;
+    padding: 5px 8px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.04);
+}
+.ppj-max-label { font-size: 0.68em; color: #3a3a58; flex: 1; }
+.ppj-max-val   { font-size: 0.8em; color: #888; min-width: 28px; text-align: center; font-weight: 600; }
+.ppj-max-val.formula { color: #4a4a68; }
+.ppj-max-val.manual  { color: #d4af37; }
+.ppj-hint { font-size: 0.6em; color: #3a3a58; }
+.ppj-hint.manual { color: rgba(212,175,55,0.5); }
+
+/* Afinidades */
+.ppj-afin-block {
+    background: rgba(255,255,255,0.02);
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.04);
+    padding: 10px 12px;
+    margin-bottom: 7px;
+}
+.ppj-afin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.ppj-afin-name  { font-size: 0.78em; color: #9090b0; font-weight: 500; }
+.ppj-afin-total { font-size: 1em; color: #d4af37; font-weight: 700; }
+.ppj-afin-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+.ppj-afin-src-lbl {
+    font-size: 0.6em;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    width: 28px; text-align: center;
+}
+.src-b   { background: rgba(100,150,255,0.12); color: #6496ff; }
+.src-ext { background: rgba(212,175,55,0.1);  color: #d4af37; }
+.src-alt { background: rgba(220,100,100,0.1); color: #e08080; }
+.ppj-afin-val { font-size: 0.82em; color: #ccc; min-width: 24px; text-align: center; font-weight: 600; }
+
+/* Push */
+.ppj-push-block {
+    background: rgba(255,255,255,0.02);
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.04);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+.ppj-push-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+}
+.ppj-push-label { font-size: 0.78em; color: #9090b0; font-weight: 600; }
+.ppj-push-dots  { display: flex; gap: 4px; }
+.ppj-dot { width: 8px; height: 8px; border-radius: 50%; }
+.ppj-dot.used  { background: #d4af37; }
+.ppj-dot.avail { background: rgba(212,175,55,0.2); border: 1px solid rgba(212,175,55,0.3); }
+.ppj-push-info {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 6px;
+}
+.ppj-push-valor { font-size: 0.72em; color: #5a5a78; }
+.ppj-push-cd { font-size: 0.7em; color: #e09040; margin-top: 4px; }
+.btn-push-pj {
+    background: rgba(212,175,55,0.1);
+    border: 1px solid rgba(212,175,55,0.3);
+    border-radius: 5px;
+    color: #d4af37;
+    font-size: 0.72em;
+    font-weight: 600;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.5px;
+}
+.btn-push-pj:hover:not(:disabled) { background: rgba(212,175,55,0.2); }
+.btn-push-pj:disabled { opacity: 0.4; cursor: default; }
+
+/* ══ TAB HECHIZOS ═══════════════════════════════════════════ */
+.ppj-hechizo-card {
+    background: rgba(255,255,255,0.02);
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.04);
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    cursor: default;
+    transition: border-color 0.15s;
+}
+.ppj-hechizo-card:hover { border-color: rgba(255,255,255,0.08); }
+.ppj-hechizo-header {
+    display: flex; align-items: flex-start; gap: 8px;
+}
+.ppj-hechizo-af {
+    font-size: 0.58em;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    text-transform: uppercase;
+}
+.ppj-hechizo-nombre { font-size: 0.82em; font-weight: 600; color: #d0d0e0; flex: 1; }
+.ppj-hechizo-clase  { font-size: 0.62em; color: #4a4a68; margin-left: auto; flex-shrink: 0; }
+.ppj-hechizo-desc   { font-size: 0.72em; color: #5a5a78; margin-top: 5px; line-height: 1.5; }
+.ppj-hechizo-hex    {
+    font-size: 0.65em; color: #8a6a20;
+    margin-top: 4px;
+    font-family: 'Cinzel', serif;
+}
+
+.ppj-aprendibles-grupo {
+    margin-bottom: 10px;
+}
+.ppj-aprendibles-req {
+    font-size: 0.63em; color: #4a4a68;
+    margin-bottom: 5px;
+    letter-spacing: 0.3px;
+    padding: 3px 8px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 3px;
+    border-left: 2px solid rgba(255,255,255,0.06);
+}
+
+/* ══ TAB OBJETOS ════════════════════════════════════════════ */
+.ppj-obj-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.04);
+    margin-bottom: 5px;
+}
+.ppj-obj-cant {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #d4af37;
+    min-width: 28px;
+    text-align: center;
+}
+.ppj-obj-info { flex: 1; min-width: 0; }
+.ppj-obj-nombre { font-size: 0.8em; color: #ccc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ppj-obj-det    { font-size: 0.65em; color: #5a5a78; margin-top: 2px; }
+.ppj-obj-eqp    { font-size: 0.62em; padding: 2px 7px; border-radius: 10px; }
+.ppj-obj-eqp.on  { background: rgba(212,175,55,0.1); color: #d4af37; border: 1px solid rgba(212,175,55,0.2); }
+.ppj-obj-eqp.off { background: rgba(255,255,255,0.03); color: #3a3a58; border: 1px solid rgba(255,255,255,0.05); }
+
+/* ══ TAB MISIONES ═══════════════════════════════════════════ */
+.ppj-mision-card {
+    background: rgba(255,255,255,0.02);
+    border-radius: 7px;
+    border: 1px solid rgba(255,255,255,0.04);
+    padding: 11px 13px;
+    margin-bottom: 7px;
+}
+.ppj-mis-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 5px; }
+.ppj-mis-titulo { font-size: 0.82em; font-weight: 600; color: #c8c8d8; flex: 1; }
+.ppj-mis-clase  { font-size: 0.62em; color: #4a4a68; flex-shrink: 0; }
+.ppj-mis-badge  { font-size: 0.62em; padding: 2px 8px; border-radius: 10px; margin-bottom: 5px; display: inline-block; }
+.ppj-mis-0 { background: rgba(100,100,100,0.1); color: #666; border: 1px solid rgba(100,100,100,0.2); }
+.ppj-mis-1 { background: rgba(212,175,55,0.1);  color: #d4af37; border: 1px solid rgba(212,175,55,0.2); }
+.ppj-mis-2 { background: rgba(74,179,232,0.1);  color: #4ab3e8; border: 1px solid rgba(74,179,232,0.2); }
+.ppj-mis-3 { background: rgba(62,207,110,0.1);  color: #3ecf6e; border: 1px solid rgba(62,207,110,0.2); }
+.ppj-mis-desc { font-size: 0.7em; color: #5a5a78; line-height: 1.5; margin-top: 4px; }
+
+/* ══ UPLOAD IMAGEN ══════════════════════════════════════════ */
+.ppj-img-preview {
+    width: 100%; max-height: 180px;
+    object-fit: cover; object-position: top;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    display: block;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.ppj-img-preview:hover { border-color: rgba(212,175,55,0.3); }
+.ppj-upload-zone {
+    border: 1px dashed rgba(212,175,55,0.25);
+    border-radius: 7px;
+    padding: 14px;
+    text-align: center;
+    font-size: 0.75em;
+    color: #4a4a68;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+.ppj-upload-zone:hover { border-color: rgba(212,175,55,0.5); background: rgba(212,175,55,0.04); color: #888; }
+
+/* ══ EMPTY STATES ══════════════════════════════════════════ */
+.ppj-empty {
+    text-align: center;
+    color: #2e2e48;
+    font-size: 0.75em;
+    padding: 24px 0;
+}
+.ppj-empty-icon { font-size: 1.6em; margin-bottom: 8px; opacity: 0.4; }
+
+/* ══ BTN EDITAR FOOTER ════════════════════════════════════ */
+.ppj-footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 10px 16px;
+    background: linear-gradient(to top, #08080f 70%, transparent);
+    display: flex; gap: 8px;
+    flex-shrink: 0;
+}
+.ppj-btn-editar {
+    flex: 1;
+    background: rgba(212,175,55,0.08);
+    border: 1px solid rgba(212,175,55,0.2);
+    border-radius: 6px;
+    color: #d4af37;
+    font-size: 0.78em;
+    font-weight: 600;
+    padding: 9px;
+    cursor: pointer;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.5px;
+    transition: background 0.15s;
+}
+.ppj-btn-editar:hover { background: rgba(212,175,55,0.15); }
+
+/* ══ LOADER INLINE ═════════════════════════════════════════ */
+.ppj-loader {
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    color: #3a3a58;
+    font-size: 0.75em;
+    gap: 8px;
+}
+.ppj-loader::before {
+    content: '';
+    width: 14px; height: 14px;
+    border: 2px solid rgba(212,175,55,0.2);
+    border-top-color: #d4af37;
+    border-radius: 50%;
+    animation: ppj-spin 0.8s linear infinite;
+}
+@keyframes ppj-spin { to { transform: rotate(360deg); } }
+
+/* ══ RESPONSIVE ═══════════════════════════════════════════ */
+@media (max-width: 480px) {
+    #panel-pj-root { width: 100vw; }
+}
+`;
+    document.head.appendChild(st);
+}
 
 // ─────────────────────────────────────────────────────────────
-// NAVEGACIÓN
+// CREAR ESTRUCTURA DEL PANEL (una sola vez)
 // ─────────────────────────────────────────────────────────────
-window.mostrarVista = function(vista) {
-    estadoUI.vista = vista;
-    document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    const page = document.getElementById('page-' + vista);
-    if (page) page.classList.add('active');
-    const tab = document.querySelector(`.tab-btn[data-vista="${vista}"]`);
-    if (tab) tab.classList.add('active');
+function _crearEstructura() {
+    if (document.getElementById('panel-pj-root')) return;
+    _inyectarEstilos();
 
-    if (vista === 'catalogo') renderCatalogo();
-    if (vista === 'crear')    inicializarFormulario();
-    if (vista === 'formulas') {
-        if (!estadoUI.esAdmin) {
-            mostrarToast('Solo el OP puede editar fórmulas', true);
-            window.mostrarVista('catalogo');
-            return;
-        }
-        renderFormulas();
-    }
-};
+    const overlay = document.createElement('div');
+    overlay.id = 'panel-pj-overlay';
+    overlay.onclick = cerrarPanelPJ;
+    document.body.appendChild(overlay);
 
-window.abrirLoginOP   = function() { hexAuth._mostrarModalLogin(); };
-
-// Abre el selector de campaña como modal inline, sin salir de la página
-window.cambiarCampaña = function() {
-    // Reutilizar el mismo sistema del guard si está disponible
-    if (typeof window._hexGuardSelect === 'function') {
-        // El guard ya está cargado, forzar su modal
-        _mostrarModalCampaña();
-        return;
-    }
-    // Fallback: si por alguna razón el guard no está activo
-    localStorage.removeItem('hex_selected');
-    window.location.reload();
-};
-
-function _mostrarModalCampaña() {
-    // Evitar duplicados
-    let modal = document.getElementById('hex-campana-modal');
-    if (modal) { modal.remove(); return; }
-
-    modal = document.createElement('div');
-    modal.id = 'hex-campana-modal';
-    modal.style.cssText = `
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.82);
-        backdrop-filter: blur(6px);
-        z-index: 999998;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 32px 20px;
-        font-family: 'Inter', system-ui, sans-serif;
+    const root = document.createElement('div');
+    root.id = 'panel-pj-root';
+    root.innerHTML = `
+        <div class="ppj-header" id="ppj-header"></div>
+        <div class="ppj-tabs"  id="ppj-tabs"></div>
+        <div class="ppj-body"  id="ppj-body"></div>
+        <div class="ppj-footer" id="ppj-footer"></div>
     `;
-    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+    document.body.appendChild(root);
+}
 
-    // Obtener configs
-    const configs = window.hexConfigs || null;
-    const actual  = localStorage.getItem('hex_selected') || 'hex1';
+// ─────────────────────────────────────────────────────────────
+// ABRIR / CERRAR
+// ─────────────────────────────────────────────────────────────
+export function abrirPanelPJ(nombre) {
+    _crearEstructura();
+    estadoUI.pjSeleccionado = nombre;
+    estadoUI.panelAbierto   = true;
 
-    let cardsHTML = '';
-    if (configs) {
-        cardsHTML = Object.entries(configs).map(([id, cfg]) => {
-            const esActual = id === actual;
-            return `<div onclick="window._hexGuardSelect('${id}')" style="
-                background: ${esActual ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.03)'};
-                border: 1px solid ${esActual ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.07)'};
-                border-radius:10px; padding:18px 16px; cursor:pointer; transition:all 0.2s;
-                display:flex; flex-direction:column; gap:5px;
-            "
-            onmouseover="this.style.borderColor='rgba(212,175,55,0.45)'; this.style.background='rgba(212,175,55,0.08)';"
-            onmouseout="this.style.borderColor='${esActual ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.07)'}'; this.style.background='${esActual ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.03)'}';">
-                <div style="font-size:0.58em; color:#5a3a8a; letter-spacing:3px; text-transform:uppercase;">${id.toUpperCase()}${esActual ? ' · ACTIVA' : ''}</div>
-                <div style="font-family:'Cinzel',serif; font-size:0.88em; color:#d4af37;">${cfg.ui?.titulo || cfg.nombreCorto || id}</div>
-                <div style="font-size:0.72em; color:#5a5a78; line-height:1.4;">${cfg.ui?.lore || cfg.ui?.subtitulo || ''}</div>
-            </div>`;
-        }).join('');
-    } else {
-        cardsHTML = ['hex1','hex2','hex3'].map(id => `
-            <div onclick="window._hexGuardSelect('${id}')" style="
-                background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
-                border-radius:10px; padding:18px 16px; cursor:pointer;
-            ">
-                <div style="font-family:'Cinzel',serif; font-size:0.88em; color:#d4af37;">${id.toUpperCase()}</div>
-            </div>
-        `).join('');
-    }
+    const root    = document.getElementById('panel-pj-root');
+    const overlay = document.getElementById('panel-pj-overlay');
+    root.classList.add('open');
+    overlay.classList.add('open');
 
-    modal.innerHTML = `
-        <div style="
-            background:#0f0f18;
-            border:1px solid rgba(212,175,55,0.2);
-            border-radius:14px;
-            padding:28px 24px;
-            width:100%;
-            max-width:600px;
-            max-height:90vh;
-            overflow-y:auto;
-        ">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:22px;">
-                <div>
-                    <div style="font-family:'Cinzel',serif; font-size:0.95em; color:#d4af37; letter-spacing:2px; margin-bottom:3px;">CAMBIAR CAMPAÑA</div>
-                    <div style="font-size:0.72em; color:#5a5a78;">La página se recargará con la campaña seleccionada</div>
-                </div>
-                <button onclick="document.getElementById('hex-campana-modal').remove()" style="
-                    background:none; border:none; color:#5a5a78; font-size:1.4em;
-                    cursor:pointer; line-height:1; padding:4px;
-                ">×</button>
-            </div>
-            <div style="
-                display:grid;
-                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-                gap:10px;
-            ">${cardsHTML}</div>
+    _renderHeader(nombre);
+    _renderTabs(nombre);
+    _renderTab(nombre, _tabActivo[nombre] || 'hex');
+}
+
+export function cerrarPanelPJ() {
+    estadoUI.panelAbierto = false;
+    document.getElementById('panel-pj-root')?.classList.remove('open');
+    document.getElementById('panel-pj-overlay')?.classList.remove('open');
+}
+
+// ─────────────────────────────────────────────────────────────
+// HEADER
+// ─────────────────────────────────────────────────────────────
+function _renderHeader(nombre) {
+    const p   = personajes[nombre]; if (!p) return;
+    const icono = p.iconoOverride || nombre;
+    const safe  = nombre.replace(/'/g, "\\'");
+
+    const tags = [
+        p.isPlayer ? `<span class="ppj-tag ppj-tag-jugador">Jugador</span>` : `<span class="ppj-tag ppj-tag-npc">NPC</span>`,
+        p.isActive ? `<span class="ppj-tag ppj-tag-activo">Activo</span>`  : `<span class="ppj-tag ppj-tag-inactivo">Inactivo</span>`
+    ].join('');
+
+    const puedeEditar = estadoUI.esAdmin || !p.isPlayer;
+
+    document.getElementById('ppj-header').innerHTML = `
+        <img class="ppj-avatar" src="${_imgIcon(icono)}"
+             onerror="this.src='${_fallback()}'"
+             onclick="window._ppjAbrirImgGrande('${safe}')"
+             title="Ver imagen">
+        <div class="ppj-header-info">
+            <div class="ppj-nombre">${nombre}</div>
+            <div class="ppj-tags">${tags}</div>
+        </div>
+        <div class="ppj-header-btns">
+            ${puedeEditar ? `<button class="ppj-btn-icon" title="Editar" onclick="window.editarPersonaje('${safe}')">✏️</button>` : ''}
+            <button class="ppj-btn-icon ppj-close" onclick="window.cerrarPanelPJ()">×</button>
         </div>
     `;
 
-    document.body.appendChild(modal);
+    // Footer
+    document.getElementById('ppj-footer').innerHTML = puedeEditar
+        ? `<button class="ppj-btn-editar" onclick="window.editarPersonaje('${safe}')">Editar personaje</button>`
+        : '';
 }
 
-// Exponer para que el guard pueda usarla también
-window._mostrarModalCampaña = _mostrarModalCampaña;
-
 // ─────────────────────────────────────────────────────────────
-// FILTROS
+// TABS
 // ─────────────────────────────────────────────────────────────
-window.setFiltro = function(tipo, val, btn) {
-    if (tipo === 'rol') {
-        estadoUI.filtroRol = val;
-        document.querySelectorAll('.filtro-rol').forEach(b => b.classList.remove('active'));
-    } else {
-        estadoUI.filtroAct = val;
-        document.querySelectorAll('.filtro-act').forEach(b => b.classList.remove('active'));
-    }
-    btn.classList.add('active');
-    renderCatalogo();
-};
-window.buscar = function(v) { estadoUI.busqueda = v.toLowerCase(); renderCatalogo(); };
-
-// ─────────────────────────────────────────────────────────────
-// PANEL LATERAL
-// ─────────────────────────────────────────────────────────────
-window.abrirDetalle = function(nombre) {
-    estadoUI.pjSeleccionado = nombre;
-    estadoUI.panelAbierto = true;
-    renderDetalle(nombre);
-    document.getElementById('panel-lateral')?.classList.add('open');
-};
-window.cerrarDetalle = function() {
-    estadoUI.panelAbierto = false;
-    document.getElementById('panel-lateral')?.classList.remove('open');
-};
-
-window.modStat = function(nombre, campo, delta) {
+function _renderTabs(nombre) {
     const p = personajes[nombre]; if (!p) return;
+    const tabs = [
+        { id: 'hex',      label: 'HEX' },
+        { id: 'stats',    label: 'Stats' },
+        { id: 'hechizos', label: 'Hechizos' },
+        { id: 'objetos',  label: 'Objetos' },
+        ...( p.isPlayer ? [{ id: 'misiones', label: 'Misiones' }] : [] )
+    ];
+
+    document.getElementById('ppj-tabs').innerHTML = tabs.map(t => `
+        <button class="ppj-tab ${(_tabActivo[nombre] || 'hex') === t.id ? 'active' : ''}"
+                onclick="window._ppjCambiarTab('${nombre.replace(/'/g,"\\'")}','${t.id}')">
+            ${t.label}
+        </button>
+    `).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// ROUTING DE TABS
+// ─────────────────────────────────────────────────────────────
+function _renderTab(nombre, tab) {
+    _tabActivo[nombre] = tab;
+    const body = document.getElementById('ppj-body');
+    body.innerHTML = `<div class="ppj-loader">Cargando...</div>`;
+
+    // Actualizar estado activo de los botones
+    document.querySelectorAll('.ppj-tab').forEach(b => b.classList.remove('active'));
+    const btnActivo = [...document.querySelectorAll('.ppj-tab')].find(b =>
+        b.textContent.trim().toLowerCase() === tab || b.getAttribute('onclick')?.includes(`'${tab}'`)
+    );
+    if (btnActivo) btnActivo.classList.add('active');
+
+    // Despachar la pestaña correcta
+    switch (tab) {
+        case 'hex':      body.innerHTML = _tabHex(nombre);      break;
+        case 'stats':    body.innerHTML = _tabStats(nombre);     break;
+        case 'hechizos': _tabHechizos(nombre, body);             break;
+        case 'objetos':  _tabObjetos(nombre, body);              break;
+        case 'misiones': _tabMisiones(nombre, body);             break;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB: HEX
+// ─────────────────────────────────────────────────────────────
+function _tabHex(nombre) {
+    const p   = personajes[nombre]; if (!p) return '<div class="ppj-empty">Sin datos</div>';
+    const safe = nombre.replace(/'/g, "\\'");
+    const canEdit = estadoUI.esAdmin || !p.isPlayer;
+
+    const deltas = [1000, 500, 300, 100, 50, 10, 5, 1];
+
+    const btnsNeg = deltas.map(d =>
+        canEdit ? `<button class="ppj-hex-btn neg" onclick="window.modStat('${safe}','hex',${-d})">−${d}</button>` : ''
+    ).join('');
+    const btnsPos = deltas.map(d =>
+        canEdit ? `<button class="ppj-hex-btn" onclick="window.modStat('${safe}','hex',${d})">+${d}</button>` : ''
+    ).join('');
+
+    // Subir imagen
+    const imgSec = (estadoUI.esAdmin || !p.isPlayer) ? `
+    <div class="ppj-section">
+        <div class="ppj-section-title">Imagen del personaje</div>
+        <img class="ppj-img-preview"
+             src="${_imgPj(p.iconoOverride || nombre)}"
+             onerror="this.src='${_fallback()}'"
+             onclick="window.abrirSubirImagen('${safe}')"
+             title="Clic para cambiar imagen">
+        <div class="ppj-upload-zone" onclick="window.abrirSubirImagen('${safe}')">
+            📷 Clic para subir nueva imagen
+        </div>
+    </div>` : `
+    <div class="ppj-section">
+        <div class="ppj-section-title">Imagen</div>
+        <img class="ppj-img-preview"
+             src="${_imgPj(p.iconoOverride || nombre)}"
+             onerror="this.src='${_fallback()}'"
+             onclick="window._ppjAbrirImgGrande('${safe}')">
+    </div>`;
+
+    return `
+    <div class="ppj-section">
+        <div class="ppj-section-title">Saldo HEX</div>
+        <div class="ppj-hex-val">${(p.hex || 0).toLocaleString()}</div>
+        ${canEdit ? `
+        <div class="ppj-hex-grid">${btnsNeg}</div>
+        <div class="ppj-hex-grid" style="margin-top:5px;">${btnsPos}</div>
+        ` : ''}
+        <div class="ppj-asistencia" style="margin-top:14px;">
+            Asistencia: <strong>${p.asistencia || 1}</strong>
+        </div>
+    </div>
+    ${imgSec}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// BARRAS SEGMENTADAS (helper)
+// ─────────────────────────────────────────────────────────────
+function _barraSegs(actual, max, tipo, maxCells = 26) {
+    if (!max || max <= 0) return '';
+    const n = Math.min(maxCells, max);
+    const hpPorCelda = max / n;
+    let segs = '';
+    for (let i = 0; i < n; i++) {
+        const filled = actual > hpPorCelda * i;
+        segs += `<span class="ppj-seg ${filled ? 'on' : 'off'}-${tipo}"></span>`;
+    }
+    return `<div class="ppj-seg-bar">${segs}</div>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB: STATS
+// ─────────────────────────────────────────────────────────────
+function _tabStats(nombre) {
+    const p = personajes[nombre]; if (!p) return '';
     const s = calcularStats(p);
-    const maximos = { vida_roja_actual: s.vida_roja_max, vex_actual: s.vex_max, guarda_actual: s.guarda_max };
-    const max = maximos[campo] ?? Infinity;
-    p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
-    encolarCambio(nombre, campo, p[campo]);
-    renderDetalle(nombre);
-    renderCatalogo();
-    actualizarBtnSync();
-};
+    const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
+    const canEdit   = estadoUI.esAdmin || !p.isPlayer;
+    const safe = nombre.replace(/'/g, "\\'");
 
-window.modAfin = function(nombre, afinKey, delta) {
-    if (!estadoUI.esAdmin) return;
-    const p = personajes[nombre]; if (!p) return;
-    if (!p.afinidadesBase) p.afinidadesBase = {};
-    p.afinidadesBase[afinKey] = Math.max(0, (p.afinidadesBase[afinKey] || 0) + delta);
-    encolarCambio(nombre, `af_${afinKey}`, p.afinidadesBase[afinKey]);
-    renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
-};
+    const _vida = (label, campo, actual, max, tipo, color, nSeg) => {
+        const barra  = _barraSegs(actual, max, tipo, nSeg);
+        const esOver = actual > max;
+        return `<div class="ppj-vida-block">
+            <div class="ppj-vida-header">
+                <span class="ppj-vida-label" style="color:${color};">${label}</span>
+                <div class="ppj-vida-ctrl">
+                    ${canEdit ? `<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','${campo}',-1)">−</button>` : ''}
+                    <span class="ppj-vida-xy">
+                        <span class="actual ${esOver ? 'val-over' : ''}" style="color:${color};">${actual}</span>
+                        <span class="sep">/</span>
+                        <span class="maximo">${max}</span>
+                    </span>
+                    ${canEdit ? `<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','${campo}',1)">+</button>` : ''}
+                </div>
+            </div>
+            ${barra}
+        </div>`;
+    };
 
-window.modBf = function(nombre, afinKey, delta) {
-    const p = personajes[nombre]; if (!p) return;
-    if (!estadoUI.esAdmin && p.isPlayer) return;
-    if (!p.afinidadesBf) p.afinidadesBf = {};
-    p.afinidadesBf[afinKey] = Math.max(-999, (p.afinidadesBf[afinKey] || 0) + delta);
-    encolarCambio(nombre, `bf_${afinKey}`, p.afinidadesBf[afinKey]);
-    renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
-};
+    const _maxOverride = (label, campo, override, formula) => {
+        if (!estadoUI.esAdmin) return '';
+        const usandoFormula = override === 0;
+        return `<div class="ppj-max-row">
+            <span class="ppj-max-label">Máx ${label}</span>
+            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','${campo}',-1)">−</button>
+            <span class="ppj-max-val ${usandoFormula ? 'formula' : 'manual'}">${formula}</span>
+            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','${campo}',1)">+</button>
+            ${!usandoFormula ? `<button class="ppj-ctrl-btn" onclick="window.resetStatMax('${safe}','${campo}')" title="Volver a fórmula">↺</button>` : ''}
+            <span class="ppj-hint ${usandoFormula ? '' : 'manual'}">${usandoFormula ? 'fórmula' : 'manual'}</span>
+        </div>`;
+    };
 
-window.modEf = function(nombre, afinKey, delta) {
-    const p = personajes[nombre]; if (!p) return;
-    if (!estadoUI.esAdmin && p.isPlayer) return;
-    if (!p.afinidadesEf) p.afinidadesEf = {};
-    p.afinidadesEf[afinKey] = Math.max(-999, (p.afinidadesEf[afinKey] || 0) + delta);
-    encolarCambio(nombre, `ef_${afinKey}`, p.afinidadesEf[afinKey]);
-    renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
-};
+    // Push
+    const _push = (recurso, label, emoji) => {
+        const hasMax = recurso === 'vex' ? s.vex_max > 0 : s.guarda_max > 0;
+        if (!hasMax) return '';
+        const disponibles = calcularPushDisponibles(p, s, recurso);
+        const usados = recurso === 'vex' ? (p.push_vex_actual || 0) : (p.push_guarda_actual || 0);
+        const restantes = Math.max(0, disponibles - usados);
+        const valorPush = calcularValorPush(p, recurso);
+        const cd = calcularCooldownPush(p, recurso);
+        const canPush = restantes > 0 && cd.disponible;
 
-window.editarPersonaje = function(nombre) {
-    const p = personajes[nombre];
-    if (!estadoUI.esAdmin && p?.isPlayer) {
-        mostrarToast('Solo el OP puede editar personajes jugadores', true);
-        return;
-    }
-    estadoUI.formMode   = 'editar';
-    estadoUI.pjEditando = nombre;
-    window.mostrarVista('crear');
-    cerrarDetalle();
-    rellenarFormulario(nombre);
-};
+        const dots = Array.from({ length: Math.max(disponibles, 1) }, (_, i) =>
+            `<span class="ppj-dot ${i < usados ? 'used' : 'avail'}"></span>`
+        ).join('');
+
+        const cdText = !cd.disponible
+            ? `<div class="ppj-push-cd">⏳ ${Math.floor(cd.restaSeg/60)}m ${String(cd.restaSeg%60).padStart(2,'0')}s</div>`
+            : '';
+
+        return `<div class="ppj-push-block">
+            <div class="ppj-push-header">
+                <span class="ppj-push-label">${emoji} ${label}</span>
+                <div class="ppj-push-dots">${dots}</div>
+                <span style="font-size:0.68em;color:#4a4a68;">${usados}/${disponibles}</span>
+            </div>
+            ${cdText}
+            <div class="ppj-push-info">
+                <span class="ppj-push-valor">+${valorPush} por push</span>
+                <button class="btn-push-pj" ${canPush ? '' : 'disabled'}
+                    onclick="window.ejecutarPush('${safe}','${recurso}')">
+                    ${!cd.disponible ? 'Cooldown' : (restantes > 0 ? `Push ${label}` : 'Sin pushes')}
+                </button>
+            </div>
+            ${estadoUI.esAdmin ? `<div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+                <span style="font-size:0.62em;color:#3a3a58;">Extra OP</span>
+                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',-1)">−</button>
+                <span style="font-size:0.75em;color:#888;">${recurso==='vex'?(p.push_vex_limit||0):(p.push_guarda_limit||0)}</span>
+                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',1)">+</button>
+                <button class="ppj-ctrl-btn" onclick="window.resetPushes('${safe}','${recurso}')" style="margin-left:4px;">↺</button>
+            </div>` : ''}
+        </div>`;
+    };
+
+    // Afinidades
+    const AFINIDADES = [
+        { key:'fisica',     label:'Física' },
+        { key:'energetica', label:'Energética' },
+        { key:'espiritual', label:'Espiritual' },
+        { key:'mando',      label:'Mando' },
+        { key:'psiquica',   label:'Psíquica' },
+        { key:'oscura',     label:'Oscura' }
+    ];
+
+    const afinRows = AFINIDADES.map(a => {
+        const base  = p.afin_base?.[a.key]  || 0;
+        const extra = p.afin_extra?.[a.key] || 0;
+        const alter = p.afin_alter?.[a.key] || 0;
+        const total = base + extra + alter;
+        return `<div class="ppj-afin-block">
+            <div class="ppj-afin-header">
+                <span class="ppj-afin-name">${a.label}</span>
+                <span class="ppj-afin-total">${total}</span>
+            </div>
+            <div class="ppj-afin-row">
+                <span class="ppj-afin-src-lbl src-b">B</span>
+                ${estadoUI.esAdmin ? `<button class="ppj-ctrl-btn" onclick="window.modAfin('${safe}','${a.key}',-1)">−</button>` : ''}
+                <span class="ppj-afin-val">${base}</span>
+                ${estadoUI.esAdmin ? `<button class="ppj-ctrl-btn" onclick="window.modAfin('${safe}','${a.key}',1)">+</button>` : ''}
+            </div>
+            <div class="ppj-afin-row">
+                <span class="ppj-afin-src-lbl src-ext">Ext</span>
+                ${estadoUI.esAdmin ? `<button class="ppj-ctrl-btn" onclick="window.modAfinExtra('${safe}','${a.key}',-1)">−</button>` : ''}
+                <span class="ppj-afin-val">${extra >= 0 ? '+' : ''}${extra}</span>
+                ${estadoUI.esAdmin ? `<button class="ppj-ctrl-btn" onclick="window.modAfinExtra('${safe}','${a.key}',1)">+</button>` : ''}
+            </div>
+            <div class="ppj-afin-row">
+                <span class="ppj-afin-src-lbl src-alt">Alt</span>
+                ${canEdit ? `<button class="ppj-ctrl-btn" onclick="window.modAfinAlter('${safe}','${a.key}',-1)">−</button>` : ''}
+                <span class="ppj-afin-val">${alter >= 0 ? '+' : ''}${alter}</span>
+                ${canEdit ? `<button class="ppj-ctrl-btn" onclick="window.modAfinAlter('${safe}','${a.key}',1)">+</button>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+
+    const pctVex = s.vex_max > 0 ? Math.min(100, Math.round((p.vex_actual || 0) / s.vex_max * 100)) : 0;
+
+    return `
+    <div class="ppj-section">
+        <div class="ppj-section-title">Recursos vitales</div>
+
+        ${_vida('Vida Roja', 'vida_roja_actual', p.vida_roja_actual || 0, s.vida_roja_max, 'vida', '#d4af37', 26)}
+        ${_maxOverride('Vida Roja', 'vida_roja_max_op', p.vida_roja_max_op || 0, s.vida_roja_max)}
+        <div class="ppj-formula">${formulas.vida_roja_max?.expr || ''}</div>
+
+        ${s.vida_azul_max > 0 ? `
+        ${_vida('Vida Azul', 'vida_azul_actual', s.vida_azul_actual, s.vida_azul_max, 'azul', '#4ab3e8', 26)}
+        <div class="ppj-formula">${formulas.vida_azul_max?.expr || ''}</div>
+        ` : ''}
+
+        ${s.guarda_max > 0 ? `
+        ${_vida('Guarda Dorada', 'guarda_actual', p.guarda_actual || 0, s.guarda_max, 'guarda', '#d4af37', 20)}
+        ${_maxOverride('Guarda', 'guarda_max_op', p.guarda_max_op || 0, s.guarda_max)}
+        <div class="ppj-formula">${formulas.guarda_max?.expr || ''}</div>
+        ` : ''}
+
+        ${s.vex_max > 0 ? `
+        <div class="ppj-vida-block">
+            <div class="ppj-vida-header">
+                <span class="ppj-vida-label" style="color:#9a50dc;">VEX</span>
+                <div class="ppj-vida-ctrl">
+                    ${canEdit ? `<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',-50)">−50</button>` : ''}
+                    <span class="ppj-vida-xy">
+                        <span class="actual" style="color:#9a50dc;">${Math.floor(p.vex_actual || 0)}</span>
+                        <span class="sep">/</span>
+                        <span class="maximo">${s.vex_max}</span>
+                    </span>
+                    ${canEdit ? `<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',50)">+50</button>` : ''}
+                </div>
+            </div>
+            <div class="ppj-vex-bar"><div class="ppj-vex-fill" style="width:${pctVex}%"></div></div>
+        </div>
+        <div class="ppj-formula">${esJugador ? (formulas.vex_max?.expr || '') : 'Fijo (NPC sistema)'}</div>
+        ` : ''}
+    </div>
+
+    <div class="ppj-section">
+        <div class="ppj-section-title">Pushes</div>
+        ${_push('vex', 'VEX', '⚡')}
+        ${_push('guarda', 'Guarda', '🛡')}
+        ${!s.vex_max && !s.guarda_max ? '<div class="ppj-empty" style="padding:10px 0"><div class="ppj-empty-icon">💤</div>Sin pushes disponibles</div>' : ''}
+    </div>
+
+    <div class="ppj-section">
+        <div class="ppj-section-title">Afinidades</div>
+        ${afinRows}
+    </div>`;
+}
 
 // ─────────────────────────────────────────────────────────────
-// SISTEMA PUSH
+// TAB: HECHIZOS (async — carga desde Supabase)
 // ─────────────────────────────────────────────────────────────
+async function _tabHechizos(nombre, body) {
+    body.innerHTML = '<div class="ppj-loader">Cargando hechizos…</div>';
 
-/**
- * Ejecuta un push de VEX o Guarda para un personaje.
- * Verifica cooldown, pushes disponibles, y actualiza estado + DB.
- */
-window.ejecutarPush = async function(nombre, recurso) {
-    const p = personajes[nombre]; if (!p) return;
-    const s = calcularStats(p);
+    // Cargar inventario de hechizos del personaje
+    const { data: invHz, error } = await supabase
+        .from('hechizos_inventario')
+        .select('hechizo_nombre, hechizo_afinidad, hechizo_hex, tipo, origen')
+        .eq('personaje_nombre', nombre)
+        .order('hechizo_afinidad');
 
-    // 1. Cooldown
-    const cd = calcularCooldownPush(p, recurso);
-    if (!cd.disponible) {
-        const min = Math.ceil(cd.restaSeg / 60);
-        mostrarToast(`⏳ Cooldown: faltan ${min} min para el siguiente push`, true);
+    if (error) {
+        body.innerHTML = '<div class="ppj-empty"><div class="ppj-empty-icon">⚠️</div>Error cargando hechizos</div>';
         return;
     }
 
-    // 2. Pushes disponibles vs. usados
-    const disponibles = calcularPushDisponibles(p, s, recurso);
-    const actualKey   = recurso === 'vex' ? 'push_vex_actual' : 'push_guarda_actual';
-    const usados      = p[actualKey] || 0;
+    const lista = invHz || [];
 
-    if (usados >= disponibles) {
-        mostrarToast(`Sin pushes de ${recurso === 'vex' ? 'VEX' : 'Guarda'} disponibles`, true);
-        return;
-    }
+    // Color por afinidad (paleta del sistema)
+    const _colorAf = (af) => {
+        const map = {
+            'Física':     '#e2a673', 'Energética': '#f3e57a',
+            'Espiritual': '#7df0a7', 'Mando':      '#a4d3f2',
+            'Psíquica':   '#dcb1f0', 'Oscura':     '#ff526f',
+            'HEX':        '#d4af37', 'Desconocida':'#888'
+        };
+        return map[af] || '#888';
+    };
 
-    // 3. Calcular valor y aplicar
-    const valor    = calcularValorPush(p, recurso);
-    const tsKey    = recurso === 'vex' ? 'push_vex_ts' : 'push_guarda_ts';
-    const recursoKey = recurso === 'vex' ? 'vex_actual' : 'guarda_actual';
-    const maxKey   = recurso === 'vex' ? 'vex_max' : 'guarda_max';
-    const maxVal   = recurso === 'vex' ? s.vex_max : s.guarda_max;
+    // Agrupar por afinidad
+    const grupos = {};
+    lista.forEach(h => {
+        const af = h.hechizo_afinidad || 'Sin afinidad';
+        if (!grupos[af]) grupos[af] = [];
+        grupos[af].push(h);
+    });
 
-    p[recursoKey]  = Math.min(maxVal, (p[recursoKey] || 0) + valor);
-    p[actualKey]   = usados + 1;
-    p[tsKey]       = new Date().toISOString();
+    let html = '';
 
-    // 4. Persistir directamente a Supabase (no espera sync manual)
-    const ok = await persistirPush(nombre, p);
-    if (ok) {
-        mostrarToast(`✨ Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`);
+    if (lista.length === 0) {
+        html = `<div class="ppj-empty"><div class="ppj-empty-icon">📖</div>Sin hechizos en el inventario</div>`;
     } else {
-        mostrarToast('Error al guardar push', true);
-    }
-
-    renderDetalle(nombre);
-    renderCatalogo();
-};
-
-/**
- * Reset de pushes del día para un personaje (solo OP, o al inicio del día).
- */
-window.resetPushes = async function(nombre, recurso) {
-    if (!estadoUI.esAdmin) return;
-    const p = personajes[nombre]; if (!p) return;
-    if (recurso === 'vex' || recurso === 'ambos') {
-        p.push_vex_actual = 0;
-        p.push_vex_ts     = null;
-    }
-    if (recurso === 'guarda' || recurso === 'ambos') {
-        p.push_guarda_actual = 0;
-        p.push_guarda_ts     = null;
-    }
-    await persistirPush(nombre, p);
-    mostrarToast('Pushes reiniciados');
-    renderDetalle(nombre);
-};
-
-/**
- * Modificar el límite extra de pushes asignado manualmente por OP.
- */
-window.modPushExtra = function(nombre, recurso, delta) {
-    if (!estadoUI.esAdmin) return;
-    const p = personajes[nombre]; if (!p) return;
-    const limitKey = recurso === 'vex' ? 'push_vex_limit' : 'push_guarda_limit';
-    p[limitKey] = Math.max(0, (p[limitKey] || 0) + delta);
-    encolarCambio(nombre, limitKey, p[limitKey]);
-    renderDetalle(nombre);
-    actualizarBtnSync();
-};
-
-// ─────────────────────────────────────────────────────────────
-// FORMULARIO CREAR / EDITAR
-// ─────────────────────────────────────────────────────────────
-let fIsJugador = true;
-let fIsActivo  = true;
-
-function inicializarFormulario() {
-    if (estadoUI.formMode === 'crear') {
-        estadoUI.pjEditando = null;
-        resetFormulario();
-        if (!estadoUI.esAdmin) {
-            setToggleJugador(false);
-            const tg  = document.getElementById('toggle-jugador');
-            const lbl = document.getElementById('lbl-jugador');
-            if (tg)  tg.style.pointerEvents = 'none';
-            if (lbl) lbl.style.opacity = '0.4';
-        } else {
-            const tg  = document.getElementById('toggle-jugador');
-            const lbl = document.getElementById('lbl-jugador');
-            if (tg)  tg.style.pointerEvents = '';
-            if (lbl) lbl.style.opacity = '';
-        }
-    }
-}
-
-function resetFormulario() {
-    fIsJugador = true; fIsActivo = true;
-    document.getElementById('form-titulo').textContent = 'Crear personaje';
-    document.getElementById('f-nombre').value     = '';
-    document.getElementById('f-icono').value      = '';
-    document.getElementById('f-hex').value        = '1000';
-    document.getElementById('f-asistencia').value = '1';
-    document.getElementById('f-vex-actual').value = '0';
-    document.getElementById('f-vex-max').value    = '0';
-    document.getElementById('f-vida-roja').value  = '10';
-    document.getElementById('f-vida-azul').value  = '0';
-    document.getElementById('f-guarda-act').value = '0';
-    document.getElementById('f-guarda-max').value = '0';
-    setToggleJugador(true);
-    setToggleActivo(true);
-    document.getElementById('npc-tipo-row').style.display  = 'none';
-    document.getElementById('vex-max-row').style.display   = 'none';
-    ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
-        const el = document.getElementById(`afin-${k}`); if (el) el.value = '0';
-    });
-    actualizarPreviewFormulario();
-}
-
-function rellenarFormulario(nombre) {
-    const p = personajes[nombre]; if (!p) return;
-    document.getElementById('form-titulo').textContent = `Editando: ${nombre}`;
-    document.getElementById('f-nombre').value     = nombre;
-    document.getElementById('f-icono').value      = p.iconoOverride || '';
-    document.getElementById('f-hex').value        = p.hex || 0;
-    document.getElementById('f-asistencia').value = p.asistencia || 1;
-    document.getElementById('f-vex-actual').value = p.vex_actual || 0;
-    document.getElementById('f-vex-max').value    = p.vex_max || 0;
-    document.getElementById('f-vida-roja').value  = p.vida_roja_actual || 10;
-    document.getElementById('f-vida-azul').value  = p.vida_azul_max || 0;
-    document.getElementById('f-guarda-act').value = p.guarda_actual || 0;
-    document.getElementById('f-guarda-max').value = p.guarda_max || 0;
-    setToggleJugador(p.isPlayer);
-    setToggleActivo(p.isActive);
-    document.getElementById('f-npc-tipo').value  = p.npc_tipo || 'sistema';
-    document.getElementById('npc-tipo-row').style.display = p.isPlayer ? 'none' : 'flex';
-    document.getElementById('vex-max-row').style.display  = p.isPlayer ? 'none' : 'flex';
-    ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
-        const el = document.getElementById(`afin-${k}`);
-        if (el) el.value = p.afinidadesBase?.[k] || 0;
-    });
-    actualizarPreviewFormulario();
-}
-
-function setToggleJugador(val) {
-    fIsJugador = val;
-    const t = document.getElementById('toggle-jugador');
-    if (t) t.classList.toggle('on', val);
-    const lbl = document.getElementById('lbl-jugador');
-    if (lbl) lbl.textContent = val ? 'Jugador (PC)' : 'NPC';
-    document.getElementById('npc-tipo-row').style.display = val ? 'none' : 'flex';
-    document.getElementById('vex-max-row').style.display  = val ? 'none' : 'flex';
-    actualizarPreviewFormulario();
-}
-function setToggleActivo(val) {
-    fIsActivo = val;
-    const t = document.getElementById('toggle-activo');
-    if (t) t.classList.toggle('on', val);
-}
-
-window.toggleJugador = () => { if (!estadoUI.esAdmin) return; setToggleJugador(!fIsJugador); };
-window.toggleActivo  = () => setToggleActivo(!fIsActivo);
-
-window.actualizarPreviewFormulario = function() {
-    const vals = {};
-    ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
-        vals[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
-    });
-    const ctx = {
-        Fis: vals.fisica, Ene: vals.energetica, Esp: vals.espiritual,
-        Man: vals.mando,  Psi: vals.psiquica,   Osc: vals.oscura,
-        FisB: vals.fisica, EneB: vals.energetica, EspB: vals.espiritual,
-        ManB: vals.mando,  PsiB: vals.psiquica,   OscB: vals.oscura,
-        Hz1:0, Hz2:0, Hz3:0, Hz4:0, Hz5:0
-    };
-    const prev = document.getElementById('afin-preview');
-    if (!prev) return;
-    const v_vida  = evalExpr(formulas.vida_roja_max.expr, ctx);
-    const v_azul  = evalExpr(formulas.vida_azul_max.expr, ctx);
-    const v_guard = evalExpr(formulas.guarda_max.expr, ctx);
-    const v_vex   = fIsJugador ? evalExpr(formulas.vex_max.expr, ctx) : parseInt(document.getElementById('f-vex-max')?.value||0)||0;
-    prev.innerHTML = `Vida Roja: <strong>${v_vida}</strong> &nbsp;·&nbsp; Vida Azul: <strong>${v_azul}</strong> &nbsp;·&nbsp; Guarda: <strong>${v_guard}</strong> &nbsp;·&nbsp; VEX máx: <strong>${v_vex}</strong>`;
-};
-
-window.guardarPersonaje = function() {
-    const nombre = document.getElementById('f-nombre').value.trim();
-    if (!nombre) return mostrarToast('El nombre es obligatorio', true);
-    if (!estadoUI.esAdmin && fIsJugador) {
-        mostrarToast('Solo el OP puede crear personajes jugadores', true);
-        return;
-    }
-    const afinBase = {};
-    ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
-        afinBase[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
-    });
-    const viejo = personajes[nombre] || {};
-    personajes[nombre] = {
-        isPlayer:  fIsJugador,
-        isActive:  fIsActivo,
-        npc_tipo:  fIsJugador ? 'jugador' : (document.getElementById('f-npc-tipo')?.value || 'sistema'),
-        iconoOverride: document.getElementById('f-icono').value.trim() || nombre,
-        hex:       parseInt(document.getElementById('f-hex').value)||0,
-        asistencia: parseInt(document.getElementById('f-asistencia').value)||1,
-        vex_actual: parseInt(document.getElementById('f-vex-actual').value)||0,
-        vex_max:    parseInt(document.getElementById('f-vex-max').value)||0,
-        vida_roja_actual: parseInt(document.getElementById('f-vida-roja').value)||10,
-        vida_azul_max:    parseInt(document.getElementById('f-vida-azul').value)||0,
-        guarda_actual: parseInt(document.getElementById('f-guarda-act').value)||0,
-        guarda_max:    parseInt(document.getElementById('f-guarda-max').value)||0,
-        afinidadesBase: afinBase,
-        afinidadesHz: viejo.afinidadesHz || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
-        afinidadesEf: viejo.afinidadesEf || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
-        afinidadesBf: viejo.afinidadesBf || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
-        hz_clase1:0, hz_clase2:0, hz_clase3:0, hz_clase4:0, hz_clase5:0,
-        estados: viejo.estados || {},
-        // Preservar push state si existía
-        push_vex_actual:    viejo.push_vex_actual    || 0,
-        push_vex_limit:     viejo.push_vex_limit     || 0,
-        push_vex_extra:     viejo.push_vex_extra     || 0,
-        push_vex_ts:        viejo.push_vex_ts        || null,
-        push_guarda_actual: viejo.push_guarda_actual || 0,
-        push_guarda_limit:  viejo.push_guarda_limit  || 0,
-        push_guarda_extra:  viejo.push_guarda_extra  || 0,
-        push_guarda_ts:     viejo.push_guarda_ts     || null,
-    };
-    encolarCambio(nombre, '__full__', true);
-    actualizarBtnSync();
-    mostrarToast(`Personaje "${nombre}" ${estadoUI.formMode === 'crear' ? 'creado' : 'actualizado'}`);
-    estadoUI.formMode = 'crear';
-    estadoUI.pjEditando = null;
-    window.mostrarVista('catalogo');
-};
-
-window.cancelarFormulario = function() {
-    estadoUI.formMode = 'crear';
-    estadoUI.pjEditando = null;
-    window.mostrarVista('catalogo');
-};
-
-// ─────────────────────────────────────────────────────────────
-// ELIMINAR
-// ─────────────────────────────────────────────────────────────
-window.pedirDelete = function(nombre) {
-    if (!estadoUI.esAdmin) return;
-    if (!confirm(`¿Eliminar a "${nombre}" permanentemente?`)) return;
-    delete personajes[nombre];
-    encolarCambio(nombre, '__delete__', true);
-    actualizarBtnSync();
-    mostrarToast(`"${nombre}" eliminado`);
-    renderCatalogo();
-};
-
-// ─────────────────────────────────────────────────────────────
-// FÓRMULAS (stats)
-// ─────────────────────────────────────────────────────────────
-let formulaActiva = null;
-window.setFormulaActiva = function(key) { formulaActiva = key; };
-
-window.insertarVar = function(varKey) {
-    if (!formulaActiva) return;
-    const isPush  = formulaActiva.startsWith('push_');
-    const inputId = isPush ? `pinput-${formulaActiva}` : `finput-${formulaActiva}`;
-    const input   = document.getElementById(inputId);
-    if (!input) return;
-    const pos = input.selectionStart;
-    const val = input.value;
-    input.value = val.slice(0, pos) + varKey + val.slice(pos);
-    input.focus();
-    input.setSelectionRange(pos + varKey.length, pos + varKey.length);
-    if (isPush) window.previsualizarPushFormula(formulaActiva);
-    else        window.previsualizarFormula(formulaActiva);
-};
-
-window.previsualizarFormula = function(key) {
-    const pjSel = document.getElementById('preview-pj-sel')?.value || Object.keys(personajes)[0];
-    if (pjSel) previsualizarFormulaConPJ(key, pjSel);
-};
-
-window.previsualizarPushFormula = function(key) {
-    const pjSel = document.getElementById('preview-pj-sel')?.value || Object.keys(personajes)[0];
-    if (!pjSel) return;
-    const pj = personajes[pjSel]; if (!pj) return;
-    const el = document.getElementById(`pprev-${key}`);
-    if (!el) return;
-    const expr = document.getElementById(`pinput-${key}`)?.value || pushFormulas[key]?.expr || '';
-    const ctx  = buildContext(pj);
-    const val  = evalExpr(expr, ctx);
-    el.innerHTML = `<span class="prev-pj">${pjSel}</span> → <strong>${val}</strong> por push`;
-};
-
-window.cambiarAplica = function(key, val) { formulas[key].aplica = val; };
-
-window.guardarFormulas = async function() {
-    Object.keys(formulas).forEach(key => {
-        const el = document.getElementById(`finput-${key}`);
-        if (el) formulas[key].expr = el.value;
-    });
-    const ok = await guardarFormulasBD();
-    mostrarToast(ok ? 'Fórmulas guardadas' : 'Error al guardar', !ok);
-    renderCatalogo();
-};
-
-window.resetFormulas = function() {
-    Object.entries(FORMULAS_DEFAULT).forEach(([k, v]) => { formulas[k] = { ...v }; });
-    renderFormulas();
-};
-
-window.actualizarPreviewPJ = function() {
-    const sel = document.getElementById('preview-pj-sel')?.value;
-    if (sel) {
-        renderPreviewCompleto(sel);
-        Object.keys(formulas).forEach(k => previsualizarFormulaConPJ(k, sel));
-        Object.keys(pushFormulas).forEach(k => window.previsualizarPushFormula(k));
-    }
-};
-
-// ─────────────────────────────────────────────────────────────
-// FÓRMULAS PUSH (guardado)
-// ─────────────────────────────────────────────────────────────
-window.guardarPushConfig = async function() {
-    // Leer fórmulas push del DOM
-    Object.keys(pushFormulas).forEach(key => {
-        const el = document.getElementById(`pinput-${key}`);
-        if (el) pushFormulas[key].expr = el.value;
-    });
-    // Leer cooldowns
-    const cdVex    = document.getElementById('push-cooldown-vex');
-    const cdGuarda = document.getElementById('push-cooldown-guarda');
-    if (cdVex)    pushCooldown.vex    = parseFloat(cdVex.value)    || 60;
-    if (cdGuarda) pushCooldown.guarda = parseFloat(cdGuarda.value) || 30;
-
-    const ok = await guardarPushFormulasBD();
-    mostrarToast(ok ? 'Config de push guardada' : 'Error al guardar', !ok);
-};
-
-window.guardarPushUmbrales = async function() {
-    // Leer umbrales del DOM
-    for (const recurso of ['vex', 'guarda']) {
-        const cont = document.getElementById(`umbrales-${recurso}`);
-        if (!cont) continue;
-        const filas = cont.querySelectorAll('[data-umbral-idx]');
-        filas.forEach((fila, idx) => {
-            const u = pushUmbrales[recurso][idx];
-            if (!u) return;
-            u.descripcion = fila.querySelector('[data-campo="descripcion"]')?.value || u.descripcion;
-            u.condicion   = fila.querySelector('[data-campo="condicion"]')?.value   || u.condicion;
-            u.pushes      = parseInt(fila.querySelector('[data-campo="pushes"]')?.value) || 1;
+        Object.entries(grupos).forEach(([af, hechizos]) => {
+            const color = _colorAf(af);
+            html += `<div class="ppj-section">
+                <div class="ppj-section-title" style="color:${color}33; border-left:2px solid ${color}55; padding-left:8px; color:${color};">${af}</div>
+                ${hechizos.map(h => `
+                    <div class="ppj-hechizo-card">
+                        <div class="ppj-hechizo-header">
+                            <div class="ppj-hechizo-nombre">${h.hechizo_nombre}</div>
+                            ${h.tipo && h.tipo !== 'Normal' ? `<span class="ppj-hechizo-clase">${h.tipo}</span>` : ''}
+                        </div>
+                        ${h.hechizo_hex > 0 ? `<div class="ppj-hechizo-hex">⬡ ${h.hechizo_hex} HEX</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>`;
         });
     }
-    const ok = await guardarPushUmbralesBD();
-    mostrarToast(ok ? 'Umbrales guardados' : 'Error al guardar', !ok);
-};
 
-window.agregarUmbral = function(recurso) {
-    pushUmbrales[recurso].push({
-        descripcion: 'Nueva condición',
-        condicion:   'pct_vida_roja >= 50',
-        pushes:      1,
-        orden:       pushUmbrales[recurso].length + 1
-    });
-    renderFormulas();
-};
+    // Sección "aprendibles" — solo si hay árbol de hechizos disponible
+    html += `
+    <div class="ppj-section" id="ppj-aprendibles-sec">
+        <div class="ppj-section-title">Puede aprender</div>
+        <div class="ppj-loader" id="ppj-aprendibles-loader">Calculando árbol…</div>
+    </div>`;
 
-window.eliminarUmbral = async function(recurso, idx) {
-    const u = pushUmbrales[recurso][idx];
-    if (u?.id) await eliminarUmbralDB(u.id);
-    pushUmbrales[recurso].splice(idx, 1);
-    renderFormulas();
-};
+    body.innerHTML = html;
 
-// ─────────────────────────────────────────────────────────────
-// SYNC (cambios manuales del OP)
-// ─────────────────────────────────────────────────────────────
-function actualizarBtnSync() {
-    const btn = document.getElementById('btn-sync');
-    const n   = Object.keys(colaCambios).length;
-    if (!btn) return;
-    btn.style.display = n > 0 ? 'block' : 'none';
-    btn.textContent   = `Guardar cambios (${n})`;
+    // Cargar aprendibles en segundo plano (no bloquea el render del inventario)
+    _cargarAprendibles(nombre, body);
 }
 
-window.ejecutarSync = async function() {
-    const btn = document.getElementById('btn-sync');
-    btn.disabled = true; btn.textContent = 'Guardando...';
-    const res = await sincronizarCola();
-    btn.disabled = false;
-    actualizarBtnSync();
-    if (res.ok) {
-        mostrarToast('Guardado correctamente');
-        renderCatalogo();
-    } else {
-        mostrarToast('Error al guardar: ' + res.errores.join(', '), true);
+async function _cargarAprendibles(nombre, body) {
+    try {
+        // Necesitamos los nodos del árbol para calcular aprendibles
+        const { data: nodos } = await supabase
+            .from('hechizos_nodos')
+            .select('hechizo_id, nombre, afinidad, clase, es_conocido')
+            .eq('es_conocido', true);
+
+        const { data: strings } = await supabase
+            .from('hechizos_strings')
+            .select('source, target');
+
+        const { data: invHz } = await supabase
+            .from('hechizos_inventario')
+            .select('hechizo_nombre')
+            .eq('personaje_nombre', nombre);
+
+        const sec = document.getElementById('ppj-aprendibles-loader');
+        if (!sec) return;
+
+        const invSet = new Set((invHz || []).map(h => h.hechizo_nombre?.toLowerCase().trim()));
+        const reqs = {};
+        (strings || []).forEach(r => {
+            if (!r.target) return;
+            if (!reqs[r.target]) reqs[r.target] = [];
+            reqs[r.target].push(r.source);
+        });
+
+        const aprendibles = [];
+        (nodos || []).forEach(n => {
+            const nombre_nodo = n.nombre?.toLowerCase().trim();
+            if (invSet.has(nombre_nodo)) return; // ya lo tiene
+            const requisitos = reqs[n.hechizo_id] || [];
+            const cumple = requisitos.length > 0 && requisitos.some(req => {
+                // buscar si el nombre del nodo con ese ID está en inventario
+                const nodoReq = (nodos || []).find(nn => nn.hechizo_id === req);
+                return nodoReq && invSet.has(nodoReq.nombre?.toLowerCase().trim());
+            });
+            if (cumple) aprendibles.push(n);
+        });
+
+        if (aprendibles.length === 0) {
+            sec.outerHTML = '<div class="ppj-empty" style="padding:10px 0;"><div class="ppj-empty-icon">🔒</div>Sin nuevos hechizos disponibles</div>';
+            return;
+        }
+
+        const _colorAf = (af) => {
+            const map = { 'Física':'#e2a673','Energética':'#f3e57a','Espiritual':'#7df0a7','Mando':'#a4d3f2','Psíquica':'#dcb1f0','Oscura':'#ff526f' };
+            return map[af] || '#888';
+        };
+
+        sec.outerHTML = aprendibles.map(n => `
+            <div class="ppj-hechizo-card">
+                <div class="ppj-hechizo-header">
+                    <span class="ppj-hechizo-af" style="background:${_colorAf(n.afinidad)}22;color:${_colorAf(n.afinidad)};">${n.afinidad || '?'}</span>
+                    <div class="ppj-hechizo-nombre">${n.nombre}</div>
+                    <span class="ppj-hechizo-clase">${n.clase || ''}</span>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {
+        const sec = document.getElementById('ppj-aprendibles-loader');
+        if (sec) sec.outerHTML = '';
     }
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB: OBJETOS (async)
+// ─────────────────────────────────────────────────────────────
+async function _tabObjetos(nombre, body) {
+    body.innerHTML = '<div class="ppj-loader">Cargando objetos…</div>';
+
+    const { data: items, error } = await supabase
+        .from('inventario_objetos')
+        .select('objeto_nombre, cantidad, equipado')
+        .eq('personaje_nombre', nombre)
+        .gt('cantidad', 0)
+        .order('objeto_nombre');
+
+    if (error) {
+        body.innerHTML = '<div class="ppj-empty"><div class="ppj-empty-icon">⚠️</div>Error cargando objetos</div>';
+        return;
+    }
+
+    const lista = items || [];
+
+    if (lista.length === 0) {
+        body.innerHTML = `<div class="ppj-section"><div class="ppj-empty"><div class="ppj-empty-icon">🎒</div>Inventario vacío</div></div>`;
+        return;
+    }
+
+    // Cargar definiciones de objetos para mostrar tipo/efecto
+    const nombres = lista.map(i => i.objeto_nombre);
+    const { data: objDefs } = await supabase
+        .from('objetos')
+        .select('nombre, tipo, rareza, material, efecto')
+        .in('nombre', nombres);
+
+    const defMap = {};
+    (objDefs || []).forEach(o => { defMap[o.nombre] = o; });
+
+    const _rarColor = (rar) => ({
+        'Legendario': '#d4af37',
+        'Raro':       '#9a50dc',
+        'Común':      '#5a5a78'
+    })[rar] || '#4a4a68';
+
+    const html = `<div class="ppj-section">
+        <div class="ppj-section-title">${lista.length} objeto${lista.length !== 1 ? 's' : ''}</div>
+        ${lista.map(item => {
+            const def = defMap[item.objeto_nombre] || {};
+            return `<div class="ppj-obj-card">
+                <div class="ppj-obj-cant">×${item.cantidad}</div>
+                <div class="ppj-obj-info">
+                    <div class="ppj-obj-nombre">${item.objeto_nombre}</div>
+                    <div class="ppj-obj-det">
+                        ${def.tipo || ''} ${def.rareza ? `· <span style="color:${_rarColor(def.rareza)}">${def.rareza}</span>` : ''}
+                        ${def.efecto ? `<br>${def.efecto}` : ''}
+                    </div>
+                </div>
+                <span class="ppj-obj-eqp ${item.equipado ? 'on' : 'off'}">${item.equipado ? 'Eqp.' : 'Inv.'}</span>
+            </div>`;
+        }).join('')}
+    </div>`;
+
+    body.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB: MISIONES (async — solo jugadores)
+// ─────────────────────────────────────────────────────────────
+async function _tabMisiones(nombre, body) {
+    body.innerHTML = '<div class="ppj-loader">Cargando misiones…</div>';
+
+    const { data: misiones, error } = await supabase
+        .from('misiones')
+        .select('titulo, tipo, clase, estado, descripcion, cupos, jugadores')
+        .order('orden');
+
+    if (error) {
+        body.innerHTML = '<div class="ppj-empty"><div class="ppj-empty-icon">⚠️</div>Error cargando misiones</div>';
+        return;
+    }
+
+    // Filtrar misiones donde participa el personaje
+    const misPersonaje = (misiones || []).filter(m => {
+        const jugs = Array.isArray(m.jugadores) ? m.jugadores : [];
+        return jugs.includes(nombre);
+    });
+
+    // También incluir misiones disponibles (inactivas con cupo)
+    const misDisponibles = (misiones || []).filter(m => {
+        const jugs = Array.isArray(m.jugadores) ? m.jugadores : [];
+        return m.estado < 3 && !jugs.includes(nombre);
+    });
+
+    const _estadoBadge = (e) => {
+        const labels = ['Inactiva','Pendiente','En Proceso','Finalizada'];
+        return `<span class="ppj-mis-badge ppj-mis-${e}">${labels[e] || '?'}</span>`;
+    };
+
+    let html = '';
+
+    if (misPersonaje.length === 0 && misDisponibles.length === 0) {
+        html = `<div class="ppj-section"><div class="ppj-empty"><div class="ppj-empty-icon">📋</div>Sin misiones</div></div>`;
+    } else {
+        if (misPersonaje.length > 0) {
+            html += `<div class="ppj-section">
+                <div class="ppj-section-title">Participando (${misPersonaje.length})</div>
+                ${misPersonaje.map(m => `
+                    <div class="ppj-mision-card">
+                        <div class="ppj-mis-header">
+                            <span class="ppj-mis-titulo">${m.titulo}</span>
+                            <span class="ppj-mis-clase">C-${m.clase}</span>
+                        </div>
+                        ${_estadoBadge(m.estado)}
+                        ${m.descripcion ? `<div class="ppj-mis-desc">${m.descripcion.slice(0, 120)}${m.descripcion.length > 120 ? '…' : ''}</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>`;
+        }
+
+        if (misDisponibles.length > 0) {
+            html += `<div class="ppj-section">
+                <div class="ppj-section-title">Disponibles (${misDisponibles.length})</div>
+                ${misDisponibles.map(m => `
+                    <div class="ppj-mision-card">
+                        <div class="ppj-mis-header">
+                            <span class="ppj-mis-titulo">${m.titulo}</span>
+                            <span class="ppj-mis-clase">C-${m.clase}</span>
+                        </div>
+                        ${_estadoBadge(m.estado)}
+                        ${m.descripcion ? `<div class="ppj-mis-desc">${m.descripcion.slice(0, 100)}${m.descripcion.length > 100 ? '…' : ''}</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>`;
+        }
+    }
+
+    body.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────
+// EXPONER AL SCOPE GLOBAL (llamados desde HTML inline)
+// ─────────────────────────────────────────────────────────────
+window.cerrarPanelPJ = cerrarPanelPJ;
+
+window._ppjCambiarTab = (nombre, tab) => {
+    // Actualizar clases de botones
+    document.querySelectorAll('.ppj-tab').forEach(b => b.classList.remove('active'));
+    // El botón que dispara el onclick es el correcto
+    event?.target?.classList.add('active');
+    _renderTab(nombre, tab);
+};
+
+window._ppjAbrirImgGrande = (nombre) => {
+    const p = personajes[nombre]; if (!p) return;
+    const url = _imgPj(p.iconoOverride || nombre);
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+    modal.onclick = () => modal.remove();
+    modal.innerHTML = `<img src="${url}" onerror="this.src='${_fallback()}'"
+        style="max-width:90vw;max-height:90vh;object-fit:contain;border-radius:10px;">`;
+    document.body.appendChild(modal);
 };
 
 // ─────────────────────────────────────────────────────────────
-// TOAST
+// REFRESH desde fuera (p.ej. después de modStat)
 // ─────────────────────────────────────────────────────────────
-let _toastTimer;
-function mostrarToast(msg, error = false) {
-    const el = document.getElementById('toast');
-    if (!el) return;
-    el.textContent   = msg;
-    el.className     = 'toast ' + (error ? 'toast-error' : 'toast-ok');
-    el.style.display = 'block';
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
+export function refreshPanelPJ() {
+    const nombre = estadoUI.pjSeleccionado;
+    if (!nombre || !estadoUI.panelAbierto) return;
+    _renderHeader(nombre);
+    const tab = _tabActivo[nombre] || 'hex';
+    // Solo refrescar stats y hex en caliente (los async se recargan solos)
+    if (tab === 'hex' || tab === 'stats') {
+        _renderTab(nombre, tab);
+    }
 }
-window.mostrarToast = mostrarToast;
