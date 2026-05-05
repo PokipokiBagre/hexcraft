@@ -20,7 +20,7 @@ import { renderCatalogo, renderDetalle, renderFormulas,
 window.hexConfigs = hexConfigs;
 
 // ─────────────────────────────────────────────────────────────
-// TIMER DE COOLDOWN EN VIVO (actualiza el panel cada segundo)
+// TIMER DE COOLDOWN EN VIVO
 // ─────────────────────────────────────────────────────────────
 let _timerInterval = null;
 
@@ -28,7 +28,6 @@ function _iniciarTimerCooldown() {
     if (_timerInterval) return;
     _timerInterval = setInterval(() => {
         if (!estadoUI.panelAbierto || !estadoUI.pjSeleccionado) return;
-        // Re-renderizar solo los bloques de cooldown sin redibujar todo el panel
         _actualizarCooldownsEnPanel(estadoUI.pjSeleccionado);
     }, 1000);
 }
@@ -38,7 +37,6 @@ function _actualizarCooldownsEnPanel(nombre) {
     if (!p) return;
     const s = calcularStats(p);
 
-    // Actualizar cada temporizador de cooldown en el DOM
     ['vex', 'guarda'].forEach(recurso => {
         const el = document.getElementById(`push-cd-display-${recurso}`);
         if (!el) return;
@@ -48,7 +46,6 @@ function _actualizarCooldownsEnPanel(nombre) {
             const seg = cd.restaSeg % 60;
             el.textContent = `⏳ ${min}m ${String(seg).padStart(2,'0')}s`;
             el.style.display = '';
-            // Deshabilitar botón push si está en cooldown
             const btn = document.getElementById(`push-btn-${recurso}`);
             if (btn) {
                 btn.disabled = true;
@@ -57,7 +54,6 @@ function _actualizarCooldownsEnPanel(nombre) {
             }
         } else {
             el.style.display = 'none';
-            // Rehabilitar botón si hay pushes disponibles
             const btn = document.getElementById(`push-btn-${recurso}`);
             if (btn) {
                 const usados     = recurso === 'vex' ? (p.push_vex_actual || 0) : (p.push_guarda_actual || 0);
@@ -99,11 +95,9 @@ window.onload = async () => {
     mostrarVista('catalogo');
     _iniciarTimerCooldown();
 
-    // ── Deep-link: ?pj=NombrePersonaje ──────────────────────────
     const urlParams = new URLSearchParams(window.location.search);
     const pjParam   = urlParams.get('pj');
     if (pjParam && personajes[pjParam]) {
-        // Pequeño delay para que el catálogo renderice primero
         setTimeout(() => window.abrirDetalle(pjParam), 150);
     }
 };
@@ -134,8 +128,6 @@ window.mostrarVista = function(vista) {
 
 window.abrirLoginOP   = function() { hexAuth._mostrarModalLogin(); };
 
-// "cambiar campaña" lo maneja hex-guard.js inyectado en el nav.
-// Esta función queda como fallback por si se llama desde algún botón viejo en el HTML.
 window.cambiarCampaña = function() {
     if (typeof window._hexGuardAbrirModal === 'function') {
         window._hexGuardAbrirModal();
@@ -172,16 +164,65 @@ window.cerrarDetalle = function() {
     document.getElementById('panel-lateral')?.classList.remove('open');
 };
 
+// ─────────────────────────────────────────────────────────────
+// MODIFICAR STATS (actual) — con cap en el máximo efectivo
+// ─────────────────────────────────────────────────────────────
 window.modStat = function(nombre, campo, delta) {
     const p = personajes[nombre]; if (!p) return;
     const s = calcularStats(p);
-    const maximos = { vida_roja_actual: s.vida_roja_max, vex_actual: s.vex_max, guarda_actual: s.guarda_max };
+    const maximos = {
+        vida_roja_actual: s.vida_roja_max,
+        vida_azul_actual: s.vida_azul_max,
+        vex_actual:       s.vex_max,
+        guarda_actual:    s.guarda_max
+    };
     const max = maximos[campo] ?? Infinity;
     p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
     encolarCambio(nombre, campo, p[campo]);
     renderDetalle(nombre);
     renderCatalogo();
     actualizarBtnSync();
+};
+
+// ─────────────────────────────────────────────────────────────
+// MODIFICAR LÍMITE MÁXIMO (override) — solo OP
+// Para vida_roja_max_override, vida_azul_max_override y guarda_max
+// ─────────────────────────────────────────────────────────────
+window.modStatMax = function(nombre, campo, delta) {
+    if (!estadoUI.esAdmin) return;
+    const p = personajes[nombre]; if (!p) return;
+    const s = calcularStats(p);
+
+    // Si el campo es override y estaba en 0 (usando fórmula),
+    // inicializarlo al valor actual de la fórmula antes de modificar
+    if (campo === 'vida_roja_max_override' && p[campo] === 0) {
+        p[campo] = s.vida_roja_max;
+    } else if (campo === 'vida_azul_max_override' && p[campo] === 0) {
+        p[campo] = s.vida_azul_max;
+    } else if (campo === 'guarda_max' && p[campo] === 0) {
+        // guarda_max === 0 significa "usar fórmula"; al modificar, partir del valor de fórmula
+        const guarda_formula = evalExpr(formulas.guarda_max.expr, s.ctx)
+            + (p.hz_guarda||0) + (p.ef_guarda||0) + (p.bf_guarda||0);
+        p[campo] = guarda_formula;
+    }
+
+    p[campo] = Math.max(0, (p[campo] || 0) + delta);
+    encolarCambio(nombre, campo, p[campo]);
+    renderDetalle(nombre);
+    renderCatalogo();
+    actualizarBtnSync();
+};
+
+// Restaurar un máx a la fórmula (poner override a 0) — solo OP
+window.resetStatMax = function(nombre, campo) {
+    if (!estadoUI.esAdmin) return;
+    const p = personajes[nombre]; if (!p) return;
+    p[campo] = 0;
+    encolarCambio(nombre, campo, 0);
+    renderDetalle(nombre);
+    renderCatalogo();
+    actualizarBtnSync();
+    mostrarToast('Máximo restaurado a fórmula');
 };
 
 window.modAfin = function(nombre, afinKey, delta) {
@@ -275,7 +316,6 @@ window.resetPushes = async function(nombre, recurso) {
     renderDetalle(nombre);
 };
 
-// Límite extra de pushes asignado manualmente por OP — mínimo 0
 window.modPushExtra = function(nombre, recurso, delta) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
@@ -361,22 +401,24 @@ function rellenarFormulario(nombre) {
 
 function setToggleJugador(val) {
     fIsJugador = val;
-    const t = document.getElementById('toggle-jugador');
-    if (t) t.classList.toggle('on', val);
+    const tg = document.getElementById('toggle-jugador');
+    if (tg) tg.classList.toggle('on', val);
+    const npcRow = document.getElementById('npc-tipo-row');
+    const vexRow = document.getElementById('vex-max-row');
+    if (npcRow) npcRow.style.display = val ? 'none' : 'flex';
+    if (vexRow) vexRow.style.display = val ? 'none' : 'flex';
     const lbl = document.getElementById('lbl-jugador');
     if (lbl) lbl.textContent = val ? 'Jugador (PC)' : 'NPC';
-    document.getElementById('npc-tipo-row').style.display = val ? 'none' : 'flex';
-    document.getElementById('vex-max-row').style.display  = val ? 'none' : 'flex';
-    actualizarPreviewFormulario();
-}
-function setToggleActivo(val) {
-    fIsActivo = val;
-    const t = document.getElementById('toggle-activo');
-    if (t) t.classList.toggle('on', val);
 }
 
-window.toggleJugador = () => { if (!estadoUI.esAdmin) return; setToggleJugador(!fIsJugador); };
-window.toggleActivo  = () => setToggleActivo(!fIsActivo);
+function setToggleActivo(val) {
+    fIsActivo = val;
+    const tg = document.getElementById('toggle-activo');
+    if (tg) tg.classList.toggle('on', val);
+}
+
+window.toggleJugador = function() { setToggleJugador(!fIsJugador); };
+window.toggleActivo  = function() { setToggleActivo(!fIsActivo); };
 
 window.actualizarPreviewFormulario = function() {
     const vals = {};
@@ -421,7 +463,10 @@ window.guardarPersonaje = function() {
         vex_actual: parseInt(document.getElementById('f-vex-actual').value)||0,
         vex_max:    parseInt(document.getElementById('f-vex-max').value)||0,
         vida_roja_actual: parseInt(document.getElementById('f-vida-roja').value)||10,
+        vida_roja_max_override: viejo.vida_roja_max_override || 0,
+        vida_azul_actual: viejo.vida_azul_actual != null ? viejo.vida_azul_actual : null,
         vida_azul_max:    parseInt(document.getElementById('f-vida-azul').value)||0,
+        vida_azul_max_override: viejo.vida_azul_max_override || 0,
         guarda_actual: parseInt(document.getElementById('f-guarda-act').value)||0,
         guarda_max:    parseInt(document.getElementById('f-guarda-max').value)||0,
         afinidadesBase: afinBase,
@@ -530,7 +575,6 @@ window.actualizarPreviewPJ = function() {
     }
 };
 
-// Push fórmulas
 window.guardarPushConfig = async function() {
     Object.keys(pushFormulas).forEach(key => {
         const el = document.getElementById(`pinput-${key}`);
@@ -609,7 +653,6 @@ window.ejecutarSync = async function() {
 window.abrirSubirImagen = function(nombre) {
     const p = personajes[nombre];
     if (!p) return;
-    // Permisos: OP puede subir a jugadores; anónimos solo a NPCs
     const puedeSubir = estadoUI.esAdmin || !p.isPlayer;
     if (!puedeSubir) { mostrarToast('Sin permiso para subir imágenes de jugadores', true); return; }
 
@@ -659,7 +702,6 @@ window.abrirSubirImagen = function(nombre) {
         </div>`;
 
     document.body.appendChild(modal);
-    // Preview en tiempo real
     document.getElementById('hex-img-file').onchange = function() {
         const file = this.files[0];
         if (file) {
@@ -697,7 +739,6 @@ window._ejecutarSubidaImagen = async function(nombre) {
     statusEl.style.color = '#5a5a78';
     statusEl.textContent = 'Subiendo imagen…';
 
-    // Convertir a PNG si no lo es (navegador lo hace via canvas)
     let uploadFile = file;
     if (!file.type.includes('png')) {
         try {
@@ -725,7 +766,6 @@ window._ejecutarSubidaImagen = async function(nombre) {
 
     statusEl.style.color = '#3ecf6e';
     statusEl.textContent = '✅ Imagen subida correctamente.';
-    // Refrescar la imagen en el catálogo y panel
     renderCatalogo();
     if (estadoUI.panelAbierto && estadoUI.pjSeleccionado === nombre) renderDetalle(nombre);
     setTimeout(() => {
