@@ -143,16 +143,23 @@ body {
     letter-spacing: 2px;
 }
 .nav-right { display: flex; align-items: center; gap: 10px; }
+/* btn-cambiar */
 .btn-cambiar {
     background: transparent;
-    border: 1px solid var(--dim);
+    border: 1px solid rgba(212,175,55,0.3);
     border-radius: var(--r);
-    color: var(--dim);
-    padding: 4px 12px;
-    font-size: 0.72em;
-    cursor: pointer; transition: all 0.2s;
+    color: rgba(212,175,55,0.6);
+    padding: 7px 14px;
+    font-size: 0.78em;
+    font-family: var(--font-display);
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s;
 }
-.btn-cambiar:hover { border-color: var(--gold-border); color: var(--gold); }
+.btn-cambiar:hover {
+    border-color: rgba(212,175,55,0.7);
+    color: var(--gold);
+}
 
 /* ══════════════════════════════════════════════════════════════
    HERO
