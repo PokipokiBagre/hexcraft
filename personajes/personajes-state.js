@@ -82,3 +82,7 @@ export function encolarCambio(nombre, campo, valor) {
     if (!colaCambios[nombre]) colaCambios[nombre] = {};
     colaCambios[nombre][campo] = valor;
 }
+
+// Tick de regeneración en cliente (cada 10s)
+export let regenTicker = null;
+export function setRegenTicker(t) { regenTicker = t; }
