@@ -136,14 +136,13 @@ window.modStatMax = function(nombre, campo, delta) {
     const p = personajes[nombre]; if (!p) return;
     const s = calcularStats(p);
 
-    if (campo === 'vida_roja_max_override' && p[campo] === 0) {
+    // Si el campo de override está a 0, inicializarlo desde la fórmula al primer toque
+    if (campo === 'vida_roja_max_override' && (p[campo] || 0) === 0) {
         p[campo] = s.vida_roja_max;
-    } else if (campo === 'vida_azul_max_override' && p[campo] === 0) {
+    } else if (campo === 'vida_azul_max_override' && (p[campo] || 0) === 0) {
         p[campo] = s.vida_azul_max;
-    } else if (campo === 'guarda_max' && p[campo] === 0) {
-        const guarda_formula = evalExpr(formulas.guarda_max.expr, s.ctx)
-            + (p.hz_guarda||0) + (p.ef_guarda||0) + (p.bf_guarda||0);
-        p[campo] = guarda_formula;
+    } else if (campo === 'guarda_max_override' && (p[campo] || 0) === 0) {
+        p[campo] = s.guarda_max;
     }
 
     p[campo] = Math.max(0, (p[campo] || 0) + delta);
