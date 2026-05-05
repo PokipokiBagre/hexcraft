@@ -30,6 +30,25 @@ function _imgIconUrl(icono) {
 const _imgFallback = `${_storageBase}/imginterfaz/no_encontrado.png`;
 
 // ─────────────────────────────────────────────────────────────
+// BARRA SEGMENTADA DE VIDA
+// Genera celdas individuales que representan puntos de vida.
+// Máximo 30 celdas; si max > 30, agrupa múltiples HP por celda.
+// ─────────────────────────────────────────────────────────────
+function _barraSegmentada(actual, max, tipo, maxCells = 28) {
+    if (!max || max <= 0) return `<div class="seg-bar-wrap"></div>`;
+    const n = Math.min(maxCells, max); // si max <= maxCells → 1 celda por HP
+    const hpPorCelda = max / n;
+    const isOver = actual > max;
+    let cells = '';
+    for (let i = 0; i < n; i++) {
+        const umbral = hpPorCelda * i;
+        const filled = actual > umbral;
+        cells += `<span class="seg-cell seg-${tipo} ${filled ? 'seg-on' : 'seg-off'}"></span>`;
+    }
+    return `<div class="seg-bar-wrap${isOver ? ' seg-over' : ''}" title="${actual}/${max}">${cells}</div>`;
+}
+
+// ─────────────────────────────────────────────────────────────
 // CATÁLOGO
 // ─────────────────────────────────────────────────────────────
 export function renderCatalogo() {
@@ -54,9 +73,9 @@ export function renderCatalogo() {
         const s = calcularStats(p);
         const mayor = getMayorAfinidad(p);
 
-        const pctVida   = s.vida_roja_max > 0 ? Math.min(100, Math.round(p.vida_roja_actual / s.vida_roja_max * 100)) : 0;
+        const vidaAzulActual = s.vida_azul_actual;
+
         const pctVex    = s.vex_max > 0 ? Math.min(100, Math.round(p.vex_actual / s.vex_max * 100)) : 0;
-        const pctGuarda = s.guarda_max > 0 ? Math.min(100, Math.round((p.guarda_actual||0) / s.guarda_max * 100)) : 0;
 
         const maxAfin = Math.max(1, ...AFINIDADES.map(a =>
             (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0)
@@ -86,10 +105,9 @@ export function renderCatalogo() {
         }).join('');
 
         const esInactivo = !p.isActive;
-        const canEdit    = estadoUI.esAdmin || !p.isPlayer;
         const canDelete  = estadoUI.esAdmin;
 
-        // Mini push indicador en tarjeta
+        // Mini push indicador
         const pushVexDisp    = calcularPushDisponibles(p, s, 'vex');
         const pushGuardaDisp = calcularPushDisponibles(p, s, 'guarda');
         const pushVexUsados    = p.push_vex_actual    || 0;
@@ -100,6 +118,11 @@ export function renderCatalogo() {
                 ${s.vex_max > 0 ? `<span class="push-mini-item push-mini-vex" title="Push VEX">⚡ ${pushVexUsados}/${pushVexDisp}</span>` : ''}
                 ${s.guarda_max > 0 ? `<span class="push-mini-item push-mini-guarda" title="Push Guarda">🛡 ${pushGuardaUsados}/${pushGuardaDisp}</span>` : ''}
             </div>` : '';
+
+        // Barras de recursos con celdas segmentadas
+        const barraVidaRoja = _barraSegmentada(p.vida_roja_actual, s.vida_roja_max, 'vida', 28);
+        const barraVidaAzul = s.vida_azul_max > 0 ? _barraSegmentada(vidaAzulActual, s.vida_azul_max, 'azul', 28) : null;
+        const barraGuarda   = s.guarda_max > 0 ? _barraSegmentada(p.guarda_actual || 0, s.guarda_max, 'guarda', 20) : null;
 
         return `<div class="pj-card ${esInactivo ? 'pj-inactivo' : ''}" onclick="window.abrirDetalle('${nombre.replace(/'/g,"\\'")}')">
             <div class="pj-card-top">
@@ -121,11 +144,14 @@ export function renderCatalogo() {
             <div class="recursos-section">
                 <div class="recurso-row">
                     <span class="recurso-label">Vida</span>
-                    <div class="recurso-bar-track">
-                        <div class="recurso-bar-fill fill-vida" style="width:${pctVida}%"></div>
-                    </div>
+                    ${barraVidaRoja}
                     <span class="recurso-xy">${p.vida_roja_actual}<span class="xy-sep">/</span>${s.vida_roja_max}</span>
                 </div>
+                ${barraVidaAzul ? `<div class="recurso-row">
+                    <span class="recurso-label">Azul</span>
+                    ${barraVidaAzul}
+                    <span class="recurso-xy">${vidaAzulActual}<span class="xy-sep">/</span>${s.vida_azul_max}</span>
+                </div>` : ''}
                 ${s.vex_max > 0 ? `<div class="recurso-row">
                     <span class="recurso-label">VEX</span>
                     <div class="recurso-bar-track">
@@ -133,11 +159,9 @@ export function renderCatalogo() {
                     </div>
                     <span class="recurso-xy">${Math.floor(p.vex_actual)}<span class="xy-sep">/</span>${s.vex_max}</span>
                 </div>` : ''}
-                ${s.guarda_max > 0 ? `<div class="recurso-row">
+                ${barraGuarda ? `<div class="recurso-row">
                     <span class="recurso-label">Guarda</span>
-                    <div class="recurso-bar-track">
-                        <div class="recurso-bar-fill fill-guarda" style="width:${pctGuarda}%"></div>
-                    </div>
+                    ${barraGuarda}
                     <span class="recurso-xy">${Math.floor(p.guarda_actual||0)}<span class="xy-sep">/</span>${s.guarda_max}</span>
                 </div>` : ''}
             </div>
@@ -206,10 +230,6 @@ export function renderDetalle(nombre) {
     const pushHTML = _renderPushSection(p, s, nombre, canEditThis);
 
     document.getElementById('panel-nombre').textContent = nombre;
-    // Botón imagen en header del panel
-    const _imgBtnPanel = (estadoUI.esAdmin || !p.isPlayer)
-        ? `<button class="btn-ghost btn-ghost-xs" style="font-size:0.75em;" title="Subir imagen del personaje" onclick="window.abrirSubirImagen('${safeN}')">🖼 imagen</button>`
-        : '';
     const _existingActions = document.querySelector('.panel-header-actions');
     if (_existingActions && !_existingActions.querySelector('.btn-img-panel')) {
         const _imgBtn = document.createElement('button');
@@ -217,55 +237,138 @@ export function renderDetalle(nombre) {
         _imgBtn.style.fontSize = '0.75em';
         _imgBtn.title = 'Subir imagen del personaje';
         _imgBtn.textContent = '🖼';
-        _imgBtn.onclick = () => window.abrirSubirImagen('${safeN}');
+        _imgBtn.onclick = () => window.abrirSubirImagen(nombre);
         _existingActions.insertBefore(_imgBtn, _existingActions.firstChild);
     }
+
+    // ── Vida Azul actual (null = igual al máx)
+    const vidaAzulActual = s.vida_azul_actual;
+
+    // ── Helper: control de stat actual con barra segmentada ───
+    const _statConBarra = (label, campo, actual, max, tipo, color, canEdit, nSegments = 30) => {
+        const barra = _barraSegmentada(actual, max, tipo, nSegments);
+        const esOver = actual > max;
+        return `
+        <div class="det-vida-item">
+            <div class="det-vida-header">
+                <span class="det-vida-label" style="color:${color};">${label}</span>
+                <div class="det-calc-xy" style="margin:0;">
+                    ${canEdit ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','${campo}',-1)">−</button>` : ''}
+                    <span class="det-xy-x ${esOver ? 'val-over' : ''}" style="color:${color};">${actual}</span>
+                    <span class="det-xy-sep">/</span>
+                    <span class="det-xy-y">${max}</span>
+                    ${canEdit ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','${campo}',1)">+</button>` : ''}
+                </div>
+            </div>
+            ${barra}
+        </div>`;
+    };
+
+    // ── Helper: control de límite máximo (override) ───────────
+    const _maxOverride = (label, campoDB, valorOverride, valorFormula, canEdit) => {
+        if (!canEdit) return '';
+        const usandoFormula = valorOverride === 0;
+        return `<div class="det-max-row">
+            <span class="det-max-label">Máx ${label}</span>
+            <div class="det-max-ctrl">
+                <button class="ctrl-btn ctrl-btn-xs" onclick="window.modStatMax('${safeN}','${campoDB}',-1)">−</button>
+                <span class="det-max-val ${usandoFormula ? 'det-max-formula' : 'det-max-manual'}">${valorFormula}</span>
+                <button class="ctrl-btn ctrl-btn-xs" onclick="window.modStatMax('${safeN}','${campoDB}',1)">+</button>
+                ${!usandoFormula ? `<button class="ctrl-btn ctrl-btn-xs det-max-reset-btn" title="Volver a fórmula" onclick="window.resetStatMax('${safeN}','${campoDB}')">⟳</button>` : ''}
+            </div>
+            ${usandoFormula ? `<span class="det-max-hint">fórmula</span>` : `<span class="det-max-hint det-max-hint-manual">manual</span>`}
+        </div>`;
+    };
+
+    // Calcular valores de fórmula para mostrar junto al override
+    const formulaGuardaMax = (() => {
+        try {
+            const { evalExpr: ev, buildContext: bc } = { evalExpr, buildContext };
+            const ctx = bc(p);
+            return evalExpr(formulas.guarda_max.expr, ctx)
+                + (p.hz_guarda||0) + (p.ef_guarda||0) + (p.bf_guarda||0);
+        } catch { return s.guarda_max; }
+    })();
+
     document.getElementById('panel-body').innerHTML = `
-        <!-- Stats calculados -->
+
+        <!-- ════ HEX — prominente al inicio ════ -->
+        ${canEditThis ? `
+        <div class="det-section det-hex-section">
+            <div class="det-section-title">HEX</div>
+            <div class="det-hex-val">${(p.hex||0).toLocaleString()}</div>
+            <div class="det-hex-btns">
+                <button class="ctrl-btn det-hex-btn det-hex-neg" onclick="window.modStat('${safeN}','hex',-1000)">−1000</button>
+                <button class="ctrl-btn det-hex-btn det-hex-neg" onclick="window.modStat('${safeN}','hex',-500)">−500</button>
+                <button class="ctrl-btn det-hex-btn det-hex-neg" onclick="window.modStat('${safeN}','hex',-300)">−300</button>
+                <button class="ctrl-btn det-hex-btn det-hex-neg" onclick="window.modStat('${safeN}','hex',-100)">−100</button>
+                <button class="ctrl-btn det-hex-btn det-hex-neg" onclick="window.modStat('${safeN}','hex',-50)">−50</button>
+                <button class="ctrl-btn det-hex-btn det-hex-neg" onclick="window.modStat('${safeN}','hex',-10)">−10</button>
+                <button class="ctrl-btn det-hex-btn det-hex-neg" onclick="window.modStat('${safeN}','hex',-5)">−5</button>
+                <button class="ctrl-btn det-hex-btn det-hex-neg" onclick="window.modStat('${safeN}','hex',-1)">−1</button>
+                <button class="ctrl-btn det-hex-btn det-hex-pos" onclick="window.modStat('${safeN}','hex',1)">+1</button>
+                <button class="ctrl-btn det-hex-btn det-hex-pos" onclick="window.modStat('${safeN}','hex',5)">+5</button>
+                <button class="ctrl-btn det-hex-btn det-hex-pos" onclick="window.modStat('${safeN}','hex',10)">+10</button>
+                <button class="ctrl-btn det-hex-btn det-hex-pos" onclick="window.modStat('${safeN}','hex',50)">+50</button>
+                <button class="ctrl-btn det-hex-btn det-hex-pos" onclick="window.modStat('${safeN}','hex',100)">+100</button>
+                <button class="ctrl-btn det-hex-btn det-hex-pos" onclick="window.modStat('${safeN}','hex',300)">+300</button>
+                <button class="ctrl-btn det-hex-btn det-hex-pos" onclick="window.modStat('${safeN}','hex',500)">+500</button>
+                <button class="ctrl-btn det-hex-btn det-hex-pos" onclick="window.modStat('${safeN}','hex',1000)">+1000</button>
+            </div>
+        </div>` : `
+        <div class="det-section">
+            <div class="det-section-title">HEX</div>
+            <div class="det-hex-val">${(p.hex||0).toLocaleString()}</div>
+        </div>`}
+
+        <!-- ════ STATS — Vida, Guarda, VEX ════ -->
         <div class="det-section">
             <div class="det-section-title">STATS CALCULADOS</div>
-            <div class="det-calc-grid">
-                <div class="det-calc-item">
-                    <div class="det-calc-label">Vida Roja</div>
-                    <div class="det-calc-xy">
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vida_roja_actual',-1)">−</button>` : ''}
-                        <span class="det-xy-x">${p.vida_roja_actual}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.vida_roja_max}</span>
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vida_roja_actual',1)">+</button>` : ''}
-                    </div>
-                    <div class="det-calc-formula">${formulas.vida_roja_max.expr}</div>
-                </div>
-                <div class="det-calc-item">
-                    <div class="det-calc-label">Vida Azul</div>
-                    <div class="det-calc-xy">
-                        <span class="det-xy-x">${s.vida_azul_max}</span>
-                    </div>
-                    <div class="det-calc-formula">${formulas.vida_azul_max.expr}</div>
-                </div>
-                <div class="det-calc-item">
-                    <div class="det-calc-label">VEX</div>
-                    <div class="det-calc-xy">
+
+            <!-- Vida Roja -->
+            ${_statConBarra('Vida Roja', 'vida_roja_actual', p.vida_roja_actual, s.vida_roja_max, 'vida', 'var(--gold)', canEditThis, 30)}
+            ${_maxOverride('Vida Roja', 'vida_roja_max_override', p.vida_roja_max_override || 0, s.vida_roja_max, estadoUI.esAdmin)}
+            <div class="det-calc-formula" style="margin-bottom:10px;">${formulas.vida_roja_max.expr}</div>
+
+            <!-- Vida Azul -->
+            ${s.vida_azul_max > 0 ? `
+            ${_statConBarra('Vida Azul', 'vida_azul_actual', vidaAzulActual, s.vida_azul_max, 'azul', '#4ab3e8', canEditThis, 30)}
+            ${_maxOverride('Vida Azul', 'vida_azul_max_override', p.vida_azul_max_override || 0, s.vida_azul_max, estadoUI.esAdmin)}
+            <div class="det-calc-formula" style="margin-bottom:10px;">${formulas.vida_azul_max.expr}</div>
+            ` : ''}
+
+            <!-- Guarda Dorada -->
+            ${s.guarda_max > 0 ? `
+            ${_statConBarra('Guarda Dorada', 'guarda_actual', p.guarda_actual || 0, s.guarda_max, 'guarda', '#d4af37', canEditThis, 20)}
+            ${_maxOverride('Guarda', 'guarda_max', p.guarda_max || 0, s.guarda_max, estadoUI.esAdmin)}
+            <div class="det-calc-formula" style="margin-bottom:10px;">${formulas.guarda_max.expr}</div>
+            ` : ''}
+
+            <!-- VEX -->
+            ${s.vex_max > 0 ? `
+            <div class="det-vida-item">
+                <div class="det-vida-header">
+                    <span class="det-vida-label" style="color:var(--violet);">VEX</span>
+                    <div class="det-calc-xy" style="margin:0;">
                         ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vex_actual',-50)">−50</button>` : ''}
-                        <span class="det-xy-x">${Math.floor(p.vex_actual)}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.vex_max}</span>
+                        <span class="det-xy-x" style="color:var(--violet);">${Math.floor(p.vex_actual)}</span>
+                        <span class="det-xy-sep">/</span>
+                        <span class="det-xy-y">${s.vex_max}</span>
                         ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vex_actual',50)">+50</button>` : ''}
                     </div>
-                    <div class="det-calc-formula">${esJugador ? formulas.vex_max.expr : 'Fijo (NPC sistema)'}</div>
                 </div>
-                ${s.guarda_max > 0 ? `<div class="det-calc-item">
-                    <div class="det-calc-label">Guarda Dorada</div>
-                    <div class="det-calc-xy">
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','guarda_actual',-1)">−</button>` : ''}
-                        <span class="det-xy-x">${Math.floor(p.guarda_actual||0)}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.guarda_max}</span>
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','guarda_actual',1)">+</button>` : ''}
-                    </div>
-                    <div class="det-calc-formula">${formulas.guarda_max.expr}</div>
-                </div>` : ''}
+                <div class="seg-vex-bar">
+                    <div class="seg-vex-fill" style="width:${s.vex_max > 0 ? Math.min(100, Math.round(p.vex_actual / s.vex_max * 100)) : 0}%"></div>
+                </div>
             </div>
+            <div class="det-calc-formula" style="margin-bottom:6px;">${esJugador ? formulas.vex_max.expr : 'Fijo (NPC sistema)'}</div>
+            ` : ''}
         </div>
 
-        <!-- Sistema Push -->
+        <!-- ════ PUSH ════ -->
         ${pushHTML}
 
-        <!-- Afinidades -->
+        <!-- ════ AFINIDADES ════ -->
         <div class="det-section">
             <div class="det-section-title">AFINIDADES
                 <span class="afin-leyenda">
@@ -277,20 +380,6 @@ export function renderDetalle(nombre) {
             </div>
             ${afinRows}
         </div>
-
-        ${canEditThis ? `
-        <!-- Recursos -->
-        <div class="det-section">
-            <div class="det-section-title">RECURSOS</div>
-            <div class="det-stat-row">
-                <span class="det-stat-label">HEX</span>
-                <div class="det-stat-ctrl">
-                    <button class="ctrl-btn" onclick="window.modStat('${safeN}','hex',-100)">−100</button>
-                    <span class="det-stat-val">${(p.hex||0).toLocaleString()}</span>
-                    <button class="ctrl-btn" onclick="window.modStat('${safeN}','hex',100)">+100</button>
-                </div>
-            </div>
-        </div>` : ''}
     `;
 }
 
@@ -308,18 +397,21 @@ function _renderPushSection(p, s, nombre, canEdit) {
         const cd          = calcularCooldownPush(p, recurso);
         const limitExtra  = recurso === 'vex' ? (p.push_vex_limit || 0) : (p.push_guarda_limit || 0);
 
-        // Indicador visual de pushes (puntos)
         const dots = Array.from({ length: disponibles }, (_, i) =>
             `<span class="push-dot ${i < usados ? 'push-dot-used' : 'push-dot-avail'}"></span>`
         ).join('');
 
-        // Cooldown display
         let cdInfo = '';
         if (!cd.disponible) {
             const min = Math.ceil(cd.restaSeg / 60);
             const seg = cd.restaSeg % 60;
-            cdInfo = `<span class="push-cd">⏳ ${min}m ${seg}s</span>`;
+            cdInfo = `<span id="push-cd-display-${recurso}" class="push-cd">⏳ ${min}m ${String(seg).padStart(2,'0')}s</span>`;
+        } else {
+            cdInfo = `<span id="push-cd-display-${recurso}" class="push-cd" style="display:none;"></span>`;
         }
+
+        const btnId = `push-btn-${recurso}`;
+        const canPush = restantes > 0 && cd.disponible;
 
         return `<div class="push-bloque">
             <div class="push-bloque-header">
@@ -329,14 +421,12 @@ function _renderPushSection(p, s, nombre, canEdit) {
             </div>
             <div class="push-bloque-info">
                 <span class="push-valor">+${valorPush} por push</span>
-                ${restantes > 0 && cd.disponible ? `
-                    <button class="btn-push ${canEdit ? '' : ''}"
-                        onclick="window.ejecutarPush('${safeN}','${recurso}')">
-                        Push ${label}
-                    </button>` : `
-                    <button class="btn-push btn-push-disabled" disabled>
-                        ${!cd.disponible ? 'En cooldown' : 'Sin pushes'}
-                    </button>`}
+                <button id="${btnId}"
+                    class="btn-push ${canPush ? '' : 'btn-push-disabled'}"
+                    ${canPush ? '' : 'disabled'}
+                    onclick="window.ejecutarPush('${safeN}','${recurso}')">
+                    ${!cd.disponible ? 'En cooldown' : (restantes > 0 ? `Push ${label}` : 'Sin pushes')}
+                </button>
             </div>
             ${estadoUI.esAdmin ? `
             <div class="push-admin-row">
@@ -350,7 +440,6 @@ function _renderPushSection(p, s, nombre, canEdit) {
         </div>`;
     };
 
-    // Para NPC sistema, vex_max está en p.vex_max (no calculado por fórmula)
     const _vexMaxEfectivo    = s.vex_max    > 0 ? s.vex_max    : (p.vex_max    || 0);
     const _guardaMaxEfectiva = s.guarda_max > 0 ? s.guarda_max : (p.guarda_max || 0);
     const vexHTML    = _pushBloque('vex',    'VEX',    '⚡', _vexMaxEfectivo    > 0);
@@ -412,7 +501,6 @@ export function renderFormulas() {
         </div>
     `).join('');
 
-    // ── Push fórmulas ──────────────────────────────────────────
     const pushFormsHTML = Object.entries(pushFormulas).map(([key, f]) => `
         <div class="formula-item">
             <div class="formula-item-header">
@@ -429,7 +517,6 @@ export function renderFormulas() {
         </div>
     `).join('');
 
-    // ── Cooldowns ──────────────────────────────────────────────
     const cooldownHTML = `
         <div class="formula-item">
             <div class="formula-item-header">
@@ -449,7 +536,6 @@ export function renderFormulas() {
             </div>
         </div>`;
 
-    // ── Umbrales de push ──────────────────────────────────────
     const _umbralesHtml = (recurso, label) => `
         <div class="formula-item">
             <div class="formula-item-header">
@@ -480,7 +566,6 @@ export function renderFormulas() {
     cont.innerHTML = `
         ${poolHTML}
 
-        <!-- Stats -->
         <div class="formulas-block">
             <div class="formulas-block-title">Stats derivados de afinidades</div>
             ${formulasHTML}
@@ -490,7 +575,6 @@ export function renderFormulas() {
             </div>
         </div>
 
-        <!-- Push config -->
         <div class="formulas-block">
             <div class="formulas-block-title">Sistema Push — Recuperación activa</div>
             <p class="formulas-help">
@@ -505,7 +589,6 @@ export function renderFormulas() {
             </div>
         </div>
 
-        <!-- Umbrales -->
         <div class="formulas-block">
             <div class="formulas-block-title">Umbrales de pushes disponibles</div>
             <p class="formulas-help">
@@ -519,7 +602,6 @@ export function renderFormulas() {
             </div>
         </div>
 
-        <!-- Preview por personaje -->
         <div class="formulas-block">
             <div class="formulas-block-title">Preview por personaje</div>
             <select id="preview-pj-sel" class="input-base" onchange="window.actualizarPreviewPJ()" style="margin-bottom:12px;width:280px;">
