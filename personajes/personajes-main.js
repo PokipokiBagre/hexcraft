@@ -5,7 +5,7 @@
 
 import { hexAuth } from '../hex-auth.js';
 import { db } from '../hex-db.js';
-import { estadoUI, personajes, formulas, regenConfig, colaCambios, encolarCambio, FORMULAS_DEFAULT, REGEN_DEFAULT } from './personajes-state.js';
+import { estadoUI, personajes, formulas, regenConfig, colaCambios, encolarCambio, FORMULAS_DEFAULT, REGEN_DEFAULT, setRegenTicker } from './personajes-state.js';
 import { calcularStats, buildContext, evalExpr } from './personajes-logic.js';
 import { cargarDatos, sincronizarCola, guardarFormulasBD, guardarRegenBD, ejecutarRegenBD } from './personajes-data.js';
 import { renderCatalogo, renderDetalle, renderFormulas, previsualizarFormulaConPJ, previsualizarRegenConPJ, renderPreviewCompleto } from './personajes-ui.js';
@@ -15,10 +15,8 @@ import { renderCatalogo, renderDetalle, renderFormulas, previsualizarFormulaConP
 // ─────────────────────────────────────────────────────────────
 window.onload = async () => {
     await hexAuth.init();
-    // El estado admin viene exclusivamente de hexAuth — no hay toggle manual.
     estadoUI.esAdmin = hexAuth.esAdmin();
 
-    // Badge de sesión (dorado/morado desde hex-auth)
     const badge = document.getElementById('hex-session-badge');
     if (badge) badge.innerHTML = hexAuth.renderStatusBadge();
 
@@ -33,12 +31,57 @@ window.onload = async () => {
     if (loader) loader.style.display = 'none';
 
     mostrarVista('catalogo');
+
+    // Regeneración cliente: cada 10 segundos aplica regen proporcional
+    const ticker = setInterval(() => {
+        const TICK_SEG = 10;
+        let cambio = false;
+        for (const [nombre, p] of Object.entries(personajes)) {
+            if (!p.isActive) continue;
+            const s = calcularStats(p);
+
+            // VEX: regen_vex por hora → por 10s
+            if (s.vex_max > 0 && p.vex_actual < s.vex_max) {
+                const regenPorTick = s.regen_vex_total / 3600 * TICK_SEG;
+                const nuevo = Math.min(s.vex_max, (p.vex_actual || 0) + regenPorTick);
+                if (nuevo > p.vex_actual + 0.001) {
+                    p._vex_fraccion = (p._vex_fraccion || 0) + regenPorTick;
+                    if (p._vex_fraccion >= 1) {
+                        const entero = Math.floor(p._vex_fraccion);
+                        p.vex_actual = Math.min(s.vex_max, (p.vex_actual || 0) + entero);
+                        p._vex_fraccion -= entero;
+                        encolarCambio(nombre, 'vex_actual', p.vex_actual);
+                        cambio = true;
+                    }
+                }
+            }
+
+            // Guarda: regen_guarda por hora → por 10s
+            if (s.guarda_max > 0 && (p.guarda_actual || 0) < s.guarda_max) {
+                p._guarda_fraccion = (p._guarda_fraccion || 0) + (s.regen_guarda_total / 3600 * TICK_SEG);
+                if (p._guarda_fraccion >= 1) {
+                    const entero = Math.floor(p._guarda_fraccion);
+                    p.guarda_actual = Math.min(s.guarda_max, (p.guarda_actual || 0) + entero);
+                    p._guarda_fraccion -= entero;
+                    encolarCambio(nombre, 'guarda_actual', p.guarda_actual);
+                    cambio = true;
+                }
+            }
+        }
+        if (cambio) {
+            if (estadoUI.panelAbierto && estadoUI.pjSeleccionado) renderDetalle(estadoUI.pjSeleccionado);
+            renderCatalogo();
+            actualizarBtnSync();
+        }
+    }, 10000);
+    setRegenTicker(ticker);
 };
 
 // ─────────────────────────────────────────────────────────────
 // NAVEGACIÓN
 // ─────────────────────────────────────────────────────────────
 window.mostrarVista = function(vista) {
+    // Pestaña "Crear": solo OP puede crear jugadores; no-OP solo NPCs
     estadoUI.vista = vista;
     document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -49,11 +92,12 @@ window.mostrarVista = function(vista) {
 
     if (vista === 'catalogo') renderCatalogo();
     if (vista === 'crear')    inicializarFormulario();
-    if (vista === 'formulas') renderFormulas();
+    if (vista === 'formulas') {
+        if (!estadoUI.esAdmin) { mostrarToast('Solo el OP puede editar fórmulas', true); window.mostrarVista('catalogo'); return; }
+        renderFormulas();
+    }
 };
 
-// El badge de hex-auth maneja login/logout.
-// cambiarCampaña está disponible desde la nav para volver al selector.
 window.abrirLoginOP = function() { hexAuth._mostrarModalLogin(); };
 window.cambiarCampaña = function() {
     localStorage.removeItem('hex_selected');
@@ -102,17 +146,62 @@ window.modStat = function(nombre, campo, delta) {
     actualizarBtnSync();
 };
 
+// Modificar afinidad BASE (solo OP)
 window.modAfin = function(nombre, afinKey, delta) {
+    if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
     if (!p.afinidadesBase) p.afinidadesBase = {};
     p.afinidadesBase[afinKey] = Math.max(0, (p.afinidadesBase[afinKey] || 0) + delta);
     encolarCambio(nombre, `af_${afinKey}`, p.afinidadesBase[afinKey]);
-    renderDetalle(nombre);
-    renderCatalogo();
-    actualizarBtnSync();
+    renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
+};
+
+// Modificar buff (bf) — disponible sin OP para NPCs, con OP para todos
+window.modBf = function(nombre, afinKey, delta) {
+    const p = personajes[nombre]; if (!p) return;
+    if (!estadoUI.esAdmin && p.isPlayer) return; // no-OP no toca jugadores
+    if (!p.afinidadesBf) p.afinidadesBf = {};
+    p.afinidadesBf[afinKey] = Math.max(-999, (p.afinidadesBf[afinKey] || 0) + delta);
+    encolarCambio(nombre, `bf_${afinKey}`, p.afinidadesBf[afinKey]);
+    renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
+};
+
+// Modificar alteración (ef) — mismo permiso que bf
+window.modEf = function(nombre, afinKey, delta) {
+    const p = personajes[nombre]; if (!p) return;
+    if (!estadoUI.esAdmin && p.isPlayer) return;
+    if (!p.afinidadesEf) p.afinidadesEf = {};
+    p.afinidadesEf[afinKey] = Math.max(-999, (p.afinidadesEf[afinKey] || 0) + delta);
+    encolarCambio(nombre, `ef_${afinKey}`, p.afinidadesEf[afinKey]);
+    renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
+};
+
+// Modificar regen bf (buff sobre regen_vex o regen_guarda)
+window.modRegenBf = function(nombre, recurso, delta) {
+    const p = personajes[nombre]; if (!p) return;
+    if (!estadoUI.esAdmin && p.isPlayer) return;
+    const campo = `regen_${recurso}_bf`;
+    p[campo] = (p[campo] || 0) + delta;
+    encolarCambio(nombre, campo, p[campo]);
+    renderDetalle(nombre); actualizarBtnSync();
+};
+
+window.modRegenEf = function(nombre, recurso, delta) {
+    const p = personajes[nombre]; if (!p) return;
+    if (!estadoUI.esAdmin && p.isPlayer) return;
+    const campo = `regen_${recurso}_ef`;
+    p[campo] = (p[campo] || 0) + delta;
+    encolarCambio(nombre, campo, p[campo]);
+    renderDetalle(nombre); actualizarBtnSync();
 };
 
 window.editarPersonaje = function(nombre) {
+    const p = personajes[nombre];
+    // No-OP solo puede editar NPCs
+    if (!estadoUI.esAdmin && p?.isPlayer) {
+        mostrarToast('Solo el OP puede editar personajes jugadores', true);
+        return;
+    }
     estadoUI.formMode   = 'editar';
     estadoUI.pjEditando = nombre;
     window.mostrarVista('crear');
@@ -130,6 +219,20 @@ function inicializarFormulario() {
     if (estadoUI.formMode === 'crear') {
         estadoUI.pjEditando = null;
         resetFormulario();
+        // No-OP: forzar NPC
+        if (!estadoUI.esAdmin) {
+            setToggleJugador(false);
+            // Ocultar toggle de tipo jugador/NPC para no-OP
+            const tg = document.getElementById('toggle-jugador');
+            if (tg) tg.style.pointerEvents = 'none';
+            const lbl = document.getElementById('lbl-jugador');
+            if (lbl) lbl.style.opacity = '0.4';
+        } else {
+            const tg = document.getElementById('toggle-jugador');
+            if (tg) tg.style.pointerEvents = '';
+            const lbl = document.getElementById('lbl-jugador');
+            if (lbl) lbl.style.opacity = '';
+        }
     }
 }
 
@@ -197,11 +300,13 @@ function setToggleActivo(val) {
     if (t) t.classList.toggle('on', val);
 }
 
-window.toggleJugador = () => setToggleJugador(!fIsJugador);
+window.toggleJugador = () => {
+    if (!estadoUI.esAdmin) return; // no-OP no puede cambiar a jugador
+    setToggleJugador(!fIsJugador);
+};
 window.toggleActivo  = () => setToggleActivo(!fIsActivo);
 
 window.actualizarPreviewFormulario = function() {
-    // Construir contexto ficticio desde los inputs del formulario
     const vals = {};
     ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
         vals[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
@@ -226,6 +331,12 @@ window.guardarPersonaje = function() {
     const nombre = document.getElementById('f-nombre').value.trim();
     if (!nombre) return mostrarToast('El nombre es obligatorio', true);
 
+    // No-OP solo puede crear NPCs
+    if (!estadoUI.esAdmin && fIsJugador) {
+        mostrarToast('Solo el OP puede crear personajes jugadores', true);
+        return;
+    }
+
     const afinBase = {};
     ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
         afinBase[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
@@ -249,7 +360,11 @@ window.guardarPersonaje = function() {
         afinidadesEf: viejo.afinidadesEf || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
         afinidadesBf: viejo.afinidadesBf || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
         hz_clase1:0, hz_clase2:0, hz_clase3:0, hz_clase4:0, hz_clase5:0,
-        estados: viejo.estados || {}
+        estados: viejo.estados || {},
+        regen_vex_bf:    viejo.regen_vex_bf    || 0,
+        regen_vex_ef:    viejo.regen_vex_ef    || 0,
+        regen_guarda_bf: viejo.regen_guarda_bf || 0,
+        regen_guarda_ef: viejo.regen_guarda_ef || 0,
     };
 
     encolarCambio(nombre, '__full__', true);
@@ -270,6 +385,7 @@ window.cancelarFormulario = function() {
 // ELIMINAR
 // ─────────────────────────────────────────────────────────────
 window.pedirDelete = function(nombre) {
+    if (!estadoUI.esAdmin) return;
     if (!confirm(`¿Eliminar a "${nombre}" permanentemente?`)) return;
     delete personajes[nombre];
     encolarCambio(nombre, '__delete__', true);
