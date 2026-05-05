@@ -4,407 +4,914 @@
     <script src="hex-guard.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HEX ROL</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="img/icon.png">
-    <link rel="shortcut icon" href="img/icon.png">
-    <link rel="apple-touch-icon" href="img/icon.png">
+    <title id="doc-title">HEX ROL</title>
+    <link rel="icon" type="image/png" id="dynamic-favicon" href="img/icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <style>
+    /* ── PARTY PRINCIPAL ─────────────────────────────────────────── */
+    .party-section {
+        padding: 28px 24px 8px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .party-section-title {
+        font-family: var(--font-display);
+        font-size: 0.68em;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--gold-dim);
+        margin-bottom: 16px;
+    }
+
+    /* Grid de personajes - ACHICADO A 160px */
+    .party-main-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 14px;
+    }
+
+    .pj-card {
+        background: linear-gradient(160deg, var(--bg2) 0%, var(--bg3) 100%);
+        border: 1px solid var(--gold-border);
+        border-radius: var(--rl);
+        overflow: hidden;
+        position: relative;
+        transition: border-color 0.22s, transform 0.18s, box-shadow 0.22s;
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        cursor: default;
+    }
+    .pj-card:hover {
+        border-color: rgba(212, 175, 55, 0.5);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    /* Imagen + overlay degradado - ACHICADO A 100px */
+    .pj-card-img-wrap {
+        position: relative;
+        width: 100%;
+        height: 100px;
+        overflow: hidden;
+        background: var(--bg3);
+    }
+    .pj-card-img-wrap img {
+        width: 100%; height: 100%;
+        object-fit: cover; object-position: top;
+        opacity: 0.65;
+        transition: opacity 0.3s, transform 0.4s;
+    }
+    .pj-card:hover .pj-card-img-wrap img {
+        opacity: 0.8;
+        transform: scale(1.04);
+    }
+    .pj-card-img-fade {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 60%;
+        background: linear-gradient(transparent, var(--bg3));
+        pointer-events: none;
+    }
+    /* Nombre sobre la imagen */
+    .pj-card-nombre {
+        position: absolute;
+        bottom: 8px; left: 12px; right: 12px;
+        font-family: var(--font-display);
+        font-size: 0.88em;
+        color: var(--gold);
+        text-shadow: 0 1px 8px rgba(0,0,0,0.9);
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Cuerpo de la card */
+    .pj-card-body {
+        padding: 10px 12px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+    }
+
+    /* HEX */
+    .pj-hex {
+        font-family: var(--font-display);
+        font-size: 1.25em;
+        color: var(--gold);
+        letter-spacing: 0.5px;
+        line-height: 1;
+    }
+    .pj-hex-label {
+        font-size: 0.62em;
+        color: var(--dim);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-top: 1px;
+    }
+
+    /* Separador sutil */
+    .pj-sep {
+        height: 1px;
+        background: var(--gold-border);
+        opacity: 0.5;
+    }
+
+    /* Barras de recursos */
+    .pj-recurso {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    .pj-recurso-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+    }
+    .pj-recurso-label {
+        font-size: 0.62em;
+        color: var(--dim);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .pj-recurso-val {
+        font-size: 0.68em;
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+    }
+    .pj-recurso-regen {
+        font-size: 0.6em;
+        color: var(--dim);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Track genérico */
+    .pj-bar-track {
+        height: 4px;
+        background: var(--bg4);
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+    }
+    .pj-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.9s linear;
+    }
+    .pj-bar-fill.vida  { background: #c8404a; }
+    .pj-bar-fill.vex   { background: var(--gold); }
+    .pj-bar-fill.guarda{ background: var(--violet); }
+
+    /* Punto pulsante de regen activa */
+    .pj-regen-dot {
+        display: inline-block;
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        margin-right: 3px;
+        vertical-align: middle;
+        animation: pulse-dot 2s ease-in-out infinite;
+    }
+    .pj-regen-dot.vex    { background: var(--gold); box-shadow: 0 0 4px var(--gold); }
+    .pj-regen-dot.guarda { background: var(--violet); box-shadow: 0 0 4px var(--violet); }
+
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* ── SECCIÓN SECUNDARIA (módulos, stats…) ────────────────────── */
+    .secondary-section {
+        padding: 4px 24px 0;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .secondary-divider {
+        height: 1px;
+        background: linear-gradient(to right, transparent, var(--gold-border), transparent);
+        margin: 20px 0 24px;
+        opacity: 0.6;
+    }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+        .party-main-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    }
+    @media (max-width: 600px) {
+        .party-main-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .party-section   { padding: 20px 14px 8px; }
+        .pj-card-img-wrap { height: 90px; }
+    }
+
+    /* Push tags en cards de party */
+    .pj-pushes-row {
+        display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px;
+    }
+    .pj-push-tag {
+        font-size: 0.6em;
+        padding: 2px 6px; border-radius: 20px;
+        border: 1px solid; display: inline-flex; align-items: center; gap: 2px;
+        font-variant-numeric: tabular-nums; line-height: 1.4;
+    }
+    .pj-push-vex    { border-color: rgba(124,77,170,0.35); color: #a07fd4; background: rgba(124,77,170,0.12); }
+    .pj-push-guarda { border-color: rgba(212,175,55,0.28); color: #8a6e1a; background: rgba(212,175,55,0.1); }
+    .pj-push-cd     { opacity: 0.65; }
+    </style>
 </head>
 <body>
 
-<!-- ── NAV ───────────────────────────────────────────────────── -->
-<nav class="site-nav">
-    <div class="nav-brand">
-        <span class="nav-logo">⬡</span>
-        <span class="nav-title" id="nav-title">HEX ROL</span>
-    </div>
-    <div class="nav-right">
-        <!-- hex-guard.js inyecta el botón "cambiar campaña" aquí -->
-        <div id="hex-session-badge"></div>
-    </div>
-</nav>
-
-<!-- ── HERO ──────────────────────────────────────────────────── -->
-<div class="hero" id="hero">
-    <div class="hero-inner">
-        <div class="hero-sub" id="hero-sub">CAMPAÑA DE ROL MÁGICA</div>
-        <div class="hero-lore" id="hero-lore">Cargando campaña…</div>
-    </div>
+<!-- ══════════════════════════════════════════════════════════
+     SELECTOR DE CAMPAÑA
+═══════════════════════════════════════════════════════════════ -->
+<div id="hex-selector" style="display:none;">
+    <div class="sel-logo">⬡</div>
+    <h1 class="sel-titulo">HEXCRAFT</h1>
+    <p class="sel-sub">Selecciona una campaña</p>
+    <div class="sel-grid" id="hex-campaigns-grid"></div>
 </div>
 
-<!-- ── MÓDULOS ───────────────────────────────────────────────── -->
-<div class="modulos-grid" id="modulos-grid">
-    <!-- Renderizado por JS -->
-</div>
+<!-- ══════════════════════════════════════════════════════════
+     CONTENIDO PRINCIPAL
+═══════════════════════════════════════════════════════════════ -->
+<div id="main-content" style="display:none;">
 
-<!-- ── DASHBOARD ─────────────────────────────────────────────── -->
-<div class="dash-section">
+    <!-- NAV -->
+    <header class="site-nav">
+        <div class="nav-brand">
+            <span class="nav-logo">⬡</span>
+            <span class="nav-title" id="ui-titulo">HEX</span>
+        </div>
+        <div class="nav-right">
+            <button onclick="cambiarCampaña()" class="btn-cambiar">cambiar campaña</button>
+            <div id="hex-session-badge"></div>
+        </div>
+    </header>
 
-    <!-- Party activa -->
-    <div class="section-title" style="margin-bottom:16px;">PARTY ACTIVA</div>
-    <div class="party-scroll" id="party-grid">
-        <!-- Renderizado por JS -->
+    <!-- HERO -->
+    <section class="hero" id="hero-section">
+        <div class="hero-inner">
+            <p class="hero-sub" id="ui-subtitulo"></p>
+            <p class="hero-lore" id="ui-lore"></p>
+        </div>
+    </section>
+
+    <!-- ── MÓDULOS (Movidos arriba) ───────────────────────────── -->
+    <div class="secondary-section">
+        <div class="secondary-divider"></div>
     </div>
 
-    <!-- Resto del dashboard -->
-    <div id="dash-extra"></div>
-</div>
+    <main class="modulos-grid">
+        <a href="personajes/index.html" class="modulo">
+            <div class="modulo-img-wrap">
+                <img data-img="estadisticas.jpg" alt="Personajes" class="modulo-img">
+            </div>
+            <div class="modulo-body">
+                <span class="modulo-nombre">Personajes</span>
+                <span class="modulo-desc">Stats · afinidades · inventario</span>
+            </div>
+        </a>
+        <a href="hechizos/index.html" class="modulo">
+            <div class="modulo-img-wrap">
+                <img data-img="mapa.png" alt="Mapa de Hechizos" class="modulo-img">
+            </div>
+            <div class="modulo-body">
+                <span class="modulo-nombre">Mapa de Hechizos</span>
+                <span class="modulo-desc">Árbol de aprendizaje · grimorio</span>
+            </div>
+        </a>
+        <a href="misiones/index.html" class="modulo">
+            <div class="modulo-img-wrap">
+                <img data-img="misiones.png" alt="Misiones" class="modulo-img">
+            </div>
+            <div class="modulo-body">
+                <span class="modulo-nombre">Misiones</span>
+                <span class="modulo-desc">Tablón de quests activas</span>
+            </div>
+        </a>
+        <a href="hechizos/index.html#casteo" class="modulo">
+            <div class="modulo-img-wrap">
+                <img data-img="hechizos.jpg" alt="HexCast" class="modulo-img">
+            </div>
+            <div class="modulo-body">
+                <span class="modulo-nombre">HexCast</span>
+                <span class="modulo-desc">Calculadora de conjuros</span>
+            </div>
+        </a>
+        <a href="panel-de-desarrollo/index.html" class="modulo modulo-op" id="btn-panel-dev" style="display:none;">
+            <div class="modulo-img-wrap">
+                <img data-img="panel-dev.png" alt="Panel de Control" class="modulo-img">
+            </div>
+            <div class="modulo-body">
+                <span class="modulo-nombre">Panel de Control</span>
+                <span class="modulo-desc">Acceso máster</span>
+            </div>
+        </a>
+    </main>
 
-<!-- ── HILOS ACTIVOS ─────────────────────────────────────────── -->
-<div class="hilos-section" id="hilos-section" style="display:none;">
-    <div class="section-title">HILOS ACTIVOS</div>
-    <div class="hilos-row" id="hilos-row"></div>
+    <!-- ══════════════════════════════════════════════════════════
+         PARTY — PROTAGONISTAS (Movidos abajo)
+    ═══════════════════════════════════════════════════════════════ -->
+    <section class="party-section" id="party-section" style="display:none;">
+        <p class="party-section-title">Party activa</p>
+        <div class="party-main-grid" id="party-main-grid"></div>
+    </section>
+
+
+    <!-- ── HILOS ACTIVOS ─────────────────────────────────────── -->
+    <section class="hilos-section">
+        <h2 class="section-title">Hilos activos</h2>
+        <div class="hilos-row">
+            <a id="ui-link-rol"  href="#" target="_blank" class="hilo-card">
+                <img data-img="hex-002.png" alt="Rol">
+                <div class="hilo-overlay"><span id="ui-nombre-rol">ROL</span></div>
+            </a>
+            <a id="ui-link-meta" href="#" target="_blank" class="hilo-card">
+                <img data-img="met-004.png" alt="Meta">
+                <div class="hilo-overlay"><span id="ui-nombre-meta">META</span></div>
+            </a>
+        </div>
+    </section>
+
+    <!-- ── DASHBOARD SECUNDARIO (stats + misiones) ────────────── -->
+    <section class="dash-section">
+        <div class="dash-stats" id="dash-stats"></div>
+        <div class="dash-cols">
+            <div class="dash-card">
+                <div class="dash-card-title">Misiones en curso</div>
+                <div id="dash-misiones"></div>
+                <a href="misiones/index.html" class="dash-link">Ver tablón →</a>
+            </div>
+        </div>
+    </section>
+
 </div>
 
 <script type="module">
-import { hexAuth, currentConfig } from './hex-auth.js';
-import { hexConfigs }              from './hex/config.js';
-import { createClient }            from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { hexAuth, currentConfig, supabase } from './hex-auth.js';
+import { db } from './hex-db.js';
+import { hexConfigs } from './hex/config.js';
 
-// Exponer para hex-guard.js
 window.hexConfigs = hexConfigs;
-
-const cfg = currentConfig;
-const sb  = createClient(cfg.dbUrl, cfg.dbAnonKey);
-
-// ── Auth ──────────────────────────────────────────────────────
-await hexAuth.init();
-const badge = document.getElementById('hex-session-badge');
-if (badge) badge.innerHTML = hexAuth.renderStatusBadge();
-
-// ── UI de campaña ─────────────────────────────────────────────
-document.getElementById('nav-title').textContent  = cfg.ui?.titulo    || 'HEX ROL';
-document.getElementById('hero-sub').textContent   = cfg.ui?.subtitulo || 'CAMPAÑA DE ROL';
-document.getElementById('hero-lore').textContent  = cfg.ui?.lore      || '';
-document.title = (cfg.ui?.titulo || 'HEX ROL');
-
-// Hero background
-if (cfg.storageUrl) {
-    const hero = document.getElementById('hero');
-    if (hero) {
-        hero.style.backgroundImage = `linear-gradient(to top, rgba(7,6,14,0.9) 0%, rgba(7,6,14,0.4) 100%), url('${cfg.storageUrl}/banner.jpg')`;
-        hero.style.backgroundSize   = 'cover';
-        hero.style.backgroundPosition = 'center';
+window.cambiarCampaña = () => {
+    if (typeof window._hexGuardAbrirModal === 'function') {
+        window._hexGuardAbrirModal();
+    } else {
+        localStorage.removeItem('hex_selected');
+        window.location.reload();
     }
+};
+window.seleccionarCampaña = (id) => {
+    if (typeof window._hexGuardSelect === 'function') {
+        window._hexGuardSelect(id);
+    } else {
+        localStorage.setItem('hex_selected', id);
+        window.location.reload();
+    }
+};
+
+// ── Helpers ───────────────────────────────────────────────────
+function setText(id, val) { const e = document.getElementById(id); if (e) e.textContent = val; }
+function setHref(id, val) { const e = document.getElementById(id); if (e) e.href = val; }
+
+function norm(s) {
+    return s.toString().trim().toLowerCase()
+        .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+        .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
+        .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
 }
 
-// ── Módulos ───────────────────────────────────────────────────
-const MODULOS = [
-    { href:'personajes/index.html', img:'personajes',    nombre:'Personajes',         desc:'Stats · afinidades · inventario' },
-    { href:'hechizos/index.html',   img:'hechizos',      nombre:'Mapa de Hechizos',   desc:'Árbol de aprendizaje · grimorio' },
-    { href:'misiones/index.html',   img:'misiones',      nombre:'Misiones',           desc:'Tablón de quests activas' },
-    { href:'hexcast/index.html',    img:'hexcast',       nombre:'HexCast',            desc:'Calculadora de conjuros' },
-    { href:'panel/index.html',      img:'panel',         nombre:'Panel de Control',   desc:'Acceso máster', op: true },
-];
+// ── INIT ──────────────────────────────────────────────────────
+async function iniciar() {
+    if (!localStorage.getItem('hex_selected')) {
+        document.getElementById('hex-selector').style.display = 'flex';
+        await renderSelector();
+        return;
+    }
 
-const grid = document.getElementById('modulos-grid');
-if (grid) {
-    grid.innerHTML = MODULOS.map(m => `
-        <a href="${m.href}" class="modulo ${m.op ? 'modulo-op' : ''}">
-            <div class="modulo-img-wrap">
-                <img class="modulo-img" src="${cfg.storageUrl}/${m.img}.jpg"
-                     onerror="this.style.display='none'" alt="">
-            </div>
-            <div class="modulo-body">
-                <div class="modulo-nombre">${m.nombre}</div>
-                <div class="modulo-desc">${m.desc}</div>
-            </div>
-        </a>
-    `).join('');
+    document.getElementById('main-content').style.display = 'block';
+    await hexAuth.init();
+
+    const ui = currentConfig.ui || {};
+    setText('doc-title',      ui.titulo    || 'HEX ROL');
+    setText('ui-titulo',      ui.titulo    || 'HEX ROL');
+    setText('ui-subtitulo',   ui.subtitulo || '');
+    setText('ui-lore',        ui.lore      || '');
+    setHref('ui-link-rol',    ui.linkRol   || '#');
+    setText('ui-nombre-rol',  ui.nombreRol || 'ROL');
+    setHref('ui-link-meta',   ui.linkMeta  || '#');
+    setText('ui-nombre-meta', ui.nombreMeta|| 'META');
+
+    try {
+        const { data: dbUI } = await supabase.from('config_ui').select('*').eq('hex_id','default').single();
+        if (dbUI) {
+            if (dbUI.titulo)    { setText('doc-title', dbUI.titulo); setText('ui-titulo', dbUI.titulo); }
+            if (dbUI.subtitulo)   setText('ui-subtitulo', dbUI.subtitulo);
+            if (dbUI.lore)        setText('ui-lore', dbUI.lore);
+            if (dbUI.link_rol)    setHref('ui-link-rol',  dbUI.link_rol);
+            if (dbUI.nombre_rol)  setText('ui-nombre-rol', dbUI.nombre_rol);
+            if (dbUI.link_meta)   setHref('ui-link-meta', dbUI.link_meta);
+            if (dbUI.nombre_meta) setText('ui-nombre-meta', dbUI.nombre_meta);
+        }
+    } catch(e) {}
+
+    const favicon = document.getElementById('dynamic-favicon');
+    if (favicon) favicon.href = db.storage.getUrlInterfaz('icon.png');
+
+    const badge = document.getElementById('hex-session-badge');
+    if (badge) badge.innerHTML = hexAuth.renderStatusBadge();
+
+    if (hexAuth.esAdmin()) {
+        const btn = document.getElementById('btn-panel-dev');
+        if (btn) btn.style.display = 'flex';
+    }
+
+    const hero = document.getElementById('hero-section');
+    if (hero) {
+        const bg = db.storage.getUrlInterfaz('hex-002.png');
+        hero.style.cssText += `;background-image:linear-gradient(rgba(8,0,18,0.7),rgba(8,0,18,0.94)),url('${bg}');background-size:cover;background-position:center;`;
+    }
+
+    cargarImagenes();
+    await Promise.all([cargarParty(), cargarDashboard()]);
 }
 
-// ── Party activa ──────────────────────────────────────────────
-async function cargarParty() {
-    const { data: pjs } = await sb
-        .from('personajes')
-        .select('nombre,is_player,is_active,hex,vex_actual,vex_max,vida_roja_actual,guarda_actual,guarda_max,push_vex_actual,push_vex_limit,push_vex_ts,push_guarda_actual,push_guarda_limit,push_guarda_ts,af_fisica,af_energetica,af_espiritual,af_mando,af_psiquica,af_oscura,af_oscura,icono_override')
-        .eq('is_player', true)
-        .eq('is_active', true)
-        .order('nombre');
-
-    const { data: formData } = await sb
-        .from('config_formulas')
-        .select('clave,expresion');
-
-    // Fórmulas mínimas para vida_roja_max y vex_max
-    const fMap = {};
-    (formData || []).forEach(f => { fMap[f.clave] = f.expresion; });
-    const fVidaRoja = fMap['vida_roja_max'] || 'Math.floor(FisB / 2) + 10';
-    const fVexMax   = fMap['vex_max']       || 'Math.round(OscB * 75 / 50) * 50';
-    const fGuardaMax= fMap['guarda_max']    || 'Math.floor(EspB / 3)';
-
-    // Push umbrales (simplificado: usamos defaults si no los cargamos)
-    const { data: pushUData } = await sb
-        .from('config_push_umbrales')
-        .select('*')
-        .order('orden');
-    const { data: pushFData } = await sb
-        .from('config_push')
-        .select('clave,expresion');
-
-    const pushFMap = {};
-    (pushFData || []).forEach(f => { pushFMap[f.clave] = f.expresion; });
-    const fPushVex    = pushFMap['valor_push_vex']    || 'Math.round((OscB * 75 / 50) * 50 * 0.5)';
-    const fPushGuarda = pushFMap['valor_push_guarda'] || 'Math.max(1, Math.round(EspB / 3))';
-    const cdVex    = parseFloat(pushFMap['cooldown_vex'])    || 60;
-    const cdGuarda = parseFloat(pushFMap['cooldown_guarda']) || 30;
-
-    const pushU = { vex: [], guarda: [] };
-    (pushUData || []).forEach(u => {
-        if (u.recurso === 'vex')    pushU.vex.push(u);
-        if (u.recurso === 'guarda') pushU.guarda.push(u);
+function cargarImagenes() {
+    const fb = db.storage.getUrlInterfaz('icon.png');
+    document.querySelectorAll('img[data-img]').forEach(img => {
+        img.onerror = () => { img.onerror = null; img.src = fb; };
+        img.src = db.storage.getUrlInterfaz(img.getAttribute('data-img'));
     });
-    // Defaults si DB está vacía
-    if (!pushU.vex.length) pushU.vex = [
-        { condicion:'pct_vida_roja >= 50', pushes:1 },
-        { condicion:'pct_vida_roja >= 75', pushes:1 },
-        { condicion:'vida_azul > 20',      pushes:1 },
-        { condicion:'vida_azul > 40',      pushes:1 },
-        { condicion:'vida_azul > 80',      pushes:1 },
-    ];
-    if (!pushU.guarda.length) pushU.guarda = pushU.vex.map(u => ({...u}));
+}
 
-    function evalEx(expr, ctx) {
+// ══════════════════════════════════════════════════════════════
+// PARTY — carga personajes jugadores activos y arranca el ticker
+// ══════════════════════════════════════════════════════════════
+
+// Estado vivo de los personajes en memoria
+const partyData = {};   // { nombre: pjObj }
+let regenConfig = { vex: { intervalo: 12 }, guarda: { intervalo: 12 } };
+let _tickTimer = null;
+const TICK_SEG = 10;
+
+async function cargarParty() {
+    try {
+        // Config de regen
+        const { data: cfgRows } = await supabase.from('config_regen').select('*');
+        if (cfgRows) {
+            cfgRows.forEach(r => {
+                if (regenConfig[r.recurso]) regenConfig[r.recurso].intervalo = parseFloat(r.intervalo_horas) || 12;
+            });
+        }
+
+        // Config de fórmulas (para calcular stats derivados)
+        let formulas = {
+            vida_roja_max: { expr: 'Math.floor(FisB / 2) + 10' },
+            vex_max:       { expr: 'Math.round(OscB * 75 / 50) * 50' },
+            guarda_max:    { expr: 'Math.floor(EspB / 3)' },
+        };
         try {
-            const {Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB} = ctx;
-            return Math.max(0, Math.round(new Function('Fis','Ene','Esp','Man','Psi','Osc','FisB','EneB','EspB','ManB','PsiB','OscB',
-                `return Math.max(0, ${expr});`)(Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB)));
+            const { data: fRows } = await supabase.from('config_formulas').select('clave,expresion');
+            if (fRows) fRows.forEach(r => { if (formulas[r.clave]) formulas[r.clave].expr = r.expresion; });
+        } catch(e) {}
+
+        // Config de push umbrales y fórmulas
+        let pushUmbrales = { vex: [], guarda: [] };
+        let pushFormulas = {
+            valor_push_vex:    'Math.round((OscB * 75 / 50) * 50 * 0.5)',
+            valor_push_guarda: 'Math.max(1, Math.round(EspB / 3))'
+        };
+        let pushCooldown = { vex: 60, guarda: 30 };
+        try {
+            const { data: puRows } = await supabase.from('config_push_umbrales').select('*').order('orden');
+            if (puRows && puRows.length) {
+                puRows.forEach(u => {
+                    if (u.recurso === 'vex')    pushUmbrales.vex.push(u);
+                    if (u.recurso === 'guarda') pushUmbrales.guarda.push(u);
+                });
+            } else {
+                // Defaults
+                const defs = [
+                    {condicion:'pct_vida_roja >= 50', pushes:1},
+                    {condicion:'pct_vida_roja >= 75', pushes:1},
+                    {condicion:'vida_azul > 20',      pushes:1},
+                    {condicion:'vida_azul > 40',      pushes:1},
+                    {condicion:'vida_azul > 80',      pushes:1},
+                ];
+                pushUmbrales.vex    = defs;
+                pushUmbrales.guarda = defs.map(u=>({...u}));
+            }
+            const { data: pfRows } = await supabase.from('config_push').select('clave,expresion');
+            if (pfRows) pfRows.forEach(r => {
+                if (r.clave === 'valor_push_vex')    pushFormulas.valor_push_vex    = r.expresion;
+                if (r.clave === 'valor_push_guarda') pushFormulas.valor_push_guarda = r.expresion;
+                if (r.clave === 'cooldown_vex')      pushCooldown.vex    = parseFloat(r.expresion)||60;
+                if (r.clave === 'cooldown_guarda')   pushCooldown.guarda = parseFloat(r.expresion)||30;
+            });
+        } catch(e) {}
+
+        // Personajes jugadores activos
+        const { data: pjs } = await supabase
+            .from('personajes')
+            .select('*')
+            .eq('is_active', true)
+            .eq('is_player', true)
+            .order('nombre');
+
+        if (!pjs || pjs.length === 0) return;
+
+        // Guardar en memoria y calcular stats iniciales
+        pjs.forEach(row => {
+            const p = mapRow(row);
+            p._stats = calcStats(p, formulas);
+            p._vex_frac    = 0;
+            p._guarda_frac = 0;
+            partyData[row.nombre] = p;
+        });
+
+        // Guardar push config en variable accesible
+        window._pushConfig = { pushUmbrales, pushFormulas, pushCooldown };
+
+        // Renderizar tarjetas por primera vez
+        renderParty(formulas);
+
+        // Arrancar ticker local visual
+        if (_tickTimer) clearInterval(_tickTimer);
+        _tickTimer = setInterval(() => tickParty(formulas), TICK_SEG * 1000);
+
+        // Suscribir Realtime para cambios externos (desde el cron job de la base de datos)
+        supabase.channel('index-party')
+            .on('postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'personajes' },
+                payload => {
+                    const row = payload.new;
+                    if (!row?.nombre || !partyData[row.nombre]) return;
+                    const p = mapRow(row);
+                    p._stats = calcStats(p, formulas);
+                    partyData[row.nombre] = p;
+                    actualizarCard(row.nombre);
+                }
+            )
+            .subscribe();
+
+    } catch(e) { console.error('cargarParty:', e); }
+}
+
+// Mapea fila de Supabase a objeto interno
+function mapRow(row) {
+    return {
+        nombre:       row.nombre,
+        hex:          row.hex           || 0,
+        vex_actual:   row.vex_actual    || 0,
+        vex_max:      row.vex_max       || 0,
+        guarda_actual:row.guarda_actual || 0,
+        guarda_max:   row.guarda_max    || 0,
+        vida_roja_actual: row.vida_roja_actual || 0,
+        af_fisica:    row.af_fisica     || 0,
+        af_energetica:row.af_energetica || 0,
+        af_espiritual:row.af_espiritual || 0,
+        af_mando:     row.af_mando      || 0,
+        af_psiquica:  row.af_psiquica   || 0,
+        af_oscura:    row.af_oscura     || 0,
+        hz_fisica:    row.hz_fisica     || 0,
+        hz_energetica:row.hz_energetica || 0,
+        hz_espiritual:row.hz_espiritual || 0,
+        hz_mando:     row.hz_mando      || 0,
+        hz_psiquica:  row.hz_psiquica   || 0,
+        hz_oscura:    row.hz_oscura     || 0,
+        ef_fisica:    row.ef_fisica     || 0,
+        ef_espiritual:row.ef_espiritual || 0,
+        ef_oscura:    row.ef_oscura     || 0,
+        bf_fisica:    row.bf_fisica     || 0,
+        bf_espiritual:row.bf_espiritual || 0,
+        bf_oscura:    row.bf_oscura     || 0,
+        regen_vex_bf:    row.regen_vex_bf    || 0,
+        regen_vex_ef:    row.regen_vex_ef    || 0,
+        regen_guarda_bf: row.regen_guarda_bf || 0,
+        regen_guarda_ef: row.regen_guarda_ef || 0,
+        hz_clase1:row.hz_clase1||0, hz_clase2:row.hz_clase2||0,
+        hz_clase3:row.hz_clase3||0, hz_clase4:row.hz_clase4||0,
+        hz_clase5:row.hz_clase5||0,
+        npc_tipo: row.npc_tipo || 'jugador',
+        // Push system
+        push_vex_actual:    row.push_vex_actual    || 0,
+        push_vex_limit:     row.push_vex_limit     || 0,
+        push_vex_ts:        row.push_vex_ts        || null,
+        push_guarda_actual: row.push_guarda_actual || 0,
+        push_guarda_limit:  row.push_guarda_limit  || 0,
+        push_guarda_ts:     row.push_guarda_ts     || null,
+        icono_override:     row.icono_override     || row.nombre,
+    };
+}
+
+// Calcula stats derivados usando las fórmulas
+function calcStats(p, formulas) {
+    const FisB = p.af_fisica, EneB = p.af_energetica, EspB = p.af_espiritual;
+    const ManB = p.af_mando,  PsiB = p.af_psiquica,   OscB = p.af_oscura;
+    const Fis  = FisB + (p.hz_fisica||0) + (p.ef_fisica||0) + (p.bf_fisica||0);
+    const Ene  = EneB + (p.hz_energetica||0);
+    const Esp  = EspB + (p.hz_espiritual||0) + (p.ef_espiritual||0) + (p.bf_espiritual||0);
+    const Man  = ManB + (p.hz_mando||0);
+    const Psi  = PsiB + (p.hz_psiquica||0);
+    const Osc  = OscB + (p.hz_oscura||0) + (p.ef_oscura||0) + (p.bf_oscura||0);
+    const Hz1  = p.hz_clase1, Hz2=p.hz_clase2, Hz3=p.hz_clase3, Hz4=p.hz_clase4, Hz5=p.hz_clase5;
+
+    function evalF(expr) {
+        try {
+            // eslint-disable-next-line no-new-func
+            const r = new Function('Fis','Ene','Esp','Man','Psi','Osc','FisB','EneB','EspB','ManB','PsiB','OscB','Hz1','Hz2','Hz3','Hz4','Hz5',
+                `return Math.max(0, ${expr});`
+            )(Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB,Hz1,Hz2,Hz3,Hz4,Hz5);
+            return isFinite(r) ? Math.round(r) : 0;
         } catch { return 0; }
     }
+
+    // Regen VEX / hora — misma lógica que personajes-logic.js
+    const regenVexBase = evalF('Math.round(OscB * 75 / 50) * 50 * 0.5 + Hz3 * 25 + Hz4 * 60');
+    const regenVex     = regenVexBase + (p.regen_vex_bf||0) + (p.regen_vex_ef||0);
+
+    // Regen Guarda / hora
+    const regenGuardaBase = evalF('Math.floor(EspB / 2)');
+    const regenGuarda     = regenGuardaBase + (p.regen_guarda_bf||0) + (p.regen_guarda_ef||0);
+
+    const vex_max    = evalF(formulas.vex_max.expr);
+    const guarda_max = evalF(formulas.guarda_max.expr);
+    const vida_roja_max = evalF(formulas.vida_roja_max.expr);
+
+    const vida_azul_max = evalF('Math.floor((EneB + EspB + ManB + PsiB) / 4)');
+    return { vex_max, guarda_max, vida_roja_max, vida_azul_max };
+}
+
+// ── Ticker — actualiza cooldown display cada segundo ──────────
+function tickParty(formulas) {
+    // Ya no hay regen automático. Solo actualizamos los badges de cooldown.
+    for (const nombre of Object.keys(partyData)) {
+        const p = partyData[nombre];
+        const s = p._stats;
+        // Actualizar solo los indicadores de push (cooldown countdown)
+        const cardEl = document.getElementById(`pjcard-${norm(nombre)}`);
+        if (!cardEl) continue;
+        const pushRow = cardEl.querySelector('.pj-pushes-row');
+        if (pushRow) pushRow.outerHTML = renderPushes(p, s);
+    }
+}
+
+// ── Render inicial de todas las cards ────────────────────────
+function renderParty(formulas) {
+    const grid = document.getElementById('party-main-grid');
+    if (!grid) return;
+
+    const nombres = Object.keys(partyData);
+    if (!nombres.length) return;
+
+    grid.innerHTML = nombres.map(nombre => {
+        const p = partyData[nombre];
+        const s = p._stats;
+        const iconoKey = norm(p.icono_override || nombre);
+        const icon   = `${db.storage.urlBase}/imgpersonajes/${iconoKey}icon.png`;
+        const portada= `${db.storage.urlBase}/imgpersonajes/${iconoKey}.png`;
+        const fb     = `${db.storage.urlBase}/imginterfaz/no_encontrado.png`;
+
+        const pjLink = `personajes/index.html?pj=${encodeURIComponent(nombre)}`;
+        return `<a href="${pjLink}" class="pj-card" id="pjcard-${norm(nombre)}" style="text-decoration:none;">
+            <div class="pj-card-img-wrap">
+                <img src="${portada}" onerror="this.onerror=null;this.src='${icon}';this.onerror=()=>{this.src='${fb}'}"
+                     alt="${nombre}" style="object-position:top;">
+                <div class="pj-card-img-fade"></div>
+                <div class="pj-card-nombre">${nombre}</div>
+            </div>
+            <div class="pj-card-body">
+                <div>
+                    <div class="pj-hex">${(p.hex||0).toLocaleString()} <span style="font-size:0.55em;color:var(--gold-dim);letter-spacing:2px;">HEX</span></div>
+                </div>
+                <div class="pj-sep"></div>
+                ${renderRecurso(p, s, 'vida')}
+                ${s.vex_max > 0 ? renderRecurso(p, s, 'vex') : ''}
+                ${s.guarda_max > 0 ? renderRecurso(p, s, 'guarda') : ''}
+                ${renderPushes(p, s)}
+            </div>
+        </a>`;
+    }).join('');
+
+    document.getElementById('party-section').style.display = 'block';
+}
+
+function renderRecurso(p, s, tipo) {
+    let actual, max, label, colorClass;
+
+    if (tipo === 'vida') {
+        actual = Math.floor(p.vida_roja_actual || 0);
+        max    = s.vida_roja_max || 1;
+        label  = 'Vida';
+        colorClass = 'vida';
+    } else if (tipo === 'vex') {
+        actual = Math.floor(p.vex_actual || 0);
+        max    = s.vex_max || 1;
+        label  = 'VEX';
+        colorClass = 'vex';
+    } else {
+        actual = Math.floor(p.guarda_actual || 0);
+        max    = s.guarda_max || 1;
+        label  = 'Guarda';
+        colorClass = 'guarda';
+    }
+
+    const pct = Math.min(100, Math.round((actual / max) * 100));
+
+    return `<div class="pj-recurso" id="rec-${colorClass}-${norm(p.nombre)}">
+        <div class="pj-recurso-header">
+            <span class="pj-recurso-label">${label}</span>
+            <span class="pj-recurso-val">${actual.toLocaleString()} / ${max.toLocaleString()}</span>
+        </div>
+        <div class="pj-bar-track"><div class="pj-bar-fill ${colorClass}" style="width:${pct}%"></div></div>
+    </div>`;
+}
+
+// Render indicadores de pushes disponibles
+function renderPushes(p, s) {
+    const pc = window._pushConfig;
+    if (!pc) return '';
 
     function evalCond(cond, pct_vida_roja, vida_azul) {
         try { return new Function('pct_vida_roja','vida_azul', `return !!(${cond});`)(pct_vida_roja, vida_azul); }
         catch { return false; }
     }
-
-    function calcPushDisp(pj, ctx, vidaRojaMax, vidaAzulMax, recurso) {
-        const pct = vidaRojaMax > 0 ? Math.round((pj.vida_roja_actual||0) / vidaRojaMax * 100) : 0;
-        const va  = vidaAzulMax;
-        let total = (pushU[recurso] || []).reduce((s, u) => s + (evalCond(u.condicion, pct, va) ? u.pushes : 0), 0);
-        total += recurso === 'vex' ? (pj.push_vex_limit || 0) : (pj.push_guarda_limit || 0);
+    function calcDisp(recurso) {
+        const pct_vida_roja = s.vida_roja_max > 0 ? Math.round((p.vida_roja_actual||0)/s.vida_roja_max*100) : 0;
+        const vida_azul = s.vida_azul_max || 0;
+        let total = (pc.pushUmbrales[recurso]||[]).reduce((acc,u) => acc + (evalCond(u.condicion,pct_vida_roja,vida_azul)?u.pushes:0), 0);
+        total += recurso==='vex' ? (p.push_vex_limit||0) : (p.push_guarda_limit||0);
         return total;
     }
-
-    function calcCd(pj, recurso) {
-        const ts = recurso === 'vex' ? pj.push_vex_ts : pj.push_guarda_ts;
-        const cd = recurso === 'vex' ? cdVex : cdGuarda;
-        if (!ts) return { disponible: true, restaSeg: 0 };
-        const pasado = (Date.now() - new Date(ts).getTime()) / 1000;
-        const total  = cd * 60;
-        if (pasado >= total) return { disponible: true, restaSeg: 0 };
-        return { disponible: false, restaSeg: Math.ceil(total - pasado) };
+    function calcCd(recurso) {
+        const ts = recurso==='vex' ? p.push_vex_ts : p.push_guarda_ts;
+        const cd = recurso==='vex' ? pc.pushCooldown.vex : pc.pushCooldown.guarda;
+        if (!ts) return { disponible:true, restaSeg:0 };
+        const pasado = (Date.now() - new Date(ts).getTime())/1000;
+        if (pasado >= cd*60) return { disponible:true, restaSeg:0 };
+        return { disponible:false, restaSeg:Math.ceil(cd*60-pasado) };
     }
 
-    const partyGrid = document.getElementById('party-grid');
-    if (!partyGrid || !pjs?.length) {
-        if (partyGrid) partyGrid.innerHTML = '<div style="color:var(--dim);font-size:0.85em;padding:20px 0;">Sin jugadores activos.</div>';
-        return;
+    const items = [];
+    if (s.vex_max > 0) {
+        const disp = calcDisp('vex');
+        const usados = p.push_vex_actual||0;
+        const cd = calcCd('vex');
+        const cdTxt = !cd.disponible ? ` ⏳${Math.ceil(cd.restaSeg/60)}m` : '';
+        items.push(`<span class="pj-push-tag pj-push-vex${!cd.disponible?' pj-push-cd':''}" title="Push VEX">⚡ ${usados}/${disp}${cdTxt}</span>`);
+    }
+    if (s.guarda_max > 0) {
+        const disp = calcDisp('guarda');
+        const usados = p.push_guarda_actual||0;
+        const cd = calcCd('guarda');
+        const cdTxt = !cd.disponible ? ` ⏳${Math.ceil(cd.restaSeg/60)}m` : '';
+        items.push(`<span class="pj-push-tag pj-push-guarda${!cd.disponible?' pj-push-cd':''}" title="Push Guarda">🛡 ${usados}/${disp}${cdTxt}</span>`);
+    }
+    if (!items.length) return '';
+    return `<div class="pj-pushes-row">${items.join('')}</div>`;
+}
+
+// ── Actualizar solo los valores numéricos de una card ─────────
+function actualizarCard(nombre) {
+    const p = partyData[nombre];
+    const s = p._stats;
+    const id = norm(nombre);
+
+    // HEX
+    const hexEl = document.querySelector(`#pjcard-${id} .pj-hex`);
+    if (hexEl) hexEl.innerHTML = `${(p.hex||0).toLocaleString()} <span style="font-size:0.55em;color:var(--gold-dim);letter-spacing:2px;">HEX</span>`;
+
+    // Recursos
+    actualizarRecurso(p, s, 'vida');
+    if (s.vex_max > 0)    actualizarRecurso(p, s, 'vex');
+    if (s.guarda_max > 0) actualizarRecurso(p, s, 'guarda');
+}
+
+function actualizarRecurso(p, s, tipo) {
+    const id = norm(p.nombre);
+    const el = document.getElementById(`rec-${tipo}-${id}`);
+    if (!el) return;
+
+    let actual, max;
+    if (tipo === 'vida') {
+        actual = Math.floor(p.vida_roja_actual || 0);
+        max    = s.vida_roja_max || 1;
+    } else if (tipo === 'vex') {
+        actual = Math.floor(p.vex_actual || 0);
+        max    = s.vex_max || 1;
+    } else {
+        actual = Math.floor(p.guarda_actual || 0);
+        max    = s.guarda_max || 1;
     }
 
-    partyGrid.innerHTML = pjs.map(pj => {
-        const OscB = pj.af_oscura     || 0;
-        const FisB = pj.af_fisica     || 0;
-        const EneB = pj.af_energetica || 0;
-        const EspB = pj.af_espiritual || 0;
-        const ManB = pj.af_mando      || 0;
-        const PsiB = pj.af_psiquica   || 0;
+    const pct = Math.min(100, Math.round((actual / max) * 100));
 
-        const ctx = { Fis:FisB,Ene:EneB,Esp:EspB,Man:ManB,Psi:PsiB,Osc:OscB,
-                      FisB,EneB,EspB,ManB,PsiB,OscB };
+    const valEl  = el.querySelector('.pj-recurso-val');
+    const fillEl = el.querySelector('.pj-bar-fill');
+    if (valEl)  valEl.textContent  = `${actual.toLocaleString()} / ${max.toLocaleString()}`;
+    if (fillEl) fillEl.style.width = `${pct}%`;
+}
 
-        const vidaRojaMax = evalEx(fVidaRoja, ctx);
-        const vexMax      = evalEx(fVexMax,   ctx);
-        const guardaMax   = evalEx(fGuardaMax, ctx);
-        const vidaAzulMax = evalEx(fMap['vida_azul_max'] || 'Math.floor((EneB+EspB+ManB+PsiB)/4)', ctx);
+// ══════════════════════════════════════════════════════════════
+// DASHBOARD SECUNDARIO (stats + misiones)
+// ══════════════════════════════════════════════════════════════
+async function cargarDashboard() {
+    try {
+        const [pjRes, misRes, invRes, hzRes] = await Promise.all([
+            supabase.from('personajes').select('nombre,is_player,is_active,hex'),
+            supabase.from('misiones').select('titulo,estado,jugadores'),
+            supabase.from('inventario_objetos').select('cantidad').gt('cantidad',0),
+            supabase.from('hechizos_inventario').select('hechizo_nombre')
+        ]);
 
-        const vidaActual  = pj.vida_roja_actual || 0;
-        const vexActual   = pj.vex_actual       || 0;
+        const pjs    = pjRes.data  || [];
+        const mis    = misRes.data || [];
+        const inv    = invRes.data || [];
+        const hz     = hzRes.data  || [];
 
-        const pctVida  = vidaRojaMax > 0 ? Math.min(100, Math.round(vidaActual / vidaRojaMax * 100)) : 0;
-        const pctVex   = vexMax > 0      ? Math.min(100, Math.round(vexActual  / vexMax      * 100)) : 0;
-        const pctGuarda= guardaMax > 0   ? Math.min(100, Math.round((pj.guarda_actual||0) / guardaMax * 100)) : 0;
+        const jugs   = pjs.filter(p => p.is_player && p.is_active);
+        const npcs   = pjs.filter(p => !p.is_player && p.is_active);
+        const misAct = mis.filter(m => m.estado === 1 || m.estado === 2);
+        const misPend= mis.filter(m => m.estado === 1);
+        const misProc= mis.filter(m => m.estado === 2);
+        const totalInv = inv.reduce((a,r) => a+(r.cantidad||0), 0);
+        const hexProm  = jugs.length ? Math.round(jugs.reduce((a,p)=>a+(p.hex||0),0)/jugs.length) : 0;
 
-        const pushVexDisp    = calcPushDisp(pj, ctx, vidaRojaMax, vidaAzulMax, 'vex');
-        const pushGuardaDisp = calcPushDisp(pj, ctx, vidaRojaMax, vidaAzulMax, 'guarda');
-        const pushVexUs      = pj.push_vex_actual    || 0;
-        const pushGuardaUs   = pj.push_guarda_actual || 0;
-        const cdVexInfo      = calcCd(pj, 'vex');
-        const cdGuardaInfo   = calcCd(pj, 'guarda');
+        // Stats
+        const statsEl = document.getElementById('dash-stats');
+        if (statsEl) {
+            const items = [
+                { n: jugs.length,              l: 'Jugadores activos'   },
+                { n: npcs.length,              l: 'NPCs activos'        },
+                { n: misAct.length,            l: 'Misiones activas'    },
+                { n: totalInv,                 l: 'Objetos circulando'  },
+                { n: hz.length,                l: 'Hechizos aprendidos' },
+                { n: hexProm.toLocaleString(), l: 'HEX promedio party'  }
+            ];
+            statsEl.innerHTML = items.map(i =>
+                `<div class="dash-stat"><div class="dash-stat-n">${i.n}</div><div class="dash-stat-l">${i.l}</div></div>`
+            ).join('');
+        }
 
-        const icono = pj.icono_override || pj.nombre;
-        const imgUrl = `${cfg.storageUrl}/${encodeURIComponent(icono)}.jpg`;
-        // Link directo a la página de personajes con el panel abierto
-        const link = `personajes/index.html?pj=${encodeURIComponent(pj.nombre)}`;
+        // Misiones
+        const misEl = document.getElementById('dash-misiones');
+        if (misEl) {
+            misEl.innerHTML = `<div class="mis-resumen">
+                <div class="mis-badge mis-pend">${misPend.length} <span>pendientes</span></div>
+                <div class="mis-badge mis-proc">${misProc.length} <span>en curso</span></div>
+            </div>` + (misAct.slice(0,5).map(m =>
+                `<div class="mis-row">
+                    <span class="mis-titulo">${m.titulo}</span>
+                    <span class="mis-tag ${m.estado===1?'mis-tag-pend':'mis-tag-proc'}">${m.estado===1?'Pendiente':'En curso'}</span>
+                    <div class="mis-jug">${(m.jugadores||[]).join(', ')||'Sin asignar'}</div>
+                </div>`
+            ).join('') || '<p class="dash-empty">No hay misiones activas</p>');
+        }
 
-        return `
-        <a href="${link}" class="party-card-link" style="text-decoration:none;">
-        <div class="party-card">
-            <div class="party-card-img-wrap">
-                <img class="party-card-img" src="${imgUrl}" onerror="this.style.display='none'" alt="${pj.nombre}">
-                <div class="party-card-overlay"></div>
-                <div class="party-card-name">${pj.nombre}</div>
+    } catch(e) { console.error('Dashboard:', e); }
+}
+
+// ── SELECTOR ─────────────────────────────────────────────────
+async function renderSelector() {
+    const grid = document.getElementById('hex-campaigns-grid');
+    if (!grid) return;
+    const campañas = Object.values(hexConfigs);
+    grid.innerHTML = campañas.map(cfg => {
+        const base   = cfg.storageUrl || '';
+        const nombre = cfg.ui?.titulo || cfg.nombreCorto || cfg.id.toUpperCase();
+        const desc   = cfg.ui?.subtitulo || '';
+        return `<div class="sel-card" onclick="seleccionarCampaña('${cfg.id}')">
+            <div class="sel-card-img">
+                <img src="${base}/imginterfaz/hex-002.png" onerror="this.style.opacity=0">
+                <div class="sel-card-icon"><img src="${base}/imginterfaz/icon.png" onerror="this.style.opacity=0"></div>
             </div>
-            <div class="party-card-body">
-                <div class="party-card-hex">${(pj.hex||0).toLocaleString()} <span style="font-family:var(--font-display);font-size:0.7em;color:var(--dim);">HEX</span></div>
-
-                <!-- Vida -->
-                <div class="party-stat-row">
-                    <span class="party-stat-label">VIDA</span>
-                    <div class="party-bar-track">
-                        <div class="party-bar-fill party-bar-vida" style="width:${pctVida}%"></div>
-                    </div>
-                    <span class="party-stat-val">${vidaActual} / ${vidaRojaMax}</span>
-                </div>
-
-                <!-- VEX -->
-                ${vexMax > 0 ? `<div class="party-stat-row">
-                    <span class="party-stat-label">VEX</span>
-                    <div class="party-bar-track">
-                        <div class="party-bar-fill party-bar-vex" style="width:${pctVex}%"></div>
-                    </div>
-                    <span class="party-stat-val">${vexActual} / ${vexMax}</span>
-                </div>` : ''}
-
-                <!-- Guarda -->
-                ${guardaMax > 0 ? `<div class="party-stat-row">
-                    <span class="party-stat-label">GUARDA</span>
-                    <div class="party-bar-track">
-                        <div class="party-bar-fill party-bar-guarda" style="width:${pctGuarda}%"></div>
-                    </div>
-                    <span class="party-stat-val">${pj.guarda_actual||0} / ${guardaMax}</span>
-                </div>` : ''}
-
-                <!-- Pushes disponibles -->
-                <div class="party-pushes">
-                    ${vexMax > 0 ? `<span class="party-push-tag party-push-vex ${cdVexInfo.disponible ? '' : 'push-cd-tag'}" title="Push VEX">
-                        ⚡ ${pushVexUs}/${pushVexDisp}
-                        ${!cdVexInfo.disponible ? `<span class="push-cd-mini">⏳${Math.ceil(cdVexInfo.restaSeg/60)}m</span>` : ''}
-                    </span>` : ''}
-                    ${guardaMax > 0 ? `<span class="party-push-tag party-push-guarda ${cdGuardaInfo.disponible ? '' : 'push-cd-tag'}" title="Push Guarda">
-                        🛡 ${pushGuardaUs}/${pushGuardaDisp}
-                        ${!cdGuardaInfo.disponible ? `<span class="push-cd-mini">⏳${Math.ceil(cdGuardaInfo.restaSeg/60)}m</span>` : ''}
-                    </span>` : ''}
-                </div>
+            <div class="sel-card-body">
+                <div class="sel-card-id">${(cfg.nombreCorto||cfg.id).toUpperCase()}</div>
+                <div class="sel-card-nombre" id="scard-t-${cfg.id}">${nombre}</div>
+                <div class="sel-card-desc"   id="scard-d-${cfg.id}">${desc}</div>
+                <div class="sel-card-cta">ENTRAR →</div>
             </div>
-        </div>
-        </a>`;
+        </div>`;
     }).join('');
+
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    for (const cfg of campañas) {
+        try {
+            const sb = createClient(cfg.dbUrl, cfg.dbAnonKey);
+            const { data } = await sb.from('config_ui').select('titulo,subtitulo').eq('hex_id','default').single();
+            if (data) {
+                const t = document.getElementById(`scard-t-${cfg.id}`);
+                const d = document.getElementById(`scard-d-${cfg.id}`);
+                if (t && data.titulo)    t.textContent = data.titulo;
+                if (d && data.subtitulo) d.textContent = data.subtitulo;
+            }
+        } catch(e) {}
+    }
 }
 
-cargarParty();
-
-// Timer para actualizar cooldowns en vivo en el índice
-setInterval(() => {
-    document.querySelectorAll('[data-cd-end]').forEach(el => {
-        const end = parseInt(el.dataset.cdEnd);
-        const rest = Math.max(0, Math.ceil((end - Date.now()) / 1000));
-        const min  = Math.floor(rest / 60);
-        el.textContent = rest > 0 ? `⏳${min}m` : '';
-    });
-}, 10000);
+iniciar();
 </script>
-
-<!-- ── ESTILOS TARJETAS PARTY ─────────────────────────────── -->
-<style>
-.party-scroll {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 14px;
-    margin-bottom: 32px;
-}
-.party-card-link { display:block; text-decoration:none; color:inherit; }
-.party-card {
-    background: var(--bg2);
-    border: 1px solid var(--gold-border);
-    border-radius: var(--rl);
-    overflow: hidden;
-    transition: border-color 0.2s, transform 0.18s, box-shadow 0.2s;
-    cursor: pointer;
-}
-.party-card:hover {
-    border-color: var(--gold);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
-.party-card-img-wrap {
-    position: relative;
-    width: 100%; height: 130px;
-    overflow: hidden;
-    background: var(--bg3);
-}
-.party-card-img {
-    width: 100%; height: 100%;
-    object-fit: cover; object-position: top center;
-    opacity: 0.7;
-    display: block;
-    transition: opacity 0.3s, transform 0.3s;
-}
-.party-card:hover .party-card-img { opacity: 0.9; transform: scale(1.05); }
-.party-card-overlay {
-    position: absolute; inset: 0;
-    background: linear-gradient(to top, rgba(7,6,14,0.9) 0%, transparent 60%);
-}
-.party-card-name {
-    position: absolute; bottom: 8px; left: 12px; right: 12px;
-    font-family: var(--font-display);
-    font-size: 0.85em;
-    color: var(--gold);
-    letter-spacing: 0.5px;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.9);
-}
-.party-card-body { padding: 12px 14px 14px; }
-.party-card-hex {
-    font-family: var(--font-display);
-    font-size: 1.3em;
-    color: var(--gold);
-    margin-bottom: 10px;
-    line-height: 1;
-}
-.party-stat-row {
-    display: flex; align-items: center; gap: 6px;
-    margin-bottom: 5px;
-}
-.party-stat-label {
-    width: 48px; font-size: 0.62em;
-    color: var(--dim); letter-spacing: 1px;
-    text-align: right; flex-shrink: 0;
-}
-.party-bar-track {
-    flex: 1; height: 4px;
-    background: var(--bg4); border-radius: 2px; overflow: hidden;
-}
-.party-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
-.party-bar-vida   { background: var(--gold); }
-.party-bar-vex    { background: var(--violet); opacity: 0.85; }
-.party-bar-guarda { background: var(--gold); opacity: 0.45; }
-.party-stat-val {
-    min-width: 58px; text-align: right;
-    font-size: 0.72em; color: var(--text);
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
-}
-.party-pushes {
-    display: flex; gap: 6px; flex-wrap: wrap;
-    margin-top: 8px;
-}
-.party-push-tag {
-    font-size: 0.68em;
-    padding: 2px 8px; border-radius: 20px;
-    border: 1px solid; display: inline-flex; align-items: center; gap: 3px;
-    font-variant-numeric: tabular-nums;
-}
-.party-push-vex {
-    border-color: var(--violet-border);
-    color: #a07fd4; background: var(--violet-faint);
-}
-.party-push-guarda {
-    border-color: var(--gold-border);
-    color: var(--gold-dim); background: var(--gold-faint);
-}
-.push-cd-tag { opacity: 0.65; }
-.push-cd-mini { font-size: 0.88em; color: #c47070; }
-</style>
 </body>
 </html>
