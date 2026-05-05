@@ -68,11 +68,20 @@ export function calcularStats(p) {
     const ctx = buildContext(p);
     const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
 
-    const vida_roja_max = evalExpr(formulas.vida_roja_max.expr, ctx)
-        + (p.hz_vida_roja||0) + (p.ef_vida_roja||0) + (p.bf_vida_roja||0);
+    // Si el OP definió un máx manual, usarlo; si no, usar fórmula + bonos
+    const vida_roja_max = (p.vida_roja_max_override > 0)
+        ? p.vida_roja_max_override
+        : evalExpr(formulas.vida_roja_max.expr, ctx)
+            + (p.hz_vida_roja||0) + (p.ef_vida_roja||0) + (p.bf_vida_roja||0);
 
-    const vida_azul_max = evalExpr(formulas.vida_azul_max.expr, ctx)
+    const vida_azul_max_formula = evalExpr(formulas.vida_azul_max.expr, ctx)
         + (p.hz_vida_azul||0) + (p.ef_vida_azul||0) + (p.bf_vida_azul||0);
+    const vida_azul_max = (p.vida_azul_max_override > 0)
+        ? p.vida_azul_max_override
+        : vida_azul_max_formula;
+
+    // vida_azul_actual: null significa "igual al máximo" (personaje sano al crear)
+    const vida_azul_actual = p.vida_azul_actual != null ? p.vida_azul_actual : vida_azul_max;
 
     const guarda_max = evalExpr(formulas.guarda_max.expr, ctx)
         + (p.hz_guarda||0) + (p.ef_guarda||0) + (p.bf_guarda||0);
@@ -87,7 +96,7 @@ export function calcularStats(p) {
     const dano_azul = evalExpr(formulas.dano_azul.expr, ctx)
         + (p.hz_dano_azul||0) + (p.ef_dano_azul||0) + (p.bf_dano_azul||0);
 
-    return { vida_roja_max, vida_azul_max, guarda_max, vex_max, dano_rojo, dano_azul, ctx };
+    return { vida_roja_max, vida_azul_max, vida_azul_actual, guarda_max, vex_max, dano_rojo, dano_azul, ctx };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -169,7 +178,10 @@ export function mapPersonaje(row) {
         vex_actual: row.vex_actual || 0,
         vex_max:    row.vex_max    || 0,
         vida_roja_actual: row.vida_roja_actual || 10,
+        vida_roja_max_override: row.vida_roja_max_override || 0,  // 0 = usar fórmula
+        vida_azul_actual: row.vida_azul_actual != null ? row.vida_azul_actual : null, // null = igual al max calculado
         vida_azul_max:    row.vida_azul_max    || 0,
+        vida_azul_max_override: row.vida_azul_max_override || 0,  // 0 = usar fórmula
         guarda_actual: row.guarda_actual || 0,
         guarda_max:    row.guarda_max    || 0,
         // Push VEX
@@ -246,8 +258,11 @@ export function serializarPersonaje(nombre, p) {
         asistencia:  p.asistencia || 1,
         vex_actual:  p.vex_actual || 0,
         vex_max:     p.vex_max    || 0,
-        vida_roja_actual: p.vida_roja_actual || 0,
-        vida_azul_max:    p.vida_azul_max    || 0,
+        vida_roja_actual:      p.vida_roja_actual      || 0,
+        vida_roja_max_override: p.vida_roja_max_override || 0,
+        vida_azul_actual:      p.vida_azul_actual != null ? p.vida_azul_actual : null,
+        vida_azul_max_override: p.vida_azul_max_override || 0,
+        vida_azul_max:         p.vida_azul_max    || 0,
         guarda_actual: p.guarda_actual || 0,
         guarda_max:    p.guarda_max    || 0,
         // Push
