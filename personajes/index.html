@@ -5,21 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personajes — HEX ROL</title>
-    <link id="dynamic-favicon" rel="icon" type="image/png" sizes="32x32" href="../img/icon.png">
-    <link id="dynamic-favicon-shortcut" rel="shortcut icon" href="../img/icon.png">
-    <link id="dynamic-favicon-apple" rel="apple-touch-icon" href="../img/icon.png">
+    <link rel="icon" type="image/png" href="../img/icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="personajes.css">
-    <script type="module">
-        // Favicon dinámico desde Supabase Storage
-        import { currentConfig } from '../hex-auth.js';
-        const iconUrl = currentConfig.storageUrl + '/imginterfaz/icon.png';
-        ['dynamic-favicon','dynamic-favicon-shortcut','dynamic-favicon-apple'].forEach((id,i) => {
-            const el = document.getElementById(id);
-            if (el) el.href = iconUrl;
-        });
-    </script>
 </head>
 <body>
 
@@ -34,7 +23,7 @@
         </nav>
     </div>
     <div class="nav-right">
-        <!-- El botón "cambiar campaña" lo inyecta hex-guard.js automáticamente -->
+        <button class="btn-cambiar" onclick="cambiarCampaña()">cambiar campaña</button>
         <div id="hex-session-badge"></div>
     </div>
 </header>
@@ -169,24 +158,13 @@
     <div class="formulas-wrap" id="formulas-cont"></div>
 </div>
 
-<!-- ── PANEL LATERAL ────────────────────────────────────────── -->
-<div class="panel-lateral" id="panel-lateral">
-    <div class="panel-header">
-        <span class="panel-nombre" id="panel-nombre"></span>
-        <div class="panel-header-actions">
-            <button class="btn-ghost" onclick="editarPersonaje(estadoUI.pjSeleccionado)">Editar</button>
-            <button class="panel-close" onclick="cerrarDetalle()">×</button>
-        </div>
-    </div>
-    <div class="panel-body" id="panel-body"></div>
-</div>
-<div class="panel-overlay" id="panel-overlay" onclick="cerrarDetalle()"></div>
-
 <!-- ── SYNC BTN ─────────────────────────────────────────────── -->
 <button class="btn-sync" id="btn-sync" style="display:none;" onclick="ejecutarSync()">Guardar cambios (0)</button>
 
 <!-- ── TOAST ────────────────────────────────────────────────── -->
 <div class="toast" id="toast" style="display:none;"></div>
+
+<!-- panel-pj.js se monta solo en el <body> al primer abrirDetalle() -->
 
 <script type="module" src="personajes-main.js"></script>
 </body>
