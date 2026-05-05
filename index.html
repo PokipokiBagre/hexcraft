@@ -24,10 +24,10 @@
         margin-bottom: 16px;
     }
 
-    /* Grid de personajes */
+    /* Grid de personajes - ACHICADO A 160px */
     .party-main-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
         gap: 14px;
     }
 
@@ -49,11 +49,11 @@
         box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
 
-    /* Imagen + overlay degradado */
+    /* Imagen + overlay degradado - ACHICADO A 100px */
     .pj-card-img-wrap {
         position: relative;
         width: 100%;
-        height: 130px;
+        height: 100px;
         overflow: hidden;
         background: var(--bg3);
     }
@@ -197,12 +197,12 @@
 
     /* ── RESPONSIVE ──────────────────────────────────────────────── */
     @media (max-width: 900px) {
-        .party-main-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+        .party-main-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
     }
     @media (max-width: 600px) {
         .party-main-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
         .party-section   { padding: 20px 14px 8px; }
-        .pj-card-img-wrap { height: 110px; }
+        .pj-card-img-wrap { height: 90px; }
     }
     </style>
 </head>
@@ -243,15 +243,7 @@
         </div>
     </section>
 
-    <!-- ══════════════════════════════════════════════════════════
-         PARTY — PROTAGONISTAS
-    ═══════════════════════════════════════════════════════════════ -->
-    <section class="party-section" id="party-section" style="display:none;">
-        <p class="party-section-title">Party activa</p>
-        <div class="party-main-grid" id="party-main-grid"></div>
-    </section>
-
-    <!-- ── MÓDULOS ───────────────────────────────────────────── -->
+    <!-- ── MÓDULOS (Movidos arriba) ───────────────────────────── -->
     <div class="secondary-section">
         <div class="secondary-divider"></div>
     </div>
@@ -303,6 +295,15 @@
             </div>
         </a>
     </main>
+
+    <!-- ══════════════════════════════════════════════════════════
+         PARTY — PROTAGONISTAS (Movidos abajo)
+    ═══════════════════════════════════════════════════════════════ -->
+    <section class="party-section" id="party-section" style="display:none;">
+        <p class="party-section-title">Party activa</p>
+        <div class="party-main-grid" id="party-main-grid"></div>
+    </section>
+
 
     <!-- ── HILOS ACTIVOS ─────────────────────────────────────── -->
     <section class="hilos-section">
@@ -476,11 +477,11 @@ async function cargarParty() {
         // Renderizar tarjetas por primera vez
         renderParty(formulas);
 
-        // Arrancar ticker
+        // Arrancar ticker local visual
         if (_tickTimer) clearInterval(_tickTimer);
         _tickTimer = setInterval(() => tickParty(formulas), TICK_SEG * 1000);
 
-        // Suscribir Realtime para cambios externos
+        // Suscribir Realtime para cambios externos (desde el cron job de la base de datos)
         supabase.channel('index-party')
             .on('postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'personajes' },
@@ -489,8 +490,11 @@ async function cargarParty() {
                     if (!row?.nombre || !partyData[row.nombre]) return;
                     const p = mapRow(row);
                     p._stats = calcStats(p, formulas);
-                    p._vex_frac    = partyData[row.nombre]._vex_frac    || 0;
-                    p._guarda_frac = partyData[row.nombre]._guarda_frac || 0;
+                    
+                    // Al recibir un UPDATE de la base de datos (por el cron), reseteamos la fracción visual
+                    p._vex_frac    = 0;
+                    p._guarda_frac = 0;
+                    
                     partyData[row.nombre] = p;
                     actualizarCard(row.nombre);
                 }
