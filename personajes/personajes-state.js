@@ -45,6 +45,10 @@ export const FORMULAS_DEFAULT = {
     dano_azul:     { label: 'Daño Azul base',      expr: 'Math.floor((EneB + ManB) / 4)',               aplica: 'todos' }
 };
 
+// Campos de vida que tienen tanto "actual" como "máx" editable por OP
+// vida_azul_actual es el HP azul actual del personaje (por defecto = vida_azul_max al cargar)
+// guarda_max también puede ser sobreescrito por el OP independientemente de la fórmula
+
 // ── Sistema Push ─────────────────────────────────────────────
 // Fórmulas que calculan cuánto recupera cada push
 export const PUSH_FORMULAS_DEFAULT = {
