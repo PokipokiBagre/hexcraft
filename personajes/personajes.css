@@ -694,3 +694,114 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
     .det-calc-grid { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
 }
+
+/* ── BARRAS DE AFINIDAD SEGMENTADAS ─────────────────────────── */
+.afin-bar-track {
+    flex: 1;
+    height: 5px;
+    background: var(--bg4);
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+}
+.afin-seg {
+    height: 100%;
+    transition: width 0.4s;
+    min-width: 0;
+}
+.afin-seg-base { background: var(--gold); }
+.afin-seg-bf   { background: #3ecf6e; }      /* verde buffo */
+.afin-seg-ef   { background: #4ab3e8; }      /* azul alteración */
+.afin-seg-hz   { background: #b06ef0; }      /* violeta hz */
+
+/* ── PANEL: AFINIDADES CON FUENTES ──────────────────────────── */
+.det-afin-block {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: var(--faint);
+}
+.det-afin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.det-afin-total {
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--gold);
+}
+.det-afin-source {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 3px;
+}
+.det-afin-src-label {
+    width: 28px;
+    font-size: 0.68em;
+    font-weight: 700;
+    text-align: center;
+    border-radius: 3px;
+    padding: 1px 3px;
+    letter-spacing: 0.3px;
+}
+.src-base  { background: rgba(212,175,55,0.2);  color: var(--gold); }
+.src-bf    { background: rgba(62,207,110,0.18); color: #3ecf6e; }
+.src-ef    { background: rgba(74,179,232,0.18); color: #4ab3e8; }
+.src-hz    { background: rgba(176,110,240,0.18);color: #b06ef0; }
+
+.det-afin-src-val {
+    min-width: 28px;
+    text-align: center;
+    font-size: 0.85em;
+    color: var(--text);
+}
+
+.ctrl-btn-xs {
+    padding: 1px 6px;
+    font-size: 0.8em;
+    height: 20px;
+    line-height: 1;
+}
+
+/* ── LEYENDA AFINIDADES ──────────────────────────────────────── */
+.afin-leyenda {
+    float: right;
+    font-size: 0.68em;
+    font-family: var(--font-body);
+    color: var(--dim);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.ley-dot {
+    font-size: 0.75em;
+    font-weight: 700;
+    border-radius: 3px;
+    padding: 1px 3px;
+}
+.src-base-dot { background: rgba(212,175,55,0.2);  color: var(--gold); }
+.src-bf-dot   { background: rgba(62,207,110,0.18); color: #3ecf6e; }
+.src-ef-dot   { background: rgba(74,179,232,0.18); color: #4ab3e8; }
+.src-hz-dot   { background: rgba(176,110,240,0.18);color: #b06ef0; }
+
+/* ── PANEL: REGENERACIÓN CON FUENTES ─────────────────────────── */
+.det-regen-block { margin-bottom: 10px; }
+.det-regen-total {
+    color: var(--gold);
+    font-weight: 600;
+}
+.det-regen-breakdown {
+    color: var(--dim);
+    font-size: 0.75em;
+    font-weight: 400;
+}
+.det-regen-sources {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+    padding-left: 4px;
+}
