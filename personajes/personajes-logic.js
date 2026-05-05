@@ -53,7 +53,6 @@ export function evalExpr(expr, ctx) {
 }
 
 // Evalúa una condición de umbral de push
-// Contexto: pct_vida_roja (0-100), vida_azul (valor absoluto calculado)
 function evalCondicion(condicion, pct_vida_roja, vida_azul) {
     try {
         // eslint-disable-next-line no-new-func
@@ -68,7 +67,7 @@ export function calcularStats(p) {
     const ctx = buildContext(p);
     const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
 
-    // Si el OP definió un máx manual, usarlo; si no, usar fórmula + bonos
+    // Vida Roja: override manual si > 0, si no formula + bonos
     const vida_roja_max = (p.vida_roja_max_override > 0)
         ? p.vida_roja_max_override
         : evalExpr(formulas.vida_roja_max.expr, ctx)
@@ -80,11 +79,13 @@ export function calcularStats(p) {
         ? p.vida_azul_max_override
         : vida_azul_max_formula;
 
-    // vida_azul_actual: null significa "igual al máximo" (personaje sano al crear)
+    // vida_azul_actual: null significa "igual al máximo"
     const vida_azul_actual = p.vida_azul_actual != null ? p.vida_azul_actual : vida_azul_max;
 
-    const guarda_max = evalExpr(formulas.guarda_max.expr, ctx)
+    // Guarda: p.guarda_max > 0 actúa como override manual (igual que vida_roja_max_override)
+    const guarda_max_formula = evalExpr(formulas.guarda_max.expr, ctx)
         + (p.hz_guarda||0) + (p.ef_guarda||0) + (p.bf_guarda||0);
+    const guarda_max = (p.guarda_max > 0) ? p.guarda_max : guarda_max_formula;
 
     const vex_max = esJugador
         ? evalExpr(formulas.vex_max.expr, ctx)
@@ -103,17 +104,12 @@ export function calcularStats(p) {
 // SISTEMA PUSH
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Calcula cuántos pushes tiene disponibles un personaje para un recurso.
- * Evalúa cada umbral y suma los pushes que cumple.
- * Más el extra que el OP haya asignado directamente en su campo push_X_limit.
- */
 export function calcularPushDisponibles(p, s, recurso) {
     const vidaRojaActual = p.vida_roja_actual || 0;
     const pct_vida_roja = s.vida_roja_max > 0
         ? Math.round(vidaRojaActual / s.vida_roja_max * 100)
         : 0;
-    const vida_azul = s.vida_azul_max || 0; // vida azul calculada (máx, no hay "actual" separada)
+    const vida_azul = s.vida_azul_max || 0;
 
     const umbrales = pushUmbrales[recurso] || [];
     let total = 0;
@@ -122,16 +118,11 @@ export function calcularPushDisponibles(p, s, recurso) {
             total += u.pushes;
         }
     }
-    // Extra asignado directamente por OP
     const extraKey = recurso === 'vex' ? 'push_vex_limit' : 'push_guarda_limit';
     total += p[extraKey] || 0;
     return total;
 }
 
-/**
- * Calcula el valor recuperado por cada push para un recurso.
- * Usa la fórmula de pushFormulas correspondiente.
- */
 export function calcularValorPush(p, recurso) {
     const ctx = buildContext(p);
     const fKey = recurso === 'vex' ? 'valor_push_vex' : 'valor_push_guarda';
@@ -139,10 +130,6 @@ export function calcularValorPush(p, recurso) {
     return evalExpr(expr, ctx);
 }
 
-/**
- * Calcula si el cooldown de push ha pasado.
- * Devuelve { disponible: bool, restaSeg: number }
- */
 export function calcularCooldownPush(p, recurso) {
     const tsKey = recurso === 'vex' ? 'push_vex_ts' : 'push_guarda_ts';
     const ts = p[tsKey];
@@ -154,9 +141,6 @@ export function calcularCooldownPush(p, recurso) {
     return { disponible: false, restaSeg: Math.ceil(totalSeg - pasadoSeg) };
 }
 
-/**
- * Devuelve la afinidad con mayor valor total
- */
 export function getMayorAfinidad(p) {
     let max = -1, mayor = null;
     AFINIDADES.forEach(a => {
@@ -178,12 +162,12 @@ export function mapPersonaje(row) {
         vex_actual: row.vex_actual || 0,
         vex_max:    row.vex_max    || 0,
         vida_roja_actual: row.vida_roja_actual || 10,
-        vida_roja_max_override: row.vida_roja_max_override || 0,  // 0 = usar fórmula
-        vida_azul_actual: row.vida_azul_actual != null ? row.vida_azul_actual : null, // null = igual al max calculado
+        vida_roja_max_override: row.vida_roja_max_override || 0,
+        vida_azul_actual: row.vida_azul_actual != null ? row.vida_azul_actual : null,
         vida_azul_max:    row.vida_azul_max    || 0,
-        vida_azul_max_override: row.vida_azul_max_override || 0,  // 0 = usar fórmula
+        vida_azul_max_override: row.vida_azul_max_override || 0,
         guarda_actual: row.guarda_actual || 0,
-        guarda_max:    row.guarda_max    || 0,
+        guarda_max:    row.guarda_max    || 0, // 0 = usar fórmula; > 0 = override manual
         // Push VEX
         push_vex_actual:  row.push_vex_actual  || 0,
         push_vex_limit:   row.push_vex_limit   || 0,
