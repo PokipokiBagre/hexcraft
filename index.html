@@ -403,7 +403,7 @@ function tickRegen() {
 async function cargarDashboard() {
     try {
         const [pjRes, misRes, invRes, hzRes] = await Promise.all([
-            supabase.from('personajes').select('nombre,is_player,is_active,hex,vida_roja_actual,vida_roja_max'),
+            supabase.from('personajes').select('nombre,is_player,is_active,hex,vida_roja_actual,af_fisica'),
             supabase.from('misiones').select('titulo,estado,jugadores'),
             supabase.from('inventario_objetos').select('cantidad').gt('cantidad',0),
             supabase.from('hechizos_inventario').select('hechizo_nombre')
@@ -446,7 +446,7 @@ async function cargarDashboard() {
                 .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
                 .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
             partyEl.innerHTML = jugs.slice(0,6).map(p => {
-                const max = p.vida_roja_max || 10;
+                const max = Math.floor((p.af_fisica || 0) / 2) + 10;
                 const act = Math.min(p.vida_roja_actual||0, max);
                 const pct = Math.round(act/max*100);
                 const icon = `${db.storage.urlBase}/imgpersonajes/${norm(p.nombre)}icon.png`;
