@@ -222,8 +222,6 @@ export function renderDetalle(nombre) {
         </div>`;
     }).join('');
 
-    const safeN = nombre.replace(/'/g,"\\'");
-
     // ── Sección PUSH ──────────────────────────────────────────
     const pushHTML = _renderPushSection(p, s, nombre, canEditThis);
 
