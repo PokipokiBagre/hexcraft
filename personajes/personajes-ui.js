@@ -113,7 +113,7 @@ export function renderCatalogo() {
                     </div>
                 </div>
                 <div class="pj-card-actions" onclick="event.stopPropagation()">
-                    ${canEdit   ? `<button class="icon-btn" onclick="window.editarPersonaje('${nombre.replace(/'/g,"\\'")}')">✎</button>` : ''}
+                    ${(estadoUI.esAdmin || !p.isPlayer) ? `<button class="icon-btn icon-btn-img" title="Subir imagen" onclick="window.abrirSubirImagen('${nombre.replace(/'/g,"\\'")}')">🖼</button>` : ''}
                     ${canDelete ? `<button class="icon-btn icon-btn-danger" onclick="window.pedirDelete('${nombre.replace(/'/g,"\\'")}')">✕</button>` : ''}
                 </div>
             </div>
@@ -206,6 +206,20 @@ export function renderDetalle(nombre) {
     const pushHTML = _renderPushSection(p, s, nombre, canEditThis);
 
     document.getElementById('panel-nombre').textContent = nombre;
+    // Botón imagen en header del panel
+    const _imgBtnPanel = (estadoUI.esAdmin || !p.isPlayer)
+        ? `<button class="btn-ghost btn-ghost-xs" style="font-size:0.75em;" title="Subir imagen del personaje" onclick="window.abrirSubirImagen('${safeN}')">🖼 imagen</button>`
+        : '';
+    const _existingActions = document.querySelector('.panel-header-actions');
+    if (_existingActions && !_existingActions.querySelector('.btn-img-panel')) {
+        const _imgBtn = document.createElement('button');
+        _imgBtn.className = 'btn-ghost btn-ghost-xs btn-img-panel';
+        _imgBtn.style.fontSize = '0.75em';
+        _imgBtn.title = 'Subir imagen del personaje';
+        _imgBtn.textContent = '🖼';
+        _imgBtn.onclick = () => window.abrirSubirImagen('${safeN}');
+        _existingActions.insertBefore(_imgBtn, _existingActions.firstChild);
+    }
     document.getElementById('panel-body').innerHTML = `
         <!-- Stats calculados -->
         <div class="det-section">
@@ -336,13 +350,17 @@ function _renderPushSection(p, s, nombre, canEdit) {
         </div>`;
     };
 
-    const vexHTML    = _pushBloque('vex',    'VEX',    '⚡', s.vex_max > 0);
-    const guardaHTML = _pushBloque('guarda', 'Guarda', '🛡', s.guarda_max > 0);
+    // Para NPC sistema, vex_max está en p.vex_max (no calculado por fórmula)
+    const _vexMaxEfectivo    = s.vex_max    > 0 ? s.vex_max    : (p.vex_max    || 0);
+    const _guardaMaxEfectiva = s.guarda_max > 0 ? s.guarda_max : (p.guarda_max || 0);
+    const vexHTML    = _pushBloque('vex',    'VEX',    '⚡', _vexMaxEfectivo    > 0);
+    const guardaHTML = _pushBloque('guarda', 'Guarda', '🛡', _guardaMaxEfectiva > 0);
 
     if (!vexHTML && !guardaHTML) return '';
 
     return `<div class="det-section">
-        <div class="det-section-title">PUSHES
+        <div class="det-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>PUSHES</span>
             ${estadoUI.esAdmin ? `<button class="btn-ghost btn-ghost-xs"
                 onclick="window.resetPushes('${safeN}','ambos')">Reset todos</button>` : ''}
         </div>
