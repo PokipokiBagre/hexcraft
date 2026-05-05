@@ -5,7 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personajes — HEX ROL</title>
-    <link rel="icon" type="image/png" href="../img/icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../img/icon.png">
+    <link rel="shortcut icon" href="../img/icon.png">
+    <link rel="apple-touch-icon" href="../img/icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="personajes.css">
@@ -13,6 +15,13 @@
 <body>
 
 <!-- ── NAV ─────────────────────────────────────────────────── -->
+<!--
+    El badge de hex-auth muestra:
+      - Si eres admin → "⚙️ MÁSTER" (clicable para logout)
+      - Si eres jugador → nombre del personaje (clicable para logout)
+      - Si no hay sesión → "Acceso OP" (abre modal de login)
+    No hay botón ON/OFF de OP. El estado admin viene únicamente de la base de datos.
+-->
 <header class="nav">
     <div class="nav-left">
         <a href="../index.html" class="nav-back">← Inicio</a>
@@ -23,8 +32,8 @@
         </nav>
     </div>
     <div class="nav-right">
+        <button class="btn-cambiar" onclick="cambiarCampaña()">cambiar campaña</button>
         <div id="hex-session-badge"></div>
-        <button id="btn-op" class="btn-op" onclick="toggleOP()">Acceso OP</button>
     </div>
 </header>
 
@@ -63,7 +72,6 @@
             <button class="btn-ghost" onclick="cancelarFormulario()">Cancelar</button>
         </div>
 
-        <!-- Identidad -->
         <section class="form-section">
             <div class="form-section-title">Identidad</div>
             <div class="form-grid">
@@ -95,7 +103,6 @@
             </div>
         </section>
 
-        <!-- Recursos -->
         <section class="form-section">
             <div class="form-section-title">Recursos</div>
             <div class="form-grid">
@@ -112,7 +119,7 @@
                     <input class="input-base" id="f-vida-roja" type="number" value="10" min="0">
                 </div>
                 <div class="field">
-                    <label>Vida Azul máx <span class="field-note">(base, sin fórmula)</span></label>
+                    <label>Vida Azul máx <span class="field-note">(base)</span></label>
                     <input class="input-base" id="f-vida-azul" type="number" value="0" min="0">
                 </div>
                 <div class="field">
@@ -134,34 +141,15 @@
             </div>
         </section>
 
-        <!-- Afinidades -->
         <section class="form-section">
             <div class="form-section-title">Afinidades base</div>
             <div class="afin-grid">
-                <div class="afin-field">
-                    <label>Física</label>
-                    <input class="input-base input-afin" id="afin-fisica" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()">
-                </div>
-                <div class="afin-field">
-                    <label>Energética</label>
-                    <input class="input-base input-afin" id="afin-energetica" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()">
-                </div>
-                <div class="afin-field">
-                    <label>Espiritual</label>
-                    <input class="input-base input-afin" id="afin-espiritual" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()">
-                </div>
-                <div class="afin-field">
-                    <label>Mando</label>
-                    <input class="input-base input-afin" id="afin-mando" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()">
-                </div>
-                <div class="afin-field">
-                    <label>Psíquica</label>
-                    <input class="input-base input-afin" id="afin-psiquica" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()">
-                </div>
-                <div class="afin-field">
-                    <label>Oscura</label>
-                    <input class="input-base input-afin" id="afin-oscura" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()">
-                </div>
+                <div class="afin-field"><label>Física</label>     <input class="input-base input-afin" id="afin-fisica"     type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Energética</label>  <input class="input-base input-afin" id="afin-energetica" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Espiritual</label>  <input class="input-base input-afin" id="afin-espiritual" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Mando</label>       <input class="input-base input-afin" id="afin-mando"      type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Psíquica</label>    <input class="input-base input-afin" id="afin-psiquica"   type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Oscura</label>      <input class="input-base input-afin" id="afin-oscura"     type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
             </div>
             <div class="afin-preview" id="afin-preview"></div>
         </section>
@@ -176,9 +164,7 @@
      PAGE: FÓRMULAS
 ═══════════════════════════════════════════════════════════════ -->
 <div class="page" id="page-formulas">
-    <div class="formulas-wrap" id="formulas-cont">
-        <!-- Generado por personajes-ui.js → renderFormulas() -->
-    </div>
+    <div class="formulas-wrap" id="formulas-cont"></div>
 </div>
 
 <!-- ── PANEL LATERAL ────────────────────────────────────────── -->
@@ -186,7 +172,7 @@
     <div class="panel-header">
         <span class="panel-nombre" id="panel-nombre"></span>
         <div class="panel-header-actions">
-            <button class="btn-ghost" onclick="editarPersonaje(estadoUI.pjSeleccionado)" id="btn-panel-editar">Editar</button>
+            <button class="btn-ghost" onclick="editarPersonaje(estadoUI.pjSeleccionado)">Editar</button>
             <button class="panel-close" onclick="cerrarDetalle()">×</button>
         </div>
     </div>
