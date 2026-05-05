@@ -91,7 +91,10 @@ export function calcularStats(p) {
 
     const vida_azul_actual = p.vida_azul_actual ?? vida_azul_max;
 
-    const guarda_max = evalExpr(formulas.guarda_max.expr, ctx) + bonoG;
+    const guarda_max_formula = evalExpr(formulas.guarda_max.expr, ctx) + bonoG;
+    const guarda_max = (p.guarda_max_override && p.guarda_max_override > 0)
+        ? p.guarda_max_override
+        : guarda_max_formula;
 
     const vex_max = esJugador
         ? evalExpr(formulas.vex_max.expr, ctx)
@@ -238,6 +241,7 @@ export function mapPersonaje(row) {
         // Overrides manuales de máximos (schema nuevo)
         vida_roja_max_override: row.vida_roja_max_op || 0,
         vida_azul_max_override: row.vida_azul_max_op || 0,
+        guarda_max_override:    row.guarda_max_op    || 0,
         // Cooldowns por afinidad (schema nuevo)
         cd_fisica:     row.cd_fisica     ?? 0.5,
         cd_energetica: row.cd_energetica ?? 0.5,
@@ -291,6 +295,7 @@ export function serializarPersonaje(nombre, p) {
         // Override máximos
         vida_roja_max_op: p.vida_roja_max_override || 0,
         vida_azul_max_op: p.vida_azul_max_override || 0,
+        guarda_max_op:    p.guarda_max_override    || 0,
         // Cooldowns
         cd_fisica:     p.cd_fisica     ?? 0.5,
         cd_energetica: p.cd_energetica ?? 0.5,
