@@ -227,57 +227,17 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
     margin-bottom: 5px;
 }
 .recurso-label { width: 44px; font-size: 0.72em; color: var(--dim); text-align: right; }
-
-/* Barra continua (VEX) */
 .recurso-bar-track { flex: 1; height: 3px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
 .recurso-bar-fill  { height: 100%; border-radius: 2px; transition: width 0.4s; }
 .fill-vida   { background: var(--gold); }
 .fill-vex    { background: var(--violet); opacity: 0.8; }
 .fill-guarda { background: var(--gold); opacity: 0.5; }
-
-/* ── Barras segmentadas (vida roja, azul, guarda) ─────────── */
-.seg-bar-wrap {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 1.5px;
-    height: 10px;
-    min-width: 0;
-}
-.seg-cell {
-    flex: 1;
-    height: 100%;
-    border-radius: 2px;
-    min-width: 2px;
-    transition: opacity 0.2s;
-    position: relative;
-}
-/* Celda encendida: brillo sólido */
-.seg-vida.seg-on   { background: var(--gold);    box-shadow: 0 0 3px rgba(212,175,55,0.55); }
-.seg-azul.seg-on   { background: #4ab3e8;         box-shadow: 0 0 3px rgba(74,179,232,0.5); }
-.seg-guarda.seg-on { background: #d4af37;          box-shadow: 0 0 3px rgba(212,175,55,0.4); opacity: 0.85; }
-/* Celda apagada: borde oscuro sin relleno */
-.seg-vida.seg-off   { background: transparent; border: 1px solid rgba(212,175,55,0.20); }
-.seg-azul.seg-off   { background: transparent; border: 1px solid rgba(74,179,232,0.20); }
-.seg-guarda.seg-off { background: transparent; border: 1px solid rgba(212,175,55,0.18); }
-/* Cuando actual > max: outline ámbar en el wrap */
-.seg-bar-wrap.seg-over { outline: 1px solid rgba(212,175,55,0.5); border-radius: 3px; }
-
-/* Barras segmentadas en el panel lateral (más altas) */
-.det-vida-item .seg-bar-wrap {
-    height: 12px;
-    gap: 2px;
-    margin-top: 4px;
-}
-
 .recurso-xy {
     min-width: 56px; text-align: right;
     font-size: 0.75em; color: var(--text);
     font-variant-numeric: tabular-nums;
 }
 .xy-sep { color: var(--dim); margin: 0 1px; }
-/* Valor en rojo si supera el máximo */
-.val-over { color: #e8a04a !important; font-weight: 600; }
 
 /* Barras de afinidad */
 .afin-section { margin-bottom: 8px; }
@@ -367,13 +327,12 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 }
 .det-calc-label { font-size: 0.72em; color: var(--dim); margin-bottom: 4px; }
 .det-calc-xy {
-    display: flex; align-items: center; gap: 4px;
+    display: flex; align-items: center; gap: 5px;
     margin-bottom: 6px;
 }
-.det-xy-x { font-size: 1.2em; font-weight: 500; color: var(--gold); }
-.det-xy-sep { color: var(--dim); }
-.det-xy-y { color: var(--dim); font-size: 0.95em; }
-.det-calc-formula { font-size: 0.65em; color: var(--dim); font-family: monospace; }
+.det-xy-x { font-size: 1.25em; font-weight: 600; color: var(--gold); }
+.det-xy-sep { color: var(--dim); font-size: 0.9em; margin: 0 1px; }
+.det-xy-y { color: var(--dim); font-size: 0.9em; }
 
 .det-regen-row {
     display: flex; justify-content: space-between;
@@ -753,6 +712,137 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .afin-seg-bf   { background: #3ecf6e; }      /* verde buffo */
 .afin-seg-ef   { background: #4ab3e8; }      /* azul alteración */
 .afin-seg-hz   { background: #b06ef0; }      /* violeta hz */
+
+/* ── PANEL: STATS DE VIDA / GUARDA / VEX ────────────────────── */
+
+/* Bloque de un stat (vida roja, guarda, etc.) */
+.det-vida-item {
+    margin-bottom: 14px;
+}
+.det-vida-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    gap: 8px;
+}
+.det-vida-label {
+    font-family: var(--font-display);
+    font-size: 0.82em;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* Fila de override de máximo */
+.det-max-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 2px;
+    flex-wrap: wrap;
+}
+.det-max-label {
+    font-size: 0.72em;
+    color: var(--dim);
+    min-width: 72px;
+}
+.det-max-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.det-max-val {
+    min-width: 32px;
+    text-align: center;
+    font-size: 0.9em;
+    font-weight: 500;
+    color: var(--text);
+}
+.det-max-formula { color: var(--dim); }
+.det-max-manual  { color: var(--gold); }
+.det-max-reset-btn { opacity: 0.6; }
+.det-max-reset-btn:hover { opacity: 1; }
+.det-max-hint {
+    font-size: 0.68em;
+    color: var(--dim);
+    font-style: italic;
+}
+.det-max-hint-manual { color: var(--gold-dim); }
+
+/* Fórmula debajo del stat */
+.det-calc-formula {
+    font-size: 0.63em;
+    color: var(--dim);
+    font-family: monospace;
+    margin-top: 1px;
+    margin-bottom: 10px;
+    opacity: 0.75;
+}
+
+/* Barra de VEX (continua) dentro del panel */
+.seg-vex-bar {
+    height: 6px;
+    background: var(--bg4);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+.seg-vex-fill {
+    height: 100%;
+    background: var(--violet);
+    border-radius: 3px;
+    transition: width 0.4s;
+    opacity: 0.85;
+}
+
+/* ── PANEL: HEX ──────────────────────────────────────────────── */
+.det-hex-section {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 20px;
+}
+.det-hex-val {
+    font-family: var(--font-display);
+    font-size: 1.6em;
+    color: var(--gold);
+    margin: 4px 0 12px;
+    letter-spacing: 1px;
+}
+.det-hex-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.det-hex-btn {
+    padding: 3px 7px;
+    font-size: 0.72em;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.15s;
+}
+.det-hex-neg {
+    background: rgba(180, 60, 60, 0.08);
+    border-color: rgba(180, 60, 60, 0.25);
+    color: #c07070;
+}
+.det-hex-neg:hover {
+    background: rgba(180, 60, 60, 0.18);
+    border-color: rgba(180, 60, 60, 0.5);
+    color: #e08080;
+}
+.det-hex-pos {
+    background: rgba(60, 207, 110, 0.08);
+    border-color: rgba(60, 207, 110, 0.22);
+    color: #4ab870;
+}
+.det-hex-pos:hover {
+    background: rgba(60, 207, 110, 0.18);
+    border-color: rgba(60, 207, 110, 0.45);
+    color: #5dd880;
+}
 
 /* ── PANEL: AFINIDADES CON FUENTES ──────────────────────────── */
 .det-afin-block {
