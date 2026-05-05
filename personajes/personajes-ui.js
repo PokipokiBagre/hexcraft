@@ -73,8 +73,6 @@ export function renderCatalogo() {
         const s = calcularStats(p);
         const mayor = getMayorAfinidad(p);
 
-        const vidaAzulActual = s.vida_azul_actual;
-
         const pctVex    = s.vex_max > 0 ? Math.min(100, Math.round(p.vex_actual / s.vex_max * 100)) : 0;
 
         const maxAfin = Math.max(1, ...AFINIDADES.map(a =>
@@ -121,7 +119,7 @@ export function renderCatalogo() {
 
         // Barras de recursos con celdas segmentadas
         const barraVidaRoja = _barraSegmentada(p.vida_roja_actual, s.vida_roja_max, 'vida', 28);
-        const barraVidaAzul = s.vida_azul_max > 0 ? _barraSegmentada(vidaAzulActual, s.vida_azul_max, 'azul', 28) : null;
+        const barraVidaAzul = s.vida_azul_max > 0 ? _barraSegmentada(s.vida_azul_max, s.vida_azul_max, 'azul', 28) : null;
         const barraGuarda   = s.guarda_max > 0 ? _barraSegmentada(p.guarda_actual || 0, s.guarda_max, 'guarda', 20) : null;
 
         return `<div class="pj-card ${esInactivo ? 'pj-inactivo' : ''}" onclick="window.abrirDetalle('${nombre.replace(/'/g,"\\'")}')">
@@ -150,7 +148,7 @@ export function renderCatalogo() {
                 ${barraVidaAzul ? `<div class="recurso-row">
                     <span class="recurso-label">Azul</span>
                     ${barraVidaAzul}
-                    <span class="recurso-xy">${vidaAzulActual}<span class="xy-sep">/</span>${s.vida_azul_max}</span>
+                    <span class="recurso-xy">${s.vida_azul_max}</span>
                 </div>` : ''}
                 ${s.vex_max > 0 ? `<div class="recurso-row">
                     <span class="recurso-label">VEX</span>
@@ -241,10 +239,9 @@ export function renderDetalle(nombre) {
         _existingActions.insertBefore(_imgBtn, _existingActions.firstChild);
     }
 
-    // ── Vida Azul actual (null = igual al máx)
-    const vidaAzulActual = s.vida_azul_actual;
+    const safeN = nombre.replace(/'/g,"\\'");
 
-    // ── Helper: control de stat actual con barra segmentada ───
+    // Helper: stat con actual editable + barra segmentada
     const _statConBarra = (label, campo, actual, max, tipo, color, canEdit, nSegments = 30) => {
         const barra = _barraSegmentada(actual, max, tipo, nSegments);
         const esOver = actual > max;
@@ -259,6 +256,20 @@ export function renderDetalle(nombre) {
                     <span class="det-xy-y">${max}</span>
                     ${canEdit ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','${campo}',1)">+</button>` : ''}
                 </div>
+            </div>
+            ${barra}
+        </div>`;
+    };
+
+    // Helper: stat que solo tiene máximo (sin actual), barra siempre llena
+    const _statSoloMax = (label, max, tipo, color, nSegments = 30) => {
+        if (!max || max <= 0) return '';
+        const barra = _barraSegmentada(max, max, tipo, nSegments);
+        return `
+        <div class="det-vida-item">
+            <div class="det-vida-header">
+                <span class="det-vida-label" style="color:${color};">${label}</span>
+                <span class="det-xy-y" style="color:${color};">${max}</span>
             </div>
             ${barra}
         </div>`;
@@ -330,9 +341,9 @@ export function renderDetalle(nombre) {
             ${_maxOverride('Vida Roja', 'vida_roja_max_override', p.vida_roja_max_override || 0, s.vida_roja_max, estadoUI.esAdmin)}
             <div class="det-calc-formula" style="margin-bottom:10px;">${formulas.vida_roja_max.expr}</div>
 
-            <!-- Vida Azul -->
+            <!-- Vida Azul — solo muestra el máximo, sin actual -->
             ${s.vida_azul_max > 0 ? `
-            ${_statConBarra('Vida Azul', 'vida_azul_actual', vidaAzulActual, s.vida_azul_max, 'azul', '#4ab3e8', canEditThis, 30)}
+            ${_statSoloMax('Vida Azul', s.vida_azul_max, 'azul', '#4ab3e8', 30)}
             ${_maxOverride('Vida Azul', 'vida_azul_max_override', p.vida_azul_max_override || 0, s.vida_azul_max, estadoUI.esAdmin)}
             <div class="det-calc-formula" style="margin-bottom:10px;">${formulas.vida_azul_max.expr}</div>
             ` : ''}
