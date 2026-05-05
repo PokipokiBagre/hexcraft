@@ -80,7 +80,11 @@ export function calcularStats(p) {
     const regen_vex    = evalExpr(regenConfig.vex.expr, ctx);
     const regen_guarda = evalExpr(regenConfig.guarda.expr, ctx);
 
-    return { vida_roja_max, vida_azul_max, guarda_max, vex_max, dano_rojo, dano_azul, regen_vex, regen_guarda, ctx };
+    const regen_vex_total    = regen_vex    + (p.regen_vex_bf||0)    + (p.regen_vex_ef||0);
+    const regen_guarda_total = regen_guarda + (p.regen_guarda_bf||0) + (p.regen_guarda_ef||0);
+
+    return { vida_roja_max, vida_azul_max, guarda_max, vex_max, dano_rojo, dano_azul,
+             regen_vex, regen_guarda, regen_vex_total, regen_guarda_total, ctx };
 }
 
 // Devuelve la afinidad con mayor valor total
@@ -152,7 +156,11 @@ export function mapPersonaje(row) {
         hz_clase1: row.hz_clase1 || 0, hz_clase2: row.hz_clase2 || 0,
         hz_clase3: row.hz_clase3 || 0, hz_clase4: row.hz_clase4 || 0,
         hz_clase5: row.hz_clase5 || 0,
-        estados: row.estados || {}
+        estados: row.estados || {},
+        regen_vex_bf:    row.regen_vex_bf    || 0,
+        regen_vex_ef:    row.regen_vex_ef    || 0,
+        regen_guarda_bf: row.regen_guarda_bf || 0,
+        regen_guarda_ef: row.regen_guarda_ef || 0
     };
 }
 
@@ -200,6 +208,10 @@ export function serializarPersonaje(nombre, p) {
         hz_clase1: p.hz_clase1||0, hz_clase2: p.hz_clase2||0,
         hz_clase3: p.hz_clase3||0, hz_clase4: p.hz_clase4||0,
         hz_clase5: p.hz_clase5||0,
-        estados: p.estados || {}
+        estados: p.estados || {},
+        regen_vex_bf:    p.regen_vex_bf    || 0,
+        regen_vex_ef:    p.regen_vex_ef    || 0,
+        regen_guarda_bf: p.regen_guarda_bf || 0,
+        regen_guarda_ef: p.regen_guarda_ef || 0
     };
 }
