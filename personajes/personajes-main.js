@@ -3,7 +3,7 @@
 // /personajes/personajes-main.js
 // ============================================================
 
-import { hexAuth } from '../hex-auth.js';
+import { hexAuth, supabase, currentConfig } from '../hex-auth.js';
 import { hexConfigs } from '../hex/config.js';
 import { estadoUI, personajes, formulas, pushFormulas, pushUmbrales, pushCooldown,
          colaCambios, encolarCambio, FORMULAS_DEFAULT, PUSH_FORMULAS_DEFAULT,
@@ -601,6 +601,136 @@ window.ejecutarSync = async function() {
     } else {
         mostrarToast('Error al guardar: ' + res.errores.join(', '), true);
     }
+};
+
+// ─────────────────────────────────────────────────────────────
+// SUBIR IMAGEN
+// ─────────────────────────────────────────────────────────────
+window.abrirSubirImagen = function(nombre) {
+    const p = personajes[nombre];
+    if (!p) return;
+    // Permisos: OP puede subir a jugadores; anónimos solo a NPCs
+    const puedeSubir = estadoUI.esAdmin || !p.isPlayer;
+    if (!puedeSubir) { mostrarToast('Sin permiso para subir imágenes de jugadores', true); return; }
+
+    const viejo = document.getElementById('hex-img-upload-modal');
+    if (viejo) viejo.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'hex-img-upload-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(6px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif;';
+    modal.onclick = e => { if (e.target === modal) modal.remove(); };
+
+    const icono = p.iconoOverride || nombre;
+    const storageBase = currentConfig.storageUrl;
+    const previewUrl  = `${storageBase}/imgpersonajes/${_normImg(icono)}.png`;
+
+    modal.innerHTML = `
+        <div style="background:#0f0f18;border:1px solid rgba(212,175,55,0.25);border-radius:12px;padding:24px;width:100%;max-width:420px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <div style="font-family:Cinzel,serif;font-size:0.9em;color:#d4af37;letter-spacing:1px;">SUBIR IMAGEN — ${nombre}</div>
+                <button onclick="document.getElementById('hex-img-upload-modal').remove()" style="background:none;border:none;color:#5a5a78;font-size:1.4em;cursor:pointer;line-height:1;">×</button>
+            </div>
+            <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;">
+                <img id="hex-img-preview" src="${previewUrl}" onerror="this.src=''" alt=""
+                     style="width:80px;height:80px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid rgba(212,175,55,0.2);background:#161622;">
+                <div style="flex:1;font-size:0.78em;color:#5a5a78;line-height:1.6;">
+                    Imagen principal del personaje.<br>
+                    Se guardará como <code style="color:#d4af37;">${_normImg(icono)}.png</code><br>
+                    <span style="color:#3a3a52;">Recomendado: PNG cuadrado, mín 200×200px</span>
+                </div>
+            </div>
+            <label style="display:block;margin-bottom:12px;">
+                <div style="font-size:0.75em;color:#5a5a78;margin-bottom:6px;">Seleccionar archivo</div>
+                <input type="file" id="hex-img-file" accept="image/*"
+                       style="width:100%;padding:8px;background:#161622;border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#c4c4d4;font-size:0.82em;cursor:pointer;">
+            </label>
+            <div id="hex-img-status" style="font-size:0.78em;min-height:20px;margin-bottom:14px;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="document.getElementById('hex-img-upload-modal').remove()"
+                        style="padding:7px 16px;background:transparent;border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#5a5a78;font-size:0.8em;cursor:pointer;">
+                    Cancelar
+                </button>
+                <button id="hex-img-upload-btn" onclick="window._ejecutarSubidaImagen('${nombre}')"
+                        style="padding:7px 18px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:6px;color:#d4af37;font-family:Cinzel,serif;font-size:0.78em;cursor:pointer;letter-spacing:0.5px;">
+                    SUBIR
+                </button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(modal);
+    // Preview en tiempo real
+    document.getElementById('hex-img-file').onchange = function() {
+        const file = this.files[0];
+        if (file) {
+            const url = URL.createObjectURL(file);
+            document.getElementById('hex-img-preview').src = url;
+        }
+    };
+};
+
+function _normImg(s) {
+    return s.toString().trim().toLowerCase()
+        .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+        .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
+        .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+}
+
+window._ejecutarSubidaImagen = async function(nombre) {
+    const p = personajes[nombre]; if (!p) return;
+    const fileInput = document.getElementById('hex-img-file');
+    const statusEl  = document.getElementById('hex-img-status');
+    const btn       = document.getElementById('hex-img-upload-btn');
+
+    if (!fileInput?.files?.length) {
+        statusEl.style.color = '#c47070';
+        statusEl.textContent = 'Selecciona un archivo primero.';
+        return;
+    }
+
+    const file  = fileInput.files[0];
+    const icono = p.iconoOverride || nombre;
+    const path  = `imgpersonajes/${_normImg(icono)}.png`;
+
+    btn.textContent = 'Subiendo...';
+    btn.disabled = true;
+    statusEl.style.color = '#5a5a78';
+    statusEl.textContent = 'Subiendo imagen…';
+
+    // Convertir a PNG si no lo es (navegador lo hace via canvas)
+    let uploadFile = file;
+    if (!file.type.includes('png')) {
+        try {
+            const bitmap = await createImageBitmap(file);
+            const canvas = document.createElement('canvas');
+            canvas.width  = bitmap.width;
+            canvas.height = bitmap.height;
+            canvas.getContext('2d').drawImage(bitmap, 0, 0);
+            const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+            uploadFile = new File([blob], path, { type: 'image/png' });
+        } catch(e) { /* usar original si falla */ }
+    }
+
+    const { error } = await supabase.storage
+        .from('imagenes-hex')
+        .upload(path, uploadFile, { upsert: true, contentType: 'image/png' });
+
+    if (error) {
+        statusEl.style.color = '#c47070';
+        statusEl.textContent = '❌ Error: ' + error.message;
+        btn.textContent = 'SUBIR';
+        btn.disabled = false;
+        return;
+    }
+
+    statusEl.style.color = '#3ecf6e';
+    statusEl.textContent = '✅ Imagen subida correctamente.';
+    // Refrescar la imagen en el catálogo y panel
+    renderCatalogo();
+    if (estadoUI.panelAbierto && estadoUI.pjSeleccionado === nombre) renderDetalle(nombre);
+    setTimeout(() => {
+        document.getElementById('hex-img-upload-modal')?.remove();
+    }, 1500);
 };
 
 // ─────────────────────────────────────────────────────────────
