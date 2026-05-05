@@ -7,6 +7,46 @@ import { AFINIDADES, VARS_FORMULA, personajes, estadoUI, formulas,
          pushFormulas, pushUmbrales, pushCooldown } from './personajes-state.js';
 import { calcularStats, getMayorAfinidad, buildContext, evalExpr,
          calcularPushDisponibles, calcularValorPush, calcularCooldownPush } from './personajes-logic.js';
+import { currentConfig } from '../hex-auth.js';
+
+// ── Helpers de imagen ─────────────────────────────────────────
+const _storageBase = currentConfig.storageUrl;
+
+function _norm(s) {
+    return s.toString().trim().toLowerCase()
+        .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+        .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
+        .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+}
+
+function _imgUrl(icono) {
+    const key = _norm(icono);
+    return `${_storageBase}/imgpersonajes/${key}.png`;
+}
+function _imgIconUrl(icono) {
+    const key = _norm(icono);
+    return `${_storageBase}/imgpersonajes/${key}icon.png`;
+}
+const _imgFallback = `${_storageBase}/imginterfaz/no_encontrado.png`;
+
+// ─────────────────────────────────────────────────────────────
+// BARRA SEGMENTADA DE VIDA
+// Genera celdas individuales que representan puntos de vida.
+// Máximo 30 celdas; si max > 30, agrupa múltiples HP por celda.
+// ─────────────────────────────────────────────────────────────
+function _barraSegmentada(actual, max, tipo, maxCells = 28) {
+    if (!max || max <= 0) return `<div class="seg-bar-wrap"></div>`;
+    const n = Math.min(maxCells, max); // si max <= maxCells → 1 celda por HP
+    const hpPorCelda = max / n;
+    const isOver = actual > max;
+    let cells = '';
+    for (let i = 0; i < n; i++) {
+        const umbral = hpPorCelda * i;
+        const filled = actual > umbral;
+        cells += `<span class="seg-cell seg-${tipo} ${filled ? 'seg-on' : 'seg-off'}"></span>`;
+    }
+    return `<div class="seg-bar-wrap${isOver ? ' seg-over' : ''}" title="${actual}/${max}">${cells}</div>`;
+}
 
 // ─────────────────────────────────────────────────────────────
 // CATÁLOGO
@@ -33,9 +73,7 @@ export function renderCatalogo() {
         const s = calcularStats(p);
         const mayor = getMayorAfinidad(p);
 
-        const pctVida   = s.vida_roja_max > 0 ? Math.min(100, Math.round(p.vida_roja_actual / s.vida_roja_max * 100)) : 0;
         const pctVex    = s.vex_max > 0 ? Math.min(100, Math.round(p.vex_actual / s.vex_max * 100)) : 0;
-        const pctGuarda = s.guarda_max > 0 ? Math.min(100, Math.round((p.guarda_actual||0) / s.guarda_max * 100)) : 0;
 
         const maxAfin = Math.max(1, ...AFINIDADES.map(a =>
             (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0)
@@ -65,10 +103,9 @@ export function renderCatalogo() {
         }).join('');
 
         const esInactivo = !p.isActive;
-        const canEdit    = estadoUI.esAdmin || !p.isPlayer;
         const canDelete  = estadoUI.esAdmin;
 
-        // Mini push indicador en tarjeta
+        // Mini push indicador
         const pushVexDisp    = calcularPushDisponibles(p, s, 'vex');
         const pushGuardaDisp = calcularPushDisponibles(p, s, 'guarda');
         const pushVexUsados    = p.push_vex_actual    || 0;
@@ -79,6 +116,11 @@ export function renderCatalogo() {
                 ${s.vex_max > 0 ? `<span class="push-mini-item push-mini-vex" title="Push VEX">⚡ ${pushVexUsados}/${pushVexDisp}</span>` : ''}
                 ${s.guarda_max > 0 ? `<span class="push-mini-item push-mini-guarda" title="Push Guarda">🛡 ${pushGuardaUsados}/${pushGuardaDisp}</span>` : ''}
             </div>` : '';
+
+        // Barras de recursos con celdas segmentadas
+        const barraVidaRoja = _barraSegmentada(p.vida_roja_actual, s.vida_roja_max, 'vida', 28);
+        const barraVidaAzul = s.vida_azul_max > 0 ? _barraSegmentada(s.vida_azul_max, s.vida_azul_max, 'azul', 28) : null;
+        const barraGuarda   = s.guarda_max > 0 ? _barraSegmentada(p.guarda_actual || 0, s.guarda_max, 'guarda', 20) : null;
 
         return `<div class="pj-card ${esInactivo ? 'pj-inactivo' : ''}" onclick="window.abrirDetalle('${nombre.replace(/'/g,"\\'")}')">
             <div class="pj-card-top">
@@ -92,7 +134,7 @@ export function renderCatalogo() {
                     </div>
                 </div>
                 <div class="pj-card-actions" onclick="event.stopPropagation()">
-                    ${canEdit   ? `<button class="icon-btn" onclick="window.editarPersonaje('${nombre.replace(/'/g,"\\'")}')">✎</button>` : ''}
+                    ${(estadoUI.esAdmin || !p.isPlayer) ? `<button class="icon-btn icon-btn-img" title="Subir imagen" onclick="window.abrirSubirImagen('${nombre.replace(/'/g,"\\'")}')">🖼</button>` : ''}
                     ${canDelete ? `<button class="icon-btn icon-btn-danger" onclick="window.pedirDelete('${nombre.replace(/'/g,"\\'")}')">✕</button>` : ''}
                 </div>
             </div>
@@ -100,11 +142,14 @@ export function renderCatalogo() {
             <div class="recursos-section">
                 <div class="recurso-row">
                     <span class="recurso-label">Vida</span>
-                    <div class="recurso-bar-track">
-                        <div class="recurso-bar-fill fill-vida" style="width:${pctVida}%"></div>
-                    </div>
+                    ${barraVidaRoja}
                     <span class="recurso-xy">${p.vida_roja_actual}<span class="xy-sep">/</span>${s.vida_roja_max}</span>
                 </div>
+                ${barraVidaAzul ? `<div class="recurso-row">
+                    <span class="recurso-label">Azul</span>
+                    ${barraVidaAzul}
+                    <span class="recurso-xy">${s.vida_azul_max}</span>
+                </div>` : ''}
                 ${s.vex_max > 0 ? `<div class="recurso-row">
                     <span class="recurso-label">VEX</span>
                     <div class="recurso-bar-track">
@@ -112,11 +157,9 @@ export function renderCatalogo() {
                     </div>
                     <span class="recurso-xy">${Math.floor(p.vex_actual)}<span class="xy-sep">/</span>${s.vex_max}</span>
                 </div>` : ''}
-                ${s.guarda_max > 0 ? `<div class="recurso-row">
+                ${barraGuarda ? `<div class="recurso-row">
                     <span class="recurso-label">Guarda</span>
-                    <div class="recurso-bar-track">
-                        <div class="recurso-bar-fill fill-guarda" style="width:${pctGuarda}%"></div>
-                    </div>
+                    ${barraGuarda}
                     <span class="recurso-xy">${Math.floor(p.guarda_actual||0)}<span class="xy-sep">/</span>${s.guarda_max}</span>
                 </div>` : ''}
             </div>
@@ -131,209 +174,7 @@ export function renderCatalogo() {
 // ─────────────────────────────────────────────────────────────
 // PANEL LATERAL DE DETALLE
 // ─────────────────────────────────────────────────────────────
-export function renderDetalle(nombre) {
-    const p = personajes[nombre];
-    if (!p) return;
-    const s = calcularStats(p);
-    const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
 
-    const canEditPlayer = estadoUI.esAdmin;
-    const canEditThis   = estadoUI.esAdmin || !p.isPlayer;
-
-    const afinRows = AFINIDADES.map(a => {
-        const base = p.afinidadesBase?.[a.key] || 0;
-        const hz   = p.afinidadesHz?.[a.key]   || 0;
-        const ef   = p.afinidadesEf?.[a.key]   || 0;
-        const bf   = p.afinidadesBf?.[a.key]   || 0;
-        const total = base + hz + ef + bf;
-        const safeNombre = nombre.replace(/'/g,"\\'");
-        const canBase = estadoUI.esAdmin;
-        const canMod  = canEditThis;
-        return `<div class="det-afin-block">
-            <div class="det-afin-header">
-                <span class="det-stat-label">${a.label}</span>
-                <span class="det-afin-total">${total}</span>
-            </div>
-            <div class="det-afin-source">
-                <span class="det-afin-src-label src-base" title="Base">B</span>
-                ${canBase ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modAfin('${safeNombre}','${a.key}',-1)">−</button>` : ''}
-                <span class="det-afin-src-val">${base}</span>
-                ${canBase ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modAfin('${safeNombre}','${a.key}',1)">+</button>` : ''}
-            </div>
-            <div class="det-afin-source">
-                <span class="det-afin-src-label src-bf" title="Buff">Bf</span>
-                ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modBf('${safeNombre}','${a.key}',-1)">−</button>` : ''}
-                <span class="det-afin-src-val">${bf > 0 ? '+' : ''}${bf}</span>
-                ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modBf('${safeNombre}','${a.key}',1)">+</button>` : ''}
-            </div>
-            <div class="det-afin-source">
-                <span class="det-afin-src-label src-ef" title="Alteración">Alt</span>
-                ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modEf('${safeNombre}','${a.key}',-1)">−</button>` : ''}
-                <span class="det-afin-src-val">${ef > 0 ? '+' : ''}${ef}</span>
-                ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modEf('${safeNombre}','${a.key}',1)">+</button>` : ''}
-            </div>
-            ${hz !== 0 ? `<div class="det-afin-source">
-                <span class="det-afin-src-label src-hz" title="Hechizos">Hz</span>
-                <span class="det-afin-src-val">${hz > 0 ? '+' : ''}${hz}</span>
-            </div>` : ''}
-        </div>`;
-    }).join('');
-
-    const safeN = nombre.replace(/'/g,"\\'");
-
-    // ── Sección PUSH ──────────────────────────────────────────
-    const pushHTML = _renderPushSection(p, s, nombre, canEditThis);
-
-    document.getElementById('panel-nombre').textContent = nombre;
-    document.getElementById('panel-body').innerHTML = `
-        <!-- Stats calculados -->
-        <div class="det-section">
-            <div class="det-section-title">STATS CALCULADOS</div>
-            <div class="det-calc-grid">
-                <div class="det-calc-item">
-                    <div class="det-calc-label">Vida Roja</div>
-                    <div class="det-calc-xy">
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vida_roja_actual',-1)">−</button>` : ''}
-                        <span class="det-xy-x">${p.vida_roja_actual}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.vida_roja_max}</span>
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vida_roja_actual',1)">+</button>` : ''}
-                    </div>
-                    <div class="det-calc-formula">${formulas.vida_roja_max.expr}</div>
-                </div>
-                <div class="det-calc-item">
-                    <div class="det-calc-label">Vida Azul</div>
-                    <div class="det-calc-xy">
-                        <span class="det-xy-x">${s.vida_azul_max}</span>
-                    </div>
-                    <div class="det-calc-formula">${formulas.vida_azul_max.expr}</div>
-                </div>
-                <div class="det-calc-item">
-                    <div class="det-calc-label">VEX</div>
-                    <div class="det-calc-xy">
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vex_actual',-50)">−50</button>` : ''}
-                        <span class="det-xy-x">${Math.floor(p.vex_actual)}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.vex_max}</span>
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vex_actual',50)">+50</button>` : ''}
-                    </div>
-                    <div class="det-calc-formula">${esJugador ? formulas.vex_max.expr : 'Fijo (NPC sistema)'}</div>
-                </div>
-                ${s.guarda_max > 0 ? `<div class="det-calc-item">
-                    <div class="det-calc-label">Guarda Dorada</div>
-                    <div class="det-calc-xy">
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','guarda_actual',-1)">−</button>` : ''}
-                        <span class="det-xy-x">${Math.floor(p.guarda_actual||0)}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.guarda_max}</span>
-                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','guarda_actual',1)">+</button>` : ''}
-                    </div>
-                    <div class="det-calc-formula">${formulas.guarda_max.expr}</div>
-                </div>` : ''}
-            </div>
-        </div>
-
-        <!-- Sistema Push -->
-        ${pushHTML}
-
-        <!-- Afinidades -->
-        <div class="det-section">
-            <div class="det-section-title">AFINIDADES
-                <span class="afin-leyenda">
-                    <span class="ley-dot src-base-dot">B</span>base&nbsp;
-                    <span class="ley-dot src-bf-dot">Bf</span>buff&nbsp;
-                    <span class="ley-dot src-ef-dot">Alt</span>alt&nbsp;
-                    <span class="ley-dot src-hz-dot">Hz</span>hz
-                </span>
-            </div>
-            ${afinRows}
-        </div>
-
-        ${canEditThis ? `
-        <!-- Recursos -->
-        <div class="det-section">
-            <div class="det-section-title">RECURSOS</div>
-            <div class="det-stat-row">
-                <span class="det-stat-label">HEX</span>
-                <div class="det-stat-ctrl">
-                    <button class="ctrl-btn" onclick="window.modStat('${safeN}','hex',-100)">−100</button>
-                    <span class="det-stat-val">${(p.hex||0).toLocaleString()}</span>
-                    <button class="ctrl-btn" onclick="window.modStat('${safeN}','hex',100)">+100</button>
-                </div>
-            </div>
-        </div>` : ''}
-    `;
-}
-
-// ── Render de la sección Push dentro del panel ─────────────────
-function _renderPushSection(p, s, nombre, canEdit) {
-    const safeN = nombre.replace(/'/g,"\\'");
-
-    const _pushBloque = (recurso, label, emoji, hasMax) => {
-        if (!hasMax) return '';
-
-        const disponibles = calcularPushDisponibles(p, s, recurso);
-        const usados      = recurso === 'vex' ? (p.push_vex_actual || 0) : (p.push_guarda_actual || 0);
-        const restantes   = Math.max(0, disponibles - usados);
-        const valorPush   = calcularValorPush(p, recurso);
-        const cd          = calcularCooldownPush(p, recurso);
-        const limitExtra  = recurso === 'vex' ? (p.push_vex_limit || 0) : (p.push_guarda_limit || 0);
-
-        // Indicador visual de pushes (puntos)
-        const dots = Array.from({ length: disponibles }, (_, i) =>
-            `<span class="push-dot ${i < usados ? 'push-dot-used' : 'push-dot-avail'}"></span>`
-        ).join('');
-
-        // Cooldown display
-        let cdInfo = '';
-        if (!cd.disponible) {
-            const min = Math.ceil(cd.restaSeg / 60);
-            const seg = cd.restaSeg % 60;
-            cdInfo = `<span class="push-cd">⏳ ${min}m ${seg}s</span>`;
-        }
-
-        return `<div class="push-bloque">
-            <div class="push-bloque-header">
-                <span class="push-bloque-label">${emoji} ${label}</span>
-                <span class="push-dots">${dots}${cdInfo}</span>
-                <span class="push-counter">${usados}/${disponibles}</span>
-            </div>
-            <div class="push-bloque-info">
-                <span class="push-valor">+${valorPush} por push</span>
-                ${restantes > 0 && cd.disponible ? `
-                    <button class="btn-push ${canEdit ? '' : ''}"
-                        onclick="window.ejecutarPush('${safeN}','${recurso}')">
-                        Push ${label}
-                    </button>` : `
-                    <button class="btn-push btn-push-disabled" disabled>
-                        ${!cd.disponible ? 'En cooldown' : 'Sin pushes'}
-                    </button>`}
-            </div>
-            ${estadoUI.esAdmin ? `
-            <div class="push-admin-row">
-                <span class="push-admin-label">Extra OP</span>
-                <button class="ctrl-btn ctrl-btn-xs" onclick="window.modPushExtra('${safeN}','${recurso}',-1)">−</button>
-                <span class="push-admin-val">${limitExtra}</span>
-                <button class="ctrl-btn ctrl-btn-xs" onclick="window.modPushExtra('${safeN}','${recurso}',1)">+</button>
-                <button class="ctrl-btn ctrl-btn-xs push-reset-btn"
-                    onclick="window.resetPushes('${safeN}','${recurso}')">Reset</button>
-            </div>` : ''}
-        </div>`;
-    };
-
-    const vexHTML    = _pushBloque('vex',    'VEX',    '⚡', s.vex_max > 0);
-    const guardaHTML = _pushBloque('guarda', 'Guarda', '🛡', s.guarda_max > 0);
-
-    if (!vexHTML && !guardaHTML) return '';
-
-    return `<div class="det-section">
-        <div class="det-section-title">PUSHES
-            ${estadoUI.esAdmin ? `<button class="btn-ghost btn-ghost-xs"
-                onclick="window.resetPushes('${safeN}','ambos')">Reset todos</button>` : ''}
-        </div>
-        <div class="push-help">Un push recupera recurso al instante. Los pushes disponibles dependen del estado de vida del personaje.</div>
-        ${vexHTML}
-        ${guardaHTML}
-    </div>`;
-}
-
-// ─────────────────────────────────────────────────────────────
-// VISTA DE FÓRMULAS (solo OP)
-// ─────────────────────────────────────────────────────────────
 export function renderFormulas() {
     const cont = document.getElementById('formulas-cont');
     if (!cont) return;
@@ -373,7 +214,6 @@ export function renderFormulas() {
         </div>
     `).join('');
 
-    // ── Push fórmulas ──────────────────────────────────────────
     const pushFormsHTML = Object.entries(pushFormulas).map(([key, f]) => `
         <div class="formula-item">
             <div class="formula-item-header">
@@ -390,7 +230,6 @@ export function renderFormulas() {
         </div>
     `).join('');
 
-    // ── Cooldowns ──────────────────────────────────────────────
     const cooldownHTML = `
         <div class="formula-item">
             <div class="formula-item-header">
@@ -410,7 +249,6 @@ export function renderFormulas() {
             </div>
         </div>`;
 
-    // ── Umbrales de push ──────────────────────────────────────
     const _umbralesHtml = (recurso, label) => `
         <div class="formula-item">
             <div class="formula-item-header">
@@ -441,7 +279,6 @@ export function renderFormulas() {
     cont.innerHTML = `
         ${poolHTML}
 
-        <!-- Stats -->
         <div class="formulas-block">
             <div class="formulas-block-title">Stats derivados de afinidades</div>
             ${formulasHTML}
@@ -451,7 +288,6 @@ export function renderFormulas() {
             </div>
         </div>
 
-        <!-- Push config -->
         <div class="formulas-block">
             <div class="formulas-block-title">Sistema Push — Recuperación activa</div>
             <p class="formulas-help">
@@ -466,7 +302,6 @@ export function renderFormulas() {
             </div>
         </div>
 
-        <!-- Umbrales -->
         <div class="formulas-block">
             <div class="formulas-block-title">Umbrales de pushes disponibles</div>
             <p class="formulas-help">
@@ -480,7 +315,6 @@ export function renderFormulas() {
             </div>
         </div>
 
-        <!-- Preview por personaje -->
         <div class="formulas-block">
             <div class="formulas-block-title">Preview por personaje</div>
             <select id="preview-pj-sel" class="input-base" onchange="window.actualizarPreviewPJ()" style="margin-bottom:12px;width:280px;">
