@@ -4,11 +4,19 @@
 // ============================================================
 
 import { hexAuth } from '../hex-auth.js';
-import { hexTicker } from '../hex-ticker.js';
-import { estadoUI, personajes, formulas, regenConfig, colaCambios, encolarCambio, FORMULAS_DEFAULT, REGEN_DEFAULT } from './personajes-state.js';
-import { calcularStats, buildContext, evalExpr } from './personajes-logic.js';
-import { cargarDatos, sincronizarCola, guardarFormulasBD, guardarRegenBD, ejecutarRegenBD } from './personajes-data.js';
-import { renderCatalogo, renderDetalle, renderFormulas, previsualizarFormulaConPJ, previsualizarRegenConPJ, renderPreviewCompleto } from './personajes-ui.js';
+import { hexConfigs } from '../hex/config.js';
+// Exponer configs globalmente para que hex-guard.js (no-module) pueda leer las campañas
+window.hexConfigs = hexConfigs;
+import { estadoUI, personajes, formulas, pushFormulas, pushUmbrales, pushCooldown,
+         colaCambios, encolarCambio, FORMULAS_DEFAULT, PUSH_FORMULAS_DEFAULT,
+         PUSH_UMBRALES_DEFAULT, PUSH_COOLDOWN_DEFAULT } from './personajes-state.js';
+import { calcularStats, buildContext, evalExpr,
+         calcularPushDisponibles, calcularValorPush, calcularCooldownPush } from './personajes-logic.js';
+import { cargarDatos, sincronizarCola, guardarFormulasBD,
+         guardarPushFormulasBD, guardarPushUmbralesBD, eliminarUmbralDB,
+         persistirPush } from './personajes-data.js';
+import { renderCatalogo, renderDetalle, renderFormulas,
+         previsualizarFormulaConPJ, renderPreviewCompleto } from './personajes-ui.js';
 
 // ─────────────────────────────────────────────────────────────
 // INIT
@@ -31,25 +39,7 @@ window.onload = async () => {
     if (loader) loader.style.display = 'none';
 
     mostrarVista('catalogo');
-
-    // ── Iniciar ticker de regeneración en tiempo real ───────────
-    // • Calcula regen en memoria cada 10s
-    // • Persiste vex_actual/guarda_actual a Supabase cada 30s
-    // • Escucha cambios externos via Supabase Realtime
-    hexTicker.iniciar({
-        personajes,
-        calcularStats,
-        onTick: () => {
-            renderCatalogo();
-            if (estadoUI.panelAbierto && estadoUI.pjSeleccionado) {
-                renderDetalle(estadoUI.pjSeleccionado);
-            }
-        }
-    });
 };
-
-// Flush antes de salir para no perder regen acumulada en memoria
-window.addEventListener('beforeunload', () => hexTicker.flushAhora());
 
 // ─────────────────────────────────────────────────────────────
 // NAVEGACIÓN
@@ -75,11 +65,108 @@ window.mostrarVista = function(vista) {
     }
 };
 
-window.abrirLoginOP  = function() { hexAuth._mostrarModalLogin(); };
+window.abrirLoginOP   = function() { hexAuth._mostrarModalLogin(); };
+
+// Abre el selector de campaña como modal inline, sin salir de la página
 window.cambiarCampaña = function() {
+    // Reutilizar el mismo sistema del guard si está disponible
+    if (typeof window._hexGuardSelect === 'function') {
+        // El guard ya está cargado, forzar su modal
+        _mostrarModalCampaña();
+        return;
+    }
+    // Fallback: si por alguna razón el guard no está activo
     localStorage.removeItem('hex_selected');
-    window.location.href = '../index.html';
+    window.location.reload();
 };
+
+function _mostrarModalCampaña() {
+    // Evitar duplicados
+    let modal = document.getElementById('hex-campana-modal');
+    if (modal) { modal.remove(); return; }
+
+    modal = document.createElement('div');
+    modal.id = 'hex-campana-modal';
+    modal.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.82);
+        backdrop-filter: blur(6px);
+        z-index: 999998;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 20px;
+        font-family: 'Inter', system-ui, sans-serif;
+    `;
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+
+    // Obtener configs
+    const configs = window.hexConfigs || null;
+    const actual  = localStorage.getItem('hex_selected') || 'hex1';
+
+    let cardsHTML = '';
+    if (configs) {
+        cardsHTML = Object.entries(configs).map(([id, cfg]) => {
+            const esActual = id === actual;
+            return `<div onclick="window._hexGuardSelect('${id}')" style="
+                background: ${esActual ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.03)'};
+                border: 1px solid ${esActual ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.07)'};
+                border-radius:10px; padding:18px 16px; cursor:pointer; transition:all 0.2s;
+                display:flex; flex-direction:column; gap:5px;
+            "
+            onmouseover="this.style.borderColor='rgba(212,175,55,0.45)'; this.style.background='rgba(212,175,55,0.08)';"
+            onmouseout="this.style.borderColor='${esActual ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.07)'}'; this.style.background='${esActual ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.03)'}';">
+                <div style="font-size:0.58em; color:#5a3a8a; letter-spacing:3px; text-transform:uppercase;">${id.toUpperCase()}${esActual ? ' · ACTIVA' : ''}</div>
+                <div style="font-family:'Cinzel',serif; font-size:0.88em; color:#d4af37;">${cfg.ui?.titulo || cfg.nombreCorto || id}</div>
+                <div style="font-size:0.72em; color:#5a5a78; line-height:1.4;">${cfg.ui?.lore || cfg.ui?.subtitulo || ''}</div>
+            </div>`;
+        }).join('');
+    } else {
+        cardsHTML = ['hex1','hex2','hex3'].map(id => `
+            <div onclick="window._hexGuardSelect('${id}')" style="
+                background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+                border-radius:10px; padding:18px 16px; cursor:pointer;
+            ">
+                <div style="font-family:'Cinzel',serif; font-size:0.88em; color:#d4af37;">${id.toUpperCase()}</div>
+            </div>
+        `).join('');
+    }
+
+    modal.innerHTML = `
+        <div style="
+            background:#0f0f18;
+            border:1px solid rgba(212,175,55,0.2);
+            border-radius:14px;
+            padding:28px 24px;
+            width:100%;
+            max-width:600px;
+            max-height:90vh;
+            overflow-y:auto;
+        ">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:22px;">
+                <div>
+                    <div style="font-family:'Cinzel',serif; font-size:0.95em; color:#d4af37; letter-spacing:2px; margin-bottom:3px;">CAMBIAR CAMPAÑA</div>
+                    <div style="font-size:0.72em; color:#5a5a78;">La página se recargará con la campaña seleccionada</div>
+                </div>
+                <button onclick="document.getElementById('hex-campana-modal').remove()" style="
+                    background:none; border:none; color:#5a5a78; font-size:1.4em;
+                    cursor:pointer; line-height:1; padding:4px;
+                ">×</button>
+            </div>
+            <div style="
+                display:grid;
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                gap:10px;
+            ">${cardsHTML}</div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+// Exponer para que el guard pueda usarla también
+window._mostrarModalCampaña = _mostrarModalCampaña;
 
 // ─────────────────────────────────────────────────────────────
 // FILTROS
@@ -123,7 +210,6 @@ window.modStat = function(nombre, campo, delta) {
     actualizarBtnSync();
 };
 
-// Modificar afinidad BASE (solo OP)
 window.modAfin = function(nombre, afinKey, delta) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
@@ -133,7 +219,6 @@ window.modAfin = function(nombre, afinKey, delta) {
     renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
 };
 
-// Modificar buff (bf)
 window.modBf = function(nombre, afinKey, delta) {
     const p = personajes[nombre]; if (!p) return;
     if (!estadoUI.esAdmin && p.isPlayer) return;
@@ -143,7 +228,6 @@ window.modBf = function(nombre, afinKey, delta) {
     renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
 };
 
-// Modificar alteración (ef)
 window.modEf = function(nombre, afinKey, delta) {
     const p = personajes[nombre]; if (!p) return;
     if (!estadoUI.esAdmin && p.isPlayer) return;
@@ -151,24 +235,6 @@ window.modEf = function(nombre, afinKey, delta) {
     p.afinidadesEf[afinKey] = Math.max(-999, (p.afinidadesEf[afinKey] || 0) + delta);
     encolarCambio(nombre, `ef_${afinKey}`, p.afinidadesEf[afinKey]);
     renderDetalle(nombre); renderCatalogo(); actualizarBtnSync();
-};
-
-// Modificar regen buff/alteración
-window.modRegenBf = function(nombre, recurso, delta) {
-    const p = personajes[nombre]; if (!p) return;
-    if (!estadoUI.esAdmin && p.isPlayer) return;
-    const campo = `regen_${recurso}_bf`;
-    p[campo] = (p[campo] || 0) + delta;
-    encolarCambio(nombre, campo, p[campo]);
-    renderDetalle(nombre); actualizarBtnSync();
-};
-window.modRegenEf = function(nombre, recurso, delta) {
-    const p = personajes[nombre]; if (!p) return;
-    if (!estadoUI.esAdmin && p.isPlayer) return;
-    const campo = `regen_${recurso}_ef`;
-    p[campo] = (p[campo] || 0) + delta;
-    encolarCambio(nombre, campo, p[campo]);
-    renderDetalle(nombre); actualizarBtnSync();
 };
 
 window.editarPersonaje = function(nombre) {
@@ -182,6 +248,91 @@ window.editarPersonaje = function(nombre) {
     window.mostrarVista('crear');
     cerrarDetalle();
     rellenarFormulario(nombre);
+};
+
+// ─────────────────────────────────────────────────────────────
+// SISTEMA PUSH
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Ejecuta un push de VEX o Guarda para un personaje.
+ * Verifica cooldown, pushes disponibles, y actualiza estado + DB.
+ */
+window.ejecutarPush = async function(nombre, recurso) {
+    const p = personajes[nombre]; if (!p) return;
+    const s = calcularStats(p);
+
+    // 1. Cooldown
+    const cd = calcularCooldownPush(p, recurso);
+    if (!cd.disponible) {
+        const min = Math.ceil(cd.restaSeg / 60);
+        mostrarToast(`⏳ Cooldown: faltan ${min} min para el siguiente push`, true);
+        return;
+    }
+
+    // 2. Pushes disponibles vs. usados
+    const disponibles = calcularPushDisponibles(p, s, recurso);
+    const actualKey   = recurso === 'vex' ? 'push_vex_actual' : 'push_guarda_actual';
+    const usados      = p[actualKey] || 0;
+
+    if (usados >= disponibles) {
+        mostrarToast(`Sin pushes de ${recurso === 'vex' ? 'VEX' : 'Guarda'} disponibles`, true);
+        return;
+    }
+
+    // 3. Calcular valor y aplicar
+    const valor    = calcularValorPush(p, recurso);
+    const tsKey    = recurso === 'vex' ? 'push_vex_ts' : 'push_guarda_ts';
+    const recursoKey = recurso === 'vex' ? 'vex_actual' : 'guarda_actual';
+    const maxKey   = recurso === 'vex' ? 'vex_max' : 'guarda_max';
+    const maxVal   = recurso === 'vex' ? s.vex_max : s.guarda_max;
+
+    p[recursoKey]  = Math.min(maxVal, (p[recursoKey] || 0) + valor);
+    p[actualKey]   = usados + 1;
+    p[tsKey]       = new Date().toISOString();
+
+    // 4. Persistir directamente a Supabase (no espera sync manual)
+    const ok = await persistirPush(nombre, p);
+    if (ok) {
+        mostrarToast(`✨ Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`);
+    } else {
+        mostrarToast('Error al guardar push', true);
+    }
+
+    renderDetalle(nombre);
+    renderCatalogo();
+};
+
+/**
+ * Reset de pushes del día para un personaje (solo OP, o al inicio del día).
+ */
+window.resetPushes = async function(nombre, recurso) {
+    if (!estadoUI.esAdmin) return;
+    const p = personajes[nombre]; if (!p) return;
+    if (recurso === 'vex' || recurso === 'ambos') {
+        p.push_vex_actual = 0;
+        p.push_vex_ts     = null;
+    }
+    if (recurso === 'guarda' || recurso === 'ambos') {
+        p.push_guarda_actual = 0;
+        p.push_guarda_ts     = null;
+    }
+    await persistirPush(nombre, p);
+    mostrarToast('Pushes reiniciados');
+    renderDetalle(nombre);
+};
+
+/**
+ * Modificar el límite extra de pushes asignado manualmente por OP.
+ */
+window.modPushExtra = function(nombre, recurso, delta) {
+    if (!estadoUI.esAdmin) return;
+    const p = personajes[nombre]; if (!p) return;
+    const limitKey = recurso === 'vex' ? 'push_vex_limit' : 'push_guarda_limit';
+    p[limitKey] = Math.max(0, (p[limitKey] || 0) + delta);
+    encolarCambio(nombre, limitKey, p[limitKey]);
+    renderDetalle(nombre);
+    actualizarBtnSync();
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -328,10 +479,15 @@ window.guardarPersonaje = function() {
         afinidadesBf: viejo.afinidadesBf || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
         hz_clase1:0, hz_clase2:0, hz_clase3:0, hz_clase4:0, hz_clase5:0,
         estados: viejo.estados || {},
-        regen_vex_bf:    viejo.regen_vex_bf    || 0,
-        regen_vex_ef:    viejo.regen_vex_ef    || 0,
-        regen_guarda_bf: viejo.regen_guarda_bf || 0,
-        regen_guarda_ef: viejo.regen_guarda_ef || 0,
+        // Preservar push state si existía
+        push_vex_actual:    viejo.push_vex_actual    || 0,
+        push_vex_limit:     viejo.push_vex_limit     || 0,
+        push_vex_extra:     viejo.push_vex_extra     || 0,
+        push_vex_ts:        viejo.push_vex_ts        || null,
+        push_guarda_actual: viejo.push_guarda_actual || 0,
+        push_guarda_limit:  viejo.push_guarda_limit  || 0,
+        push_guarda_extra:  viejo.push_guarda_extra  || 0,
+        push_guarda_ts:     viejo.push_guarda_ts     || null,
     };
     encolarCambio(nombre, '__full__', true);
     actualizarBtnSync();
@@ -361,38 +517,44 @@ window.pedirDelete = function(nombre) {
 };
 
 // ─────────────────────────────────────────────────────────────
-// FÓRMULAS
+// FÓRMULAS (stats)
 // ─────────────────────────────────────────────────────────────
 let formulaActiva = null;
 window.setFormulaActiva = function(key) { formulaActiva = key; };
 
 window.insertarVar = function(varKey) {
     if (!formulaActiva) return;
-    const isRegen = formulaActiva.startsWith('regen_');
-    const realKey = isRegen ? formulaActiva.replace('regen_', '') : formulaActiva;
-    const inputId = isRegen ? `rinput-${realKey}` : `finput-${realKey}`;
-    const input = document.getElementById(inputId);
+    const isPush  = formulaActiva.startsWith('push_');
+    const inputId = isPush ? `pinput-${formulaActiva}` : `finput-${formulaActiva}`;
+    const input   = document.getElementById(inputId);
     if (!input) return;
     const pos = input.selectionStart;
     const val = input.value;
     input.value = val.slice(0, pos) + varKey + val.slice(pos);
     input.focus();
     input.setSelectionRange(pos + varKey.length, pos + varKey.length);
-    if (isRegen) window.previsualizarRegen(realKey);
-    else         window.previsualizarFormula(realKey);
+    if (isPush) window.previsualizarPushFormula(formulaActiva);
+    else        window.previsualizarFormula(formulaActiva);
 };
 
 window.previsualizarFormula = function(key) {
     const pjSel = document.getElementById('preview-pj-sel')?.value || Object.keys(personajes)[0];
     if (pjSel) previsualizarFormulaConPJ(key, pjSel);
 };
-window.previsualizarRegen = function(key) {
+
+window.previsualizarPushFormula = function(key) {
     const pjSel = document.getElementById('preview-pj-sel')?.value || Object.keys(personajes)[0];
-    if (pjSel) previsualizarRegenConPJ(key, pjSel);
+    if (!pjSel) return;
+    const pj = personajes[pjSel]; if (!pj) return;
+    const el = document.getElementById(`pprev-${key}`);
+    if (!el) return;
+    const expr = document.getElementById(`pinput-${key}`)?.value || pushFormulas[key]?.expr || '';
+    const ctx  = buildContext(pj);
+    const val  = evalExpr(expr, ctx);
+    el.innerHTML = `<span class="prev-pj">${pjSel}</span> → <strong>${val}</strong> por push`;
 };
 
-window.cambiarAplica   = function(key, val) { formulas[key].aplica = val; };
-window.cambiarRegenIv  = function(key, val) { regenConfig[key].intervalo = parseFloat(val)||12; };
+window.cambiarAplica = function(key, val) { formulas[key].aplica = val; };
 
 window.guardarFormulas = async function() {
     Object.keys(formulas).forEach(key => {
@@ -404,27 +566,9 @@ window.guardarFormulas = async function() {
     renderCatalogo();
 };
 
-window.guardarRegen = async function() {
-    Object.keys(regenConfig).forEach(key => {
-        const el = document.getElementById(`rinput-${key}`);
-        if (el) regenConfig[key].expr = el.value;
-    });
-    const ok = await guardarRegenBD();
-    mostrarToast(ok ? 'Regeneración guardada' : 'Error al guardar', !ok);
-};
-
 window.resetFormulas = function() {
     Object.entries(FORMULAS_DEFAULT).forEach(([k, v]) => { formulas[k] = { ...v }; });
-    Object.entries(REGEN_DEFAULT).forEach(([k, v])    => { regenConfig[k] = { ...v }; });
     renderFormulas();
-};
-
-window.ejecutarRegenManual = async function() {
-    const btn = event.target; btn.disabled = true; btn.textContent = 'Ejecutando...';
-    const res = await ejecutarRegenBD();
-    mostrarToast(res.ok ? res.mensaje : 'Error: ' + res.mensaje, !res.ok);
-    btn.disabled = false; btn.textContent = 'Ejecutar ahora (todos los personajes)';
-    if (res.ok) { const ok2 = await cargarDatos(null); if (ok2) renderCatalogo(); }
 };
 
 window.actualizarPreviewPJ = function() {
@@ -432,8 +576,62 @@ window.actualizarPreviewPJ = function() {
     if (sel) {
         renderPreviewCompleto(sel);
         Object.keys(formulas).forEach(k => previsualizarFormulaConPJ(k, sel));
-        Object.keys(regenConfig).forEach(k => previsualizarRegenConPJ(k, sel));
+        Object.keys(pushFormulas).forEach(k => window.previsualizarPushFormula(k));
     }
+};
+
+// ─────────────────────────────────────────────────────────────
+// FÓRMULAS PUSH (guardado)
+// ─────────────────────────────────────────────────────────────
+window.guardarPushConfig = async function() {
+    // Leer fórmulas push del DOM
+    Object.keys(pushFormulas).forEach(key => {
+        const el = document.getElementById(`pinput-${key}`);
+        if (el) pushFormulas[key].expr = el.value;
+    });
+    // Leer cooldowns
+    const cdVex    = document.getElementById('push-cooldown-vex');
+    const cdGuarda = document.getElementById('push-cooldown-guarda');
+    if (cdVex)    pushCooldown.vex    = parseFloat(cdVex.value)    || 60;
+    if (cdGuarda) pushCooldown.guarda = parseFloat(cdGuarda.value) || 30;
+
+    const ok = await guardarPushFormulasBD();
+    mostrarToast(ok ? 'Config de push guardada' : 'Error al guardar', !ok);
+};
+
+window.guardarPushUmbrales = async function() {
+    // Leer umbrales del DOM
+    for (const recurso of ['vex', 'guarda']) {
+        const cont = document.getElementById(`umbrales-${recurso}`);
+        if (!cont) continue;
+        const filas = cont.querySelectorAll('[data-umbral-idx]');
+        filas.forEach((fila, idx) => {
+            const u = pushUmbrales[recurso][idx];
+            if (!u) return;
+            u.descripcion = fila.querySelector('[data-campo="descripcion"]')?.value || u.descripcion;
+            u.condicion   = fila.querySelector('[data-campo="condicion"]')?.value   || u.condicion;
+            u.pushes      = parseInt(fila.querySelector('[data-campo="pushes"]')?.value) || 1;
+        });
+    }
+    const ok = await guardarPushUmbralesBD();
+    mostrarToast(ok ? 'Umbrales guardados' : 'Error al guardar', !ok);
+};
+
+window.agregarUmbral = function(recurso) {
+    pushUmbrales[recurso].push({
+        descripcion: 'Nueva condición',
+        condicion:   'pct_vida_roja >= 50',
+        pushes:      1,
+        orden:       pushUmbrales[recurso].length + 1
+    });
+    renderFormulas();
+};
+
+window.eliminarUmbral = async function(recurso, idx) {
+    const u = pushUmbrales[recurso][idx];
+    if (u?.id) await eliminarUmbralDB(u.id);
+    pushUmbrales[recurso].splice(idx, 1);
+    renderFormulas();
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -448,8 +646,6 @@ function actualizarBtnSync() {
 }
 
 window.ejecutarSync = async function() {
-    // Flush de regen antes de guardar para que los valores en Supabase estén al día
-    await hexTicker.flushAhora();
     const btn = document.getElementById('btn-sync');
     btn.disabled = true; btn.textContent = 'Guardando...';
     const res = await sincronizarCola();
