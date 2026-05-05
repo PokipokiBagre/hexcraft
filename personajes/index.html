@@ -5,12 +5,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personajes — HEX ROL</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="../img/icon.png">
-    <link rel="shortcut icon" href="../img/icon.png">
-    <link rel="apple-touch-icon" href="../img/icon.png">
+    <link id="dynamic-favicon" rel="icon" type="image/png" sizes="32x32" href="../img/icon.png">
+    <link id="dynamic-favicon-shortcut" rel="shortcut icon" href="../img/icon.png">
+    <link id="dynamic-favicon-apple" rel="apple-touch-icon" href="../img/icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="personajes.css">
+    <script type="module">
+        // Favicon dinámico desde Supabase Storage
+        import { currentConfig } from '../hex-auth.js';
+        const iconUrl = currentConfig.storageUrl + '/imginterfaz/icon.png';
+        ['dynamic-favicon','dynamic-favicon-shortcut','dynamic-favicon-apple'].forEach((id,i) => {
+            const el = document.getElementById(id);
+            if (el) el.href = iconUrl;
+        });
+    </script>
 </head>
 <body>
 
