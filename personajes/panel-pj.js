@@ -203,6 +203,23 @@ function _inyectarEstilos() {
 .ppj-btn-editar{flex:1;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:6px;color:#d4af37;font-size:0.78em;font-weight:600;padding:9px;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:0.5px;transition:background 0.15s;}
 .ppj-btn-editar:hover{background:rgba(212,175,55,0.15);}
 @media(max-width:480px){#panel-pj-root{width:100vw;}}
+.ppj-hz-oculto{font-style:italic;color:#3a3a5a;letter-spacing:0.5px;}
+.ppj-cat-divider{height:1px;background:linear-gradient(to right,transparent,rgba(212,175,55,0.15),transparent);margin:4px 0 12px;}
+.ppj-cat-assigned{border-color:rgba(62,207,110,0.25)!important;background:rgba(62,207,110,0.03)!important;}
+.ppj-cat-assigned .ppj-hz-nombre{color:#3ecf6e;}
+.ppj-cat-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.04);}
+.ppj-cat-btn{font-size:0.65em;font-weight:700;padding:4px 10px;border-radius:5px;cursor:pointer;border:1px solid;transition:background 0.15s;letter-spacing:0.3px;font-family:'Inter',system-ui,sans-serif;}
+.ppj-cat-free{background:rgba(62,207,110,0.08);color:#3ecf6e;border-color:rgba(62,207,110,0.3);}
+.ppj-cat-free:hover{background:rgba(62,207,110,0.18);}
+.ppj-cat-half{background:rgba(74,179,232,0.08);color:#4ab3e8;border-color:rgba(74,179,232,0.3);}
+.ppj-cat-half:hover{background:rgba(74,179,232,0.18);}
+.ppj-cat-full{background:rgba(212,175,55,0.08);color:#d4af37;border-color:rgba(212,175,55,0.3);}
+.ppj-cat-full:hover{background:rgba(212,175,55,0.18);}
+.ppj-cat-over{background:rgba(220,80,80,0.08);color:#e06060;border-color:rgba(220,80,80,0.3);}
+.ppj-cat-over:hover{background:rgba(220,80,80,0.18);}
+.ppj-cat-deasign{background:rgba(220,80,80,0.07);color:#e06060;border-color:rgba(220,80,80,0.25);}
+.ppj-cat-deasign:hover{background:rgba(220,80,80,0.16);}
+.ppj-cat-assigned-tag{font-size:0.6em;padding:1px 7px;border-radius:10px;background:rgba(62,207,110,0.1);color:#3ecf6e;border:1px solid rgba(62,207,110,0.25);margin-left:auto;}
 `;
     document.head.appendChild(st);
 }
@@ -532,7 +549,7 @@ function _tabStats(nombre) {
         ${_maxOv('Vida Roja','vida_roja_max_override',p.vida_roja_max_override||0,s.vida_roja_max)}
         <div class="ppj-formula">${formulas.vida_roja_max?.expr||''}</div>
         ${s.vida_azul_max>0?`${_vida('Vida Azul','vida_azul_actual',s.vida_azul_actual,s.vida_azul_max,'azul','#4ab3e8',26)}<div class="ppj-formula">${formulas.vida_azul_max?.expr||''}</div>`:''}
-        ${s.guarda_max>0?`${_vida('Guarda Dorada','guarda_actual',p.guarda_actual||0,s.guarda_max,'guarda','#d4af37',20)}${_maxOv('Guarda','guarda_max',p.guarda_max||0,s.guarda_max)}<div class="ppj-formula">${formulas.guarda_max?.expr||''}</div>`:''}
+        ${s.guarda_max>0?`${_vida('Guarda Dorada','guarda_actual',p.guarda_actual||0,s.guarda_max,'guarda','#d4af37',20)}${_maxOv('Guarda','guarda_max_override',p.guarda_max_override||0,s.guarda_max)}<div class="ppj-formula">${formulas.guarda_max?.expr||''}</div>`:''}
         ${s.vex_max>0?`<div class="ppj-vida-block">
             <div class="ppj-vida-header"><span class="ppj-vida-label" style="color:#9a50dc;">VEX</span>
                 <div class="ppj-vida-ctrl">
@@ -556,20 +573,31 @@ function _tabStats(nombre) {
 async function _tabHechizos(nombre, body) {
     body.innerHTML = '<div class="ppj-loader">Cargando hechizos…</div>';
 
+    const p = personajes[nombre]; if (!p) return;
+    const esAdmin = estadoUI.esAdmin;
+
+    // ── Inventario del personaje ─────────────────────────────────
     const { data: invHz } = await supabase
         .from('hechizos_inventario')
         .select('hechizo_nombre, hechizo_afinidad, hechizo_hex, tipo, origen')
         .eq('personaje_nombre', nombre);
 
     const lista = (invHz || []).filter(h => (h.hechizo_afinidad || '').toLowerCase() !== 'hex');
+    const invSet = new Set(lista.map(h => (h.hechizo_nombre || '').toLowerCase().trim()));
+
     const hNombres = lista.map(h => h.hechizo_nombre);
-    let nodosMap = {};
+    let nodosMapInv = {};
     if (hNombres.length > 0) {
         const { data: nd } = await supabase.from('hechizos_nodos')
-            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial')
+            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id')
             .in('nombre', hNombres);
-        (nd||[]).forEach(n => { nodosMap[n.nombre] = n; });
+        (nd||[]).forEach(n => { nodosMapInv[n.nombre] = n; });
     }
+
+    // ── Catálogo completo (solo es_conocido, sin es_oculto) ──────
+    const { data: catalogo } = await supabase.from('hechizos_nodos')
+        .select('id, nombre, hechizo_id, afinidad, clase, resumen, efecto, hex_cost, es_conocido')
+        .order('clase').order('nombre');
 
     const _colAf = (af) => ({
         'Física':'#e2a673','Energética':'#f3e57a','Espiritual':'#7df0a7',
@@ -577,55 +605,13 @@ async function _tabHechizos(nombre, body) {
         'Desconocida':'#888'
     })[af] || '#888';
 
-    if (lista.length === 0) {
-        body.innerHTML = `
-            <div class="ppj-section"><div class="ppj-empty"><div class="ppj-empty-icon">📖</div>Sin hechizos en el inventario</div></div>
-            <div class="ppj-section"><div class="ppj-section-title">Puede aprender</div><div id="ppj-apr-loader" class="ppj-loader">Calculando…</div></div>`;
-        _cargarAprendibles(nombre, body, lista, nodosMap, _colAf);
-        return;
-    }
-
-    const _campo = (label, val) => {
-        if (!val || val==='0' || val===0 || val==='EMPTY' || val==='null') return '';
-        return `<div class="ppj-hz-field"><strong>${label}:</strong> ${val}</div>`;
-    };
-
-    // ── Agrupar: afinidad → clase ────────────────────────────────
-    const grupos = {}; // { afinidad: { clase: [hechizos] } }
-    lista.forEach(h => {
-        const af = h.hechizo_afinidad || 'Sin afinidad';
-        const nd = nodosMap[h.hechizo_nombre] || {};
-        const cl = nd.clase ? String(nd.clase) : '?';
-        if (!grupos[af]) grupos[af] = {};
-        if (!grupos[af][cl]) grupos[af][cl] = [];
-        grupos[af][cl].push(h);
-    });
-
-    const _hzCard = (h, color, show) => {
-        const nd  = nodosMap[h.hechizo_nombre] || {};
-        const cls = nd.clase ? `Clase ${nd.clase}` : '';
-        return `<div class="ppj-hz-card" data-hz-nombre="${(h.hechizo_nombre||'').toLowerCase()}" style="${show?'':'display:none;'}">
-            <div class="ppj-hz-header">
-                <span class="ppj-hz-af" style="background:${color}22;color:${color};">${(h.hechizo_afinidad||'?').split(' ')[0]}</span>
-                <span class="ppj-hz-nombre">${h.hechizo_nombre}</span>
-                <span class="ppj-hz-clase">${cls}</span>
-            </div>
-            ${h.hechizo_hex>0?`<div class="ppj-hz-hex">⬡ ${h.hechizo_hex} HEX</div>`:''}
-            <div class="ppj-hz-fields">
-                ${_campo('Efecto',nd.efecto)}${_campo('Resumen',nd.resumen)}
-                ${_campo('Overcast',nd.overcast)}${_campo('Undercast',nd.undercast)}${_campo('Especial',nd.especial)}
-            </div>
-        </div>`;
-    };
-
-    // Estilos de acordeón (inyectar una sola vez)
+    // ── Inyectar estilos de acordeón ─────────────────────────────
     if (!document.getElementById('ppj-hz-acc-styles')) {
         const s = document.createElement('style');
         s.id = 'ppj-hz-acc-styles';
         s.textContent = `
 .ppj-hz-search{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#ccc;font-size:0.8em;padding:7px 10px;margin-bottom:10px;box-sizing:border-box;outline:none;}
-.ppj-hz-search::placeholder{color:#3a3a58;}
-.ppj-hz-search:focus{border-color:rgba(212,175,55,0.3);}
+.ppj-hz-search::placeholder{color:#3a3a58;}.ppj-hz-search:focus{border-color:rgba(212,175,55,0.3);}
 .ppj-af-acc{margin-bottom:6px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);}
 .ppj-af-acc-header{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.03);}
 .ppj-af-acc-header:hover{background:rgba(255,255,255,0.05);}
@@ -648,53 +634,155 @@ async function _tabHechizos(nombre, body) {
         document.head.appendChild(s);
     }
 
-    // Construir HTML
-    let html = `<div class="ppj-section">
-        <input class="ppj-hz-search" id="ppj-hz-buscador" placeholder="Buscar hechizo…" oninput="window._ppjBuscarHz(this.value)">`;
+    const _campo = (label, val) => {
+        if (!val || val==='0' || val===0 || val==='EMPTY' || val==='null') return '';
+        return `<div class="ppj-hz-field"><strong>${label}:</strong> ${val}</div>`;
+    };
 
-    Object.entries(grupos).forEach(([af, clases]) => {
-        const color   = _colAf(af);
-        const totalAf = Object.values(clases).reduce((s,a)=>s+a.length,0);
-        html += `<div class="ppj-af-acc" data-af="${af.toLowerCase()}">
+    // ── Sección 1: Aprendidos ────────────────────────────────────
+    const grupos = {};
+    lista.forEach(h => {
+        const af = h.hechizo_afinidad || 'Sin afinidad';
+        const nd = nodosMapInv[h.hechizo_nombre] || {};
+        const cl = nd.clase ? String(nd.clase) : '?';
+        if (!grupos[af]) grupos[af] = {};
+        if (!grupos[af][cl]) grupos[af][cl] = [];
+        grupos[af][cl].push(h);
+    });
+
+    const _hzCard = (h, color) => {
+        const nd  = nodosMapInv[h.hechizo_nombre] || {};
+        const cls = nd.clase ? `Clase ${nd.clase}` : '';
+        return `<div class="ppj-hz-card" data-hz-nombre="${(h.hechizo_nombre||'').toLowerCase()}">
+            <div class="ppj-hz-header">
+                <span class="ppj-hz-af" style="background:${color}22;color:${color};">${(h.hechizo_afinidad||'?').split(' ')[0]}</span>
+                <span class="ppj-hz-nombre">${h.hechizo_nombre}</span>
+                <span class="ppj-hz-clase">${cls}</span>
+            </div>
+            ${h.hechizo_hex>0?`<div class="ppj-hz-hex">⬡ ${h.hechizo_hex} HEX</div>`:''}
+            <div class="ppj-hz-fields">
+                ${_campo('Efecto',nd.efecto)}${_campo('Resumen',nd.resumen)}
+                ${_campo('Overcast',nd.overcast)}${_campo('Undercast',nd.undercast)}${_campo('Especial',nd.especial)}
+            </div>
+        </div>`;
+    };
+
+    let html = `<div class="ppj-section">
+        <div class="ppj-section-title">Hechizos aprendidos${lista.length?' ('+lista.length+')':''}</div>
+        <input class="ppj-hz-search" id="ppj-hz-buscador" placeholder="Buscar hechizo aprendido…" oninput="window._ppjBuscarHz(this.value)">
+        <div id="ppj-hz-inv-list">`;
+
+    if (lista.length === 0) {
+        html += `<div class="ppj-empty"><div class="ppj-empty-icon">📖</div>Sin hechizos en el inventario</div>`;
+    } else {
+        Object.entries(grupos).forEach(([af, clases]) => {
+            const color   = _colAf(af);
+            const totalAf = Object.values(clases).reduce((s,a)=>s+a.length,0);
+            html += `<div class="ppj-af-acc" data-af="${af.toLowerCase()}">
+                <div class="ppj-af-acc-header" onclick="window._ppjToggleAcc(this.parentElement)">
+                    <span class="ppj-af-arrow">▶</span>
+                    <span class="ppj-af-acc-title" style="color:${color};">${af}</span>
+                    <span class="ppj-af-acc-count">${totalAf}</span>
+                </div>
+                <div class="ppj-af-acc-body">`;
+
+            const clasesOrdenadas = Object.entries(clases).sort(([a],[b]) => (parseInt(a)||999)-(parseInt(b)||999));
+            clasesOrdenadas.forEach(([cl, hechizos]) => {
+                if (clasesOrdenadas.length === 1) {
+                    hechizos.forEach(h => { html += _hzCard(h, color); });
+                } else {
+                    const clLabel = cl === '?' ? 'Sin clase' : `Clase ${cl}`;
+                    html += `<div class="ppj-cl-acc" data-clase="${cl}">
+                        <div class="ppj-cl-acc-header" onclick="window._ppjToggleAcc(this.parentElement)">
+                            <span class="ppj-cl-arrow">▶</span>
+                            <span class="ppj-cl-acc-title">${clLabel}</span>
+                            <span class="ppj-cl-acc-count">${hechizos.length}</span>
+                        </div>
+                        <div class="ppj-cl-acc-body">`;
+                    hechizos.forEach(h => { html += _hzCard(h, color); });
+                    html += `</div></div>`;
+                }
+            });
+            html += `</div></div>`;
+        });
+    }
+
+    html += `</div></div>`;
+
+    // ── Sección 2: Grimorio / Catálogo completo ──────────────────
+    const catGrupos = {};
+    (catalogo || []).forEach(n => {
+        const af = n.afinidad || 'Sin afinidad';
+        if (!catGrupos[af]) catGrupos[af] = [];
+        catGrupos[af].push(n);
+    });
+
+    const safe = nombre.replace(/'/g, "\\'");
+
+    html += `<div class="ppj-section">
+        <div class="ppj-section-title" style="display:flex;align-items:center;gap:8px;">
+            📖 Grimorio completo
+            <span style="font-size:0.85em;color:#3a3a58;font-weight:400;letter-spacing:0;">(${(catalogo||[]).length} hechizos)</span>
+        </div>
+        <div class="ppj-cat-divider"></div>
+        <input class="ppj-hz-search" id="ppj-cat-buscador" placeholder="Buscar en catálogo…" oninput="window._ppjBuscarCat(this.value)">
+        <div id="ppj-cat-lista">`;
+
+    Object.entries(catGrupos).forEach(([af, nodos]) => {
+        const color = _colAf(af);
+        html += `<div class="ppj-af-acc ppj-cat-acc" data-cat-af="${af.toLowerCase()}">
             <div class="ppj-af-acc-header" onclick="window._ppjToggleAcc(this.parentElement)">
                 <span class="ppj-af-arrow">▶</span>
                 <span class="ppj-af-acc-title" style="color:${color};">${af}</span>
-                <span class="ppj-af-acc-count">${totalAf}</span>
+                <span class="ppj-af-acc-count">${nodos.length}</span>
             </div>
             <div class="ppj-af-acc-body">`;
 
-        // Ordenar clases numéricamente
-        const clasesOrdenadas = Object.entries(clases).sort(([a],[b]) => {
-            const na = parseInt(a)||999, nb = parseInt(b)||999;
-            return na - nb;
-        });
+        nodos.forEach(n => {
+            const isAssigned = invSet.has((n.nombre || '').toLowerCase().trim());
+            // es_conocido=true → visible; false → oculto (solo OP ve nombre real)
+            const isKnown    = n.es_conocido;
+            const showFull   = isKnown || esAdmin;
+            const displayNombre = showFull ? n.nombre : n.hechizo_id;
+            const displayAf     = showFull ? (n.afinidad || '?').split(' ')[0] : '???';
+            const safeHzId  = (n.hechizo_id || '').replace(/'/g, "\\'");
+            const hexCost   = n.hex_cost || 0;
+            const half      = Math.round(hexCost * 0.5);
+            const doble     = hexCost * 2;
 
-        clasesOrdenadas.forEach(([cl, hechizos]) => {
-            // No mostrar sub-acordeón si solo hay 1 clase
-            if (clasesOrdenadas.length === 1) {
-                hechizos.forEach(h => { html += _hzCard(h, color, true); });
-            } else {
-                const clLabel = cl === '?' ? 'Sin clase' : `Clase ${cl}`;
-                html += `<div class="ppj-cl-acc" data-clase="${cl}">
-                    <div class="ppj-cl-acc-header" onclick="window._ppjToggleAcc(this.parentElement)">
-                        <span class="ppj-cl-arrow">▶</span>
-                        <span class="ppj-cl-acc-title">${clLabel}</span>
-                        <span class="ppj-cl-acc-count">${hechizos.length}</span>
-                    </div>
-                    <div class="ppj-cl-acc-body">`;
-                hechizos.forEach(h => { html += _hzCard(h, color, true); });
-                html += `</div></div>`;
-            }
+            const btnsDeasign = `<button class="ppj-cat-btn ppj-cat-deasign"
+                onclick="window._ppjDeasignarHz('${safe}','${safeHzId}')">✕ Deasignar</button>`;
+
+            const btnsAsign = `<button class="ppj-cat-btn ppj-cat-free"
+                    onclick="window._ppjAsignarHz('${safe}','${safeHzId}','gratis')">✅ Gratis</button>
+                ${hexCost > 0 ? `
+                <button class="ppj-cat-btn ppj-cat-half"
+                    onclick="window._ppjAsignarHz('${safe}','${safeHzId}','50')" title="50% del costo">🔵 −${half}</button>
+                <button class="ppj-cat-btn ppj-cat-full"
+                    onclick="window._ppjAsignarHz('${safe}','${safeHzId}','100')" title="Costo completo">🟡 −${hexCost}</button>
+                <button class="ppj-cat-btn ppj-cat-over"
+                    onclick="window._ppjAsignarHz('${safe}','${safeHzId}','200')" title="200% del costo">🔴 −${doble}</button>` : ''}`;
+
+            html += `<div class="ppj-hz-card ppj-cat-card ${isAssigned?'ppj-cat-assigned':''}"
+                         data-cat-nombre="${(n.nombre||'').toLowerCase()}"
+                         data-cat-id="${n.hechizo_id||''}">
+                <div class="ppj-hz-header">
+                    <span class="ppj-hz-af" style="background:${color}22;color:${color};">${displayAf}</span>
+                    <span class="ppj-hz-nombre ${!showFull?'ppj-hz-oculto':''}">${displayNombre}</span>
+                    <span class="ppj-hz-clase">${showFull?`Clase ${n.clase||'?'}`:'?'}</span>
+                    ${isAssigned?`<span class="ppj-cat-assigned-tag">✓ Aprendido</span>`:''}
+                </div>
+                ${hexCost>0&&showFull?`<div class="ppj-hz-hex">⬡ ${hexCost} HEX</div>`:''}
+                ${showFull&&n.resumen?`<div class="ppj-hz-fields"><div class="ppj-hz-field">${n.resumen}</div></div>`:''}
+                ${esAdmin?`<div class="ppj-cat-actions">${isAssigned?btnsDeasign:btnsAsign}</div>`:''}
+            </div>`;
         });
 
         html += `</div></div>`;
     });
 
-    html += `</div>`;
-    html += `<div class="ppj-section"><div class="ppj-section-title">Puede aprender</div><div id="ppj-apr-loader" class="ppj-loader">Calculando…</div></div>`;
-
+    html += `</div></div>`;
     body.innerHTML = html;
-    _cargarAprendibles(nombre, body, lista, nodosMap, _colAf);
 }
 
 async function _cargarAprendibles(nombre, body, lista, nodosMap, _colAf) {
@@ -915,30 +1003,118 @@ window._ppjToggleAcc = (el) => {
     el.classList.toggle('open');
 };
 
-// Buscador de hechizos: muestra/oculta cards y abre acordeones padres con resultados
+// Buscador de hechizos APRENDIDOS (scoped al contenedor de inventario)
 window._ppjBuscarHz = (query) => {
     const q = query.toLowerCase().trim();
+    const inv = document.getElementById('ppj-hz-inv-list');
+    if (!inv) return;
     if (!q) {
-        // Restaurar todo al estado cerrado original
-        document.querySelectorAll('.ppj-hz-card').forEach(c => { c.style.display = ''; });
-        document.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => { a.classList.remove('open'); });
+        inv.querySelectorAll('.ppj-hz-card').forEach(c => { c.style.display = ''; });
+        inv.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => { a.classList.remove('open'); });
         return;
     }
-    document.querySelectorAll('.ppj-hz-card').forEach(c => {
+    inv.querySelectorAll('.ppj-hz-card').forEach(c => {
         const nombre = c.getAttribute('data-hz-nombre') || '';
-        const match  = nombre.includes(q);
-        c.style.display = match ? '' : 'none';
+        c.style.display = nombre.includes(q) ? '' : 'none';
     });
-    // Abrir acordeones que tienen al menos un resultado visible
-    document.querySelectorAll('.ppj-cl-acc').forEach(cl => {
+    inv.querySelectorAll('.ppj-cl-acc').forEach(cl => {
         const visible = cl.querySelectorAll('.ppj-hz-card:not([style*="display: none"]):not([style*="display:none"])').length;
         cl.classList.toggle('open', visible > 0);
     });
-    document.querySelectorAll('.ppj-af-acc').forEach(af => {
+    inv.querySelectorAll('.ppj-af-acc').forEach(af => {
         const visible = af.querySelectorAll('.ppj-hz-card:not([style*="display: none"]):not([style*="display:none"])').length;
         af.classList.toggle('open', visible > 0);
     });
 };
+
+// Buscador del catálogo completo
+window._ppjBuscarCat = (query) => {
+    const q = query.toLowerCase().trim();
+    const cat = document.getElementById('ppj-cat-lista');
+    if (!cat) return;
+    if (!q) {
+        cat.querySelectorAll('.ppj-cat-card').forEach(c => { c.style.display = ''; });
+        cat.querySelectorAll('.ppj-cat-acc').forEach(a => { a.classList.remove('open'); });
+        return;
+    }
+    cat.querySelectorAll('.ppj-cat-card').forEach(c => {
+        const nombre = c.getAttribute('data-cat-nombre') || '';
+        const id     = c.getAttribute('data-cat-id') || '';
+        c.style.display = (nombre.includes(q) || id.toLowerCase().includes(q)) ? '' : 'none';
+    });
+    cat.querySelectorAll('.ppj-cat-acc').forEach(af => {
+        const visible = af.querySelectorAll('.ppj-cat-card:not([style*="display: none"]):not([style*="display:none"])').length;
+        af.classList.toggle('open', visible > 0);
+    });
+};
+
+// Asignar hechizo del catálogo a un personaje
+window._ppjAsignarHz = async (nombrePJ, hechizo_id, modo) => {
+    if (!estadoUI.esAdmin) return;
+    const p = personajes[nombrePJ]; if (!p) return;
+
+    const { data: nodo } = await supabase.from('hechizos_nodos')
+        .select('nombre, afinidad, hex_cost, clase')
+        .eq('hechizo_id', hechizo_id).single();
+    if (!nodo) { window.mostrarToast?.('Hechizo no encontrado', true); return; }
+
+    const hexCost = nodo.hex_cost || 0;
+    let cobro = 0;
+    if (modo === '50')  cobro = Math.round(hexCost * 0.5);
+    if (modo === '100') cobro = hexCost;
+    if (modo === '200') cobro = hexCost * 2;
+
+    if (cobro > 0 && (p.hex || 0) < cobro) {
+        window.mostrarToast?.(`HEX insuficiente (tiene ${p.hex||0}, necesita ${cobro})`, true);
+        return;
+    }
+
+    const { error } = await supabase.from('hechizos_inventario').insert({
+        personaje_nombre: nombrePJ,
+        hechizo_nombre:   nodo.nombre,
+        hechizo_afinidad: nodo.afinidad || '',
+        hechizo_hex:      hexCost,
+        tipo:   'aprendido',
+        origen: cobro > 0 ? 'Compra' : 'OP'
+    });
+    if (error) { window.mostrarToast?.('Error al asignar: ' + error.message, true); return; }
+
+    if (cobro > 0) {
+        p.hex = Math.max(0, (p.hex || 0) - cobro);
+        encolarCambio(nombrePJ, 'hex', p.hex);
+        window.actualizarBtnSync?.();
+        window.renderCatalogo?.();
+    }
+
+    const modoTxt = { gratis:'gratis', '50':`−${Math.round(hexCost*0.5)} HEX (50%)`, '100':`−${hexCost} HEX`, '200':`−${hexCost*2} HEX (200%)` }[modo] || '';
+    window.mostrarToast?.(`✨ "${nodo.nombre}" → ${nombrePJ} ${modoTxt}`);
+
+    const body = document.getElementById('ppj-body');
+    if (body) _tabHechizos(nombrePJ, body);
+};
+
+// Deasignar hechizo de un personaje
+window._ppjDeasignarHz = async (nombrePJ, hechizo_id) => {
+    if (!estadoUI.esAdmin) return;
+
+    const { data: nodo } = await supabase.from('hechizos_nodos')
+        .select('nombre').eq('hechizo_id', hechizo_id).single();
+    if (!nodo) { window.mostrarToast?.('Hechizo no encontrado', true); return; }
+
+    if (!confirm(`¿Deasignar "${nodo.nombre}" de ${nombrePJ}?`)) return;
+
+    const { error } = await supabase.from('hechizos_inventario')
+        .delete()
+        .eq('personaje_nombre', nombrePJ)
+        .eq('hechizo_nombre', nodo.nombre);
+
+    if (error) { window.mostrarToast?.('Error al deasignar: ' + error.message, true); return; }
+    window.mostrarToast?.(`✅ "${nodo.nombre}" deasignado de ${nombrePJ}`);
+
+    const body = document.getElementById('ppj-body');
+    if (body) _tabHechizos(nombrePJ, body);
+};
+
 
 window._ppjSetCd = (nombre, afinKey, valor) => {
     if (!estadoUI.esAdmin) return;
