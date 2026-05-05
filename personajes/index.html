@@ -15,13 +15,6 @@
 <body>
 
 <!-- ── NAV ─────────────────────────────────────────────────── -->
-<!--
-    El badge de hex-auth muestra:
-      - Si eres admin → "⚙️ MÁSTER" (clicable para logout)
-      - Si eres jugador → nombre del personaje (clicable para logout)
-      - Si no hay sesión → "Acceso OP" (abre modal de login)
-    No hay botón ON/OFF de OP. El estado admin viene únicamente de la base de datos.
--->
 <header class="nav">
     <div class="nav-left">
         <a href="../index.html" class="nav-back">← Inicio</a>
@@ -32,7 +25,7 @@
         </nav>
     </div>
     <div class="nav-right">
-        <button class="btn-cambiar" onclick="cambiarCampaña()">cambiar campaña</button>
+        <!-- El botón "cambiar campaña" lo inyecta hex-guard.js automáticamente -->
         <div id="hex-session-badge"></div>
     </div>
 </header>
