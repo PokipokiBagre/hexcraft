@@ -7,8 +7,6 @@ import { AFINIDADES, VARS_FORMULA, personajes, estadoUI, formulas, regenConfig }
 import { calcularStats, getMayorAfinidad, buildContext, evalExpr } from './personajes-logic.js';
 import { db } from '../hex-db.js';
 
-const STORAGE_URL = '';  // se sobreescribe en main con currentConfig.storageUrl
-
 // ─────────────────────────────────────────────────────────────
 // CATÁLOGO
 // ─────────────────────────────────────────────────────────────
@@ -33,29 +31,46 @@ export function renderCatalogo() {
     grid.innerHTML = lista.map(([nombre, p]) => {
         const s = calcularStats(p);
         const mayor = getMayorAfinidad(p);
-        const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
 
-        // Progreso de vida (porcentaje)
-        const pctVida = s.vida_roja_max > 0 ? Math.min(100, Math.round(p.vida_roja_actual / s.vida_roja_max * 100)) : 0;
-        const pctVex  = s.vex_max > 0 ? Math.min(100, Math.round(p.vex_actual / s.vex_max * 100)) : 0;
+        const pctVida   = s.vida_roja_max > 0 ? Math.min(100, Math.round(p.vida_roja_actual / s.vida_roja_max * 100)) : 0;
+        const pctVex    = s.vex_max > 0 ? Math.min(100, Math.round(p.vex_actual / s.vex_max * 100)) : 0;
         const pctGuarda = s.guarda_max > 0 ? Math.min(100, Math.round((p.guarda_actual||0) / s.guarda_max * 100)) : 0;
 
-        // Barras de afinidad
-        const maxAfin = Math.max(1, ...AFINIDADES.map(a => (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0)));
+        // Barras de afinidad segmentadas por fuente
+        const maxAfin = Math.max(1, ...AFINIDADES.map(a => {
+            return (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0);
+        }));
+
         const barras = AFINIDADES.map(a => {
-            const v = (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0);
-            const pct = Math.round(v / maxAfin * 100);
+            const base = p.afinidadesBase?.[a.key] || 0;
+            const bf   = p.afinidadesBf?.[a.key]   || 0;
+            const ef   = p.afinidadesEf?.[a.key]   || 0;
+            const hz   = p.afinidadesHz?.[a.key]   || 0;
+            const total = base + bf + ef + hz;
             const esMayor = mayor && mayor.key === a.key;
+
+            // Porcentajes proporcionales al max
+            const pBase = Math.round(base / maxAfin * 100);
+            const pBf   = Math.round(bf   / maxAfin * 100);
+            const pEf   = Math.round(ef   / maxAfin * 100);
+            const pHz   = Math.round(hz   / maxAfin * 100);
+
             return `<div class="afin-bar-row">
                 <span class="afin-bar-label ${esMayor ? 'mayor' : ''}">${a.abr}</span>
                 <div class="afin-bar-track">
-                    <div class="afin-bar-fill ${esMayor ? 'fill-gold' : 'fill-dim'}" style="width:${pct}%"></div>
+                    <div class="afin-seg afin-seg-base" style="width:${pBase}%" title="Base: ${base}"></div>
+                    <div class="afin-seg afin-seg-bf"   style="width:${pBf}%"   title="Buff: ${bf}"></div>
+                    <div class="afin-seg afin-seg-ef"   style="width:${pEf}%"   title="Alt: ${ef}"></div>
+                    <div class="afin-seg afin-seg-hz"   style="width:${pHz}%"   title="Hz: ${hz}"></div>
                 </div>
-                <span class="afin-bar-val ${esMayor ? 'val-gold' : ''}">${v}</span>
+                <span class="afin-bar-val ${esMayor ? 'val-gold' : ''}">${total}</span>
             </div>`;
         }).join('');
 
         const esInactivo = !p.isActive;
+        // Botones de acción según rol
+        const canEdit   = estadoUI.esAdmin || !p.isPlayer;
+        const canDelete = estadoUI.esAdmin;
 
         return `<div class="pj-card ${esInactivo ? 'pj-inactivo' : ''}" onclick="window.abrirDetalle('${nombre.replace(/'/g,"\\'")}')">
             <div class="pj-card-top">
@@ -68,13 +83,12 @@ export function renderCatalogo() {
                         <span class="tag ${p.isActive ? 'tag-activo' : 'tag-inactivo'}">${p.isActive ? 'Activo' : 'Inactivo'}</span>
                     </div>
                 </div>
-                ${estadoUI.esAdmin ? `<div class="pj-card-actions" onclick="event.stopPropagation()">
-                    <button class="icon-btn" onclick="window.editarPersonaje('${nombre.replace(/'/g,"\\'")}')">✎</button>
-                    <button class="icon-btn icon-btn-danger" onclick="window.pedirDelete('${nombre.replace(/'/g,"\\'")}')">✕</button>
-                </div>` : ''}
+                <div class="pj-card-actions" onclick="event.stopPropagation()">
+                    ${canEdit   ? `<button class="icon-btn" onclick="window.editarPersonaje('${nombre.replace(/'/g,"\\'")}')">✎</button>` : ''}
+                    ${canDelete ? `<button class="icon-btn icon-btn-danger" onclick="window.pedirDelete('${nombre.replace(/'/g,"\\'")}')">✕</button>` : ''}
+                </div>
             </div>
 
-            <!-- Barras de recursos x/y -->
             <div class="recursos-section">
                 <div class="recurso-row">
                     <span class="recurso-label">Vida</span>
@@ -88,21 +102,18 @@ export function renderCatalogo() {
                     <div class="recurso-bar-track">
                         <div class="recurso-bar-fill fill-vex" style="width:${pctVex}%"></div>
                     </div>
-                    <span class="recurso-xy">${p.vex_actual}<span class="xy-sep">/</span>${s.vex_max}</span>
+                    <span class="recurso-xy">${Math.floor(p.vex_actual)}<span class="xy-sep">/</span>${s.vex_max}</span>
                 </div>` : ''}
                 ${s.guarda_max > 0 ? `<div class="recurso-row">
                     <span class="recurso-label">Guarda</span>
                     <div class="recurso-bar-track">
                         <div class="recurso-bar-fill fill-guarda" style="width:${pctGuarda}%"></div>
                     </div>
-                    <span class="recurso-xy">${p.guarda_actual||0}<span class="xy-sep">/</span>${s.guarda_max}</span>
+                    <span class="recurso-xy">${Math.floor(p.guarda_actual||0)}<span class="xy-sep">/</span>${s.guarda_max}</span>
                 </div>` : ''}
             </div>
 
-            <!-- Afinidades -->
             <div class="afin-section">${barras}</div>
-
-            <!-- HEX -->
             <div class="pj-hex">HEX ${(p.hex||0).toLocaleString()}</div>
         </div>`;
     }).join('');
@@ -117,25 +128,57 @@ export function renderDetalle(nombre) {
     const s = calcularStats(p);
     const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
 
+    // OP puede editar todo; no-OP solo puede editar NPCs
+    const canEditPlayer = estadoUI.esAdmin;
+    const canEditThis   = estadoUI.esAdmin || !p.isPlayer;
+
+    // ── Filas de afinidades con base/bf/ef editables ──
     const afinRows = AFINIDADES.map(a => {
         const base = p.afinidadesBase?.[a.key] || 0;
         const hz   = p.afinidadesHz?.[a.key]   || 0;
         const ef   = p.afinidadesEf?.[a.key]   || 0;
         const bf   = p.afinidadesBf?.[a.key]   || 0;
         const total = base + hz + ef + bf;
-        const desglose = [hz && `Hz:+${hz}`, ef && `Ef:+${ef}`, bf && `Bf:+${bf}`].filter(Boolean).join(' ');
-        return `<div class="det-stat-row">
-            <span class="det-stat-label">${a.label}</span>
-            <div class="det-stat-ctrl">
-                ${estadoUI.esAdmin ? `<button class="ctrl-btn" onclick="window.modAfin('${nombre}','${a.key}',-1)">−</button>` : ''}
-                <div style="text-align:center;">
-                    <div class="det-stat-val">${total}</div>
-                    ${desglose ? `<div class="det-stat-sub">${desglose}</div>` : ''}
-                </div>
-                ${estadoUI.esAdmin ? `<button class="ctrl-btn" onclick="window.modAfin('${nombre}','${a.key}',1)">+</button>` : ''}
+
+        const safeNombre = nombre.replace(/'/g,"\\'");
+        const canBase = estadoUI.esAdmin;
+        const canMod  = canEditThis;
+
+        return `<div class="det-afin-block">
+            <div class="det-afin-header">
+                <span class="det-stat-label">${a.label}</span>
+                <span class="det-afin-total">${total}</span>
             </div>
+            <!-- BASE (solo OP) -->
+            <div class="det-afin-source">
+                <span class="det-afin-src-label src-base" title="Base">B</span>
+                ${canBase ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modAfin('${safeNombre}','${a.key}',-1)">−</button>` : ''}
+                <span class="det-afin-src-val">${base}</span>
+                ${canBase ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modAfin('${safeNombre}','${a.key}',1)">+</button>` : ''}
+            </div>
+            <!-- BUFF -->
+            <div class="det-afin-source">
+                <span class="det-afin-src-label src-bf" title="Buff">Bf</span>
+                ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modBf('${safeNombre}','${a.key}',-1)">−</button>` : ''}
+                <span class="det-afin-src-val">${bf > 0 ? '+' : ''}${bf}</span>
+                ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modBf('${safeNombre}','${a.key}',1)">+</button>` : ''}
+            </div>
+            <!-- ALTERACIÓN (ef) -->
+            <div class="det-afin-source">
+                <span class="det-afin-src-label src-ef" title="Alteración">Alt</span>
+                ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modEf('${safeNombre}','${a.key}',-1)">−</button>` : ''}
+                <span class="det-afin-src-val">${ef > 0 ? '+' : ''}${ef}</span>
+                ${canMod ? `<button class="ctrl-btn ctrl-btn-xs" onclick="window.modEf('${safeNombre}','${a.key}',1)">+</button>` : ''}
+            </div>
+            <!-- HZ (solo lectura) -->
+            ${hz !== 0 ? `<div class="det-afin-source">
+                <span class="det-afin-src-label src-hz" title="Hechizos">Hz</span>
+                <span class="det-afin-src-val">${hz > 0 ? '+' : ''}${hz}</span>
+            </div>` : ''}
         </div>`;
     }).join('');
+
+    const safeN = nombre.replace(/'/g,"\\'");
 
     document.getElementById('panel-nombre').textContent = nombre;
     document.getElementById('panel-body').innerHTML = `
@@ -146,9 +189,9 @@ export function renderDetalle(nombre) {
                 <div class="det-calc-item">
                     <div class="det-calc-label">Vida Roja</div>
                     <div class="det-calc-xy">
-                        ${estadoUI.esAdmin ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${nombre}','vida_roja_actual',-1)">−</button>` : ''}
+                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vida_roja_actual',-1)">−</button>` : ''}
                         <span class="det-xy-x">${p.vida_roja_actual}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.vida_roja_max}</span>
-                        ${estadoUI.esAdmin ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${nombre}','vida_roja_actual',1)">+</button>` : ''}
+                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vida_roja_actual',1)">+</button>` : ''}
                     </div>
                     <div class="det-calc-formula">${formulas.vida_roja_max.expr}</div>
                 </div>
@@ -162,53 +205,96 @@ export function renderDetalle(nombre) {
                 <div class="det-calc-item">
                     <div class="det-calc-label">VEX</div>
                     <div class="det-calc-xy">
-                        ${estadoUI.esAdmin ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${nombre}','vex_actual',-50)">−50</button>` : ''}
-                        <span class="det-xy-x">${p.vex_actual}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.vex_max}</span>
-                        ${estadoUI.esAdmin ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${nombre}','vex_actual',50)">+50</button>` : ''}
+                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vex_actual',-50)">−50</button>` : ''}
+                        <span class="det-xy-x">${Math.floor(p.vex_actual)}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.vex_max}</span>
+                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','vex_actual',50)">+50</button>` : ''}
                     </div>
                     <div class="det-calc-formula">${esJugador ? formulas.vex_max.expr : 'Fijo (NPC sistema)'}</div>
                 </div>
                 ${s.guarda_max > 0 ? `<div class="det-calc-item">
                     <div class="det-calc-label">Guarda Dorada</div>
                     <div class="det-calc-xy">
-                        ${estadoUI.esAdmin ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${nombre}','guarda_actual',-1)">−</button>` : ''}
-                        <span class="det-xy-x">${p.guarda_actual||0}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.guarda_max}</span>
-                        ${estadoUI.esAdmin ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${nombre}','guarda_actual',1)">+</button>` : ''}
+                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','guarda_actual',-1)">−</button>` : ''}
+                        <span class="det-xy-x">${Math.floor(p.guarda_actual||0)}</span><span class="det-xy-sep">/</span><span class="det-xy-y">${s.guarda_max}</span>
+                        ${canEditThis ? `<button class="ctrl-btn ctrl-btn-sm" onclick="window.modStat('${safeN}','guarda_actual',1)">+</button>` : ''}
                     </div>
                     <div class="det-calc-formula">${formulas.guarda_max.expr}</div>
                 </div>` : ''}
             </div>
         </div>
 
-        <!-- Regeneración -->
+        <!-- Regeneración con bf/ef editables -->
         <div class="det-section">
             <div class="det-section-title">REGENERACIÓN / ${regenConfig.vex.intervalo}H</div>
-            <div class="det-regen-row">
-                <span>VEX</span>
-                <span class="det-regen-val">+${s.regen_vex}</span>
+
+            <!-- VEX regen -->
+            <div class="det-regen-block">
+                <div class="det-regen-row">
+                    <span>VEX</span>
+                    <span class="det-regen-total">+${s.regen_vex_total ?? s.regen_vex} <span class="det-regen-breakdown">(base ${s.regen_vex}${(p.regen_vex_bf||0)!==0?' Bf'+(p.regen_vex_bf>0?'+':'')+p.regen_vex_bf:''}${(p.regen_vex_ef||0)!==0?' Alt'+(p.regen_vex_ef>0?'+':'')+p.regen_vex_ef:''})</span></span>
+                </div>
+                ${canEditThis ? `<div class="det-regen-sources">
+                    <div class="det-afin-source">
+                        <span class="det-afin-src-label src-bf">Bf</span>
+                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenBf('${safeN}','vex',-10)">−10</button>
+                        <span class="det-afin-src-val">${p.regen_vex_bf||0}</span>
+                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenBf('${safeN}','vex',10)">+10</button>
+                    </div>
+                    <div class="det-afin-source">
+                        <span class="det-afin-src-label src-ef">Alt</span>
+                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenEf('${safeN}','vex',-10)">−10</button>
+                        <span class="det-afin-src-val">${p.regen_vex_ef||0}</span>
+                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenEf('${safeN}','vex',10)">+10</button>
+                    </div>
+                </div>` : ''}
             </div>
-            ${s.guarda_max > 0 ? `<div class="det-regen-row">
-                <span>Guarda</span>
-                <span class="det-regen-val">+${s.regen_guarda}</span>
+
+            ${s.guarda_max > 0 ? `<!-- Guarda regen -->
+            <div class="det-regen-block">
+                <div class="det-regen-row">
+                    <span>Guarda</span>
+                    <span class="det-regen-total">+${s.regen_guarda_total ?? s.regen_guarda} <span class="det-regen-breakdown">(base ${s.regen_guarda}${(p.regen_guarda_bf||0)!==0?' Bf'+(p.regen_guarda_bf>0?'+':'')+p.regen_guarda_bf:''}${(p.regen_guarda_ef||0)!==0?' Alt'+(p.regen_guarda_ef>0?'+':'')+p.regen_guarda_ef:''})</span></span>
+                </div>
+                ${canEditThis ? `<div class="det-regen-sources">
+                    <div class="det-afin-source">
+                        <span class="det-afin-src-label src-bf">Bf</span>
+                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenBf('${safeN}','guarda',-1)">−</button>
+                        <span class="det-afin-src-val">${p.regen_guarda_bf||0}</span>
+                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenBf('${safeN}','guarda',1)">+</button>
+                    </div>
+                    <div class="det-afin-source">
+                        <span class="det-afin-src-label src-ef">Alt</span>
+                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenEf('${safeN}','guarda',-1)">−</button>
+                        <span class="det-afin-src-val">${p.regen_guarda_ef||0}</span>
+                        <button class="ctrl-btn ctrl-btn-xs" onclick="window.modRegenEf('${safeN}','guarda',1)">+</button>
+                    </div>
+                </div>` : ''}
             </div>` : ''}
         </div>
 
-        <!-- Afinidades -->
+        <!-- Afinidades con fuentes -->
         <div class="det-section">
-            <div class="det-section-title">AFINIDADES</div>
+            <div class="det-section-title">AFINIDADES
+                <span class="afin-leyenda">
+                    <span class="ley-dot src-base-dot">B</span>base&nbsp;
+                    <span class="ley-dot src-bf-dot">Bf</span>buff&nbsp;
+                    <span class="ley-dot src-ef-dot">Alt</span>alt&nbsp;
+                    <span class="ley-dot src-hz-dot">Hz</span>hz
+                </span>
+            </div>
             ${afinRows}
         </div>
 
-        ${estadoUI.esAdmin ? `
-        <!-- HEX -->
+        ${canEditThis ? `
+        <!-- RECURSOS -->
         <div class="det-section">
             <div class="det-section-title">RECURSOS</div>
             <div class="det-stat-row">
                 <span class="det-stat-label">HEX</span>
                 <div class="det-stat-ctrl">
-                    <button class="ctrl-btn" onclick="window.modStat('${nombre}','hex',-100)">−100</button>
+                    <button class="ctrl-btn" onclick="window.modStat('${safeN}','hex',-100)">−100</button>
                     <span class="det-stat-val">${(p.hex||0).toLocaleString()}</span>
-                    <button class="ctrl-btn" onclick="window.modStat('${nombre}','hex',100)">+100</button>
+                    <button class="ctrl-btn" onclick="window.modStat('${safeN}','hex',100)">+100</button>
                 </div>
             </div>
         </div>` : ''}
@@ -216,13 +302,12 @@ export function renderDetalle(nombre) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// VISTA DE FÓRMULAS (interactiva con pool de variables)
+// VISTA DE FÓRMULAS (solo OP accede)
 // ─────────────────────────────────────────────────────────────
 export function renderFormulas() {
     const cont = document.getElementById('formulas-cont');
     if (!cont) return;
 
-    // Pool de variables clickeables
     const poolHTML = `
         <div class="var-pool">
             <div class="var-pool-label">Variables disponibles — clic para insertar en la fórmula activa</div>
@@ -280,12 +365,10 @@ export function renderFormulas() {
         </div>
     `).join('');
 
-    // Preview por personaje
     const pjOptions = Object.keys(personajes).map(n => `<option value="${n}">${n}</option>`).join('');
 
     cont.innerHTML = `
         ${poolHTML}
-
         <div class="formulas-block">
             <div class="formulas-block-title">Stats derivados de afinidades</div>
             ${formulasHTML}
@@ -294,17 +377,15 @@ export function renderFormulas() {
                 <button class="btn-primary" onclick="window.guardarFormulas()">Guardar fórmulas</button>
             </div>
         </div>
-
         <div class="formulas-block">
             <div class="formulas-block-title">Regeneración automática</div>
-            <p class="formulas-help">Las mismas variables de afinidad están disponibles. Hz3, Hz4, Hz5 = hechizos clase 3/4/5 del personaje.</p>
+            <p class="formulas-help">Mismas variables de afinidad disponibles. Hz3/Hz4/Hz5 = hechizos clase 3/4/5. La regeneración en cliente corre cada 10 s de forma proporcional.</p>
             ${regenHTML}
             <div class="formula-actions">
                 <button class="btn-secondary" onclick="window.ejecutarRegenManual()">Ejecutar ahora (todos los personajes)</button>
                 <button class="btn-primary" onclick="window.guardarRegen()">Guardar regeneración</button>
             </div>
         </div>
-
         <div class="formulas-block">
             <div class="formulas-block-title">Preview por personaje</div>
             <select id="preview-pj-sel" class="input-base" onchange="window.actualizarPreviewPJ()" style="margin-bottom:12px;width:280px;">
@@ -315,7 +396,6 @@ export function renderFormulas() {
         </div>
     `;
 
-    // Inicializar previews con primer personaje
     const primero = Object.keys(personajes)[0];
     if (primero) {
         Object.keys(formulas).forEach(key => previsualizarFormulaConPJ(key, primero));
