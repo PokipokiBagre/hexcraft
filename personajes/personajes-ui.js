@@ -7,6 +7,27 @@ import { AFINIDADES, VARS_FORMULA, personajes, estadoUI, formulas,
          pushFormulas, pushUmbrales, pushCooldown } from './personajes-state.js';
 import { calcularStats, getMayorAfinidad, buildContext, evalExpr,
          calcularPushDisponibles, calcularValorPush, calcularCooldownPush } from './personajes-logic.js';
+import { currentConfig } from '../hex-auth.js';
+
+// ── Helpers de imagen ─────────────────────────────────────────
+const _storageBase = currentConfig.storageUrl;
+
+function _norm(s) {
+    return s.toString().trim().toLowerCase()
+        .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+        .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
+        .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+}
+
+function _imgUrl(icono) {
+    const key = _norm(icono);
+    return `${_storageBase}/imgpersonajes/${key}.png`;
+}
+function _imgIconUrl(icono) {
+    const key = _norm(icono);
+    return `${_storageBase}/imgpersonajes/${key}icon.png`;
+}
+const _imgFallback = `${_storageBase}/imginterfaz/no_encontrado.png`;
 
 // ─────────────────────────────────────────────────────────────
 // CATÁLOGO
