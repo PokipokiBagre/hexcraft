@@ -561,7 +561,7 @@ async function _tabHechizos(nombre, body) {
         .select('hechizo_nombre, hechizo_afinidad, hechizo_hex, tipo, origen')
         .eq('personaje_nombre', nombre);
 
-    const lista = invHz || [];
+    const lista = (invHz || []).filter(h => (h.hechizo_afinidad || '').toLowerCase() !== 'hex');
     const hNombres = lista.map(h => h.hechizo_nombre);
     let nodosMap = {};
     if (hNombres.length > 0) {
@@ -574,48 +574,130 @@ async function _tabHechizos(nombre, body) {
     const _colAf = (af) => ({
         'Física':'#e2a673','Energética':'#f3e57a','Espiritual':'#7df0a7',
         'Mando':'#a4d3f2','Psíquica':'#dcb1f0','Oscura':'#ff526f',
-        'HEX':'#d4af37','Desconocida':'#888'
+        'Desconocida':'#888'
     })[af] || '#888';
 
     if (lista.length === 0) {
-        body.innerHTML = `<div class="ppj-section"><div class="ppj-empty"><div class="ppj-empty-icon">📖</div>Sin hechizos en el inventario</div></div>`;
+        body.innerHTML = `
+            <div class="ppj-section"><div class="ppj-empty"><div class="ppj-empty-icon">📖</div>Sin hechizos en el inventario</div></div>
+            <div class="ppj-section"><div class="ppj-section-title">Puede aprender</div><div id="ppj-apr-loader" class="ppj-loader">Calculando…</div></div>`;
+        _cargarAprendibles(nombre, body, lista, nodosMap, _colAf);
         return;
     }
-
-    const grupos = {};
-    lista.forEach(h => { const af = h.hechizo_afinidad||'Sin afinidad'; if(!grupos[af])grupos[af]=[]; grupos[af].push(h); });
 
     const _campo = (label, val) => {
         if (!val || val==='0' || val===0 || val==='EMPTY' || val==='null') return '';
         return `<div class="ppj-hz-field"><strong>${label}:</strong> ${val}</div>`;
     };
 
-    let html = '';
-    Object.entries(grupos).forEach(([af, hechizos]) => {
-        const color = _colAf(af);
-        html += `<div class="ppj-section">
-            <div class="ppj-section-title" style="border-left:2px solid ${color}55;padding-left:8px;color:${color};">${af}</div>
-            ${hechizos.map(h => {
-                const nd = nodosMap[h.hechizo_nombre] || {};
-                return `<div class="ppj-hz-card">
-                    <div class="ppj-hz-header">
-                        <span class="ppj-hz-af" style="background:${color}22;color:${color};">${af.split(' ')[0]}</span>
-                        <span class="ppj-hz-nombre">${h.hechizo_nombre}</span>
-                        <span class="ppj-hz-clase">${nd.clase||''}</span>
-                    </div>
-                    ${h.hechizo_hex>0?`<div class="ppj-hz-hex">⬡ ${h.hechizo_hex} HEX</div>`:''}
-                    <div class="ppj-hz-fields">
-                        ${_campo('Efecto',nd.efecto)}${_campo('Resumen',nd.resumen)}
-                        ${_campo('Overcast',nd.overcast)}${_campo('Undercast',nd.undercast)}${_campo('Especial',nd.especial)}
-                    </div>
-                </div>`;
-            }).join('')}
-        </div>`;
+    // ── Agrupar: afinidad → clase ────────────────────────────────
+    const grupos = {}; // { afinidad: { clase: [hechizos] } }
+    lista.forEach(h => {
+        const af = h.hechizo_afinidad || 'Sin afinidad';
+        const nd = nodosMap[h.hechizo_nombre] || {};
+        const cl = nd.clase ? String(nd.clase) : '?';
+        if (!grupos[af]) grupos[af] = {};
+        if (!grupos[af][cl]) grupos[af][cl] = [];
+        grupos[af][cl].push(h);
     });
 
-    html += `<div class="ppj-section"><div class="ppj-section-title">Puede aprender</div><div id="ppj-apr-loader" class="ppj-loader">Calculando…</div></div>`;
-    body.innerHTML = html;
+    const _hzCard = (h, color, show) => {
+        const nd  = nodosMap[h.hechizo_nombre] || {};
+        const cls = nd.clase ? `Clase ${nd.clase}` : '';
+        return `<div class="ppj-hz-card" data-hz-nombre="${(h.hechizo_nombre||'').toLowerCase()}" style="${show?'':'display:none;'}">
+            <div class="ppj-hz-header">
+                <span class="ppj-hz-af" style="background:${color}22;color:${color};">${(h.hechizo_afinidad||'?').split(' ')[0]}</span>
+                <span class="ppj-hz-nombre">${h.hechizo_nombre}</span>
+                <span class="ppj-hz-clase">${cls}</span>
+            </div>
+            ${h.hechizo_hex>0?`<div class="ppj-hz-hex">⬡ ${h.hechizo_hex} HEX</div>`:''}
+            <div class="ppj-hz-fields">
+                ${_campo('Efecto',nd.efecto)}${_campo('Resumen',nd.resumen)}
+                ${_campo('Overcast',nd.overcast)}${_campo('Undercast',nd.undercast)}${_campo('Especial',nd.especial)}
+            </div>
+        </div>`;
+    };
 
+    // Estilos de acordeón (inyectar una sola vez)
+    if (!document.getElementById('ppj-hz-acc-styles')) {
+        const s = document.createElement('style');
+        s.id = 'ppj-hz-acc-styles';
+        s.textContent = `
+.ppj-hz-search{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#ccc;font-size:0.8em;padding:7px 10px;margin-bottom:10px;box-sizing:border-box;outline:none;}
+.ppj-hz-search::placeholder{color:#3a3a58;}
+.ppj-hz-search:focus{border-color:rgba(212,175,55,0.3);}
+.ppj-af-acc{margin-bottom:6px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.05);}
+.ppj-af-acc-header{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.03);}
+.ppj-af-acc-header:hover{background:rgba(255,255,255,0.05);}
+.ppj-af-arrow{font-size:0.7em;color:#4a4a68;transition:transform 0.2s;display:inline-block;}
+.ppj-af-acc.open .ppj-af-arrow{transform:rotate(90deg);}
+.ppj-af-acc-title{font-size:0.78em;font-weight:600;flex:1;}
+.ppj-af-acc-count{font-size:0.65em;color:#4a4a68;background:rgba(255,255,255,0.06);padding:2px 7px;border-radius:10px;}
+.ppj-af-acc-body{display:none;padding:0 8px 8px;}
+.ppj-af-acc.open .ppj-af-acc-body{display:block;}
+.ppj-cl-acc{margin-top:6px;border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,0.04);}
+.ppj-cl-acc-header{display:flex;align-items:center;gap:6px;padding:7px 10px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.02);}
+.ppj-cl-acc-header:hover{background:rgba(255,255,255,0.04);}
+.ppj-cl-arrow{font-size:0.62em;color:#4a4a68;transition:transform 0.2s;display:inline-block;}
+.ppj-cl-acc.open .ppj-cl-arrow{transform:rotate(90deg);}
+.ppj-cl-acc-title{font-size:0.68em;font-weight:600;color:#888;flex:1;}
+.ppj-cl-acc-count{font-size:0.6em;color:#4a4a68;}
+.ppj-cl-acc-body{display:none;padding:4px 0;}
+.ppj-cl-acc.open .ppj-cl-acc-body{display:block;}
+`;
+        document.head.appendChild(s);
+    }
+
+    // Construir HTML
+    let html = `<div class="ppj-section">
+        <input class="ppj-hz-search" id="ppj-hz-buscador" placeholder="Buscar hechizo…" oninput="window._ppjBuscarHz(this.value)">`;
+
+    Object.entries(grupos).forEach(([af, clases]) => {
+        const color   = _colAf(af);
+        const totalAf = Object.values(clases).reduce((s,a)=>s+a.length,0);
+        html += `<div class="ppj-af-acc" data-af="${af.toLowerCase()}">
+            <div class="ppj-af-acc-header" onclick="window._ppjToggleAcc(this.parentElement)">
+                <span class="ppj-af-arrow">▶</span>
+                <span class="ppj-af-acc-title" style="color:${color};">${af}</span>
+                <span class="ppj-af-acc-count">${totalAf}</span>
+            </div>
+            <div class="ppj-af-acc-body">`;
+
+        // Ordenar clases numéricamente
+        const clasesOrdenadas = Object.entries(clases).sort(([a],[b]) => {
+            const na = parseInt(a)||999, nb = parseInt(b)||999;
+            return na - nb;
+        });
+
+        clasesOrdenadas.forEach(([cl, hechizos]) => {
+            // No mostrar sub-acordeón si solo hay 1 clase
+            if (clasesOrdenadas.length === 1) {
+                hechizos.forEach(h => { html += _hzCard(h, color, true); });
+            } else {
+                const clLabel = cl === '?' ? 'Sin clase' : `Clase ${cl}`;
+                html += `<div class="ppj-cl-acc" data-clase="${cl}">
+                    <div class="ppj-cl-acc-header" onclick="window._ppjToggleAcc(this.parentElement)">
+                        <span class="ppj-cl-arrow">▶</span>
+                        <span class="ppj-cl-acc-title">${clLabel}</span>
+                        <span class="ppj-cl-acc-count">${hechizos.length}</span>
+                    </div>
+                    <div class="ppj-cl-acc-body">`;
+                hechizos.forEach(h => { html += _hzCard(h, color, true); });
+                html += `</div></div>`;
+            }
+        });
+
+        html += `</div></div>`;
+    });
+
+    html += `</div>`;
+    html += `<div class="ppj-section"><div class="ppj-section-title">Puede aprender</div><div id="ppj-apr-loader" class="ppj-loader">Calculando…</div></div>`;
+
+    body.innerHTML = html;
+    _cargarAprendibles(nombre, body, lista, nodosMap, _colAf);
+}
+
+async function _cargarAprendibles(nombre, body, lista, nodosMap, _colAf) {
     try {
         const { data: todosNodos } = await supabase.from('hechizos_nodos')
             .select('hechizo_id, nombre, afinidad, clase, es_conocido');
@@ -639,7 +721,7 @@ async function _tabHechizos(nombre, body) {
                 return `<div class="ppj-hz-card"><div class="ppj-hz-header">
                     <span class="ppj-hz-af" style="background:${c}22;color:${c};">${(n.afinidad||'?').split(' ')[0]}</span>
                     <span class="ppj-hz-nombre">${n.nombre}</span>
-                    <span class="ppj-hz-clase">${n.clase||''}</span>
+                    <span class="ppj-hz-clase">Clase ${n.clase||'?'}</span>
                 </div></div>`;
             }).join('');
         }
@@ -825,6 +907,36 @@ window._ppjFiltrarObjetos = (query) => {
     const q = query.toLowerCase().trim();
     document.querySelectorAll('.ppj-obj-card').forEach(c => {
         c.style.display = (!q || (c.getAttribute('data-nombre')||'').includes(q)) ? '' : 'none';
+    });
+};
+
+// Acordeón de hechizos
+window._ppjToggleAcc = (el) => {
+    el.classList.toggle('open');
+};
+
+// Buscador de hechizos: muestra/oculta cards y abre acordeones padres con resultados
+window._ppjBuscarHz = (query) => {
+    const q = query.toLowerCase().trim();
+    if (!q) {
+        // Restaurar todo al estado cerrado original
+        document.querySelectorAll('.ppj-hz-card').forEach(c => { c.style.display = ''; });
+        document.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => { a.classList.remove('open'); });
+        return;
+    }
+    document.querySelectorAll('.ppj-hz-card').forEach(c => {
+        const nombre = c.getAttribute('data-hz-nombre') || '';
+        const match  = nombre.includes(q);
+        c.style.display = match ? '' : 'none';
+    });
+    // Abrir acordeones que tienen al menos un resultado visible
+    document.querySelectorAll('.ppj-cl-acc').forEach(cl => {
+        const visible = cl.querySelectorAll('.ppj-hz-card:not([style*="display: none"]):not([style*="display:none"])').length;
+        cl.classList.toggle('open', visible > 0);
+    });
+    document.querySelectorAll('.ppj-af-acc').forEach(af => {
+        const visible = af.querySelectorAll('.ppj-hz-card:not([style*="display: none"]):not([style*="display:none"])').length;
+        af.classList.toggle('open', visible > 0);
     });
 };
 

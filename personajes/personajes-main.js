@@ -119,7 +119,7 @@ window.cerrarDetalle = cerrarPanelPJ;
 window.modStat = function(nombre, campo, delta) {
     const p = personajes[nombre]; if (!p) return;
     const s = calcularStats(p);
-    const caps = { vex_actual: s.vex_max };
+    const caps = { vex_actual: s.vex_max, vida_azul_actual: s.vida_azul_max, guarda_actual: s.guarda_max };
     const max = caps[campo] ?? Infinity;
     p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
     encolarCambio(nombre, campo, p[campo]);
@@ -170,31 +170,40 @@ window.resetStatMax = function(nombre, campo) {
 window.modAfin = function(nombre, afinKey, delta) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
+    if (!p.afin_base) p.afin_base = { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 };
+    p.afin_base[afinKey] = Math.max(0, (p.afin_base[afinKey] || 0) + delta);
+    // mantener alias legacy en sincronía
     if (!p.afinidadesBase) p.afinidadesBase = {};
-    p.afinidadesBase[afinKey] = Math.max(0, (p.afinidadesBase[afinKey] || 0) + delta);
-    encolarCambio(nombre, `af_${afinKey}`, p.afinidadesBase[afinKey]);
+    p.afinidadesBase[afinKey] = p.afin_base[afinKey];
+    encolarCambio(nombre, 'afin_base', { ...p.afin_base });
     renderCatalogo(); actualizarBtnSync(); refreshPanelPJ();
 };
 
 window.modBf = function(nombre, afinKey, delta) {
     const p = personajes[nombre]; if (!p) return;
     if (!estadoUI.esAdmin && p.isPlayer) return;
+    if (!p.afin_extra) p.afin_extra = { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 };
+    p.afin_extra[afinKey] = Math.max(-999, (p.afin_extra[afinKey] || 0) + delta);
     if (!p.afinidadesBf) p.afinidadesBf = {};
-    p.afinidadesBf[afinKey] = Math.max(-999, (p.afinidadesBf[afinKey] || 0) + delta);
-    encolarCambio(nombre, `bf_${afinKey}`, p.afinidadesBf[afinKey]);
+    p.afinidadesBf[afinKey] = p.afin_extra[afinKey];
+    encolarCambio(nombre, 'afin_extra', { ...p.afin_extra });
     renderCatalogo(); actualizarBtnSync(); refreshPanelPJ();
 };
 
 window.modEf = function(nombre, afinKey, delta) {
     const p = personajes[nombre]; if (!p) return;
     if (!estadoUI.esAdmin && p.isPlayer) return;
+    if (!p.afin_alter) p.afin_alter = { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 };
+    p.afin_alter[afinKey] = Math.max(-999, (p.afin_alter[afinKey] || 0) + delta);
     if (!p.afinidadesEf) p.afinidadesEf = {};
-    p.afinidadesEf[afinKey] = Math.max(-999, (p.afinidadesEf[afinKey] || 0) + delta);
-    encolarCambio(nombre, `ef_${afinKey}`, p.afinidadesEf[afinKey]);
+    p.afinidadesEf[afinKey] = p.afin_alter[afinKey];
+    encolarCambio(nombre, 'afin_alter', { ...p.afin_alter });
     renderCatalogo(); actualizarBtnSync(); refreshPanelPJ();
 };
 
-window.editarPersonaje = function(nombre) {
+// Aliases usados desde el panel de stats
+window.modAfinExtra = window.modBf;
+window.modAfinAlter = window.modEf;
     const p = personajes[nombre];
     if (!estadoUI.esAdmin && p?.isPlayer) {
         mostrarToast('Solo el OP puede editar personajes jugadores', true);
@@ -395,6 +404,7 @@ window.guardarPersonaje = function() {
         afinBase[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
     });
     const viejo = personajes[nombre] || {};
+    const _afin0 = { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 };
     personajes[nombre] = {
         isPlayer:  fIsJugador,
         isActive:  fIsActivo,
@@ -406,17 +416,29 @@ window.guardarPersonaje = function() {
         vex_max:    parseInt(document.getElementById('f-vex-max').value)||0,
         vida_roja_actual: parseInt(document.getElementById('f-vida-roja').value)||10,
         vida_roja_max_override: viejo.vida_roja_max_override || 0,
-        vida_azul_actual: viejo.vida_azul_actual != null ? viejo.vida_azul_actual : null,
+        vida_azul_actual: viejo.vida_azul_actual != null ? viejo.vida_azul_actual : 0,
         vida_azul_max:    parseInt(document.getElementById('f-vida-azul').value)||0,
         vida_azul_max_override: viejo.vida_azul_max_override || 0,
         guarda_actual: parseInt(document.getElementById('f-guarda-act').value)||0,
         guarda_max:    parseInt(document.getElementById('f-guarda-max').value)||0,
-        afinidadesBase: afinBase,
-        afinidadesHz: viejo.afinidadesHz || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
-        afinidadesEf: viejo.afinidadesEf || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
-        afinidadesBf: viejo.afinidadesBf || { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 },
+        // Afinidades nuevo schema
+        afin_base:  { ..._afin0, ...afinBase },
+        afin_extra: viejo.afin_extra  || viejo.afinidadesBf || { ..._afin0 },
+        afin_alter: viejo.afin_alter  || viejo.afinidadesEf || { ..._afin0 },
+        // Legacy aliases
+        afinidadesBase: { ..._afin0, ...afinBase },
+        afinidadesBf:   viejo.afin_extra  || viejo.afinidadesBf || { ..._afin0 },
+        afinidadesEf:   viejo.afin_alter  || viejo.afinidadesEf || { ..._afin0 },
+        afinidadesHz:   { ..._afin0 },
+        bonos_stats: viejo.bonos_stats || { vida_roja:0, vida_azul:0, guarda:0, dano_rojo:0, dano_azul:0 },
         hz_clase1:0, hz_clase2:0, hz_clase3:0, hz_clase4:0, hz_clase5:0,
         estados: viejo.estados || {},
+        cd_fisica:     viejo.cd_fisica     ?? 0.5,
+        cd_energetica: viejo.cd_energetica ?? 0.5,
+        cd_espiritual: viejo.cd_espiritual ?? 0.5,
+        cd_mando:      viejo.cd_mando      ?? 0.5,
+        cd_psiquica:   viejo.cd_psiquica   ?? 0.5,
+        cd_oscura:     viejo.cd_oscura     ?? 0.5,
         push_vex_actual:    viejo.push_vex_actual    || 0,
         push_vex_limit:     viejo.push_vex_limit     || 0,
         push_vex_extra:     viejo.push_vex_extra     || 0,

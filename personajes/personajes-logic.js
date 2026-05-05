@@ -9,10 +9,11 @@ import { AFINIDADES, formulas, pushFormulas, pushUmbrales, pushCooldown, persona
 // Contexto de variables para evaluar fórmulas
 // ─────────────────────────────────────────────────────────────
 export function buildContext(p) {
-    const af = p.afinidadesBase   || {};
-    const hz = p.afinidadesHz     || {};
-    const ef = p.afinidadesEf     || {};
-    const bf = p.afinidadesBf     || {};
+    // Soporta tanto nuevo schema (afin_base/afin_extra/afin_alter) como legacy
+    const af = p.afin_base  || p.afinidadesBase || {};
+    const hz = {};  // Hz afin ya no existe como columna separada
+    const ef = p.afin_alter || p.afinidadesEf   || {};
+    const bf = p.afin_extra || p.afinidadesBf   || {};
 
     const tot = (k) => (af[k]||0) + (hz[k]||0) + (ef[k]||0) + (bf[k]||0);
 
@@ -68,26 +69,38 @@ export function calcularStats(p) {
     const ctx = buildContext(p);
     const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
 
-    const vida_roja_max = evalExpr(formulas.vida_roja_max.expr, ctx)
-        + (p.hz_vida_roja||0) + (p.ef_vida_roja||0) + (p.bf_vida_roja||0);
+    // Bonos del schema nuevo (trigger calcula vida_roja_max_db, etc.)
+    // Si existe vida_roja_max_op (override manual) lo usamos como tope, si no usamos fórmula + bonos_stats
+    const b = p.bonos_stats || {};
+    const bonoVR = b.vida_roja || p.bono_vida_roja || 0;
+    const bonoVA = b.vida_azul || p.bono_vida_azul || 0;
+    const bonoG  = b.guarda    || p.bono_guarda    || 0;
+    const bonoDR = b.dano_rojo || p.bono_dano_rojo || 0;
+    const bonoDA = b.dano_azul || p.bono_dano_azul || 0;
 
-    const vida_azul_max = evalExpr(formulas.vida_azul_max.expr, ctx)
-        + (p.hz_vida_azul||0) + (p.ef_vida_azul||0) + (p.bf_vida_azul||0);
+    const vida_roja_max_formula = evalExpr(formulas.vida_roja_max.expr, ctx) + bonoVR;
+    // Override manual (vida_roja_max_op) tiene prioridad si > 0
+    const vida_roja_max = (p.vida_roja_max_override && p.vida_roja_max_override > 0)
+        ? p.vida_roja_max_override
+        : vida_roja_max_formula;
 
-    const guarda_max = evalExpr(formulas.guarda_max.expr, ctx)
-        + (p.hz_guarda||0) + (p.ef_guarda||0) + (p.bf_guarda||0);
+    const vida_azul_max_formula = evalExpr(formulas.vida_azul_max.expr, ctx) + bonoVA;
+    const vida_azul_max = (p.vida_azul_max_override && p.vida_azul_max_override > 0)
+        ? p.vida_azul_max_override
+        : vida_azul_max_formula;
+
+    const vida_azul_actual = p.vida_azul_actual ?? vida_azul_max;
+
+    const guarda_max = evalExpr(formulas.guarda_max.expr, ctx) + bonoG;
 
     const vex_max = esJugador
         ? evalExpr(formulas.vex_max.expr, ctx)
         : (p.vex_max || 0);
 
-    const dano_rojo = evalExpr(formulas.dano_rojo.expr, ctx)
-        + (p.hz_dano_rojo||0) + (p.ef_dano_rojo||0) + (p.bf_dano_rojo||0);
+    const dano_rojo = evalExpr(formulas.dano_rojo.expr, ctx) + bonoDR;
+    const dano_azul = evalExpr(formulas.dano_azul.expr, ctx) + bonoDA;
 
-    const dano_azul = evalExpr(formulas.dano_azul.expr, ctx)
-        + (p.hz_dano_azul||0) + (p.ef_dano_azul||0) + (p.bf_dano_azul||0);
-
-    return { vida_roja_max, vida_azul_max, guarda_max, vex_max, dano_rojo, dano_azul, ctx };
+    return { vida_roja_max, vida_azul_max, vida_azul_actual, guarda_max, vex_max, dano_rojo, dano_azul, ctx };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -158,7 +171,30 @@ export function getMayorAfinidad(p) {
 }
 
 // Mapea un registro crudo de Supabase al formato interno
+// Compatible con schema nuevo (afin_base/afin_extra/afin_alter JSONB + bonos_stats + cd_*)
+// y schema antiguo (columnas af_fisica, hz_fisica, etc.) como fallback
 export function mapPersonaje(row) {
+    const _afin0 = { fisica:0, energetica:0, espiritual:0, mando:0, psiquica:0, oscura:0 };
+
+    // ── Afinidades: schema nuevo (JSONB) tiene prioridad ─────────
+    const afinBase  = row.afin_base  && typeof row.afin_base  === 'object' ? row.afin_base
+        : { fisica: row.af_fisica||0, energetica: row.af_energetica||0, espiritual: row.af_espiritual||0,
+            mando: row.af_mando||0, psiquica: row.af_psiquica||0, oscura: row.af_oscura||0 };
+
+    // afin_extra = "Ext" (antes afinidadesBf — buffs externos asignados por OP)
+    const afinExtra = row.afin_extra && typeof row.afin_extra === 'object' ? row.afin_extra
+        : { fisica: row.bf_fisica||0, energetica: row.bf_energetica||0, espiritual: row.bf_espiritual||0,
+            mando: row.bf_mando||0, psiquica: row.bf_psiquica||0, oscura: row.bf_oscura||0 };
+
+    // afin_alter = "Alt" (antes afinidadesEf — modificadores de efecto)
+    const afinAlter = row.afin_alter && typeof row.afin_alter === 'object' ? row.afin_alter
+        : { fisica: row.ef_fisica||0, energetica: row.ef_energetica||0, espiritual: row.ef_espiritual||0,
+            mando: row.ef_mando||0, psiquica: row.ef_psiquica||0, oscura: row.ef_oscura||0 };
+
+    // ── Bonos de stats (schema nuevo) ────────────────────────────
+    const bonos = row.bonos_stats && typeof row.bonos_stats === 'object' ? row.bonos_stats
+        : { vida_roja:0, vida_azul:0, guarda:0, dano_rojo:0, dano_azul:0 };
+
     return {
         isPlayer:  row.is_player,
         isActive:  row.is_active,
@@ -169,6 +205,7 @@ export function mapPersonaje(row) {
         vex_actual: row.vex_actual || 0,
         vex_max:    row.vex_max    || 0,
         vida_roja_actual: row.vida_roja_actual || 10,
+        vida_azul_actual: row.vida_azul_actual || 0,
         vida_azul_max:    row.vida_azul_max    || 0,
         guarda_actual: row.guarda_actual || 0,
         guarda_max:    row.guarda_max    || 0,
@@ -182,47 +219,33 @@ export function mapPersonaje(row) {
         push_guarda_limit:  row.push_guarda_limit  || 0,
         push_guarda_extra:  row.push_guarda_extra  || 0,
         push_guarda_ts:     row.push_guarda_ts     || null,
-        afinidadesBase: {
-            fisica:     row.af_fisica     || 0,
-            energetica: row.af_energetica || 0,
-            espiritual: row.af_espiritual || 0,
-            mando:      row.af_mando      || 0,
-            psiquica:   row.af_psiquica   || 0,
-            oscura:     row.af_oscura     || 0
-        },
-        afinidadesHz: {
-            fisica:     row.hz_fisica     || 0,
-            energetica: row.hz_energetica || 0,
-            espiritual: row.hz_espiritual || 0,
-            mando:      row.hz_mando      || 0,
-            psiquica:   row.hz_psiquica   || 0,
-            oscura:     row.hz_oscura     || 0
-        },
-        afinidadesEf: {
-            fisica:     row.ef_fisica     || 0,
-            energetica: row.ef_energetica || 0,
-            espiritual: row.ef_espiritual || 0,
-            mando:      row.ef_mando      || 0,
-            psiquica:   row.ef_psiquica   || 0,
-            oscura:     row.ef_oscura     || 0
-        },
-        afinidadesBf: {
-            fisica:     row.bf_fisica     || 0,
-            energetica: row.bf_energetica || 0,
-            espiritual: row.bf_espiritual || 0,
-            mando:      row.bf_mando      || 0,
-            psiquica:   row.bf_psiquica   || 0,
-            oscura:     row.bf_oscura     || 0
-        },
-        hz_vida_roja: row.hz_vida_roja || 0, hz_vida_azul: row.hz_vida_azul || 0,
-        hz_guarda:    row.hz_guarda    || 0, hz_dano_rojo: row.hz_dano_rojo || 0,
-        hz_dano_azul: row.hz_dano_azul || 0,
-        ef_vida_roja: row.ef_vida_roja || 0, ef_vida_azul: row.ef_vida_azul || 0,
-        ef_guarda:    row.ef_guarda    || 0, ef_dano_rojo: row.ef_dano_rojo || 0,
-        ef_dano_azul: row.ef_dano_azul || 0,
-        bf_vida_roja: row.bf_vida_roja || 0, bf_vida_azul: row.bf_vida_azul || 0,
-        bf_guarda:    row.bf_guarda    || 0, bf_dano_rojo: row.bf_dano_rojo || 0,
-        bf_dano_azul: row.bf_dano_azul || 0,
+        // Afinidades (nuevo schema JSONB)
+        afin_base:  { ..._afin0, ...afinBase  },
+        afin_extra: { ..._afin0, ...afinExtra },
+        afin_alter: { ..._afin0, ...afinAlter },
+        // Alias legacy para compatibilidad con buildContext y renderCatalogo
+        afinidadesBase: { ..._afin0, ...afinBase  },
+        afinidadesHz:   { ..._afin0 },   // Hz afin ya no existe como columna separada
+        afinidadesEf:   { ..._afin0, ...afinAlter },
+        afinidadesBf:   { ..._afin0, ...afinExtra },
+        // Bonos de stats calculados (del trigger o manual)
+        bonos_stats: bonos,
+        bono_vida_roja: bonos.vida_roja || 0,
+        bono_vida_azul: bonos.vida_azul || 0,
+        bono_guarda:    bonos.guarda    || 0,
+        bono_dano_rojo: bonos.dano_rojo || 0,
+        bono_dano_azul: bonos.dano_azul || 0,
+        // Overrides manuales de máximos (schema nuevo)
+        vida_roja_max_override: row.vida_roja_max_op || 0,
+        vida_azul_max_override: row.vida_azul_max_op || 0,
+        // Cooldowns por afinidad (schema nuevo)
+        cd_fisica:     row.cd_fisica     ?? 0.5,
+        cd_energetica: row.cd_energetica ?? 0.5,
+        cd_espiritual: row.cd_espiritual ?? 0.5,
+        cd_mando:      row.cd_mando      ?? 0.5,
+        cd_psiquica:   row.cd_psiquica   ?? 0.5,
+        cd_oscura:     row.cd_oscura     ?? 0.5,
+        // Hechizos por clase
         hz_clase1: row.hz_clase1 || 0, hz_clase2: row.hz_clase2 || 0,
         hz_clase3: row.hz_clase3 || 0, hz_clase4: row.hz_clase4 || 0,
         hz_clase5: row.hz_clase5 || 0,
@@ -230,12 +253,13 @@ export function mapPersonaje(row) {
     };
 }
 
-// Serializa el estado interno al formato de Supabase para upsert
+// Serializa el estado interno al formato de Supabase para upsert (schema nuevo)
 export function serializarPersonaje(nombre, p) {
-    const af = p.afinidadesBase || {};
-    const hz = p.afinidadesHz   || {};
-    const ef = p.afinidadesEf   || {};
-    const bf = p.afinidadesBf   || {};
+    const _afin0 = { fisica:0, energetica:0, espiritual:0, mando:0, psiquica:0, oscura:0 };
+    const afinBase  = { ..._afin0, ...(p.afin_base  || p.afinidadesBase || {}) };
+    const afinExtra = { ..._afin0, ...(p.afin_extra  || p.afinidadesBf   || {}) };
+    const afinAlter = { ..._afin0, ...(p.afin_alter  || p.afinidadesEf   || {}) };
+
     return {
         nombre,
         is_player:   p.isPlayer,
@@ -247,6 +271,7 @@ export function serializarPersonaje(nombre, p) {
         vex_actual:  p.vex_actual || 0,
         vex_max:     p.vex_max    || 0,
         vida_roja_actual: p.vida_roja_actual || 0,
+        vida_azul_actual: p.vida_azul_actual || 0,
         vida_azul_max:    p.vida_azul_max    || 0,
         guarda_actual: p.guarda_actual || 0,
         guarda_max:    p.guarda_max    || 0,
@@ -259,27 +284,21 @@ export function serializarPersonaje(nombre, p) {
         push_guarda_limit:  p.push_guarda_limit  || 0,
         push_guarda_extra:  p.push_guarda_extra  || 0,
         push_guarda_ts:     p.push_guarda_ts     || null,
-        af_fisica:    af.fisica     || 0, af_energetica: af.energetica || 0,
-        af_espiritual:af.espiritual || 0, af_mando:      af.mando      || 0,
-        af_psiquica:  af.psiquica   || 0, af_oscura:     af.oscura     || 0,
-        hz_fisica:    hz.fisica     || 0, hz_energetica: hz.energetica || 0,
-        hz_espiritual:hz.espiritual || 0, hz_mando:      hz.mando      || 0,
-        hz_psiquica:  hz.psiquica   || 0, hz_oscura:     hz.oscura     || 0,
-        ef_fisica:    ef.fisica     || 0, ef_energetica: ef.energetica || 0,
-        ef_espiritual:ef.espiritual || 0, ef_mando:      ef.mando      || 0,
-        ef_psiquica:  ef.psiquica   || 0, ef_oscura:     ef.oscura     || 0,
-        bf_fisica:    bf.fisica     || 0, bf_energetica: bf.energetica || 0,
-        bf_espiritual:bf.espiritual || 0, bf_mando:      bf.mando      || 0,
-        bf_psiquica:  bf.psiquica   || 0, bf_oscura:     bf.oscura     || 0,
-        hz_vida_roja: p.hz_vida_roja||0, hz_vida_azul: p.hz_vida_azul||0,
-        hz_guarda:    p.hz_guarda   ||0, hz_dano_rojo: p.hz_dano_rojo||0,
-        hz_dano_azul: p.hz_dano_azul||0,
-        ef_vida_roja: p.ef_vida_roja||0, ef_vida_azul: p.ef_vida_azul||0,
-        ef_guarda:    p.ef_guarda   ||0, ef_dano_rojo: p.ef_dano_rojo||0,
-        ef_dano_azul: p.ef_dano_azul||0,
-        bf_vida_roja: p.bf_vida_roja||0, bf_vida_azul: p.bf_vida_azul||0,
-        bf_guarda:    p.bf_guarda   ||0, bf_dano_rojo: p.bf_dano_rojo||0,
-        bf_dano_azul: p.bf_dano_azul||0,
+        // Afinidades JSONB (schema nuevo)
+        afin_base:  afinBase,
+        afin_extra: afinExtra,
+        afin_alter: afinAlter,
+        // Override máximos
+        vida_roja_max_op: p.vida_roja_max_override || 0,
+        vida_azul_max_op: p.vida_azul_max_override || 0,
+        // Cooldowns
+        cd_fisica:     p.cd_fisica     ?? 0.5,
+        cd_energetica: p.cd_energetica ?? 0.5,
+        cd_espiritual: p.cd_espiritual ?? 0.5,
+        cd_mando:      p.cd_mando      ?? 0.5,
+        cd_psiquica:   p.cd_psiquica   ?? 0.5,
+        cd_oscura:     p.cd_oscura     ?? 0.5,
+        // Hechizos por clase
         hz_clase1: p.hz_clase1||0, hz_clase2: p.hz_clase2||0,
         hz_clase3: p.hz_clase3||0, hz_clase4: p.hz_clase4||0,
         hz_clase5: p.hz_clase5||0,
