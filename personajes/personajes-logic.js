@@ -162,12 +162,71 @@ export function mapPersonaje(row) {
         vex_actual: row.vex_actual || 0,
         vex_max:    row.vex_max    || 0,
         vida_roja_actual: row.vida_roja_actual || 10,
-        vida_roja_max_override: row.vida_roja_max_override || 0,
+        // vida_roja_max en la DB es el override manual (0 = usar fórmula)
+        vida_roja_max_override: row.vida_roja_max || 0,
         vida_azul_actual: row.vida_azul_actual != null ? row.vida_azul_actual : null,
-        vida_azul_max:    row.vida_azul_max    || 0,
-        vida_azul_max_override: row.vida_azul_max_override || 0,
+        // vida_azul_max en la DB es el override manual (0 = usar fórmula)
+        vida_azul_max:    0, // se calcula por fórmula, no se lee de DB
+        vida_azul_max_override: row.vida_azul_max || 0,
         guarda_actual: row.guarda_actual || 0,
         guarda_max:    row.guarda_max    || 0, // 0 = usar fórmula; > 0 = override manual
+        // Push VEX
+        push_vex_actual:  row.push_vex_actual  || 0,
+        push_vex_limit:   row.push_vex_limit   || 0,
+        push_vex_extra:   row.push_vex_extra   || 0,
+        push_vex_ts:      row.push_vex_ts      || null,
+        // Push Guarda
+        push_guarda_actual: row.push_guarda_actual || 0,
+        push_guarda_limit:  row.push_guarda_limit  || 0,
+        push_guarda_extra:  row.push_guarda_extra  || 0,
+        push_guarda_ts:     row.push_guarda_ts     || null,
+        afinidadesBase: {
+            fisica:     row.af_fisica     || 0,
+            energetica: row.af_energetica || 0,
+            espiritual: row.af_espiritual || 0,
+            mando:      row.af_mando      || 0,
+            psiquica:   row.af_psiquica   || 0,
+            oscura:     row.af_oscura     || 0
+        },
+        afinidadesHz: {
+            fisica:     row.hz_fisica     || 0,
+            energetica: row.hz_energetica || 0,
+            espiritual: row.hz_espiritual || 0,
+            mando:      row.hz_mando      || 0,
+            psiquica:   row.hz_psiquica   || 0,
+            oscura:     row.hz_oscura     || 0
+        },
+        afinidadesEf: {
+            fisica:     row.ef_fisica     || 0,
+            energetica: row.ef_energetica || 0,
+            espiritual: row.ef_espiritual || 0,
+            mando:      row.ef_mando      || 0,
+            psiquica:   row.ef_psiquica   || 0,
+            oscura:     row.ef_oscura     || 0
+        },
+        afinidadesBf: {
+            fisica:     row.bf_fisica     || 0,
+            energetica: row.bf_energetica || 0,
+            espiritual: row.bf_espiritual || 0,
+            mando:      row.bf_mando      || 0,
+            psiquica:   row.bf_psiquica   || 0,
+            oscura:     row.bf_oscura     || 0
+        },
+        hz_vida_roja: row.hz_vida_roja || 0, hz_vida_azul: row.hz_vida_azul || 0,
+        hz_guarda:    row.hz_guarda    || 0, hz_dano_rojo: row.hz_dano_rojo || 0,
+        hz_dano_azul: row.hz_dano_azul || 0,
+        ef_vida_roja: row.ef_vida_roja || 0, ef_vida_azul: row.ef_vida_azul || 0,
+        ef_guarda:    row.ef_guarda    || 0, ef_dano_rojo: row.ef_dano_rojo || 0,
+        ef_dano_azul: row.ef_dano_azul || 0,
+        bf_vida_roja: row.bf_vida_roja || 0, bf_vida_azul: row.bf_vida_azul || 0,
+        bf_guarda:    row.bf_guarda    || 0, bf_dano_rojo: row.bf_dano_rojo || 0,
+        bf_dano_azul: row.bf_dano_azul || 0,
+        hz_clase1: row.hz_clase1 || 0, hz_clase2: row.hz_clase2 || 0,
+        hz_clase3: row.hz_clase3 || 0, hz_clase4: row.hz_clase4 || 0,
+        hz_clase5: row.hz_clase5 || 0,
+        estados: row.estados || {}
+    };
+}
         // Push VEX
         push_vex_actual:  row.push_vex_actual  || 0,
         push_vex_limit:   row.push_vex_limit   || 0,
@@ -243,10 +302,11 @@ export function serializarPersonaje(nombre, p) {
         vex_actual:  p.vex_actual || 0,
         vex_max:     p.vex_max    || 0,
         vida_roja_actual:      p.vida_roja_actual      || 0,
-        vida_roja_max_override: p.vida_roja_max_override || 0,
+        // vida_roja_max: el override manual; si es 0, no mandamos nada (la DB mantiene su valor)
+        // Si el usuario hizo override, lo guardamos; si no, guardamos 0 para que el trigger use la fórmula
+        vida_roja_max:         p.vida_roja_max_override || 0,
         vida_azul_actual:      p.vida_azul_actual != null ? p.vida_azul_actual : null,
-        vida_azul_max_override: p.vida_azul_max_override || 0,
-        vida_azul_max:         p.vida_azul_max    || 0,
+        vida_azul_max:         p.vida_azul_max_override || p.vida_azul_max || 0,
         guarda_actual: p.guarda_actual || 0,
         guarda_max:    p.guarda_max    || 0,
         // Push
