@@ -204,6 +204,8 @@ window.modEf = function(nombre, afinKey, delta) {
 // Aliases usados desde el panel de stats
 window.modAfinExtra = window.modBf;
 window.modAfinAlter = window.modEf;
+
+window.editarPersonaje = function(nombre) {
     const p = personajes[nombre];
     if (!estadoUI.esAdmin && p?.isPlayer) {
         mostrarToast('Solo el OP puede editar personajes jugadores', true);
