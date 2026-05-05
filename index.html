@@ -8,6 +8,203 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <style>
+    /* ── PARTY PRINCIPAL ─────────────────────────────────────────── */
+    .party-section {
+        padding: 28px 24px 8px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .party-section-title {
+        font-family: var(--font-display);
+        font-size: 0.68em;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--gold-dim);
+        margin-bottom: 16px;
+    }
+
+    /* Grid de personajes */
+    .party-main-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 14px;
+    }
+
+    .pj-card {
+        background: linear-gradient(160deg, var(--bg2) 0%, var(--bg3) 100%);
+        border: 1px solid var(--gold-border);
+        border-radius: var(--rl);
+        overflow: hidden;
+        position: relative;
+        transition: border-color 0.22s, transform 0.18s, box-shadow 0.22s;
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        cursor: default;
+    }
+    .pj-card:hover {
+        border-color: rgba(212, 175, 55, 0.5);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    /* Imagen + overlay degradado */
+    .pj-card-img-wrap {
+        position: relative;
+        width: 100%;
+        height: 130px;
+        overflow: hidden;
+        background: var(--bg3);
+    }
+    .pj-card-img-wrap img {
+        width: 100%; height: 100%;
+        object-fit: cover; object-position: top;
+        opacity: 0.65;
+        transition: opacity 0.3s, transform 0.4s;
+    }
+    .pj-card:hover .pj-card-img-wrap img {
+        opacity: 0.8;
+        transform: scale(1.04);
+    }
+    .pj-card-img-fade {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 60%;
+        background: linear-gradient(transparent, var(--bg3));
+        pointer-events: none;
+    }
+    /* Nombre sobre la imagen */
+    .pj-card-nombre {
+        position: absolute;
+        bottom: 8px; left: 12px; right: 12px;
+        font-family: var(--font-display);
+        font-size: 0.88em;
+        color: var(--gold);
+        text-shadow: 0 1px 8px rgba(0,0,0,0.9);
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Cuerpo de la card */
+    .pj-card-body {
+        padding: 10px 12px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+    }
+
+    /* HEX */
+    .pj-hex {
+        font-family: var(--font-display);
+        font-size: 1.25em;
+        color: var(--gold);
+        letter-spacing: 0.5px;
+        line-height: 1;
+    }
+    .pj-hex-label {
+        font-size: 0.62em;
+        color: var(--dim);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-top: 1px;
+    }
+
+    /* Separador sutil */
+    .pj-sep {
+        height: 1px;
+        background: var(--gold-border);
+        opacity: 0.5;
+    }
+
+    /* Barras de recursos */
+    .pj-recurso {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    .pj-recurso-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+    }
+    .pj-recurso-label {
+        font-size: 0.62em;
+        color: var(--dim);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .pj-recurso-val {
+        font-size: 0.68em;
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+    }
+    .pj-recurso-regen {
+        font-size: 0.6em;
+        color: var(--dim);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Track genérico */
+    .pj-bar-track {
+        height: 4px;
+        background: var(--bg4);
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+    }
+    .pj-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.9s linear;
+    }
+    .pj-bar-fill.vida  { background: #c8404a; }
+    .pj-bar-fill.vex   { background: var(--gold); }
+    .pj-bar-fill.guarda{ background: var(--violet); }
+
+    /* Punto pulsante de regen activa */
+    .pj-regen-dot {
+        display: inline-block;
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        margin-right: 3px;
+        vertical-align: middle;
+        animation: pulse-dot 2s ease-in-out infinite;
+    }
+    .pj-regen-dot.vex    { background: var(--gold); box-shadow: 0 0 4px var(--gold); }
+    .pj-regen-dot.guarda { background: var(--violet); box-shadow: 0 0 4px var(--violet); }
+
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* ── SECCIÓN SECUNDARIA (módulos, stats…) ────────────────────── */
+    .secondary-section {
+        padding: 4px 24px 0;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .secondary-divider {
+        height: 1px;
+        background: linear-gradient(to right, transparent, var(--gold-border), transparent);
+        margin: 20px 0 24px;
+        opacity: 0.6;
+    }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+        .party-main-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+    }
+    @media (max-width: 600px) {
+        .party-main-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .party-section   { padding: 20px 14px 8px; }
+        .pj-card-img-wrap { height: 110px; }
+    }
+    </style>
 </head>
 <body>
 
@@ -46,31 +243,20 @@
         </div>
     </section>
 
-    <!-- ── BARRA DE REGENERACIÓN ─────────────────────────────── -->
-    <section class="regen-section" id="regen-section" style="display:none;">
-        <div class="regen-row">
-            <div class="regen-meta">
-                <span class="regen-recurso-label" id="regen-label-vex">VEX</span>
-                <span class="regen-eta" id="regen-eta-vex">calculando...</span>
-            </div>
-            <div class="regen-track" id="regen-track-vex">
-                <div class="regen-fill" id="regen-fill-vex"></div>
-            </div>
-        </div>
-        <div class="regen-row" style="margin-top:12px;">
-            <div class="regen-meta">
-                <span class="regen-recurso-label" id="regen-label-guarda">Guarda</span>
-                <span class="regen-eta" id="regen-eta-guarda">calculando...</span>
-            </div>
-            <div class="regen-track" id="regen-track-guarda">
-                <div class="regen-fill regen-fill-guarda" id="regen-fill-guarda"></div>
-            </div>
-        </div>
+    <!-- ══════════════════════════════════════════════════════════
+         PARTY — PROTAGONISTAS
+    ═══════════════════════════════════════════════════════════════ -->
+    <section class="party-section" id="party-section" style="display:none;">
+        <p class="party-section-title">Party activa</p>
+        <div class="party-main-grid" id="party-main-grid"></div>
     </section>
 
     <!-- ── MÓDULOS ───────────────────────────────────────────── -->
-    <main class="modulos-grid">
+    <div class="secondary-section">
+        <div class="secondary-divider"></div>
+    </div>
 
+    <main class="modulos-grid">
         <a href="personajes/index.html" class="modulo">
             <div class="modulo-img-wrap">
                 <img data-img="estadisticas.jpg" alt="Personajes" class="modulo-img">
@@ -80,7 +266,6 @@
                 <span class="modulo-desc">Stats · afinidades · inventario</span>
             </div>
         </a>
-
         <a href="hechizos/index.html" class="modulo">
             <div class="modulo-img-wrap">
                 <img data-img="mapa.png" alt="Mapa de Hechizos" class="modulo-img">
@@ -90,7 +275,6 @@
                 <span class="modulo-desc">Árbol de aprendizaje · grimorio</span>
             </div>
         </a>
-
         <a href="misiones/index.html" class="modulo">
             <div class="modulo-img-wrap">
                 <img data-img="misiones.png" alt="Misiones" class="modulo-img">
@@ -100,7 +284,6 @@
                 <span class="modulo-desc">Tablón de quests activas</span>
             </div>
         </a>
-
         <a href="hechizos/index.html#casteo" class="modulo">
             <div class="modulo-img-wrap">
                 <img data-img="hechizos.jpg" alt="HexCast" class="modulo-img">
@@ -110,7 +293,6 @@
                 <span class="modulo-desc">Calculadora de conjuros</span>
             </div>
         </a>
-
         <a href="panel-de-desarrollo/index.html" class="modulo modulo-op" id="btn-panel-dev" style="display:none;">
             <div class="modulo-img-wrap">
                 <img data-img="panel-dev.png" alt="Panel de Control" class="modulo-img">
@@ -120,25 +302,7 @@
                 <span class="modulo-desc">Acceso máster</span>
             </div>
         </a>
-
     </main>
-
-    <!-- ── DASHBOARD ─────────────────────────────────────────── -->
-    <section class="dash-section">
-        <div class="dash-stats" id="dash-stats"></div>
-        <div class="dash-cols">
-            <div class="dash-card">
-                <div class="dash-card-title">Party activa</div>
-                <div class="dash-party-grid" id="dash-party"></div>
-                <a href="personajes/index.html" class="dash-link">Ver todos →</a>
-            </div>
-            <div class="dash-card">
-                <div class="dash-card-title">Misiones en curso</div>
-                <div id="dash-misiones"></div>
-                <a href="misiones/index.html" class="dash-link">Ver tablón →</a>
-            </div>
-        </div>
-    </section>
 
     <!-- ── HILOS ACTIVOS ─────────────────────────────────────── -->
     <section class="hilos-section">
@@ -152,6 +316,18 @@
                 <img data-img="met-004.png" alt="Meta">
                 <div class="hilo-overlay"><span id="ui-nombre-meta">META</span></div>
             </a>
+        </div>
+    </section>
+
+    <!-- ── DASHBOARD SECUNDARIO (stats + misiones) ────────────── -->
+    <section class="dash-section">
+        <div class="dash-stats" id="dash-stats"></div>
+        <div class="dash-cols">
+            <div class="dash-card">
+                <div class="dash-card-title">Misiones en curso</div>
+                <div id="dash-misiones"></div>
+                <a href="misiones/index.html" class="dash-link">Ver tablón →</a>
+            </div>
         </div>
     </section>
 
@@ -173,6 +349,17 @@ window.seleccionarCampaña = (id) => {
     else window.location.reload();
 };
 
+// ── Helpers ───────────────────────────────────────────────────
+function setText(id, val) { const e = document.getElementById(id); if (e) e.textContent = val; }
+function setHref(id, val) { const e = document.getElementById(id); if (e) e.href = val; }
+
+function norm(s) {
+    return s.toString().trim().toLowerCase()
+        .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+        .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
+        .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+}
+
 // ── INIT ──────────────────────────────────────────────────────
 async function iniciar() {
     if (!localStorage.getItem('hex_selected')) {
@@ -185,25 +372,25 @@ async function iniciar() {
     await hexAuth.init();
 
     const ui = currentConfig.ui || {};
-    setText('doc-title',       ui.titulo    || 'HEX ROL');
-    setText('ui-titulo',       ui.titulo    || 'HEX ROL');
-    setText('ui-subtitulo',    ui.subtitulo || '');
-    setText('ui-lore',         ui.lore      || '');
-    setHref('ui-link-rol',     ui.linkRol   || '#');
-    setText('ui-nombre-rol',   ui.nombreRol || 'ROL');
-    setHref('ui-link-meta',    ui.linkMeta  || '#');
-    setText('ui-nombre-meta',  ui.nombreMeta|| 'META');
+    setText('doc-title',      ui.titulo    || 'HEX ROL');
+    setText('ui-titulo',      ui.titulo    || 'HEX ROL');
+    setText('ui-subtitulo',   ui.subtitulo || '');
+    setText('ui-lore',        ui.lore      || '');
+    setHref('ui-link-rol',    ui.linkRol   || '#');
+    setText('ui-nombre-rol',  ui.nombreRol || 'ROL');
+    setHref('ui-link-meta',   ui.linkMeta  || '#');
+    setText('ui-nombre-meta', ui.nombreMeta|| 'META');
 
     try {
         const { data: dbUI } = await supabase.from('config_ui').select('*').eq('hex_id','default').single();
         if (dbUI) {
-            if (dbUI.titulo)     { setText('doc-title', dbUI.titulo); setText('ui-titulo', dbUI.titulo); }
-            if (dbUI.subtitulo)    setText('ui-subtitulo', dbUI.subtitulo);
-            if (dbUI.lore)         setText('ui-lore',      dbUI.lore);
-            if (dbUI.link_rol)     setHref('ui-link-rol',  dbUI.link_rol);
-            if (dbUI.nombre_rol)   setText('ui-nombre-rol',dbUI.nombre_rol);
-            if (dbUI.link_meta)    setHref('ui-link-meta', dbUI.link_meta);
-            if (dbUI.nombre_meta)  setText('ui-nombre-meta',dbUI.nombre_meta);
+            if (dbUI.titulo)    { setText('doc-title', dbUI.titulo); setText('ui-titulo', dbUI.titulo); }
+            if (dbUI.subtitulo)   setText('ui-subtitulo', dbUI.subtitulo);
+            if (dbUI.lore)        setText('ui-lore', dbUI.lore);
+            if (dbUI.link_rol)    setHref('ui-link-rol',  dbUI.link_rol);
+            if (dbUI.nombre_rol)  setText('ui-nombre-rol', dbUI.nombre_rol);
+            if (dbUI.link_meta)   setHref('ui-link-meta', dbUI.link_meta);
+            if (dbUI.nombre_meta) setText('ui-nombre-meta', dbUI.nombre_meta);
         }
     } catch(e) {}
 
@@ -225,13 +412,9 @@ async function iniciar() {
     }
 
     cargarImagenes();
-    await Promise.all([cargarDashboard(), cargarRegen()]);
+    await Promise.all([cargarParty(), cargarDashboard()]);
 }
 
-function setText(id, val) { const e = document.getElementById(id); if(e) e.textContent = val; }
-function setHref(id, val) { const e = document.getElementById(id); if(e) e.href = val; }
-
-// ── IMÁGENES ─────────────────────────────────────────────────
 function cargarImagenes() {
     const fb = db.storage.getUrlInterfaz('icon.png');
     document.querySelectorAll('img[data-img]').forEach(img => {
@@ -241,223 +424,350 @@ function cargarImagenes() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// BARRA DE REGENERACIÓN
-// Lee config_regen (intervalo_horas, expresión) y last_regen_*
-// de los jugadores activos. La barra avanza segundo a segundo.
-// Los nodos se colocan dinámicamente según cuántos ticks caben
-// en el máximo del recurso.
+// PARTY — carga personajes jugadores activos y arranca el ticker
 // ══════════════════════════════════════════════════════════════
 
-let _regenTimer = null;
+// Estado vivo de los personajes en memoria
+const partyData = {};   // { nombre: pjObj }
+let regenConfig = { vex: { intervalo: 12 }, guarda: { intervalo: 12 } };
+let _tickTimer = null;
+const TICK_SEG = 10;
 
-// Estado calculado de regen
-const regen = {
-    vex:    { label:'VEX',          intervalo:12, cantidad:0, max:1000, actual:0, proximo:null },
-    guarda: { label:'Guarda Dorada', intervalo:12, cantidad:0, max:10,   actual:0, proximo:null }
-};
-
-async function cargarRegen() {
+async function cargarParty() {
     try {
-        // 1. Config de la DB
+        // Config de regen
         const { data: cfgRows } = await supabase.from('config_regen').select('*');
         if (cfgRows) {
             cfgRows.forEach(r => {
-                if (regen[r.recurso]) {
-                    regen[r.recurso].intervalo = parseFloat(r.intervalo_horas) || 12;
-                    regen[r.recurso].label     = r.label || r.recurso;
-                }
+                if (regenConfig[r.recurso]) regenConfig[r.recurso].intervalo = parseFloat(r.intervalo_horas) || 12;
             });
         }
 
-        // 2. Jugadores activos (tomamos el primero como referencia de timestamps)
+        // Config de fórmulas (para calcular stats derivados)
+        let formulas = {
+            vida_roja_max: { expr: 'Math.floor(FisB / 2) + 10' },
+            vex_max:       { expr: 'Math.round(OscB * 75 / 50) * 50' },
+            guarda_max:    { expr: 'Math.floor(EspB / 3)' },
+        };
+        try {
+            const { data: fRows } = await supabase.from('config_formulas').select('clave,expresion');
+            if (fRows) fRows.forEach(r => { if (formulas[r.clave]) formulas[r.clave].expr = r.expresion; });
+        } catch(e) {}
+
+        // Personajes jugadores activos
         const { data: pjs } = await supabase
             .from('personajes')
-            .select('vex_actual,vex_max,guarda_actual,guarda_max,last_regen_vex,last_regen_guarda,af_oscura,hz_oscura,ef_oscura,bf_oscura,af_espiritual,hz_espiritual,ef_espiritual,bf_espiritual')
+            .select('*')
             .eq('is_active', true)
             .eq('is_player', true)
-            .order('nombre')
-            .limit(1);
+            .order('nombre');
 
         if (!pjs || pjs.length === 0) return;
-        const p = pjs[0];
 
-        // VEX
-        const oscTotal = (p.af_oscura||0)+(p.hz_oscura||0)+(p.ef_oscura||0)+(p.bf_oscura||0);
-        regen.vex.max      = p.vex_max || Math.round(oscTotal*75/50)*50 || 1000;
-        regen.vex.actual   = p.vex_actual || 0;
-        regen.vex.cantidad = Math.round(oscTotal*75/50)*50 * 0.5 || Math.round(regen.vex.max * 0.5);
-        regen.vex.proximo  = p.last_regen_vex
-            ? new Date(p.last_regen_vex).getTime() + regen.vex.intervalo * 3600000
-            : Date.now() + regen.vex.intervalo * 3600000;
+        // Guardar en memoria y calcular stats iniciales
+        pjs.forEach(row => {
+            const p = mapRow(row);
+            p._stats = calcStats(p, formulas);
+            p._vex_frac    = 0;
+            p._guarda_frac = 0;
+            partyData[row.nombre] = p;
+        });
 
-        // Guarda
-        const espTotal = (p.af_espiritual||0)+(p.hz_espiritual||0)+(p.ef_espiritual||0)+(p.bf_espiritual||0);
-        regen.guarda.max      = p.guarda_max || 10;
-        regen.guarda.actual   = p.guarda_actual || 0;
-        regen.guarda.cantidad = Math.floor(espTotal / 2) || 1;
-        regen.guarda.proximo  = p.last_regen_guarda
-            ? new Date(p.last_regen_guarda).getTime() + regen.guarda.intervalo * 3600000
-            : Date.now() + regen.guarda.intervalo * 3600000;
+        // Renderizar tarjetas por primera vez
+        renderParty(formulas);
 
-        // Actualizar labels
-        setText('regen-label-vex',    regen.vex.label);
-        setText('regen-label-guarda', regen.guarda.label);
+        // Arrancar ticker
+        if (_tickTimer) clearInterval(_tickTimer);
+        _tickTimer = setInterval(() => tickParty(formulas), TICK_SEG * 1000);
 
-        // Construir nodos en las tracks
-        Object.keys(regen).forEach(key => construirNodos(key));
+        // Suscribir Realtime para cambios externos
+        supabase.channel('index-party')
+            .on('postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'personajes' },
+                payload => {
+                    const row = payload.new;
+                    if (!row?.nombre || !partyData[row.nombre]) return;
+                    const p = mapRow(row);
+                    p._stats = calcStats(p, formulas);
+                    p._vex_frac    = partyData[row.nombre]._vex_frac    || 0;
+                    p._guarda_frac = partyData[row.nombre]._guarda_frac || 0;
+                    partyData[row.nombre] = p;
+                    actualizarCard(row.nombre);
+                }
+            )
+            .subscribe();
 
-        document.getElementById('regen-section').style.display = 'block';
-
-        // Arrancar el ticker
-        if (_regenTimer) clearInterval(_regenTimer);
-        tickRegen();
-        _regenTimer = setInterval(tickRegen, 1000);
-
-    } catch(e) { console.warn('cargarRegen:', e); }
+    } catch(e) { console.error('cargarParty:', e); }
 }
 
-// Construye los nodos de control en la barra.
-// Cada nodo representa un "umbral de cantidad" alcanzado.
-// Si max/cantidad > 8, agrupa en menos nodos para no saturar visualmente.
-function construirNodos(key) {
-    const track = document.getElementById(`regen-track-${key}`);
-    if (!track) return;
-    track.querySelectorAll('.regen-nodo').forEach(n => n.remove());
+// Mapea fila de Supabase a objeto interno
+function mapRow(row) {
+    return {
+        nombre:       row.nombre,
+        hex:          row.hex           || 0,
+        vex_actual:   row.vex_actual    || 0,
+        vex_max:      row.vex_max       || 0,
+        guarda_actual:row.guarda_actual || 0,
+        guarda_max:   row.guarda_max    || 0,
+        vida_roja_actual: row.vida_roja_actual || 0,
+        af_fisica:    row.af_fisica     || 0,
+        af_energetica:row.af_energetica || 0,
+        af_espiritual:row.af_espiritual || 0,
+        af_mando:     row.af_mando      || 0,
+        af_psiquica:  row.af_psiquica   || 0,
+        af_oscura:    row.af_oscura     || 0,
+        hz_fisica:    row.hz_fisica     || 0,
+        hz_energetica:row.hz_energetica || 0,
+        hz_espiritual:row.hz_espiritual || 0,
+        hz_mando:     row.hz_mando      || 0,
+        hz_psiquica:  row.hz_psiquica   || 0,
+        hz_oscura:    row.hz_oscura     || 0,
+        ef_fisica:    row.ef_fisica     || 0,
+        ef_espiritual:row.ef_espiritual || 0,
+        ef_oscura:    row.ef_oscura     || 0,
+        bf_fisica:    row.bf_fisica     || 0,
+        bf_espiritual:row.bf_espiritual || 0,
+        bf_oscura:    row.bf_oscura     || 0,
+        regen_vex_bf:    row.regen_vex_bf    || 0,
+        regen_vex_ef:    row.regen_vex_ef    || 0,
+        regen_guarda_bf: row.regen_guarda_bf || 0,
+        regen_guarda_ef: row.regen_guarda_ef || 0,
+        hz_clase1:row.hz_clase1||0, hz_clase2:row.hz_clase2||0,
+        hz_clase3:row.hz_clase3||0, hz_clase4:row.hz_clase4||0,
+        hz_clase5:row.hz_clase5||0,
+        npc_tipo: row.npc_tipo || 'jugador',
+    };
+}
 
-    const cfg   = regen[key];
-    const max   = cfg.max    || 1000;
-    const cant  = cfg.cantidad || 100;
-    if (cant <= 0 || max <= 0) return;
+// Calcula stats derivados usando las fórmulas
+function calcStats(p, formulas) {
+    const FisB = p.af_fisica, EneB = p.af_energetica, EspB = p.af_espiritual;
+    const ManB = p.af_mando,  PsiB = p.af_psiquica,   OscB = p.af_oscura;
+    const Fis  = FisB + (p.hz_fisica||0) + (p.ef_fisica||0) + (p.bf_fisica||0);
+    const Ene  = EneB + (p.hz_energetica||0);
+    const Esp  = EspB + (p.hz_espiritual||0) + (p.ef_espiritual||0) + (p.bf_espiritual||0);
+    const Man  = ManB + (p.hz_mando||0);
+    const Psi  = PsiB + (p.hz_psiquica||0);
+    const Osc  = OscB + (p.hz_oscura||0) + (p.ef_oscura||0) + (p.bf_oscura||0);
+    const Hz1  = p.hz_clase1, Hz2=p.hz_clase2, Hz3=p.hz_clase3, Hz4=p.hz_clase4, Hz5=p.hz_clase5;
 
-    // Cuántos ticks caben en el total
-    const ticksMax  = Math.floor(max / cant);
-    // Mostrar máximo 8 nodos; si hay más, mostramos 1 de cada N
-    const step      = Math.max(1, Math.ceil(ticksMax / 8));
+    function evalF(expr) {
+        try {
+            // eslint-disable-next-line no-new-func
+            const r = new Function('Fis','Ene','Esp','Man','Psi','Osc','FisB','EneB','EspB','ManB','PsiB','OscB','Hz1','Hz2','Hz3','Hz4','Hz5',
+                `return Math.max(0, ${expr});`
+            )(Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB,Hz1,Hz2,Hz3,Hz4,Hz5);
+            return isFinite(r) ? Math.round(r) : 0;
+        } catch { return 0; }
+    }
 
-    for (let i = step; i <= ticksMax; i += step) {
-        const val  = Math.round(i * cant);
-        const pct  = (val / max) * 100;
-        const nodo = document.createElement('div');
-        nodo.className   = 'regen-nodo';
-        nodo.style.left  = `${pct}%`;
-        nodo.dataset.pct = pct;
-        nodo.title       = `+${val.toLocaleString()}`;
+    // Regen VEX / hora — misma lógica que personajes-logic.js
+    const regenVexBase = evalF('Math.round(OscB * 75 / 50) * 50 * 0.5 + Hz3 * 25 + Hz4 * 60');
+    const regenVex     = regenVexBase + (p.regen_vex_bf||0) + (p.regen_vex_ef||0);
 
-        const lbl = document.createElement('span');
-        lbl.className   = 'regen-nodo-lbl';
-        lbl.textContent = val >= 1000 ? `${(val/1000).toFixed(1)}k` : String(val);
-        nodo.appendChild(lbl);
-        track.appendChild(nodo);
+    // Regen Guarda / hora
+    const regenGuardaBase = evalF('Math.floor(EspB / 2)');
+    const regenGuarda     = regenGuardaBase + (p.regen_guarda_bf||0) + (p.regen_guarda_ef||0);
+
+    const vex_max    = evalF(formulas.vex_max.expr);
+    const guarda_max = evalF(formulas.guarda_max.expr);
+    const vida_roja_max = evalF(formulas.vida_roja_max.expr);
+
+    return { vex_max, guarda_max, vida_roja_max, regenVex, regenGuarda };
+}
+
+// ── Ticker local de regen ─────────────────────────────────────
+function tickParty(formulas) {
+    for (const nombre of Object.keys(partyData)) {
+        const p = partyData[nombre];
+        const s = p._stats;
+        let cambio = false;
+
+        // VEX
+        if (s.regenVex > 0 && s.vex_max > 0 && Math.floor(p.vex_actual) < s.vex_max) {
+            p._vex_frac += s.regenVex / 3600 * TICK_SEG;
+            if (p._vex_frac >= 1) {
+                const ent = Math.floor(p._vex_frac);
+                p._vex_frac -= ent;
+                p.vex_actual = Math.min(s.vex_max, Math.floor(p.vex_actual) + ent);
+                cambio = true;
+            }
+        }
+        // Guarda
+        if (s.regenGuarda > 0 && s.guarda_max > 0 && Math.floor(p.guarda_actual) < s.guarda_max) {
+            p._guarda_frac += s.regenGuarda / 3600 * TICK_SEG;
+            if (p._guarda_frac >= 1) {
+                const ent = Math.floor(p._guarda_frac);
+                p._guarda_frac -= ent;
+                p.guarda_actual = Math.min(s.guarda_max, Math.floor(p.guarda_actual) + ent);
+                cambio = true;
+            }
+        }
+        if (cambio) actualizarCard(nombre);
     }
 }
 
-function tickRegen() {
-    const ahora = Date.now();
+// ── Render inicial de todas las cards ────────────────────────
+function renderParty(formulas) {
+    const grid = document.getElementById('party-main-grid');
+    if (!grid) return;
 
-    Object.keys(regen).forEach(key => {
-        const cfg  = regen[key];
-        const fill = document.getElementById(`regen-fill-${key}`);
-        const eta  = document.getElementById(`regen-eta-${key}`);
-        if (!fill || !cfg.proximo) return;
+    const nombres = Object.keys(partyData);
+    if (!nombres.length) return;
 
-        const totalMs = cfg.intervalo * 3600000;
-        const resta   = Math.max(0, cfg.proximo - ahora);
-        const pct     = Math.min(100, ((totalMs - resta) / totalMs) * 100);
+    grid.innerHTML = nombres.map(nombre => {
+        const p = partyData[nombre];
+        const s = p._stats;
+        const icon   = `${db.storage.urlBase}/imgpersonajes/${norm(nombre)}icon.png`;
+        const portada= `${db.storage.urlBase}/imgpersonajes/${norm(nombre)}.png`;
+        const fb     = `${db.storage.urlBase}/imginterfaz/no_encontrado.png`;
 
-        fill.style.width = `${pct.toFixed(3)}%`;
+        return `<div class="pj-card" id="pjcard-${norm(nombre)}">
+            <div class="pj-card-img-wrap">
+                <img src="${portada}" onerror="this.onerror=null;this.src='${icon}';this.onerror=()=>{this.src='${fb}'}"
+                     alt="${nombre}" style="object-position:top;">
+                <div class="pj-card-img-fade"></div>
+                <div class="pj-card-nombre">${nombre}</div>
+            </div>
+            <div class="pj-card-body">
+                <div>
+                    <div class="pj-hex">${(p.hex||0).toLocaleString()} <span style="font-size:0.55em;color:var(--gold-dim);letter-spacing:2px;">HEX</span></div>
+                </div>
+                <div class="pj-sep"></div>
+                ${renderRecurso(p, s, 'vida')}
+                ${s.vex_max > 0 ? renderRecurso(p, s, 'vex') : ''}
+                ${s.guarda_max > 0 ? renderRecurso(p, s, 'guarda') : ''}
+            </div>
+        </div>`;
+    }).join('');
 
-        // Iluminar nodos alcanzados
-        const track = document.getElementById(`regen-track-${key}`);
-        if (track) {
-            track.querySelectorAll('.regen-nodo').forEach(nodo => {
-                const nodoPct = parseFloat(nodo.dataset.pct || nodo.style.left);
-                nodo.classList.toggle('alcanzado', pct >= nodoPct);
-            });
-        }
-
-        if (resta <= 0) {
-            // Tick completado
-            setText(`regen-eta-${key}`, '¡Regenerando!');
-            fill.style.width = '100%';
-            // Simular reset del ciclo localmente
-            setTimeout(() => {
-                cfg.proximo = Date.now() + cfg.intervalo * 3600000;
-                cfg.actual  = Math.min(cfg.max, cfg.actual + cfg.cantidad);
-            }, 2500);
-        } else {
-            const h = Math.floor(resta / 3600000);
-            const m = Math.floor((resta % 3600000) / 60000);
-            const s = Math.floor((resta % 60000)   / 1000);
-            const tiempo = [
-                h > 0 ? `${h}h` : '',
-                (h > 0 || m > 0) ? `${m}m` : '',
-                `${s}s`
-            ].filter(Boolean).join(' ');
-            const ganar = `+${cfg.cantidad.toLocaleString()} en ${tiempo}`;
-            setText(`regen-eta-${key}`, ganar);
-        }
-    });
+    document.getElementById('party-section').style.display = 'block';
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────
+function renderRecurso(p, s, tipo) {
+    let actual, max, regen, label, colorClass;
+
+    if (tipo === 'vida') {
+        actual = Math.floor(p.vida_roja_actual || 0);
+        max    = s.vida_roja_max || 1;
+        regen  = 0;
+        label  = 'Vida';
+        colorClass = 'vida';
+    } else if (tipo === 'vex') {
+        actual = Math.floor(p.vex_actual || 0);
+        max    = s.vex_max || 1;
+        regen  = s.regenVex;
+        label  = 'VEX';
+        colorClass = 'vex';
+    } else {
+        actual = Math.floor(p.guarda_actual || 0);
+        max    = s.guarda_max || 1;
+        regen  = s.regenGuarda;
+        label  = 'Guarda Dorada';
+        colorClass = 'guarda';
+    }
+
+    const pct    = Math.min(100, Math.round((actual / max) * 100));
+    const dotHtml = regen > 0 && actual < max
+        ? `<span class="pj-regen-dot ${colorClass}"></span>`
+        : '';
+    const regenHtml = regen > 0
+        ? `<div class="pj-recurso-regen">${dotHtml}+${regen.toLocaleString()}/h</div>`
+        : '';
+
+    return `<div class="pj-recurso" id="rec-${colorClass}-${norm(p.nombre)}">
+        <div class="pj-recurso-header">
+            <span class="pj-recurso-label">${label}</span>
+            <span class="pj-recurso-val">${actual.toLocaleString()} / ${max.toLocaleString()}</span>
+        </div>
+        <div class="pj-bar-track"><div class="pj-bar-fill ${colorClass}" style="width:${pct}%"></div></div>
+        ${regenHtml}
+    </div>`;
+}
+
+// ── Actualizar solo los valores numéricos de una card ─────────
+function actualizarCard(nombre) {
+    const p = partyData[nombre];
+    const s = p._stats;
+    const id = norm(nombre);
+
+    // HEX
+    const hexEl = document.querySelector(`#pjcard-${id} .pj-hex`);
+    if (hexEl) hexEl.innerHTML = `${(p.hex||0).toLocaleString()} <span style="font-size:0.55em;color:var(--gold-dim);letter-spacing:2px;">HEX</span>`;
+
+    // Recursos
+    actualizarRecurso(p, s, 'vida');
+    if (s.vex_max > 0)    actualizarRecurso(p, s, 'vex');
+    if (s.guarda_max > 0) actualizarRecurso(p, s, 'guarda');
+}
+
+function actualizarRecurso(p, s, tipo) {
+    const id = norm(p.nombre);
+    const el = document.getElementById(`rec-${tipo}-${id}`);
+    if (!el) return;
+
+    let actual, max, regen;
+    if (tipo === 'vida') {
+        actual = Math.floor(p.vida_roja_actual || 0);
+        max    = s.vida_roja_max || 1;
+        regen  = 0;
+    } else if (tipo === 'vex') {
+        actual = Math.floor(p.vex_actual || 0);
+        max    = s.vex_max || 1;
+        regen  = s.regenVex;
+    } else {
+        actual = Math.floor(p.guarda_actual || 0);
+        max    = s.guarda_max || 1;
+        regen  = s.regenGuarda;
+    }
+
+    const pct = Math.min(100, Math.round((actual / max) * 100));
+
+    const valEl  = el.querySelector('.pj-recurso-val');
+    const fillEl = el.querySelector('.pj-bar-fill');
+    if (valEl)  valEl.textContent  = `${actual.toLocaleString()} / ${max.toLocaleString()}`;
+    if (fillEl) fillEl.style.width = `${pct}%`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// DASHBOARD SECUNDARIO (stats + misiones)
+// ══════════════════════════════════════════════════════════════
 async function cargarDashboard() {
     try {
         const [pjRes, misRes, invRes, hzRes] = await Promise.all([
-            supabase.from('personajes').select('nombre,is_player,is_active,hex,vida_roja_actual,af_fisica'),
+            supabase.from('personajes').select('nombre,is_player,is_active,hex'),
             supabase.from('misiones').select('titulo,estado,jugadores'),
             supabase.from('inventario_objetos').select('cantidad').gt('cantidad',0),
             supabase.from('hechizos_inventario').select('hechizo_nombre')
         ]);
 
-        const pjs     = pjRes.data  || [];
-        const mis     = misRes.data || [];
-        const inv     = invRes.data || [];
-        const hz      = hzRes.data  || [];
+        const pjs    = pjRes.data  || [];
+        const mis    = misRes.data || [];
+        const inv    = invRes.data || [];
+        const hz     = hzRes.data  || [];
 
-        const jugs    = pjs.filter(p => p.is_player && p.is_active);
-        const npcs    = pjs.filter(p => !p.is_player && p.is_active);
-        const misAct  = mis.filter(m => m.estado === 1 || m.estado === 2);
-        const misPend = mis.filter(m => m.estado === 1);
-        const misProc = mis.filter(m => m.estado === 2);
-        const totalInv= inv.reduce((a,r) => a+(r.cantidad||0), 0);
-        const hexProm = jugs.length ? Math.round(jugs.reduce((a,p)=>a+(p.hex||0),0)/jugs.length) : 0;
+        const jugs   = pjs.filter(p => p.is_player && p.is_active);
+        const npcs   = pjs.filter(p => !p.is_player && p.is_active);
+        const misAct = mis.filter(m => m.estado === 1 || m.estado === 2);
+        const misPend= mis.filter(m => m.estado === 1);
+        const misProc= mis.filter(m => m.estado === 2);
+        const totalInv = inv.reduce((a,r) => a+(r.cantidad||0), 0);
+        const hexProm  = jugs.length ? Math.round(jugs.reduce((a,p)=>a+(p.hex||0),0)/jugs.length) : 0;
 
         // Stats
         const statsEl = document.getElementById('dash-stats');
         if (statsEl) {
             const items = [
-                { n: jugs.length,              l: 'Jugadores activos'    },
-                { n: npcs.length,              l: 'NPCs activos'         },
-                { n: misAct.length,            l: 'Misiones activas'     },
-                { n: totalInv,                 l: 'Objetos circulando'   },
-                { n: hz.length,                l: 'Hechizos aprendidos'  },
-                { n: hexProm.toLocaleString(), l: 'HEX promedio party'   }
+                { n: jugs.length,              l: 'Jugadores activos'   },
+                { n: npcs.length,              l: 'NPCs activos'        },
+                { n: misAct.length,            l: 'Misiones activas'    },
+                { n: totalInv,                 l: 'Objetos circulando'  },
+                { n: hz.length,                l: 'Hechizos aprendidos' },
+                { n: hexProm.toLocaleString(), l: 'HEX promedio party'  }
             ];
             statsEl.innerHTML = items.map(i =>
                 `<div class="dash-stat"><div class="dash-stat-n">${i.n}</div><div class="dash-stat-l">${i.l}</div></div>`
             ).join('');
-        }
-
-        // Party
-        const partyEl = document.getElementById('dash-party');
-        if (partyEl) {
-            const norm = s => s.toString().trim().toLowerCase()
-                .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
-                .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
-                .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
-            partyEl.innerHTML = jugs.slice(0,6).map(p => {
-                const max = Math.floor((p.af_fisica || 0) / 2) + 10;
-                const act = Math.min(p.vida_roja_actual||0, max);
-                const pct = Math.round(act/max*100);
-                const icon = `${db.storage.urlBase}/imgpersonajes/${norm(p.nombre)}icon.png`;
-                const fb   = `${db.storage.urlBase}/imginterfaz/no_encontrado.png`;
-                return `<a href="personajes/index.html" class="party-pj">
-                    <img src="${icon}" onerror="this.onerror=null;this.src='${fb}'">
-                    <div class="party-pj-name">${p.nombre}</div>
-                    <div class="party-pj-hex">${(p.hex||0).toLocaleString()} HEX</div>
-                    <div class="party-vida-track"><div class="party-vida-fill" style="width:${pct}%"></div></div>
-                </a>`;
-            }).join('') || '<p class="dash-empty">Sin jugadores activos</p>';
         }
 
         // Misiones
@@ -484,7 +794,7 @@ async function renderSelector() {
     if (!grid) return;
     const campañas = Object.values(hexConfigs);
     grid.innerHTML = campañas.map(cfg => {
-        const base = cfg.storageUrl || '';
+        const base   = cfg.storageUrl || '';
         const nombre = cfg.ui?.titulo || cfg.nombreCorto || cfg.id.toUpperCase();
         const desc   = cfg.ui?.subtitulo || '';
         return `<div class="sel-card" onclick="seleccionarCampaña('${cfg.id}')">
