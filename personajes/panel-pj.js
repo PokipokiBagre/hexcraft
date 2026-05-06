@@ -204,24 +204,18 @@ function _inyectarEstilos() {
 .ppj-footer{position:absolute;bottom:0;left:0;right:0;padding:10px 16px;background:linear-gradient(to top,#08080f 70%,transparent);display:flex;gap:8px;flex-shrink:0;}
 .ppj-btn-editar{flex:1;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:6px;color:#d4af37;font-size:0.78em;font-weight:600;padding:9px;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:0.5px;transition:background 0.15s;}
 .ppj-btn-editar:hover{background:rgba(212,175,55,0.15);}
-@media(max-width:480px){#panel-pj-root{width:100vw;}}
-.ppj-hz-oculto{font-style:italic;color:#3a3a5a;letter-spacing:0.5px;}
-.ppj-cat-divider{height:1px;background:linear-gradient(to right,transparent,rgba(212,175,55,0.15),transparent);margin:4px 0 12px;}
-.ppj-cat-assigned{border-color:rgba(62,207,110,0.25)!important;background:rgba(62,207,110,0.03)!important;}
-.ppj-cat-assigned .ppj-hz-nombre{color:#3ecf6e;}
-.ppj-cat-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.04);}
-.ppj-cat-btn{font-size:0.65em;font-weight:700;padding:4px 10px;border-radius:5px;cursor:pointer;border:1px solid;transition:background 0.15s;letter-spacing:0.3px;font-family:'Inter',system-ui,sans-serif;}
-.ppj-cat-free{background:rgba(62,207,110,0.08);color:#3ecf6e;border-color:rgba(62,207,110,0.3);}
-.ppj-cat-free:hover{background:rgba(62,207,110,0.18);}
-.ppj-cat-half{background:rgba(74,179,232,0.08);color:#4ab3e8;border-color:rgba(74,179,232,0.3);}
-.ppj-cat-half:hover{background:rgba(74,179,232,0.18);}
-.ppj-cat-full{background:rgba(212,175,55,0.08);color:#d4af37;border-color:rgba(212,175,55,0.3);}
-.ppj-cat-full:hover{background:rgba(212,175,55,0.18);}
-.ppj-cat-over{background:rgba(220,80,80,0.08);color:#e06060;border-color:rgba(220,80,80,0.3);}
-.ppj-cat-over:hover{background:rgba(220,80,80,0.18);}
-.ppj-cat-deasign{background:rgba(220,80,80,0.07);color:#e06060;border-color:rgba(220,80,80,0.25);}
-.ppj-cat-deasign:hover{background:rgba(220,80,80,0.16);}
-.ppj-cat-assigned-tag{font-size:0.6em;padding:1px 7px;border-radius:10px;background:rgba(62,207,110,0.1);color:#3ecf6e;border:1px solid rgba(62,207,110,0.25);margin-left:auto;}
+.ppj-hz-new-btn{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;font-size:0.75em;font-family:'Cinzel',serif;cursor:pointer;transition:all 0.15s;letter-spacing:0.5px;border:1px solid;margin:10px 0 8px;width:100%;box-sizing:border-box;text-align:left;}
+.ppj-hz-new-inv{background:rgba(212,175,55,0.09);color:#d4af37;border-color:rgba(212,175,55,0.28);}
+.ppj-hz-new-inv:hover{background:rgba(212,175,55,0.18);border-color:rgba(212,175,55,0.45);}
+.ppj-hz-new-cat{background:rgba(0,200,200,0.06);color:#00cccc;border-color:rgba(0,200,200,0.22);}
+.ppj-hz-new-cat:hover{background:rgba(0,200,200,0.14);border-color:rgba(0,200,200,0.4);}
+.ppj-hz-new-icon{font-size:1.3em;flex-shrink:0;}
+.ppj-hz-new-text-main{font-weight:700;font-size:1em;}
+.ppj-hz-new-text-sub{font-size:0.8em;opacity:0.65;font-family:'Inter',system-ui,sans-serif;font-weight:400;letter-spacing:0;margin-top:1px;}
+.ppj-hz-assign-notice{background:rgba(212,175,55,0.07);border:1px solid rgba(212,175,55,0.2);border-radius:8px;padding:11px 14px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;}
+.ppj-hz-assign-icon{font-size:1.4em;flex-shrink:0;line-height:1.2;}
+.ppj-hz-assign-title{font-size:0.76em;color:#d4af37;font-family:'Cinzel',serif;letter-spacing:0.5px;margin-bottom:3px;}
+.ppj-hz-assign-sub{font-size:0.68em;color:#888;line-height:1.4;}
 `;
     document.head.appendChild(st);
 }
@@ -766,10 +760,17 @@ async function _tabHechizos(nombre, body) {
     };
 
     let html = `<div class="ppj-section">
-        <div class="ppj-section-title" style="display:flex;align-items:center;gap:8px;">
-            Hechizos aprendidos${lista.length?' ('+lista.length+')':''}            ${esAdmin?`<button class="ppj-ctrl-btn" style="margin-left:auto;font-size:0.7em;" onclick="window._ppjAbrirEditorHz(null,'${safe}','inv')">＋ Nuevo hechizo</button>`:''}
+        <div class="ppj-section-title">
+            Hechizos aprendidos${lista.length?' ('+lista.length+')':''}
         </div>
         <input class="ppj-hz-search" id="ppj-hz-buscador" placeholder="Buscar hechizo aprendido…" oninput="window._ppjBuscarHz(this.value)">
+        ${esAdmin?`<button class="ppj-hz-new-btn ppj-hz-new-inv" onclick="window._ppjNuevoHechizoPj('${safe}')">
+            <span class="ppj-hz-new-icon">✨</span>
+            <div>
+                <div class="ppj-hz-new-text-main">Nuevo hechizo para ${nombre}</div>
+                <div class="ppj-hz-new-text-sub">Crea y asigna un hechizo directamente al personaje</div>
+            </div>
+        </button>`:''}
         <div id="ppj-hz-inv-list">`;
 
     if (lista.length === 0) {
@@ -819,9 +820,15 @@ async function _tabHechizos(nombre, body) {
         <div class="ppj-section-title" style="display:flex;align-items:center;gap:8px;">
             📖 Grimorio completo
             <span style="font-size:0.85em;color:#3a3a58;font-weight:400;letter-spacing:0;">(${(catalogo||[]).length} hechizos)</span>
-            ${esAdmin?`<button class="ppj-ctrl-btn" style="margin-left:auto;font-size:0.7em;" onclick="window._ppjAbrirEditorHz(null,'${safe}','cat')">＋ Nuevo hechizo</button>`:''}
         </div>
         <input class="ppj-hz-search" id="ppj-cat-buscador" placeholder="Buscar en catálogo…" oninput="window._ppjBuscarCat(this.value)">
+        ${esAdmin?`<button class="ppj-hz-new-btn ppj-hz-new-cat" onclick="window._ppjNuevoHechizoCat('${safe}')">
+            <span class="ppj-hz-new-icon">➕</span>
+            <div>
+                <div class="ppj-hz-new-text-main">Nuevo hechizo en catálogo</div>
+                <div class="ppj-hz-new-text-sub">Crea un nodo en el mapa sin asignarlo a nadie</div>
+            </div>
+        </button>`:''}
         <div id="ppj-cat-lista">`;
 
     Object.entries(catGrupos).forEach(([af, nodos]) => {
@@ -1270,6 +1277,11 @@ window._ppjToggleConocido = async (hechizo_id, nuevoValor, nombrePJ) => {
 window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
     if (!estadoUI.esAdmin) return;
 
+    // ── Consumir el nodo temporal del mapa (si lo hay) ──────────
+    const tempNodo = window._pmhNodoTempActual || null;
+    window._pmhNodoTempActual = null;
+    window._ppjHzTempMapNodeId = tempNodo?.id || null;
+
     const body = document.getElementById('ppj-body');
     if (!body) return;
     body.innerHTML = `<div class="ppj-loader">Cargando editor…</div>`;
@@ -1311,6 +1323,9 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
     let strsEntSel = [...stringsEntrada];
     let strsSalSel = [...stringsSalida];
 
+    // ── Helper: id activo (real o temporal) ─────────────────────
+    const _currentId = () => hechizo_id || window._ppjHzTempMapNodeId;
+
     const _renderStrTags = () => {
         // Entrada
         const wrapIn = document.getElementById('ppj-hz-str-wrap-in');
@@ -1350,14 +1365,66 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
         }
     };
 
-    window._ppjHzAddStrIn    = (sid) => { if (sid && !strsEntSel.includes(sid)) { strsEntSel.push(sid); _renderStrTags(); } };
-    window._ppjHzRemoveStrIn = (sid) => { strsEntSel = strsEntSel.filter(s => s !== sid); _renderStrTags(); };
-    window._ppjHzAddStrOut    = (sid) => { if (sid && !strsSalSel.includes(sid)) { strsSalSel.push(sid); _renderStrTags(); } };
-    window._ppjHzRemoveStrOut = (sid) => { strsSalSel = strsSalSel.filter(s => s !== sid); _renderStrTags(); };
-    window._ppjHzGetStrs      = () => ({ entrada: strsEntSel, salida: strsSalSel });
-    window._ppjHzIdOriginal   = hechizo_id;
+    // ── Funciones con sincronización bidireccional con el mapa ──
+    window._ppjHzAddStrIn = (sid) => {
+        if (!sid || strsEntSel.includes(sid)) return;
+        strsEntSel.push(sid);
+        _renderStrTags();
+        // Sincronizar flecha en el mapa
+        if (_currentId() && window._pmhAgregarEnlaceVisual)
+            window._pmhAgregarEnlaceVisual(sid, _currentId());
+    };
+    window._ppjHzRemoveStrIn = (sid) => {
+        strsEntSel = strsEntSel.filter(s => s !== sid);
+        _renderStrTags();
+        // Quitar flecha en el mapa
+        if (_currentId() && window._pmhEliminarEnlaceVisual)
+            window._pmhEliminarEnlaceVisual(sid, _currentId());
+    };
+    window._ppjHzAddStrOut = (sid) => {
+        if (!sid || strsSalSel.includes(sid)) return;
+        strsSalSel.push(sid);
+        _renderStrTags();
+        // Sincronizar flecha en el mapa
+        if (_currentId() && window._pmhAgregarEnlaceVisual)
+            window._pmhAgregarEnlaceVisual(_currentId(), sid);
+    };
+    window._ppjHzRemoveStrOut = (sid) => {
+        strsSalSel = strsSalSel.filter(s => s !== sid);
+        _renderStrTags();
+        // Quitar flecha en el mapa
+        if (_currentId() && window._pmhEliminarEnlaceVisual)
+            window._pmhEliminarEnlaceVisual(_currentId(), sid);
+    };
+
+    // Exponer estado para guardar (fix: _ppjHzStrsSel nunca estaba definida)
+    window._ppjHzStrsSel  = () => strsEntSel;
+    window._ppjHzGetStrs  = () => ({ entrada: strsEntSel, salida: strsSalSel });
+    window._ppjHzIdOriginal = hechizo_id;
+
+    // Sincronización mapa → editor (cuando el usuario dibuja una flecha en el mapa)
+    window._ppjHzSyncEnlaceFromMap = (sourceId, targetId) => {
+        const cid = _currentId();
+        if (!cid) return;
+        if (targetId === cid && !strsEntSel.includes(sourceId)) {
+            strsEntSel.push(sourceId); _renderStrTags();
+        }
+        if (sourceId === cid && !strsSalSel.includes(targetId)) {
+            strsSalSel.push(targetId); _renderStrTags();
+        }
+    };
 
     const safePJ = nombrePJ.replace(/'/g, "\\'");
+
+    // Banner de asignación (solo para modo inventario al crear)
+    const noticeInv = esNuevo && modo === 'inv' ? `
+    <div class="ppj-hz-assign-notice">
+        <span class="ppj-hz-assign-icon">✨</span>
+        <div>
+            <div class="ppj-hz-assign-title">Asignar a ${nombrePJ}</div>
+            <div class="ppj-hz-assign-sub">Este hechizo será creado y añadido directamente al inventario del personaje sin coste de HEX.</div>
+        </div>
+    </div>` : '';
 
     // Botón eliminar solo en modo edición
     const btnEliminar = !esNuevo ? `
@@ -1373,6 +1440,8 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
                 onclick="window._ppjVolverHechizos('${safePJ}')">←</button>
             <span style="font-family:'Cinzel',serif;color:#d4af37;font-size:0.85em;letter-spacing:1px;">${titulo}</span>
         </div>
+
+        ${noticeInv}
 
         <div class="ppj-hz-modal-row">
             <div>
@@ -1499,7 +1568,12 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
     const overcast= document.getElementById('hze-overcast')?.value.trim();
     const undercast=document.getElementById('hze-undercast')?.value.trim();
     const especial= document.getElementById('hze-especial')?.value.trim();
-    const strsSel = window._ppjHzStrsSel?.() || [];
+
+    // ── FIX: usar _ppjHzGetStrs() (antes _ppjHzStrsSel no estaba definida) ──
+    const strs       = window._ppjHzGetStrs?.() || { entrada: [], salida: [] };
+    const strsEntrada = strs.entrada;   // precedentes
+    const strsSalida  = strs.salida;    // salientes
+
     const idOriginal = window._ppjHzIdOriginal;
 
     if (!id || !nombre) { alert('El ID y el nombre son obligatorios.'); return; }
@@ -1515,11 +1589,20 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
         .upsert(payload, { onConflict: 'hechizo_id' });
     if (errNodo) { alert('Error guardando hechizo: ' + errNodo.message); return; }
 
-    // Gestionar strings: borrar los existentes de este target y reinsertar
+    // ── FIX: guardar precedentes (strings de entrada) ───────────
     await supabase.from('hechizos_strings').delete().eq('target_id', id);
-    if (strsSel.length > 0) {
-        const rows = strsSel.map(src => ({ source_id: src, target_id: id }));
-        await supabase.from('hechizos_strings').insert(rows);
+    if (strsEntrada.length > 0) {
+        await supabase.from('hechizos_strings').insert(
+            strsEntrada.map(src => ({ source_id: src, target_id: id }))
+        );
+    }
+
+    // ── FIX: guardar salientes (strings de salida) — antes nunca se guardaban ──
+    await supabase.from('hechizos_strings').delete().eq('source_id', id);
+    if (strsSalida.length > 0) {
+        await supabase.from('hechizos_strings').insert(
+            strsSalida.map(tgt => ({ source_id: id, target_id: tgt }))
+        );
     }
 
     // Si viene desde inventario del PJ → asignar el hechizo gratis
@@ -1535,6 +1618,20 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
                 tipo:             'Normal',
                 origen:           'Editor OP'
             });
+        }
+    }
+
+    // ── Sincronizar el mapa: quitar nodo temporal + recargar datos reales ──
+    const tempId = window._ppjHzTempMapNodeId;
+    window._ppjHzTempMapNodeId = null;
+    if (tempId && typeof window._pmhEliminarNuevo === 'function') {
+        window._pmhEliminarNuevo(tempId);
+    }
+    if (typeof window._pmhRecargar === 'function') {
+        await window._pmhRecargar();
+        // Centrar el mapa en el hechizo recién guardado
+        if (typeof window.centrarEnHechizo === 'function') {
+            setTimeout(() => window.centrarEnHechizo(id), 400);
         }
     }
 
