@@ -995,16 +995,13 @@ function _seleccionarNodo(nodo) {
     }
 }
 
-// ── OP: CREAR NODO NUEVO ─────────────────────────────────────
-function _crearNodoNuevo() {
-    if (!_estado.esAdmin) return;
-
-    // Posición central de la cámara
+// ── OP: CREAR NODO TEMPORAL (helper compartido) ───────────────
+function _crearNodoTemporal() {
     const wrap = document.getElementById('pmh-canvas-wrap');
+    if (!wrap) return null;
     const cx = (wrap.clientWidth  / 2 - _estado.camara.x) / _estado.camara.zoom;
     const cy = (wrap.clientHeight / 2 - _estado.camara.y) / _estado.camara.zoom;
-
-    const id = `hechizo_nuevo_${Date.now()}`;
+    const id  = `hechizo_nuevo_${Date.now()}`;
     const nodo = {
         id, nombre: 'Nuevo Hechizo',
         afinidad: 'Desconocida', clase: '1', hex: 0,
@@ -1014,12 +1011,26 @@ function _crearNodoNuevo() {
     };
     _estado.nodos.push(nodo);
     _seleccionarNodo(nodo);
+    window._pmhNodoTempActual = nodo;   // señal para que el editor lo consuma
+    return nodo;
+}
 
-    // Abrir editor de hechizo del panel-pj si está disponible
+// ── OP: CREAR NODO NUEVO (botón "Nodo" del toolbar) ──────────
+function _crearNodoNuevo() {
+    if (!_estado.esAdmin) return;
+    _crearNodoTemporal();
+    // Abrir editor de hechizo del panel-pj (modo catálogo)
     if (typeof window._ppjAbrirEditorHz === 'function') {
         window._ppjAbrirEditorHz(null, _estado.jugadorPanel, 'cat');
     }
 }
+
+// ── API PÚBLICA: crear nodo temporal SIN abrir editor ─────────
+// Llamado desde panel-pj cuando el usuario pulsa "Nuevo hechizo"
+window._pmhCrearNodoParaEditor = () => {
+    if (!_estado.esAdmin || !_estado.abierto) { window._pmhNodoTempActual = null; return null; }
+    return _crearNodoTemporal();
+};
 
 // ── OP: TOGGLE MODO CONEXIÓN ─────────────────────────────────
 function _toggleModoConexion() {
@@ -1039,6 +1050,11 @@ async function _crearEnlace(src, tgt) {
 
     _estado.enlaces.push({ source: src, target: tgt });
     tgt.incomingSources.push(src);
+
+    // Notificar al editor de panel-pj si está abierto
+    if (typeof window._ppjHzSyncEnlaceFromMap === 'function') {
+        window._ppjHzSyncEnlaceFromMap(src.id, tgt.id);
+    }
 
     // Recalcular vista
     await _cargarInventarioPJ(_estado.jugadorPanel);
@@ -1151,6 +1167,43 @@ window._pmhToggleConocido = async (id, nuevoValor) => {
 // ── OP: DESCARTAR NODO NUEVO ──────────────────────────────────
 window._pmhEliminarNuevo = (id) => {
     _estado.nodos = _estado.nodos.filter(n => n.id !== id);
+    _estado.enlaces = _estado.enlaces.filter(e => e.source.id !== id && e.target.id !== id);
     _estado.nodoSeleccionado = null;
     _renderInfo(null);
+};
+
+// ── API: AGREGAR ENLACE VISUAL desde el editor (sin DB) ──────
+// Llamado cuando se añade un precedente/saliente en el panel derecho
+window._pmhAgregarEnlaceVisual = (sourceId, targetId) => {
+    if (!_estado.abierto) return;
+    const src = _estado.nodos.find(n => n.id === sourceId);
+    const tgt = _estado.nodos.find(n => n.id === targetId);
+    if (!src || !tgt || src === tgt) return;
+    const existe = _estado.enlaces.some(e => e.source === src && e.target === tgt);
+    if (existe) return;
+    _estado.enlaces.push({ source: src, target: tgt });
+    if (!tgt.incomingSources.includes(src)) tgt.incomingSources.push(src);
+    _calcularSetsGlobales();
+};
+
+// ── API: ELIMINAR ENLACE VISUAL desde el editor (sin DB) ─────
+// Llamado cuando se quita un precedente/saliente en el panel derecho
+window._pmhEliminarEnlaceVisual = (sourceId, targetId) => {
+    if (!_estado.abierto) return;
+    const src = _estado.nodos.find(n => n.id === sourceId);
+    const tgt = _estado.nodos.find(n => n.id === targetId);
+    if (!src || !tgt) return;
+    _estado.enlaces = _estado.enlaces.filter(e => !(e.source === src && e.target === tgt));
+    tgt.incomingSources = (tgt.incomingSources || []).filter(s => s !== src);
+    _calcularSetsGlobales();
+};
+
+// ── API: RECARGAR TODOS LOS DATOS DESDE DB ───────────────────
+// Llamado desde panel-pj tras guardar un hechizo
+window._pmhRecargar = async () => {
+    if (!_estado.abierto) return;
+    _estado.nodoSeleccionado = null;
+    await _cargarDatos();
+    _calcularSetsGlobales();
+    _calcularVista(_estado.jugadorPanel);
 };
