@@ -1645,7 +1645,11 @@ window._ppjVolverHechizos = (nombrePJ) => {
 window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
     if (!estadoUI.esAdmin) return;
 
-    const id      = document.getElementById('hze-id')?.value.trim().replace(/\s+/g,'_');
+    // Al editar, el campo ID es readonly → usar idOriginal directamente.
+    // Al crear nuevo, limpiar solo espacios extremos (NO reemplazar internos: "Hechizo 6" debe quedar igual).
+    const idOriginal = window._ppjHzIdOriginal;
+    const idRaw  = document.getElementById('hze-id')?.value.trim() || '';
+    const id     = idOriginal || idRaw;   // edición: idOriginal; creación: lo que escribió el usuario
     const nombre  = document.getElementById('hze-nombre')?.value.trim();
     const afinidad= document.getElementById('hze-afinidad')?.value;
     const clase   = document.getElementById('hze-clase')?.value;
@@ -1669,8 +1673,6 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
     const strsEntrada = strs.entrada;   // precedentes
     const strsSalida  = strs.salida;    // salientes
 
-    const idOriginal = window._ppjHzIdOriginal;
-
     if (!id || !nombre) { alert('El ID y el nombre son obligatorios.'); return; }
 
     const payload = {
@@ -1683,9 +1685,18 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
         afecta_objetivo: afObjetivo,
     };
 
-    // Upsert del nodo
-    const { error: errNodo } = await supabase.from('hechizos_nodos')
-        .upsert(payload, { onConflict: 'hechizo_id' });
+    // Guardar nodo: UPDATE si es edición, INSERT si es nuevo
+    let errNodo;
+    if (idOriginal) {
+        // Edición: update por hechizo_id original (nunca crea duplicado)
+        ({ error: errNodo } = await supabase.from('hechizos_nodos')
+            .update(payload)
+            .eq('hechizo_id', idOriginal));
+    } else {
+        // Creación: insert nuevo
+        ({ error: errNodo } = await supabase.from('hechizos_nodos')
+            .insert(payload));
+    }
     if (errNodo) { alert('Error guardando hechizo: ' + errNodo.message); return; }
 
     // ── FIX: guardar precedentes (strings de entrada) ───────────
