@@ -1258,6 +1258,30 @@ export function refreshPanelPJ() {
 // ─────────────────────────────────────────────────────────────
 // TOGGLE CONOCIDO (visibilidad pública del hechizo)
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// BOTONES "NUEVO HECHIZO" — modo inventario (PJ) y catálogo
+// ─────────────────────────────────────────────────────────────
+
+// Nuevo hechizo para asignar directamente al PJ (modo inv)
+window._ppjNuevoHechizoPj = (nombrePJ) => {
+    if (!estadoUI.esAdmin) return;
+    // Si el minimapa está abierto, crear nodo temporal en él primero
+    if (typeof window._pmhCrearNodoParaEditor === 'function') {
+        window._pmhCrearNodoParaEditor();
+    }
+    window._ppjAbrirEditorHz(null, nombrePJ, 'inv');
+};
+
+// Nuevo hechizo en catálogo (sin asignar a nadie)
+window._ppjNuevoHechizoCat = (nombrePJ) => {
+    if (!estadoUI.esAdmin) return;
+    // Si el minimapa está abierto, crear nodo temporal en él primero
+    if (typeof window._pmhCrearNodoParaEditor === 'function') {
+        window._pmhCrearNodoParaEditor();
+    }
+    window._ppjAbrirEditorHz(null, nombrePJ, 'cat');
+};
+
 window._ppjToggleConocido = async (hechizo_id, nuevoValor, nombrePJ) => {
     if (!estadoUI.esAdmin) return;
     const { error } = await supabase.from('hechizos_nodos')
