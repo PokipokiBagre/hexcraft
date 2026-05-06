@@ -216,6 +216,17 @@ function _inyectarEstilos() {
 .ppj-hz-assign-icon{font-size:1.4em;flex-shrink:0;line-height:1.2;}
 .ppj-hz-assign-title{font-size:0.76em;color:#d4af37;font-family:'Cinzel',serif;letter-spacing:0.5px;margin-bottom:3px;}
 .ppj-hz-assign-sub{font-size:0.68em;color:#888;line-height:1.4;}
+.ppj-cat-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:5px;font-size:0.7em;font-family:'Inter',system-ui,sans-serif;cursor:pointer;border:1px solid;transition:all 0.15s;white-space:nowrap;}
+.ppj-cat-free{background:rgba(80,200,80,0.1);color:#50c864;border-color:rgba(80,200,80,0.3);}
+.ppj-cat-free:hover{background:rgba(80,200,80,0.22);}
+.ppj-cat-half{background:rgba(0,160,255,0.1);color:#4eb4ff;border-color:rgba(0,160,255,0.3);}
+.ppj-cat-half:hover{background:rgba(0,160,255,0.22);}
+.ppj-cat-full{background:rgba(212,175,55,0.1);color:#d4af37;border-color:rgba(212,175,55,0.3);}
+.ppj-cat-full:hover{background:rgba(212,175,55,0.22);}
+.ppj-cat-over{background:rgba(220,60,60,0.1);color:#ff6060;border-color:rgba(220,60,60,0.3);}
+.ppj-cat-over:hover{background:rgba(220,60,60,0.22);}
+.ppj-cat-deasign{background:rgba(120,120,120,0.08);color:#888;border-color:rgba(120,120,120,0.2);}
+.ppj-cat-deasign:hover{background:rgba(120,120,120,0.18);color:#bbb;}
 `;
     document.head.appendChild(st);
 }
@@ -1258,6 +1269,25 @@ export function refreshPanelPJ() {
 // ─────────────────────────────────────────────────────────────
 // TOGGLE CONOCIDO (visibilidad pública del hechizo)
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// BOTONES "NUEVO HECHIZO" — modo inventario (PJ) y catálogo
+// ─────────────────────────────────────────────────────────────
+window._ppjNuevoHechizoPj = (nombrePJ) => {
+    if (!estadoUI.esAdmin) return;
+    if (typeof window._pmhCrearNodoParaEditor === 'function') {
+        window._pmhCrearNodoParaEditor();
+    }
+    window._ppjAbrirEditorHz(null, nombrePJ, 'inv');
+};
+
+window._ppjNuevoHechizoCat = (nombrePJ) => {
+    if (!estadoUI.esAdmin) return;
+    if (typeof window._pmhCrearNodoParaEditor === 'function') {
+        window._pmhCrearNodoParaEditor();
+    }
+    window._ppjAbrirEditorHz(null, nombrePJ, 'cat');
+};
+
 window._ppjToggleConocido = async (hechizo_id, nuevoValor, nombrePJ) => {
     if (!estadoUI.esAdmin) return;
     const { error } = await supabase.from('hechizos_nodos')
