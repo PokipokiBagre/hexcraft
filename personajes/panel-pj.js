@@ -381,17 +381,7 @@ async function _tabHechizosConMapa(nombre, body) {
             }
         };
 
-        // Buscar en hechizos aprendidos primero
-        const invCard = document.querySelector(`[data-hz-nombre="${(nodo.nombre||'').toLowerCase()}"]`);
-        if (invCard) {
-            // Abrir su acordeón padre si está cerrado
-            const accPadre = invCard.closest('.ppj-af-acc, .ppj-cl-acc');
-            if (accPadre) _abrirAcc(accPadre);
-            setTimeout(() => _flash(invCard), 80);
-            return;
-        }
-
-        // Buscar en grimorio completo
+        // Buscar en grimorio completo (siempre, independientemente de si el PJ lo posee)
         const catCard = document.querySelector(
             `[data-cat-id="${nodo.id}"], [data-cat-nombre="${(nodo.nombre||'').toLowerCase()}"]`
         );
