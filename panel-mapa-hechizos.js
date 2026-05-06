@@ -302,7 +302,7 @@ function _inyectarEstilos() {
 // ── CARGA DE DATOS ───────────────────────────────────────────
 async function _cargarDatos() {
     const [nodosRes, stringsRes, afinRes, jugadoresRes] = await Promise.all([
-        supabase.from('hechizos_nodos').select('hechizo_id, nombre, afinidad, clase, hex_cost, es_conocido, pos_x, pos_y, radio, color, backcast, nextcast, es_estado, es_prioridad, afecta_hechizos, afecta_usuario, afecta_objetivo'),
+        supabase.from('hechizos_nodos').select('hechizo_id, nombre, afinidad, clase, hex_cost, es_conocido, pos_x, pos_y, radio, color, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo'),
         supabase.from('hechizos_strings').select('source_id, target_id'),
         supabase.from('hechizos_afinidades').select('afinidad, color_t, color_b'),
         supabase.from('personajes').select('nombre').eq('is_player', true).eq('is_active', true).order('nombre'),
