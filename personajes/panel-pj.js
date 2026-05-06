@@ -155,9 +155,9 @@ function _inyectarEstilos() {
 .ppj-hz-card{background:rgba(255,255,255,0.02);border-radius:7px;border:1px solid rgba(255,255,255,0.04);padding:10px 12px;margin-bottom:6px;}
 .ppj-hz-header{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;}
 .ppj-hz-af{font-size:0.58em;font-weight:700;letter-spacing:0.5px;padding:2px 6px;border-radius:4px;flex-shrink:0;margin-top:2px;text-transform:uppercase;}
-.ppj-hz-nombre{font-size:0.84em;font-weight:700;color:#d0d0e0;flex:1;}
-.ppj-hz-clase{font-size:0.62em;color:#4a4a68;flex-shrink:0;}
-.ppj-hz-hex{font-size:0.68em;color:#8a6a20;font-family:'Cinzel',serif;margin-bottom:4px;}
+.ppj-hz-nombre{font-size:0.88em;font-weight:700;color:#d0d0e0;flex:1;}
+.ppj-hz-clase{font-size:0.66em;color:#5a5a7a;flex-shrink:0;align-self:center;}
+.ppj-hz-hex{display:inline-flex;align-items:center;gap:3px;font-size:0.75em;color:#c9953a;font-family:'Cinzel',serif;background:rgba(212,175,55,0.07);border:1px solid rgba(212,175,55,0.2);border-radius:4px;padding:1px 6px;margin-left:6px;flex-shrink:0;}
 .ppj-hz-fields{display:flex;flex-direction:column;gap:3px;}
 .ppj-hz-field{font-size:0.7em;color:#5a5a78;line-height:1.4;}
 .ppj-hz-field strong{color:#888;font-weight:600;}
@@ -227,6 +227,12 @@ function _inyectarEstilos() {
 .ppj-cat-over:hover{background:rgba(220,60,60,0.22);}
 .ppj-cat-deasign{background:rgba(120,120,120,0.08);color:#888;border-color:rgba(120,120,120,0.2);}
 .ppj-cat-deasign:hover{background:rgba(120,120,120,0.18);color:#bbb;}
+.ppj-hz-badge{display:inline-flex;align-items:center;gap:3px;font-size:0.62em;padding:1px 6px;border-radius:10px;border:1px solid;flex-shrink:0;white-space:nowrap;}
+.ppj-hz-badge-estado{background:rgba(212,175,55,0.08);color:#c9953a;border-color:rgba(212,175,55,0.25);}
+.ppj-hz-badge-cast{background:rgba(100,180,255,0.07);color:#7ab8e8;border-color:rgba(100,180,255,0.2);}
+.ppj-hz-badge-afecta{background:rgba(140,100,220,0.07);color:#a07ad0;border-color:rgba(140,100,220,0.2);}
+.ppj-hz-btn-danger{background:rgba(200,50,50,0.12);color:#ff5555;border:1px solid rgba(200,50,50,0.35);border-radius:6px;padding:10px 18px;font-size:0.8em;font-family:'Cinzel',serif;cursor:pointer;transition:background 0.15s;}
+.ppj-hz-btn-danger:hover{background:rgba(200,50,50,0.28);}
 `;
     document.head.appendChild(st);
 }
@@ -755,15 +761,25 @@ async function _tabHechizos(nombre, body) {
         const editBtn = esAdmin && nd.hechizo_id
             ? `<button class="ppj-ctrl-btn" style="margin-left:auto;font-size:0.65em;" onclick="window._ppjAbrirEditorHz('${safeHzId}','${safe}','inv')">✏️</button>`
             : '';
+        const hexInv   = h.hechizo_hex > 0 ? `<span class="ppj-hz-hex">⬡ ${h.hechizo_hex}</span>` : '';
+        const clsBadge = cls ? `<span class="ppj-hz-clase">${cls}</span>` : '';
+        const estadoBadge = nd.es_estado ? `<span class="ppj-hz-badge ppj-hz-badge-estado">⬛ Estado</span>` : '';
+        const castParts = [];
+        if (nd.backcast > 0) castParts.push(`←${nd.backcast}`);
+        if (nd.nextcast > 0) castParts.push(`→${nd.nextcast}`);
+        const castBadge = castParts.length ? `<span class="ppj-hz-badge ppj-hz-badge-cast">⟳ ${castParts.join(' ')}</span>` : '';
+        const afTargets = [nd.afecta_hechizos?'🌀':'', nd.afecta_usuario?'🧙':'', nd.afecta_objetivo?'🎯':''].filter(Boolean).join('');
+        const afBadge  = afTargets ? `<span class="ppj-hz-badge ppj-hz-badge-afecta">${afTargets}</span>` : '';
         return `<div class="ppj-hz-card" data-hz-nombre="${(h.hechizo_nombre||'').toLowerCase()}"
             style="cursor:pointer;"
             onclick="if(window.centrarEnHechizo && '${safeHzId}') window.centrarEnHechizo('${safeHzId}')">
             <div class="ppj-hz-header">
                 <span class="ppj-hz-nombre">${h.hechizo_nombre}</span>
-                <span class="ppj-hz-clase">${cls}</span>
+                ${hexInv}${clsBadge}
                 ${editBtn}
             </div>
-            ${h.hechizo_hex>0?`<div class="ppj-hz-hex">⬡ ${h.hechizo_hex} HEX</div>`:''}            <div class="ppj-hz-fields">
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">${estadoBadge}${castBadge}${afBadge}</div>
+            <div class="ppj-hz-fields">
                 ${_campo('Efecto',nd.efecto)}${_campo('Resumen',nd.resumen)}
                 ${_campo('Overcast',nd.overcast)}${_campo('Undercast',nd.undercast)}${_campo('Especial',nd.especial)}
             </div>
@@ -880,6 +896,15 @@ async function _tabHechizos(nombre, body) {
                 ? `<button class="ppj-ctrl-btn" style="font-size:0.62em;" onclick="window._ppjAbrirEditorHz('${safeHzId}','${safe}','cat')">✏️</button>`
                 : '';
 
+            const hexBadgeCat = hexCost > 0 && showFull ? `<span class="ppj-hz-hex">⬡ ${hexCost}</span>` : '';
+            const clsBadgeCat = showFull ? `<span class="ppj-hz-clase">Cl.${n.clase||'?'}</span>` : `<span class="ppj-hz-clase">?</span>`;
+            const estadoBadgeCat = showFull && n.es_estado ? `<span class="ppj-hz-badge ppj-hz-badge-estado">⬛ Estado</span>` : '';
+            const castPartsCat = [];
+            if (showFull && n.backcast > 0) castPartsCat.push(`←${n.backcast}`);
+            if (showFull && n.nextcast > 0) castPartsCat.push(`→${n.nextcast}`);
+            const castBadgeCat = castPartsCat.length ? `<span class="ppj-hz-badge ppj-hz-badge-cast">⟳ ${castPartsCat.join(' ')}</span>` : '';
+            const afTargetsCat = showFull ? [n.afecta_hechizos?'🌀':'', n.afecta_usuario?'🧙':'', n.afecta_objetivo?'🎯':''].filter(Boolean).join('') : '';
+            const afBadgeCat   = afTargetsCat ? `<span class="ppj-hz-badge ppj-hz-badge-afecta">${afTargetsCat}</span>` : '';
             html += `<div class="ppj-hz-card ppj-cat-card ${isAssigned?'ppj-cat-assigned':''}"
                          data-cat-nombre="${(n.nombre||'').toLowerCase()}"
                          data-cat-id="${n.hechizo_id||''}"
@@ -887,12 +912,12 @@ async function _tabHechizos(nombre, body) {
                          style="cursor:pointer;">
                 <div class="ppj-hz-header">
                     <span class="ppj-hz-nombre ${!showFull?'ppj-hz-oculto':''}">${displayNombre}</span>
-                    <span class="ppj-hz-clase">${showFull?`Clase ${n.clase||'?'}`:'?'}</span>
+                    ${hexBadgeCat}${clsBadgeCat}
                     ${ocultoBadge}
                     ${isAssigned?`<span class="ppj-cat-assigned-tag">✓ Aprendido</span>`:''}
                     <span style="margin-left:auto;display:flex;gap:4px;">${editBtn}${toggleKnown}</span>
                 </div>
-                ${hexCost>0&&showFull?`<div class="ppj-hz-hex">⬡ ${hexCost} HEX</div>`:''}
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${estadoBadgeCat}${castBadgeCat}${afBadgeCat}</div>
                 ${showFull&&n.resumen?`<div class="ppj-hz-fields"><div class="ppj-hz-field">${n.resumen}</div></div>`:''}
                 ${esAdmin?`<div class="ppj-cat-actions">${isAssigned?btnsDeasign:btnsAsign}</div>`:''}
             </div>`;
