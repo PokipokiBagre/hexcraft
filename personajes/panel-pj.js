@@ -56,6 +56,7 @@ function _inyectarEstilos() {
 #panel-pj-root{position:fixed;top:0;right:0;width:440px;height:100vh;background:#08080f;border-left:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;z-index:1200;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1),width 0.28s cubic-bezier(0.4,0,0.2,1);font-family:'Inter',system-ui,sans-serif;box-shadow:-8px 0 40px rgba(0,0,0,0.6);}
 #panel-pj-root.open{transform:translateX(0);}
 #panel-pj-root.hz-mode{width:50vw;min-width:480px;}
+#panel-pj-root.obj-mode{width:50vw;min-width:480px;}
 #panel-pj-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1199;opacity:0;pointer-events:none;transition:opacity 0.28s;}
 #panel-pj-overlay.open{opacity:1;pointer-events:all;}
 .ppj-header{display:flex;align-items:center;gap:12px;padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;min-height:68px;}
@@ -275,6 +276,7 @@ export function cerrarPanelPJ() {
     document.getElementById('panel-pj-root')?.classList.remove('hz-mode');
     document.getElementById('panel-pj-overlay')?.classList.remove('open');
     cerrarMinimapa();
+    _cerrarPanelObjetos();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -343,6 +345,9 @@ function _renderTab(nombre, tab) {
         document.getElementById('panel-pj-root')?.classList.remove('hz-mode');
     } else {
         document.getElementById('panel-pj-root')?.classList.add('hz-mode');
+    }
+    if (tab !== 'objetos') {
+        _cerrarPanelObjetos();
     }
 
     switch(tab) {
@@ -974,144 +979,527 @@ async function _cargarAprendibles(nombre, body, lista, nodosMap, _colAf) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// TAB: OBJETOS — delega al panel-objetos.js
+// TAB: OBJETOS — split izq(catálogo) / der(inventario PJ)
+// Mismo patrón que tab Hechizos con minimapa
 // ─────────────────────────────────────────────────────────────
+
+let _objState = {
+    catalogo: [], inventario: [], contenidores: {},
+    busqCat: '', busqInv: '', filtroRar: 'Todos', filtroTipo: 'Todos',
+    nombrePJ: null,
+    modoCrear: false,       // mostrando form de crear objeto
+    objEditando: null,      // nombre del objeto en edición inline
+    expandedConts: new Set(),
+};
+
+function _cerrarPanelObjetos() {
+    document.getElementById('ppj-obj-panel-izq')?.remove();
+    document.getElementById('panel-pj-root')?.classList.remove('obj-mode');
+}
+
 async function _tabObjetos(nombre, body) {
+    _objState.nombrePJ     = nombre;
+    _objState.busqCat      = '';
+    _objState.busqInv      = '';
+    _objState.filtroRar    = 'Todos';
+    _objState.filtroTipo   = 'Todos';
+    _objState.modoCrear    = false;
+    _objState.objEditando  = null;
+    _objState.expandedConts= new Set();
+
+    // Activar modo wide igual que hechizos
+    document.getElementById('panel-pj-root')?.classList.add('obj-mode');
+
+    // Inyectar panel izquierdo (catálogo) si no existe
+    _cerrarPanelObjetos();
+    const izq = document.createElement('div');
+    izq.id = 'ppj-obj-panel-izq';
+    document.getElementById('panel-pj-root').insertAdjacentElement('beforebegin', izq);
+
+    // Inyectar estilos obj si no existen
+    if (!document.getElementById('ppj-obj-styles')) {
+        const s = document.createElement('style');
+        s.id = 'ppj-obj-styles';
+        s.textContent = `
+#ppj-obj-panel-izq{position:fixed;left:0;top:0;bottom:0;width:calc(100vw - 50vw);max-width:calc(100vw - 480px);display:flex;flex-direction:column;background:rgba(5,0,12,0.97);border-right:1px solid rgba(212,175,55,0.15);z-index:1200;font-family:'Inter',system-ui,sans-serif;overflow:hidden;}
+#panel-pj-root.obj-mode{width:50vw;min-width:480px;}
+@media(max-width:900px){#ppj-obj-panel-izq{display:none;}}
+.pobj-izq-header{flex-shrink:0;padding:10px 14px 8px;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.05);}
+.pobj-izq-scroll{flex:1;overflow-y:auto;padding:6px 10px 80px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,0.2) transparent;}
+.pobj-search-izq{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:5px;color:#ccc;padding:6px 9px;font-size:0.76em;outline:none;font-family:inherit;box-sizing:border-box;margin-bottom:6px;}
+.pobj-search-izq:focus{border-color:rgba(212,175,55,0.35);}
+.pobj-search-izq::placeholder{color:#3a3a58;}
+.pobj-filtros{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;}
+.pobj-fbtn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);color:#444;border-radius:4px;padding:2px 7px;font-size:0.6em;cursor:pointer;font-family:inherit;transition:all 0.12s;}
+.pobj-fbtn:hover{color:#888;}
+.pobj-fbtn.on{color:#d4af37;border-color:rgba(212,175,55,0.35);background:rgba(212,175,55,0.08);}
+.pobj-cat-card{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:6px;margin-bottom:4px;border:1px solid rgba(255,255,255,0.03);background:rgba(255,255,255,0.015);transition:background 0.1s;}
+.pobj-cat-card:hover{background:rgba(255,255,255,0.035);}
+.pobj-cat-card.en-inv{border-color:rgba(212,175,55,0.15);}
+.pobj-cat-img{width:38px;height:38px;border-radius:4px;object-fit:cover;background:#111;flex-shrink:0;border:1px solid rgba(255,255,255,0.05);}
+.pobj-cat-info{flex:1;min-width:0;}
+.pobj-cat-nombre{font-size:0.78em;font-weight:700;color:#d0d0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pobj-cat-sub{font-size:0.62em;color:#444;margin-top:1px;}
+.pobj-cat-eff{font-size:0.64em;color:#3a3a58;margin-top:2px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pobj-rar-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:3px;}
+.pobj-op-label-sm{font-size:0.6em;letter-spacing:1.2px;text-transform:uppercase;color:#3a3a58;font-weight:700;display:block;margin:10px 0 4px;}
+.pobj-input-sm{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);border-radius:5px;color:#ccc;padding:6px 8px;font-size:0.76em;box-sizing:border-box;outline:none;font-family:inherit;}
+.pobj-input-sm:focus{border-color:rgba(212,175,55,0.35);}
+textarea.pobj-input-sm{resize:vertical;min-height:50px;}
+select.pobj-input-sm{cursor:pointer;}
+.pobj-grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.pobj-btn-crear{width:100%;background:rgba(62,207,110,0.1);border:1px solid rgba(62,207,110,0.3);color:#3ecf6e;border-radius:5px;padding:7px;font-size:0.72em;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:0.5px;transition:all 0.12s;margin-top:6px;}
+.pobj-btn-crear:hover{background:rgba(62,207,110,0.22);}
+.pobj-btn-gold{background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);color:#d4af37;border-radius:5px;padding:5px 10px;font-size:0.7em;cursor:pointer;font-family:inherit;transition:all 0.12s;}
+.pobj-btn-gold:hover{background:rgba(212,175,55,0.2);}
+.pobj-btn-danger{background:rgba(220,60,60,0.08);border:1px solid rgba(220,60,60,0.25);color:#ff6060;border-radius:5px;padding:5px 10px;font-size:0.7em;cursor:pointer;font-family:inherit;transition:all 0.12s;}
+.pobj-btn-danger:hover{background:rgba(220,60,60,0.18);}
+.pobj-section-title{font-size:0.6em;letter-spacing:1.5px;text-transform:uppercase;color:#3a3a58;font-weight:700;margin:10px 0 5px;}
+.pobj-transfer-row{display:flex;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:5px;margin-bottom:3px;font-size:0.72em;cursor:pointer;transition:background 0.1s;}
+.pobj-transfer-row:hover{background:rgba(255,255,255,0.05);}
+.pobj-transfer-row.sel{border-color:rgba(212,175,55,0.35);background:rgba(212,175,55,0.06);color:#d4af37;}
+        `;
+        document.head.appendChild(s);
+    }
+
     body.innerHTML = '<div class="ppj-loader">Cargando objetos…</div>';
 
-    // Cargar módulo OP si el admin está activo (import dinámico, solo una vez)
-    if (estadoUI.esAdmin && !window._pobjopAbrirEditor) {
-        try { await import('../panel-objetos-op.js'); } catch(e) { console.warn('panel-objetos-op.js no cargado:', e); }
-    }
+    // Cargar datos
+    const [catRes, invRes] = await Promise.all([
+        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul,contenedor_padre').eq('es_propuesta', false).order('nombre'),
+        supabase.from('inventario_objetos').select('objeto_nombre,cantidad,equipado').eq('personaje_nombre', nombre).gt('cantidad', 0),
+    ]);
 
-    const esAdmin = estadoUI.esAdmin;
+    _objState.catalogo   = catRes.data || [];
+    _objState.inventario = invRes.data || [];
 
-    // ── Cargar datos para la vista inline del tab ─────────────
-    const { data: items } = await supabase
-        .from('inventario_objetos')
-        .select('objeto_nombre, cantidad, equipado')
-        .eq('personaje_nombre', nombre)
-        .gt('cantidad', 0);
-
-    const lista = items || [];
-    const nombres = lista.map(i => i.objeto_nombre);
-
-    let defMap = {};
-    let contenidoMap = {};
-
-    if (nombres.length > 0) {
-        const { data: defs } = await supabase.from('objetos')
-            .select('nombre, tipo, rareza, efecto, descripcion, vida_roja, vida_azul, contenedor_padre')
-            .in('nombre', nombres);
-        (defs||[]).forEach(o => { defMap[o.nombre] = o; });
-
-        const contenedores = lista.filter(i => defMap[i.objeto_nombre]?.tipo === 'Contenedor').map(i => i.objeto_nombre);
-        if (contenedores.length > 0) {
-            const { data: cont } = await supabase.from('objetos')
-                .select('nombre, contenedor_padre').in('contenedor_padre', contenedores);
-            (cont||[]).forEach(c => {
-                if (!contenidoMap[c.contenedor_padre]) contenidoMap[c.contenedor_padre] = [];
-                contenidoMap[c.contenedor_padre].push(c.nombre);
-            });
+    // Mapa contenedor → hijos
+    _objState.contenidores = {};
+    _objState.catalogo.forEach(o => {
+        if (o.contenedor_padre) {
+            if (!_objState.contenidores[o.contenedor_padre]) _objState.contenidores[o.contenedor_padre] = [];
+            _objState.contenidores[o.contenedor_padre].push(o.nombre);
         }
-    }
-
-    const sorted = [...lista].sort((a, b) => {
-        if (a.equipado !== b.equipado) return b.equipado - a.equipado;
-        return _rarOrd(defMap[b.objeto_nombre]?.rareza) - _rarOrd(defMap[a.objeto_nombre]?.rareza);
     });
 
-    const safe = nombre.replace(/'/g, "\\'");
-    const EQUIPABLES = ['Equipamiento', 'Accesorio', 'Vehículo', 'Vehiculo'];
+    _renderObjIzq();
+    _renderObjDer(nombre, body);
 
-    const _renderObj = (item) => {
-        const def      = defMap[item.objeto_nombre] || {};
-        const isEqp    = item.equipado;
-        const rarCol   = _rarColor(def.rareza);
-        const tipo     = def.tipo || '-';
-        const safeObj  = item.objeto_nombre.replace(/'/g, "\\'");
-        const esContenedor = tipo === 'Contenedor';
-        const esVehiculo   = tipo === 'Vehículo' || tipo === 'Vehiculo';
-        const puedeEquipar = EQUIPABLES.includes(tipo);
-        const contenidos   = contenidoMap[item.objeto_nombre] || [];
+    // Limpiar al cambiar tab
+    window._ppjObjLimpiar = _cerrarPanelObjetos;
+}
 
-        // Botón OP de editar objeto (solo admin)
-        const editBtn = esAdmin && def.nombre
-            ? `<button class="ppj-ctrl-btn" style="font-size:0.6em;margin-left:auto;" title="Editar objeto"
-                onclick="window._pobjopAbrirEditor('${safeObj}')">✏️</button>`
-            : '';
+// ── PANEL IZQUIERDO: catálogo + funciones OP ─────────────────
+function _renderObjIzq() {
+    const izq = document.getElementById('ppj-obj-panel-izq');
+    if (!izq) return;
 
-        // Botón gestionar contenedor (solo admin)
-        const contBtn = esAdmin && esContenedor
-            ? `<button class="ppj-ctrl-btn" style="font-size:0.6em;" title="Gestionar contenedor"
-                onclick="window._pobjopAbrirContenedor('${safeObj}')">📦</button>`
-            : '';
+    const esAdmin  = estadoUI.esAdmin;
+    const RAREZAS  = ['Todos','Común','Raro','Legendario'];
+    const tipos    = ['Todos', ...new Set(_objState.catalogo.map(o=>o.tipo).filter(t=>t&&t!=='-'))].sort((a,b)=>a==='Todos'?-1:a.localeCompare(b));
+    const RAR_COL  = {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
+    const _imgObj  = (n) => { try{return `${window._hexConfig?.storageUrl||''}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
+    const _fall    = () => { try{return `${window._hexConfig?.storageUrl||''}/imginterfaz/no_encontrado.png`;}catch{return '';} };
 
-        return `<div class="ppj-obj-card ${isEqp ? 'equipado' : ''}" data-nombre="${item.objeto_nombre.toLowerCase()}">
-            <div class="ppj-obj-header">
-                <span class="ppj-obj-cant">×${item.cantidad}</span>
-                <span class="ppj-obj-nombre" title="${item.objeto_nombre}">${item.objeto_nombre}</span>
-                <span class="ppj-obj-rar" style="background:${rarCol}22;color:${rarCol};border:1px solid ${rarCol}44;">${def.rareza || '-'}</span>
-                ${editBtn}${contBtn}
-            </div>
-            ${def.efecto ? `<div class="ppj-obj-det">${def.efecto}</div>` : ''}
-            ${esVehiculo ? `<div class="ppj-obj-vehiculo">
-                ${(def.vida_roja||0) > 0 ? `<span class="ppj-obj-vida-pill ppj-obj-vida-roja">❤ ${def.vida_roja}</span>` : ''}
-                ${(def.vida_azul||0) > 0 ? `<span class="ppj-obj-vida-pill ppj-obj-vida-azul">💙 ${def.vida_azul}</span>` : ''}
-            </div>` : ''}
-            ${esContenedor && contenidos.length > 0 ? `<div class="ppj-contenedor-items">
-                ${contenidos.map(c => `<div class="ppj-contenedor-item">• ${c}</div>`).join('')}
-            </div>` : ''}
-            <div class="ppj-obj-footer">
-                <span class="ppj-obj-tipo">${tipo}</span>
-                ${puedeEquipar ? `<button class="ppj-eqp-btn ${isEqp ? 'on' : 'off'}"
-                    onclick="window._ppjToggleEquipar('${safe}','${safeObj}',${!isEqp})">
-                    ${isEqp ? '✓ Equipado' : 'Equipar'}</button>` : ''}
-            </div>
+    const q        = _objState.busqCat.toLowerCase().trim();
+    const invSet   = new Set(_objState.inventario.map(i=>i.objeto_nombre));
+
+    const lista = _objState.catalogo.filter(o => {
+        if (_objState.filtroRar  !== 'Todos' && o.rareza !== _objState.filtroRar) return false;
+        if (_objState.filtroTipo !== 'Todos' && o.tipo   !== _objState.filtroTipo) return false;
+        if (q && !o.nombre.toLowerCase().includes(q) && !(o.efecto||'').toLowerCase().includes(q)) return false;
+        return true;
+    });
+
+    // Determinar qué sección mostrar en la izquierda
+    let seccionIzq = 'catalogo'; // 'catalogo' | 'crear' | 'editar' | 'transfer' | 'imagenes'
+    if (_objState.modoCrear)     seccionIzq = 'crear';
+    if (_objState.objEditando)   seccionIzq = 'editar';
+    if (_objState.modoTransfer)  seccionIzq = 'transfer';
+    if (_objState.modoImagenes)  seccionIzq = 'imagenes';
+
+    const btnVolver = `<button class="pobj-btn-gold" onclick="window._pobjVolverCatalogo()" style="margin-bottom:8px;">← Catálogo</button>`;
+
+    let contenidoScroll = '';
+
+    if (seccionIzq === 'crear' || seccionIzq === 'editar') {
+        const obj     = seccionIzq === 'editar' ? _objState.catalogo.find(o=>o.nombre===_objState.objEditando) : null;
+        const esNuevo = seccionIzq === 'crear';
+        const TIPOS   = ['Consumible','Herramienta','Accesorio','Equipo','Equipamiento','Contenedor','-'];
+        const MATS    = ['Cristal','Metal','Orgánico','Sagrado','-'];
+        const RARS    = ['Común','Raro','Legendario','-'];
+        const contPadreOpts = _objState.catalogo.filter(o=>o.tipo==='Contenedor'&&o.nombre!==_objState.objEditando)
+            .map(o=>`<option value="${o.nombre.replace(/"/g,'&quot;')}" ${obj?.contenedor_padre===o.nombre?'selected':''}>${o.nombre}</option>`).join('');
+
+        contenidoScroll = `${btnVolver}
+        <div class="pobj-section-title">${esNuevo?'Nuevo objeto':'Editar: '+_objState.objEditando}</div>
+        <label class="pobj-op-label-sm">Nombre *</label>
+        <input id="pobj-f-nombre" class="pobj-input-sm" value="${(obj?.nombre||'').replace(/"/g,'&quot;')}" placeholder="Nombre único" ${!esNuevo?'readonly style="opacity:0.5"':''}>
+        <div class="pobj-grid2" style="margin-top:6px;">
+            <div><label class="pobj-op-label-sm">Tipo</label>
+            <select id="pobj-f-tipo" class="pobj-input-sm">${TIPOS.map(t=>`<option value="${t}" ${(obj?.tipo||'-')===t?'selected':''}>${t}</option>`).join('')}</select></div>
+            <div><label class="pobj-op-label-sm">Material</label>
+            <select id="pobj-f-mat" class="pobj-input-sm">${MATS.map(m=>`<option value="${m}" ${(obj?.material||'-')===m?'selected':''}>${m}</option>`).join('')}</select></div>
+        </div>
+        <div class="pobj-grid2" style="margin-top:4px;">
+            <div><label class="pobj-op-label-sm">Rareza</label>
+            <select id="pobj-f-rar" class="pobj-input-sm">${RARS.map(r=>`<option value="${r}" ${(obj?.rareza||'Común')===r?'selected':''}>${r}</option>`).join('')}</select></div>
+            <div><label class="pobj-op-label-sm">Contenedor padre</label>
+            <select id="pobj-f-cont" class="pobj-input-sm"><option value="">— Ninguno —</option>${contPadreOpts}</select></div>
+        </div>
+        <label class="pobj-op-label-sm" style="margin-top:6px;">Efecto / Descripción</label>
+        <textarea id="pobj-f-eff" class="pobj-input-sm">${obj?.efecto||''}</textarea>
+        <div class="pobj-grid2" style="margin-top:4px;">
+            <div><label class="pobj-op-label-sm">Vida Roja +</label><input id="pobj-f-vr" type="number" class="pobj-input-sm" value="${obj?.vida_roja||0}" min="0"></div>
+            <div><label class="pobj-op-label-sm">Vida Azul +</label><input id="pobj-f-va" type="number" class="pobj-input-sm" value="${obj?.vida_azul||0}" min="0"></div>
+        </div>
+        ${esNuevo ? `<label class="pobj-op-label-sm" style="margin-top:8px;">Dar al personaje actual (cantidad)</label>
+        <input id="pobj-f-cant-pj" type="number" class="pobj-input-sm" value="" placeholder="0 = no asignar" min="0">` : ''}
+        <div style="display:flex;gap:6px;margin-top:10px;">
+            <button class="pobj-btn-crear" onclick="window._pobjGuardarObjeto(${!esNuevo?`'${(_objState.objEditando||'').replace(/'/g,"\\'")}'`:'null'})">${esNuevo?'✨ Crear':'💾 Guardar'}</button>
+            ${!esNuevo?`<button class="pobj-btn-danger" onclick="window._pobjEliminarObjeto('${(_objState.objEditando||'').replace(/'/g,"\\'")}')">🗑</button>`:''}
         </div>`;
-    };
 
-    const equipados   = sorted.filter(i => i.equipado);
-    const noEquipados = sorted.filter(i => !i.equipado);
+    } else if (seccionIzq === 'transfer') {
+        const pjSafe  = _objState.nombrePJ.replace(/'/g,"\\'");
+        const CANTS   = [1,3,5,10,'TODO'];
+        const personajesDisp = Object.keys(personajes).filter(p => p !== _objState.nombrePJ).sort();
+        const selDest = _objState.transferDest || '';
+        const selObj  = _objState.transferObj  || '';
+        const selCant = _objState.transferCant || 1;
 
-    // ── Botones OP (solo admin) ───────────────────────────────
-    const botonesOP = esAdmin ? `
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
-            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
-                onclick="window._pobjopAbrirCrear()">✨ Crear objeto</button>
-            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
-                onclick="window._pobjopAbrirCrearMulti()">⚒️ Forja múltiple</button>
-            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
-                onclick="window._pobjopAbrirAsignacionMasiva()">🎁 Asignar</button>
-            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
-                onclick="window._pobjopAbrirTransfer()">⇄ Mover</button>
-            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
-                onclick="window._pobjopAbrirImagenes()">🖼️ Imágenes</button>
-        </div>` : '';
+        const invItems = _objState.inventario.filter(i=>i.cantidad>0);
 
-    if (lista.length === 0) {
-        body.innerHTML = `<div class="ppj-section">
-            ${botonesOP}
-            <div class="ppj-empty"><div class="ppj-empty-icon">🎒</div>Inventario vacío</div>
-        </div>`;
-        return;
+        contenidoScroll = `${btnVolver}
+        <div class="pobj-section-title">Mover objeto a otro inventario</div>
+        <label class="pobj-op-label-sm">1. Destino</label>
+        <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;">
+            ${personajesDisp.map(p=>`<div class="pobj-transfer-row ${selDest===p?'sel':''}" onclick="window._pobjSelDest('${p.replace(/'/g,"\\'")}')">
+                <span style="flex:1;color:${personajes[p]?.isPlayer?'#ccc':'#777'}">${p}</span>
+            </div>`).join('')}
+        </div>
+        <label class="pobj-op-label-sm">2. Objeto</label>
+        <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;">
+            ${invItems.map(i=>`<div class="pobj-transfer-row ${selObj===i.objeto_nombre?'sel':''}" onclick="window._pobjSelObj('${i.objeto_nombre.replace(/'/g,"\\'")}')">
+                <span style="flex:1;">${i.objeto_nombre}</span><b style="color:#d4af37">×${i.cantidad}</b>
+            </div>`).join('')}
+        </div>
+        <label class="pobj-op-label-sm">3. Cantidad</label>
+        <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;">
+            ${CANTS.map(c=>`<button class="pobj-fbtn ${selCant===c?'on':''}" onclick="window._pobjSelCant('${c}')">${c==='TODO'?'Todo':'×'+c}</button>`).join('')}
+        </div>
+        <button class="pobj-btn-crear" onclick="window._pobjEjecutarTransfer()">⇄ Transferir</button>`;
+
+    } else if (seccionIzq === 'imagenes') {
+        const selImg = _objState.imgSelObj || '';
+        const filt   = (_objState.imgBusq||'').toLowerCase();
+        const listaImg = _objState.catalogo.filter(o=>!filt||o.nombre.toLowerCase().includes(filt));
+
+        contenidoScroll = `${btnVolver}
+        <div class="pobj-section-title">Subir imagen de objeto</div>
+        <input class="pobj-search-izq" placeholder="Buscar objeto…" value="${_objState.imgBusq||''}" oninput="window._pobjImgBuscar(this.value)">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px;">
+            ${listaImg.map(o=>`<div onclick="window._pobjImgSeleccionar('${o.nombre.replace(/'/g,"\\'")}')"
+                style="cursor:pointer;border-radius:5px;overflow:hidden;border:2px solid ${selImg===o.nombre?'#d4af37':'transparent'};transition:all 0.12s;">
+                <img src="${_imgObj(o.nombre)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:100%;height:48px;object-fit:cover;display:block;background:#111;">
+                <div style="font-size:0.55em;color:#555;padding:2px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${o.nombre}</div>
+            </div>`).join('')}
+        </div>
+        ${selImg ? `
+        <div style="padding:10px;background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.18);border-radius:6px;margin-bottom:8px;">
+            <div style="font-size:0.75em;color:#d4af37;font-weight:700;margin-bottom:6px;">📍 ${selImg}</div>
+            <div id="pobj-img-drop-zone" style="border:2px dashed rgba(212,175,55,0.25);border-radius:6px;padding:20px;text-align:center;color:#3a3a58;font-size:0.72em;cursor:pointer;transition:all 0.12s;"
+                onclick="document.getElementById('pobj-img-file').click()"
+                ondragover="event.preventDefault();this.style.borderColor='#d4af37';this.style.color='#d4af37';"
+                ondragleave="this.style.borderColor='rgba(212,175,55,0.25)';this.style.color='#3a3a58';"
+                ondrop="window._pobjImgDrop(event)">
+                🖼️ Clic o arrastra imagen aquí
+            </div>
+            <input type="file" id="pobj-img-file" accept="image/*" style="display:none" onchange="window._pobjImgSubir(this.files[0])">
+            <div id="pobj-img-status" style="font-size:0.68em;margin-top:6px;color:#555;"></div>
+        </div>` : `<div class="ppj-empty" style="padding:16px 0;font-size:0.7em;">← Selecciona un objeto para subir su imagen</div>`}`;
+
+    } else {
+        // Catálogo normal
+        const btnNuevo = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirCrear()" style="width:100%;margin-bottom:6px;text-align:center;">✨ Nuevo objeto</button>` : '';
+        const btnTransf= esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirTransfer()" style="flex:1;">⇄ Mover</button>` : '';
+        const btnImg   = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirImagenes()" style="flex:1;">🖼️ Imágenes</button>` : '';
+
+        const listaHTML = lista.length === 0
+            ? `<div class="ppj-empty" style="padding:20px 0;font-size:0.72em;">Sin resultados</div>`
+            : lista.map(o => {
+                const enInv  = invSet.has(o.nombre);
+                const oSafe  = o.nombre.replace(/'/g,"\\'");
+                const rc     = RAR_COL[o.rareza]||'#888';
+                const hijos  = (_objState.contenidores[o.nombre]||[]).length;
+                const addBtn = esAdmin
+                    ? `<button class="pobj-btn-gold" style="padding:2px 7px;font-size:0.6em;flex-shrink:0;" onclick="window._pobjDarAlPJ('${oSafe}',1)">${enInv?'+1':'Dar'}</button>` : '';
+                const editBtn= esAdmin
+                    ? `<button class="pobj-fbtn" style="padding:2px 6px;" onclick="window._pobjAbrirEditar('${oSafe}')">✏️</button>` : '';
+
+                return `<div class="pobj-cat-card ${enInv?'en-inv':''}">
+                    <img class="pobj-cat-img" src="${_imgObj(o.nombre)}" onerror="this.onerror=null;this.src='${_fall()}'" loading="lazy">
+                    <div class="pobj-cat-info">
+                        <div class="pobj-cat-nombre">${o.nombre}${hijos>0?`<span style="color:#6496ff;font-size:0.7em;margin-left:4px;">📦${hijos}</span>`:''}</div>
+                        <div class="pobj-cat-sub">${o.tipo||'-'} · ${o.material||'-'} · <span style="color:${rc}">${o.rareza||'-'}</span></div>
+                        <div class="pobj-cat-eff">${o.efecto||''}</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end;">${addBtn}${editBtn}</div>
+                </div>`;
+            }).join('');
+
+        contenidoScroll = `
+        ${btnNuevo}
+        ${esAdmin ? `<div style="display:flex;gap:4px;margin-bottom:6px;">${btnTransf}${btnImg}</div>` : ''}
+        <input class="pobj-search-izq" placeholder="Buscar en catálogo…" value="${_objState.busqCat}" oninput="window._pobjBusqCat(this.value)">
+        <div class="pobj-filtros">
+            ${RAREZAS.map(r=>`<button class="pobj-fbtn ${_objState.filtroRar===r?'on':''}" onclick="window._pobjFiltroRar('${r}')">${r}</button>`).join('')}
+            <span style="color:#2e2e48;font-size:0.6em;align-self:center;">·</span>
+            ${tipos.slice(0,6).map(t=>`<button class="pobj-fbtn ${_objState.filtroTipo===t?'on':''}" onclick="window._pobjFiltroTipo('${t.replace(/'/g,"\\'")}')">${t}</button>`).join('')}
+        </div>
+        ${listaHTML}`;
     }
 
+    izq.innerHTML = `
+        <div class="pobj-izq-header">
+            <span style="font-size:0.6em;letter-spacing:1.8px;text-transform:uppercase;color:#3a3a58;font-weight:700;">🎒 Catálogo de Objetos</span>
+        </div>
+        <div class="pobj-izq-scroll">${contenidoScroll}</div>`;
+}
+
+// ── PANEL DERECHO: inventario del PJ ─────────────────────────
+function _renderObjDer(nombre, body) {
+    if (!body) { body = document.getElementById('ppj-body'); }
+    if (!body) return;
+
+    const esAdmin  = estadoUI.esAdmin;
+    const safe     = nombre.replace(/'/g,"\\'");
+    const EQUIPABLES = ['Equipamiento','Accesorio','Vehículo','Vehiculo'];
+    const RAR_COL  = {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
+
+    const sorted = [..._objState.inventario].sort((a,b)=>{
+        if (a.equipado!==b.equipado) return b.equipado-a.equipado;
+        const rOrd = {'Legendario':3,'Raro':2,'Común':1,'-':0};
+        const catA = _objState.catalogo.find(o=>o.nombre===a.objeto_nombre);
+        const catB = _objState.catalogo.find(o=>o.nombre===b.objeto_nombre);
+        return (rOrd[catB?.rareza]||0)-(rOrd[catA?.rareza]||0);
+    });
+
+    const q = (_objState.busqInv||'').toLowerCase();
+    const lista = sorted.filter(i=>!q||i.objeto_nombre.toLowerCase().includes(q));
+
+    const _renderItem = (item) => {
+        const cat      = _objState.catalogo.find(o=>o.nombre===item.objeto_nombre)||{};
+        const isEqp    = item.equipado;
+        const rarCol   = RAR_COL[cat.rareza]||'#888';
+        const tipo     = cat.tipo||'-';
+        const safeObj  = item.objeto_nombre.replace(/'/g,"\\'");
+        const puedeEqp = EQUIPABLES.includes(tipo);
+        const esContenedor = tipo==='Contenedor';
+        const esVehiculo   = tipo==='Vehículo'||tipo==='Vehiculo';
+        const hijos    = _objState.contenidores[item.objeto_nombre]||[];
+        const expanded = _objState.expandedConts.has(item.objeto_nombre);
+
+        const ctrlHTML = esAdmin ? `
+            <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
+                <button class="ppj-ctrl-btn" onclick="window._pobjModCant('${safeObj}',-1)">−</button>
+                <span style="font-size:0.85em;font-weight:700;color:#d4af37;min-width:18px;text-align:center;">${item.cantidad}</span>
+                <button class="ppj-ctrl-btn" onclick="window._pobjModCant('${safeObj}',1)">+</button>
+            </div>` : `<span style="font-size:0.85em;font-weight:700;color:#d4af37;">×${item.cantidad}</span>`;
+
+        let html = `<div class="ppj-obj-card ${isEqp?'equipado':''}" data-nombre="${item.objeto_nombre.toLowerCase()}">
+            <div class="ppj-obj-header">
+                <span class="ppj-obj-nombre" title="${item.objeto_nombre}">${item.objeto_nombre}
+                    ${isEqp?`<span style="font-size:0.6em;background:rgba(212,175,55,0.15);color:#d4af37;border:1px solid rgba(212,175,55,0.3);border-radius:3px;padding:1px 4px;margin-left:4px;">EQP</span>`:''}
+                </span>
+                <span class="ppj-obj-rar" style="background:${rarCol}22;color:${rarCol};border:1px solid ${rarCol}44;">${cat.rareza||'-'}</span>
+                ${ctrlHTML}
+                ${esContenedor?`<button class="ppj-ctrl-btn" onclick="window._pobjToggleCont('${safeObj}')" title="Ver contenido">${expanded?'▲':'▼'}</button>`:''}
+            </div>
+            ${cat.efecto?`<div class="ppj-obj-det">${cat.efecto}</div>`:''}
+            ${esVehiculo?`<div class="ppj-obj-vehiculo">
+                ${(cat.vida_roja||0)>0?`<span class="ppj-obj-vida-pill ppj-obj-vida-roja">❤ ${cat.vida_roja}</span>`:''}
+                ${(cat.vida_azul||0)>0?`<span class="ppj-obj-vida-pill ppj-obj-vida-azul">💙 ${cat.vida_azul}</span>`:''}
+            </div>`:''}
+            <div class="ppj-obj-footer">
+                <span class="ppj-obj-tipo">${tipo}</span>
+                ${puedeEqp?`<button class="ppj-eqp-btn ${isEqp?'on':'off'}" onclick="window._ppjToggleEquipar('${safe}','${safeObj}',${!isEqp})">${isEqp?'✓ Equipado':'Equipar'}</button>`:''}
+            </div>
+        </div>`;
+
+        if (esContenedor && expanded && hijos.length > 0) {
+            html += `<div style="padding-left:12px;border-left:1px solid rgba(100,150,255,0.2);margin-bottom:4px;">` +
+                hijos.map(h => {
+                    const hCat  = _objState.catalogo.find(o=>o.nombre===h)||{};
+                    const hInv  = _objState.inventario.find(i=>i.objeto_nombre===h);
+                    const hCant = hInv?.cantidad||0;
+                    const hSafe = h.replace(/'/g,"\\'");
+                    const addBtn= esAdmin ? `<button class="ppj-ctrl-btn" onclick="window._pobjDarAlPJ('${hSafe}',1)" style="font-size:0.6em;padding:0 5px;">+</button>`:'';
+                    return `<div class="ppj-obj-card" style="opacity:${hCant>0?1:0.45};margin-bottom:3px;">
+                        <div class="ppj-obj-header">
+                            <span class="ppj-obj-nombre" style="font-size:0.75em;">${h}</span>
+                            <span style="font-size:0.72em;color:#d4af37;">×${hCant}</span>
+                            ${hCant>0&&esAdmin?`<button class="ppj-ctrl-btn" onclick="window._pobjModCant('${hSafe}',-1)">−</button>`:''}
+                            ${addBtn}
+                        </div>
+                    </div>`;
+                }).join('') +
+            `</div>`;
+        }
+
+        return html;
+    };
+
+    const equipados   = lista.filter(i=>i.equipado);
+    const noEquipados = lista.filter(i=>!i.equipado);
+
     body.innerHTML = `<div class="ppj-section">
-        ${botonesOP}
-        <input class="ppj-obj-search" placeholder="Buscar objeto…" oninput="window._ppjFiltrarObjetos(this.value)">
+        <input class="ppj-obj-search" placeholder="Buscar en inventario…" oninput="window._ppjFiltrarObjetos(this.value)">
         <div id="ppj-obj-lista">
-            ${equipados.length ? `<div class="ppj-obj-seccion-titulo">Equipados</div>${equipados.map(_renderObj).join('')}` : ''}
-            ${noEquipados.length ? `<div class="ppj-obj-seccion-titulo">Inventario</div>${noEquipados.map(_renderObj).join('')}` : ''}
+            ${lista.length===0?`<div class="ppj-empty"><div class="ppj-empty-icon">🎒</div>Sin objetos</div>`:''}
+            ${equipados.length?`<div class="ppj-obj-seccion-titulo">Equipados</div>${equipados.map(_renderItem).join('')}`:''}
+            ${noEquipados.length?`<div class="ppj-obj-seccion-titulo">Inventario</div>${noEquipados.map(_renderItem).join('')}`:''}
         </div>
     </div>`;
-
-    // Refrescar tras operaciones OP
-    window._pobjRecargarDesdeOP = async () => {
-        const b = document.getElementById('ppj-body');
-        if (b) _tabObjetos(nombre, b);
-    };
 }
+
+// ── Helpers de recarga ────────────────────────────────────────
+async function _recargarObjetos() {
+    const nombre = _objState.nombrePJ;
+    if (!nombre) return;
+    const [catRes, invRes] = await Promise.all([
+        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul,contenedor_padre').eq('es_propuesta', false).order('nombre'),
+        supabase.from('inventario_objetos').select('objeto_nombre,cantidad,equipado').eq('personaje_nombre', nombre).gt('cantidad', 0),
+    ]);
+    _objState.catalogo   = catRes.data || [];
+    _objState.inventario = invRes.data || [];
+    _objState.contenidores = {};
+    _objState.catalogo.forEach(o => {
+        if (o.contenedor_padre) {
+            if (!_objState.contenidores[o.contenedor_padre]) _objState.contenidores[o.contenedor_padre] = [];
+            _objState.contenidores[o.contenedor_padre].push(o.nombre);
+        }
+    });
+    _renderObjIzq();
+    _renderObjDer(nombre, document.getElementById('ppj-body'));
+}
+
+// ── Funciones globales de objetos ─────────────────────────────
+window._pobjVolverCatalogo = () => {
+    _objState.modoCrear     = false;
+    _objState.objEditando   = null;
+    _objState.modoTransfer  = false;
+    _objState.modoImagenes  = false;
+    _renderObjIzq();
+};
+window._pobjAbrirCrear    = () => { _objState.modoCrear=true; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _renderObjIzq(); };
+window._pobjAbrirEditar   = (n) => { _objState.objEditando=n; _objState.modoCrear=false; _objState.modoTransfer=false; _objState.modoImagenes=false; _renderObjIzq(); };
+window._pobjAbrirTransfer = () => { _objState.modoTransfer=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoImagenes=false; _objState.transferDest=null; _objState.transferObj=null; _objState.transferCant=1; _renderObjIzq(); };
+window._pobjAbrirImagenes = () => { _objState.modoImagenes=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.imgSelObj=null; _renderObjIzq(); };
+window._pobjBusqCat       = (v) => { _objState.busqCat=v; _renderObjIzq(); };
+window._pobjFiltroRar     = (v) => { _objState.filtroRar=v; _renderObjIzq(); };
+window._pobjFiltroTipo    = (v) => { _objState.filtroTipo=v; _renderObjIzq(); };
+window._pobjToggleCont    = (n) => { if(_objState.expandedConts.has(n))_objState.expandedConts.delete(n); else _objState.expandedConts.add(n); _renderObjDer(_objState.nombrePJ); };
+
+// Transfer
+window._pobjSelDest  = (v) => { _objState.transferDest=v; _renderObjIzq(); };
+window._pobjSelObj   = (v) => { _objState.transferObj=v; _renderObjIzq(); };
+window._pobjSelCant  = (v) => { _objState.transferCant=v==='TODO'?'TODO':parseInt(v); _renderObjIzq(); };
+window._pobjEjecutarTransfer = async () => {
+    const {transferDest:dest, transferObj:obj, transferCant:cant, nombrePJ:origen} = _objState;
+    if (!dest||!obj) { alert('Selecciona destino y objeto.'); return; }
+    const invItem = _objState.inventario.find(i=>i.objeto_nombre===obj);
+    if (!invItem) return;
+    const cantReal = cant==='TODO' ? invItem.cantidad : Math.min(cant, invItem.cantidad);
+    const origenNuevo = invItem.cantidad - cantReal;
+    if (origenNuevo===0) { await supabase.from('inventario_objetos').delete().eq('personaje_nombre',origen).eq('objeto_nombre',obj); }
+    else { await supabase.from('inventario_objetos').update({cantidad:origenNuevo}).eq('personaje_nombre',origen).eq('objeto_nombre',obj); }
+    const {data:destData} = await supabase.from('inventario_objetos').select('cantidad').eq('personaje_nombre',dest).eq('objeto_nombre',obj).maybeSingle();
+    await supabase.from('inventario_objetos').upsert({personaje_nombre:dest,objeto_nombre:obj,cantidad:(destData?.cantidad||0)+cantReal,equipado:false},{onConflict:'personaje_nombre,objeto_nombre'});
+    window.mostrarToast?.(`✅ ${cantReal}× ${obj} → ${dest}`);
+    _objState.modoTransfer=false; _objState.transferDest=null; _objState.transferObj=null;
+    await _recargarObjetos();
+};
+
+// Dar objeto del catálogo al PJ actual
+window._pobjDarAlPJ = async (nombreObj, cantidad) => {
+    if (!estadoUI.esAdmin) return;
+    const inv = _objState.inventario.find(i=>i.objeto_nombre===nombreObj);
+    const nuevaCant = (inv?.cantidad||0) + cantidad;
+    await supabase.from('inventario_objetos').upsert({personaje_nombre:_objState.nombrePJ,objeto_nombre:nombreObj,cantidad:nuevaCant,equipado:false},{onConflict:'personaje_nombre,objeto_nombre'});
+    await _recargarObjetos();
+};
+
+// Modificar cantidad
+window._pobjModCant = async (nombreObj, delta) => {
+    if (!estadoUI.esAdmin) return;
+    const inv = _objState.inventario.find(i=>i.objeto_nombre===nombreObj);
+    const nueva = Math.max(0,(inv?.cantidad||0)+delta);
+    if (nueva===0) { await supabase.from('inventario_objetos').delete().eq('personaje_nombre',_objState.nombrePJ).eq('objeto_nombre',nombreObj); }
+    else { await supabase.from('inventario_objetos').upsert({personaje_nombre:_objState.nombrePJ,objeto_nombre:nombreObj,cantidad:nueva},{onConflict:'personaje_nombre,objeto_nombre'}); }
+    await _recargarObjetos();
+};
+
+// Guardar objeto (crear o editar)
+window._pobjGuardarObjeto = async (nombreExistente) => {
+    const esNuevo = !nombreExistente;
+    const nombre  = (document.getElementById('pobj-f-nombre')?.value||'').trim();
+    const tipo    = document.getElementById('pobj-f-tipo')?.value||'-';
+    const mat     = document.getElementById('pobj-f-mat')?.value||'-';
+    const rar     = document.getElementById('pobj-f-rar')?.value||'Común';
+    const eff     = (document.getElementById('pobj-f-eff')?.value||'').trim();
+    const vr      = parseInt(document.getElementById('pobj-f-vr')?.value)||0;
+    const va      = parseInt(document.getElementById('pobj-f-va')?.value)||0;
+    const cont    = document.getElementById('pobj-f-cont')?.value||null;
+    if (!nombre) { alert('El nombre es obligatorio.'); return; }
+    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,contenedor_padre:cont||null,es_propuesta:false};
+    let error;
+    if (esNuevo) { ({error}=await supabase.from('objetos').insert(payload)); }
+    else         { ({error}=await supabase.from('objetos').update(payload).eq('nombre',nombreExistente)); }
+    if (error) { alert('Error: '+error.message); return; }
+    if (esNuevo) {
+        const cantPJ = parseInt(document.getElementById('pobj-f-cant-pj')?.value)||0;
+        if (cantPJ>0) await supabase.from('inventario_objetos').upsert({personaje_nombre:_objState.nombrePJ,objeto_nombre:nombre,cantidad:cantPJ,equipado:false},{onConflict:'personaje_nombre,objeto_nombre'});
+    }
+    window.mostrarToast?.(esNuevo?'✨ Objeto creado':'💾 Guardado');
+    _objState.modoCrear=false; _objState.objEditando=null;
+    await _recargarObjetos();
+};
+
+window._pobjEliminarObjeto = async (nombre) => {
+    if (!confirm(`¿Eliminar "${nombre}" del catálogo? Se quitará de todos los inventarios.`)) return;
+    const {error}=await supabase.from('objetos').delete().eq('nombre',nombre);
+    if (error) { alert('Error: '+error.message); return; }
+    window.mostrarToast?.('🗑 Eliminado');
+    _objState.objEditando=null;
+    await _recargarObjetos();
+};
+
+// Imágenes
+window._pobjImgSeleccionar = (n) => { _objState.imgSelObj=n; _renderObjIzq(); };
+window._pobjImgBuscar = (v) => { _objState.imgBusq=v; _renderObjIzq(); };
+window._pobjImgDrop = (e) => { e.preventDefault(); e.currentTarget.style.borderColor='rgba(212,175,55,0.25)'; e.currentTarget.style.color='#3a3a58'; const f=e.dataTransfer?.files?.[0]; if(f) window._pobjImgSubir(f); };
+window._pobjImgSubir = async (file) => {
+    if (!file||!_objState.imgSelObj) return;
+    const status=document.getElementById('pobj-img-status');
+    if (status) status.textContent='Subiendo…';
+    const _norm=(s)=>s.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+    const path=`${_norm(_objState.imgSelObj)}.png`;
+    const img=new Image(); const url=URL.createObjectURL(file);
+    img.onload=async()=>{
+        const canvas=document.createElement('canvas'); canvas.width=img.naturalWidth; canvas.height=img.naturalHeight;
+        canvas.getContext('2d').drawImage(img,0,0); URL.revokeObjectURL(url);
+        canvas.toBlob(async(blob)=>{
+            const {error}=await supabase.storage.from('imgobjetos').upload(path,blob,{upsert:true,contentType:'image/png'});
+            if(error){if(status)status.innerHTML=`<span style="color:#ff6060">Error: ${error.message}</span>`;return;}
+            if(status)status.innerHTML=`<span style="color:#3ecf6e">✅ Imagen actualizada</span>`;
+        },'image/png');
+    };
+    img.onerror=()=>{if(status)status.innerHTML=`<span style="color:#ff6060">No se pudo leer la imagen</span>`;};
+    img.src=url;
+};
+
+window._pobjRecargarDesdeOP = _recargarObjetos;
 
 // ─────────────────────────────────────────────────────────────
 // TAB: MISIONES
