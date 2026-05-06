@@ -1736,6 +1736,10 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
 
     if (!id || !nombre) { alert('El ID y el nombre son obligatorios.'); return; }
 
+    // Incluir posición del nodo temporal del mapa (si existe) al crear
+    const tempMapId = window._ppjHzTempMapNodeId;
+    // Buscar el nodo en el mapa para obtener su posición actual
+    const tempNodo = tempMapId && window._pmhGetNodo ? window._pmhGetNodo(tempMapId) : null;
     const payload = {
         hechizo_id: id, nombre, afinidad, clase,
         hex_cost: hexCost, es_conocido: conocido,
@@ -1744,6 +1748,7 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
         afecta_hechizos: afHechizos,
         afecta_usuario:  afUsuario,
         afecta_objetivo: afObjetivo,
+        ...((!idOriginal && tempNodo) ? { pos_x: Math.round(tempNodo.x), pos_y: Math.round(tempNodo.y) } : {}),
     };
 
     // Guardar nodo: UPDATE si es edición, INSERT si es nuevo
@@ -1753,6 +1758,13 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
         ({ error: errNodo } = await supabase.from('hechizos_nodos')
             .update(payload)
             .eq('hechizo_id', idOriginal));
+        // Si la posición fue modificada en el mapa, guardarla también
+        if (!errNodo && tempNodo && tempNodo._dirty) {
+            await supabase.from('hechizos_nodos')
+                .update({ pos_x: Math.round(tempNodo.x), pos_y: Math.round(tempNodo.y) })
+                .eq('hechizo_id', idOriginal);
+            tempNodo._dirty = false;
+        }
     } else {
         // Creación: insert nuevo
         ({ error: errNodo } = await supabase.from('hechizos_nodos')
