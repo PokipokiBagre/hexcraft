@@ -672,7 +672,7 @@ async function _tabHechizos(nombre, body) {
     let nodosMapInv = {};
     if (hNombres.length > 0) {
         const { data: nd } = await supabase.from('hechizos_nodos')
-            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id, backcast, nextcast, es_estado, es_prioridad, afecta_hechizos, afecta_usuario, afecta_objetivo')
+            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo')
             .in('nombre', hNombres);
         (nd||[]).forEach(n => { nodosMapInv[n.nombre] = n; });
     }
@@ -1172,26 +1172,27 @@ window._ppjBuscarHz = (query) => {
         return;
     }
 
-    // 1. Marcar cada card como visible u oculto
+    // PASO 1: Abrir TODO (necesario para que los cards sean accesibles en el DOM visual)
+    inv.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => a.classList.add('open'));
+
+    // PASO 2: Marcar cada card
     inv.querySelectorAll('.ppj-hz-card').forEach(c => {
-        const nombre = c.getAttribute('data-hz-nombre') || '';
+        const nombre = (c.getAttribute('data-hz-nombre') || '').toLowerCase();
         const texto  = c.textContent.toLowerCase();
         const match  = nombre.includes(q) || texto.includes(q);
         c.classList.toggle('ppj-hidden', !match);
         c.style.display = match ? '' : 'none';
     });
 
-    // 2. Para cada ppj-af-acc, abrir si tiene ALGÚN card visible (en cualquier profundidad)
-    //    y también abrir sus ppj-cl-acc hijos que tengan cards visibles
+    // PASO 3: Cerrar los que no tienen ningún card visible
+    // Primero los cl-acc (hijos), luego los af-acc (padres)
+    inv.querySelectorAll('.ppj-cl-acc').forEach(cl => {
+        const tieneVisible = cl.querySelector('.ppj-hz-card:not(.ppj-hidden)') !== null;
+        cl.classList.toggle('open', tieneVisible);
+    });
     inv.querySelectorAll('.ppj-af-acc').forEach(af => {
-        const cardsVisibles = [...af.querySelectorAll('.ppj-hz-card')].filter(c => !c.classList.contains('ppj-hidden'));
-        af.classList.toggle('open', cardsVisibles.length > 0);
-
-        // Abrir/cerrar sub-acordeones de clase según si tienen cards visibles
-        af.querySelectorAll('.ppj-cl-acc').forEach(cl => {
-            const clVisible = [...cl.querySelectorAll('.ppj-hz-card')].some(c => !c.classList.contains('ppj-hidden'));
-            cl.classList.toggle('open', clVisible);
-        });
+        const tieneVisible = af.querySelector('.ppj-hz-card:not(.ppj-hidden)') !== null;
+        af.classList.toggle('open', tieneVisible);
     });
 };
 
