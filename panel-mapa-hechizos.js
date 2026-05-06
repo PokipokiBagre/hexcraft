@@ -576,8 +576,11 @@ function _dibujar() {
         const tP = posesiones.has(e.target);
 
         if (hayEnfoque) {
-            // Modo enfoque: solo resaltar enlaces del nodo seleccionado
-            if (e.target === enfocado && enfoqPrev.has(e.source)) {
+            // Modo enfoque: resaltar toda la cadena de ancestros y salientes
+            const srcEsAncestro = enfoqPrev.has(e.source);
+            const tgtEsAncestro = enfoqPrev.has(e.target) || e.target === enfocado;
+            if (srcEsAncestro && tgtEsAncestro) {
+                // Enlace dentro de la cadena de precedentes (incluyendo el último hacia el nodo)
                 color = COLOR_ENFOQ_PREV; lw = 2.0 / sf;
             } else if (e.source === enfocado && enfoqNext.has(e.target)) {
                 color = COLOR_ENFOQ_NEXT; lw = 2.0 / sf;
