@@ -52,8 +52,9 @@ function _inyectarEstilos() {
     const st = document.createElement('style');
     st.id = 'panel-pj-styles';
     st.textContent = `
-#panel-pj-root{position:fixed;top:0;right:0;width:440px;height:100vh;background:#08080f;border-left:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;z-index:1200;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);font-family:'Inter',system-ui,sans-serif;box-shadow:-8px 0 40px rgba(0,0,0,0.6);}
+#panel-pj-root{position:fixed;top:0;right:0;width:440px;height:100vh;background:#08080f;border-left:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;z-index:1200;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1),width 0.28s cubic-bezier(0.4,0,0.2,1);font-family:'Inter',system-ui,sans-serif;box-shadow:-8px 0 40px rgba(0,0,0,0.6);}
 #panel-pj-root.open{transform:translateX(0);}
+#panel-pj-root.hz-mode{width:50vw;min-width:480px;}
 #panel-pj-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1199;opacity:0;pointer-events:none;transition:opacity 0.28s;}
 #panel-pj-overlay.open{opacity:1;pointer-events:all;}
 .ppj-header{display:flex;align-items:center;gap:12px;padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;min-height:68px;}
@@ -258,6 +259,7 @@ export function abrirPanelPJ(nombre) {
 export function cerrarPanelPJ() {
     estadoUI.panelAbierto = false;
     document.getElementById('panel-pj-root')?.classList.remove('open');
+    document.getElementById('panel-pj-root')?.classList.remove('hz-mode');
     document.getElementById('panel-pj-overlay')?.classList.remove('open');
     cerrarMinimapa();
 }
@@ -323,7 +325,12 @@ function _renderTab(nombre, tab) {
     body.innerHTML = `<div class="ppj-loader">Cargando…</div>`;
 
     // Cerrar minimapa si cambiamos a otro tab
-    if (tab !== 'hechizos') cerrarMinimapa();
+    if (tab !== 'hechizos') {
+        cerrarMinimapa();
+        document.getElementById('panel-pj-root')?.classList.remove('hz-mode');
+    } else {
+        document.getElementById('panel-pj-root')?.classList.add('hz-mode');
+    }
 
     switch(tab) {
         case 'hex':      _tabHex(nombre, body);               break;
@@ -1230,9 +1237,13 @@ window._ppjToggleConocido = async (hechizo_id, nuevoValor, nombrePJ) => {
 window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
     if (!estadoUI.esAdmin) return;
 
-    // Cargar datos del hechizo existente (si edición)
+    const body = document.getElementById('ppj-body');
+    if (!body) return;
+    body.innerHTML = `<div class="ppj-loader">Cargando editor…</div>`;
+
+    // Cargar datos del hechizo existente
     let nodo = null;
-    let stringsActuales = []; // source_id[] que apuntan a este hechizo
+    let stringsActuales = [];
     if (hechizo_id) {
         const { data: nd } = await supabase.from('hechizos_nodos')
             .select('*').eq('hechizo_id', hechizo_id).single();
@@ -1242,15 +1253,15 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
         stringsActuales = (strs || []).map(s => s.source_id);
     }
 
-    // Cargar todos los nodos para el selector de dependencias
     const { data: todosNodos } = await supabase.from('hechizos_nodos')
         .select('hechizo_id, nombre, afinidad, clase').order('nombre');
     const nodosList = (todosNodos || []).filter(n => n.hechizo_id !== hechizo_id);
 
     const esNuevo = !hechizo_id;
     const titulo  = esNuevo ? 'Nuevo hechizo' : `Editar · ${nodo?.nombre || hechizo_id}`;
+    const esCon   = nodo ? nodo.es_conocido : (modo === 'inv');
+    const asigPj  = esNuevo && modo === 'inv';
 
-    // Estado local de strings seleccionados
     let strsSel = [...stringsActuales];
 
     const _renderStrTags = () => {
@@ -1261,13 +1272,10 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
             const lbl = nd ? nd.nombre : sid;
             return `<span class="ppj-hz-str-tag">${lbl}<span class="rm" onclick="window._ppjHzRemoveStr('${sid}')">✕</span></span>`;
         }).join('');
-
-        // Opciones disponibles (no seleccionadas aún)
         const disponibles = nodosList.filter(n => !strsSel.includes(n.hechizo_id));
         const opciones = disponibles.map(n =>
             `<option value="${n.hechizo_id}">${n.nombre} (${n.afinidad||'?'} · Cl.${n.clase||'?'})</option>`
         ).join('');
-
         wrap.innerHTML = tags + `
             <select class="ppj-hz-str-add" onchange="window._ppjHzAddStr(this.value); this.value=''">
                 <option value="">＋ Agregar precedente…</option>
@@ -1281,84 +1289,113 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
     window._ppjHzRemoveStr = (sid) => {
         strsSel = strsSel.filter(s => s !== sid); _renderStrTags();
     };
+    window._ppjHzStrsSel    = () => strsSel;
+    window._ppjHzIdOriginal = hechizo_id;
 
-    // Construir modal
-    const bg = document.createElement('div');
-    bg.className = 'ppj-hz-modal-bg';
-    bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+    // Renderizar editor INLINE dentro del ppj-body
+    body.innerHTML = `
+    <div style="padding:14px 16px 80px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.06);">
+            <button class="ppj-ctrl-btn" style="font-size:0.9em;width:28px;height:28px;"
+                onclick="window._ppjVolverHechizos('${nombrePJ.replace(/'/g,"\\'")}')">←</button>
+            <span style="font-family:'Cinzel',serif;color:#d4af37;font-size:0.85em;letter-spacing:1px;">${titulo}</span>
+        </div>
 
-    const esCon  = nodo ? nodo.es_conocido : (modo === 'inv');
-    const asigPj = esNuevo && modo === 'inv';
-
-    bg.innerHTML = `<div class="ppj-hz-modal">
-        <h3>${titulo}</h3>
         <div class="ppj-hz-modal-row">
             <div>
-                <label>ID único (snake_case)</label>
-                <input id="hze-id" value="${nodo?.hechizo_id||''}" placeholder="hechizo_nuevo" ${!esNuevo?'readonly':''}>
+                <label class="ppj-hz-inline-label">ID único</label>
+                <input class="ppj-hz-inline-input" id="hze-id" value="${nodo?.hechizo_id||''}" placeholder="hechizo_nuevo" ${!esNuevo?'readonly':''}>
             </div>
             <div>
-                <label>Nombre visible</label>
-                <input id="hze-nombre" value="${nodo?.nombre||''}" placeholder="Nombre del hechizo">
+                <label class="ppj-hz-inline-label">Nombre visible</label>
+                <input class="ppj-hz-inline-input" id="hze-nombre" value="${nodo?.nombre||''}" placeholder="Nombre del hechizo">
             </div>
         </div>
-        <div class="ppj-hz-modal-row">
+        <div class="ppj-hz-modal-row" style="margin-top:10px;">
             <div>
-                <label>Afinidad</label>
-                <select id="hze-afinidad">
+                <label class="ppj-hz-inline-label">Afinidad</label>
+                <select class="ppj-hz-inline-input" id="hze-afinidad">
                     ${['Física','Energética','Espiritual','Mando','Psíquica','Oscura','Desconocida'].map(a =>
                         `<option ${(nodo?.afinidad||'')==a?'selected':''}>${a}</option>`
                     ).join('')}
                 </select>
             </div>
             <div>
-                <label>Clase</label>
-                <select id="hze-clase">
+                <label class="ppj-hz-inline-label">Clase</label>
+                <select class="ppj-hz-inline-input" id="hze-clase">
                     ${['1','2','3','4','5'].map(c =>
                         `<option value="${c}" ${(nodo?.clase||'1')==c?'selected':''}>${c}</option>`
                     ).join('')}
                 </select>
             </div>
         </div>
-        <div class="ppj-hz-modal-row">
+        <div class="ppj-hz-modal-row" style="margin-top:10px;">
             <div>
-                <label>Costo HEX</label>
-                <input id="hze-hex" type="number" min="0" value="${nodo?.hex_cost||0}">
+                <label class="ppj-hz-inline-label">Costo HEX</label>
+                <input class="ppj-hz-inline-input" id="hze-hex" type="number" min="0" value="${nodo?.hex_cost||0}">
             </div>
-            <div style="display:flex;align-items:center;gap:8px;padding-top:24px;">
-                <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <div style="display:flex;align-items:center;padding-top:20px;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.75em;color:#888;">
                     <input type="checkbox" id="hze-conocido" ${esCon?'checked':''}>
-                    <span style="font-size:0.75em;color:#888;">Público (visible para todos)</span>
+                    Público (visible para todos)
                 </label>
             </div>
         </div>
-        <label>Resumen</label>
-        <input id="hze-resumen" value="${nodo?.resumen||''}" placeholder="Descripción breve">
-        <label>Efecto</label>
-        <textarea id="hze-efecto">${nodo?.efecto||''}</textarea>
-        <label>Overcast (100%)</label>
-        <input id="hze-overcast" value="${nodo?.overcast||''}" placeholder="">
-        <label>Undercast (50%)</label>
-        <input id="hze-undercast" value="${nodo?.undercast||''}" placeholder="">
-        <label>Especial</label>
-        <input id="hze-especial" value="${nodo?.especial||''}" placeholder="">
-        <label>Precedentes (strings de entrada)</label>
+
+        <label class="ppj-hz-inline-label" style="margin-top:12px;">Resumen</label>
+        <input class="ppj-hz-inline-input" id="hze-resumen" value="${(nodo?.resumen||'').replace(/"/g,'&quot;')}" placeholder="Descripción breve">
+
+        <label class="ppj-hz-inline-label" style="margin-top:10px;">Efecto</label>
+        <textarea class="ppj-hz-inline-input" id="hze-efecto" style="resize:vertical;min-height:70px;">${nodo?.efecto||''}</textarea>
+
+        <label class="ppj-hz-inline-label" style="margin-top:10px;">Overcast (100%)</label>
+        <input class="ppj-hz-inline-input" id="hze-overcast" value="${(nodo?.overcast||'').replace(/"/g,'&quot;')}">
+
+        <label class="ppj-hz-inline-label" style="margin-top:10px;">Undercast (50%)</label>
+        <input class="ppj-hz-inline-input" id="hze-undercast" value="${(nodo?.undercast||'').replace(/"/g,'&quot;')}">
+
+        <label class="ppj-hz-inline-label" style="margin-top:10px;">Especial</label>
+        <input class="ppj-hz-inline-input" id="hze-especial" value="${(nodo?.especial||'').replace(/"/g,'&quot;')}">
+
+        <label class="ppj-hz-inline-label" style="margin-top:10px;">Precedentes (strings de entrada)</label>
         <div class="ppj-hz-strings-wrap" id="ppj-hz-str-wrap"></div>
-        <div class="ppj-hz-modal-footer">
-            <button class="ppj-hz-btn-cancel" onclick="document.querySelector('.ppj-hz-modal-bg').remove()">Cancelar</button>
-            <button class="ppj-hz-btn-save" onclick="window._ppjGuardarHz('${nombrePJ}',${JSON.stringify(asigPj)})">
-                ${esNuevo ? 'Crear hechizo' : 'Guardar cambios'}
+
+        <div style="display:flex;gap:8px;margin-top:20px;">
+            <button class="ppj-hz-btn-cancel" style="flex:1;"
+                onclick="window._ppjVolverHechizos('${nombrePJ.replace(/'/g,"\\'")}')">Cancelar</button>
+            <button class="ppj-hz-btn-save" style="flex:2;"
+                onclick="window._ppjGuardarHz('${nombrePJ.replace(/'/g,"\\'")}',${JSON.stringify(asigPj)})">
+                ${esNuevo ? '✨ Crear hechizo' : '💾 Guardar cambios'}
             </button>
         </div>
     </div>`;
 
-    document.body.appendChild(bg);
-    _renderStrTags();
+    // Inyectar estilos inline si no existen
+    if (!document.getElementById('ppj-hz-inline-styles')) {
+        const st = document.createElement('style');
+        st.id = 'ppj-hz-inline-styles';
+        st.textContent = `
+.ppj-hz-inline-label{font-size:0.65em;color:#5a5a78;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;}
+.ppj-hz-inline-input{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#ccc;padding:7px 10px;font-size:0.8em;box-sizing:border-box;outline:none;font-family:inherit;}
+.ppj-hz-inline-input:focus{border-color:rgba(212,175,55,0.4);}
+.ppj-hz-inline-input[readonly]{opacity:0.5;cursor:not-allowed;}
+.ppj-hz-btn-save{background:rgba(212,175,55,0.15);color:#d4af37;border:1px solid rgba(212,175,55,0.4);border-radius:6px;padding:10px 18px;font-size:0.8em;font-family:'Cinzel',serif;cursor:pointer;transition:background 0.15s;}
+.ppj-hz-btn-save:hover{background:rgba(212,175,55,0.28);}
+.ppj-hz-btn-cancel{background:transparent;color:#5a5a78;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px 18px;font-size:0.8em;font-family:'Cinzel',serif;cursor:pointer;}
+.ppj-hz-btn-cancel:hover{color:#888;border-color:rgba(255,255,255,0.2);}
+`;
+        document.head.appendChild(st);
+    }
 
-    // Guardar strsSel accesible para _ppjGuardarHz
-    window._ppjHzStrsSel = () => strsSel;
-    window._ppjHzIdOriginal = hechizo_id;
+    _renderStrTags();
 };
+
+// Volver a la tab de hechizos desde el editor inline
+window._ppjVolverHechizos = (nombrePJ) => {
+    const body = document.getElementById('ppj-body');
+    if (body) _tabHechizos(nombrePJ, body);
+};
+
 
 window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
     if (!estadoUI.esAdmin) return;
@@ -1413,9 +1450,5 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
         }
     }
 
-    document.querySelector('.ppj-hz-modal-bg')?.remove();
-
-    // Refrescar pestaña
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHechizos(nombrePJ, body);
+    window._ppjVolverHechizos(nombrePJ);
 };
