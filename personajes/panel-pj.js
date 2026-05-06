@@ -1162,22 +1162,33 @@ window._ppjBuscarHz = (query) => {
     const q = query.toLowerCase().trim();
     const inv = document.getElementById('ppj-hz-inv-list');
     if (!inv) return;
+
     if (!q) {
-        inv.querySelectorAll('.ppj-hz-card').forEach(c => { c.style.display = ''; });
-        inv.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => { a.classList.remove('open'); });
+        // Restaurar todo
+        inv.querySelectorAll('.ppj-hz-card').forEach(c => c.classList.remove('ppj-hidden'));
+        inv.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => a.classList.remove('open'));
         return;
     }
+
+    // 1. Marcar cards que no matchean
     inv.querySelectorAll('.ppj-hz-card').forEach(c => {
         const nombre = c.getAttribute('data-hz-nombre') || '';
-        c.style.display = nombre.includes(q) ? '' : 'none';
+        const texto  = c.textContent.toLowerCase();
+        const match  = nombre.includes(q) || texto.includes(q);
+        c.classList.toggle('ppj-hidden', !match);
+        c.style.display = match ? '' : 'none';
     });
+
+    // 2. Abrir ppj-cl-acc si tiene algún card visible
     inv.querySelectorAll('.ppj-cl-acc').forEach(cl => {
-        const visible = cl.querySelectorAll('.ppj-hz-card:not([style*="display: none"]):not([style*="display:none"])').length;
-        cl.classList.toggle('open', visible > 0);
+        const hayVisible = [...cl.querySelectorAll('.ppj-hz-card')].some(c => !c.classList.contains('ppj-hidden'));
+        cl.classList.toggle('open', hayVisible);
     });
+
+    // 3. Abrir ppj-af-acc si tiene algún card visible (en cualquier nivel)
     inv.querySelectorAll('.ppj-af-acc').forEach(af => {
-        const visible = af.querySelectorAll('.ppj-hz-card:not([style*="display: none"]):not([style*="display:none"])').length;
-        af.classList.toggle('open', visible > 0);
+        const hayVisible = [...af.querySelectorAll('.ppj-hz-card')].some(c => !c.classList.contains('ppj-hidden'));
+        af.classList.toggle('open', hayVisible);
     });
 };
 
@@ -1186,19 +1197,27 @@ window._ppjBuscarCat = (query) => {
     const q = query.toLowerCase().trim();
     const cat = document.getElementById('ppj-cat-lista');
     if (!cat) return;
+
     if (!q) {
-        cat.querySelectorAll('.ppj-cat-card').forEach(c => { c.style.display = ''; });
-        cat.querySelectorAll('.ppj-cat-acc').forEach(a => { a.classList.remove('open'); });
+        cat.querySelectorAll('.ppj-cat-card').forEach(c => { c.classList.remove('ppj-hidden'); c.style.display = ''; });
+        cat.querySelectorAll('.ppj-cat-acc').forEach(a => a.classList.remove('open'));
         return;
     }
+
+    // 1. Marcar cards que no matchean
     cat.querySelectorAll('.ppj-cat-card').forEach(c => {
         const nombre = c.getAttribute('data-cat-nombre') || '';
         const id     = c.getAttribute('data-cat-id') || '';
-        c.style.display = (nombre.includes(q) || id.toLowerCase().includes(q)) ? '' : 'none';
+        const texto  = c.textContent.toLowerCase();
+        const match  = nombre.includes(q) || id.toLowerCase().includes(q) || texto.includes(q);
+        c.classList.toggle('ppj-hidden', !match);
+        c.style.display = match ? '' : 'none';
     });
+
+    // 2. Abrir ppj-cat-acc si tiene algún card visible
     cat.querySelectorAll('.ppj-cat-acc').forEach(af => {
-        const visible = af.querySelectorAll('.ppj-cat-card:not([style*="display: none"]):not([style*="display:none"])').length;
-        af.classList.toggle('open', visible > 0);
+        const hayVisible = [...af.querySelectorAll('.ppj-cat-card')].some(c => !c.classList.contains('ppj-hidden'));
+        af.classList.toggle('open', hayVisible);
     });
 };
 
