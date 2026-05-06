@@ -599,7 +599,7 @@ function _dibujar() {
         const esTodos = _estado.jugadorPanel === 'Todos';
 
         // Color núcleo basado en estado global
-        let colorNucleo = esTodos ? 'rgba(100,95,130,0.7)' : 'rgba(60,60,70,0.3)';
+        let colorNucleo = esTodos ? 'rgba(100,95,130,0.7)' : 'rgba(80,75,105,0.75)';
         if (esNuevo)      colorNucleo = COLOR_NUEVO;
         else if (esDes)   colorNucleo = esPar ? COLOR_RASTR : COLOR_POS;
         else if (esApr)   colorNucleo = COLOR_APR;
@@ -648,12 +648,12 @@ function _dibujar() {
         ctx.fillStyle = '#0d0d1a';
         ctx.fill();
 
-        // Núcleo
+        // Núcleo — siempre rellenado con su color (nunca vacío)
         ctx.beginPath();
         ctx.arc(nodo.x, nodo.y, Math.max(1, nodo.radio - 7), 0, Math.PI*2);
-        const rellenar = esDes || esApr || esNuevo || esTodos;
-        ctx.fillStyle = rellenar ? colorNucleo : '#0d0d1a';
-        if (rellenar) { ctx.shadowBlur = esNuevo ? 14 : 7; ctx.shadowColor = colorNucleo; }
+        const rellenar = true; // siempre rellenar con colorNucleo
+        ctx.fillStyle = colorNucleo;
+        if (esDes || esApr || esNuevo || esTodos) { ctx.shadowBlur = esNuevo ? 14 : 7; ctx.shadowColor = colorNucleo; }
         ctx.fill();
         ctx.shadowBlur = 0;
 
