@@ -1058,6 +1058,8 @@ select.pobj-input-sm{cursor:pointer;}
 .pobj-transfer-row{display:flex;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:5px;margin-bottom:3px;font-size:0.72em;cursor:pointer;transition:background 0.1s;}
 .pobj-transfer-row:hover{background:rgba(255,255,255,0.05);}
 .pobj-transfer-row.sel{border-color:rgba(212,175,55,0.35);background:rgba(212,175,55,0.06);color:#d4af37;}
+.pobj-cat-card[draggable="true"]{cursor:grab;}.pobj-cat-card[draggable="true"]:active{cursor:grabbing;}
+.pobj-drop-over,.ppj-obj-card.pobj-drop-over{outline:1px dashed rgba(212,175,55,0.5)!important;background:rgba(212,175,55,0.05)!important;}
         `;
         document.head.appendChild(s);
     }
@@ -1095,8 +1097,11 @@ function _renderObjIzq() {
     if (!izq) return;
 
     const esAdmin  = estadoUI.esAdmin;
+    // Filtros en orden: primero tipos, luego rareza
+    const TIPOS_FIJO = ['Todos','Consumible','Herramienta','Accesorio','Equipo','Contenedor','Vehículo'];
+    const tiposExtra = [...new Set(_objState.catalogo.map(o=>o.tipo).filter(t=>t&&t!=='-'&&!TIPOS_FIJO.includes(t)))].sort();
+    const TIPOS_FILTRO = [...TIPOS_FIJO, ...tiposExtra];
     const RAREZAS  = ['Todos','Común','Raro','Legendario'];
-    const tipos    = ['Todos', ...new Set(_objState.catalogo.map(o=>o.tipo).filter(t=>t&&t!=='-'))].sort((a,b)=>a==='Todos'?-1:a.localeCompare(b));
     const RAR_COL  = {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
     const _imgObj  = (n) => { try{return `${window._hexConfig?.storageUrl||''}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
     const _fall    = () => { try{return `${window._hexConfig?.storageUrl||''}/imginterfaz/no_encontrado.png`;}catch{return '';} };
@@ -1111,12 +1116,12 @@ function _renderObjIzq() {
         return true;
     });
 
-    // Determinar qué sección mostrar en la izquierda
-    let seccionIzq = 'catalogo'; // 'catalogo' | 'crear' | 'editar' | 'transfer' | 'imagenes'
+    let seccionIzq = 'catalogo';
     if (_objState.modoCrear)     seccionIzq = 'crear';
     if (_objState.objEditando)   seccionIzq = 'editar';
     if (_objState.modoTransfer)  seccionIzq = 'transfer';
     if (_objState.modoImagenes)  seccionIzq = 'imagenes';
+    if (_objState.modoForja)     seccionIzq = 'forja';
 
     const btnVolver = `<button class="pobj-btn-gold" onclick="window._pobjVolverCatalogo()" style="margin-bottom:8px;">← Catálogo</button>`;
 
@@ -1125,11 +1130,10 @@ function _renderObjIzq() {
     if (seccionIzq === 'crear' || seccionIzq === 'editar') {
         const obj     = seccionIzq === 'editar' ? _objState.catalogo.find(o=>o.nombre===_objState.objEditando) : null;
         const esNuevo = seccionIzq === 'crear';
-        const TIPOS   = ['Consumible','Herramienta','Accesorio','Equipo','Equipamiento','Contenedor','-'];
+        // Sin Equipamiento (duplicado), sin Vehículo como tipo editable aquí, sin contenedor padre
+        const TIPOS   = ['Consumible','Herramienta','Accesorio','Equipo','Contenedor','Vehículo','-'];
         const MATS    = ['Cristal','Metal','Orgánico','Sagrado','-'];
         const RARS    = ['Común','Raro','Legendario','-'];
-        const contPadreOpts = _objState.catalogo.filter(o=>o.tipo==='Contenedor'&&o.nombre!==_objState.objEditando)
-            .map(o=>`<option value="${o.nombre.replace(/"/g,'&quot;')}" ${obj?.contenedor_padre===o.nombre?'selected':''}>${o.nombre}</option>`).join('');
 
         contenidoScroll = `${btnVolver}
         <div class="pobj-section-title">${esNuevo?'Nuevo objeto':'Editar: '+_objState.objEditando}</div>
@@ -1144,30 +1148,57 @@ function _renderObjIzq() {
         <div class="pobj-grid2" style="margin-top:4px;">
             <div><label class="pobj-op-label-sm">Rareza</label>
             <select id="pobj-f-rar" class="pobj-input-sm">${RARS.map(r=>`<option value="${r}" ${(obj?.rareza||'Común')===r?'selected':''}>${r}</option>`).join('')}</select></div>
-            <div><label class="pobj-op-label-sm">Contenedor padre</label>
-            <select id="pobj-f-cont" class="pobj-input-sm"><option value="">— Ninguno —</option>${contPadreOpts}</select></div>
+            <div><label class="pobj-op-label-sm">Vida Roja + / Azul +</label>
+            <div style="display:flex;gap:4px;"><input id="pobj-f-vr" type="number" class="pobj-input-sm" value="${obj?.vida_roja||0}" min="0" placeholder="VR"><input id="pobj-f-va" type="number" class="pobj-input-sm" value="${obj?.vida_azul||0}" min="0" placeholder="VA"></div></div>
         </div>
         <label class="pobj-op-label-sm" style="margin-top:6px;">Efecto / Descripción</label>
         <textarea id="pobj-f-eff" class="pobj-input-sm">${obj?.efecto||''}</textarea>
-        <div class="pobj-grid2" style="margin-top:4px;">
-            <div><label class="pobj-op-label-sm">Vida Roja +</label><input id="pobj-f-vr" type="number" class="pobj-input-sm" value="${obj?.vida_roja||0}" min="0"></div>
-            <div><label class="pobj-op-label-sm">Vida Azul +</label><input id="pobj-f-va" type="number" class="pobj-input-sm" value="${obj?.vida_azul||0}" min="0"></div>
-        </div>
-        ${esNuevo ? `<label class="pobj-op-label-sm" style="margin-top:8px;">Dar al personaje actual (cantidad)</label>
-        <input id="pobj-f-cant-pj" type="number" class="pobj-input-sm" value="" placeholder="0 = no asignar" min="0">` : ''}
+        ${esNuevo ? `<label class="pobj-op-label-sm" style="margin-top:8px;">Dar al personaje actual</label>
+        <input id="pobj-f-cant-pj" type="number" class="pobj-input-sm" value="0" min="0">` : ''}
         <div style="display:flex;gap:6px;margin-top:10px;">
             <button class="pobj-btn-crear" onclick="window._pobjGuardarObjeto(${!esNuevo?`'${(_objState.objEditando||'').replace(/'/g,"\\'")}'`:'null'})">${esNuevo?'✨ Crear':'💾 Guardar'}</button>
             ${!esNuevo?`<button class="pobj-btn-danger" onclick="window._pobjEliminarObjeto('${(_objState.objEditando||'').replace(/'/g,"\\'")}')">🗑</button>`:''}
         </div>`;
 
+    } else if (seccionIzq === 'forja') {
+        // Forja múltiple: grid compacto, N configurable
+        const N = _objState.forjaN || 4;
+        const TIPOS_F = ['Consumible','Herramienta','Accesorio','Equipo','Contenedor','Vehículo','-'];
+        const RARS_F  = ['Común','Raro','Legendario'];
+
+        const miniCards = Array.from({length:N}, (_,i) => `
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:5px;">
+                <div style="font-size:0.6em;color:#d4af37;font-family:'Cinzel',serif;letter-spacing:0.5px;">Objeto ${i+1}</div>
+                <input id="pm-nombre-${i}" class="pobj-input-sm" placeholder="Nombre…" style="font-size:0.72em;">
+                <div style="display:flex;gap:4px;">
+                    <select id="pm-tipo-${i}" class="pobj-input-sm" style="flex:1;font-size:0.68em;">${TIPOS_F.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+                    <select id="pm-rar-${i}" class="pobj-input-sm" style="flex:1;font-size:0.68em;">${RARS_F.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
+                </div>
+                <input id="pm-eff-${i}" class="pobj-input-sm" placeholder="Efecto…" style="font-size:0.68em;">
+            </div>`).join('');
+
+        contenidoScroll = `${btnVolver}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div class="pobj-section-title" style="margin:0;">Forja múltiple</div>
+            <div style="display:flex;align-items:center;gap:4px;">
+                <span style="font-size:0.65em;color:#555;">Cantidad:</span>
+                ${[2,4,6,8].map(n=>`<button class="pobj-fbtn ${N===n?'on':''}" onclick="window._pobjForjaSetN(${n})">${n}</button>`).join('')}
+            </div>
+        </div>
+        <label class="pobj-op-label-sm">Dar todos a (opcional)</label>
+        <select id="pm-dest" class="pobj-input-sm" style="margin-bottom:8px;">
+            <option value="">— Solo catálogo —</option>
+            ${Object.keys(personajes).sort().map(p=>`<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('')}
+        </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">${miniCards}</div>
+        <button class="pobj-btn-crear" onclick="window._pobjEjecutarForja()">⚒️ Forjar todos</button>`;
+
     } else if (seccionIzq === 'transfer') {
-        const pjSafe  = _objState.nombrePJ.replace(/'/g,"\\'");
         const CANTS   = [1,3,5,10,'TODO'];
         const personajesDisp = Object.keys(personajes).filter(p => p !== _objState.nombrePJ).sort();
         const selDest = _objState.transferDest || '';
         const selObj  = _objState.transferObj  || '';
         const selCant = _objState.transferCant || 1;
-
         const invItems = _objState.inventario.filter(i=>i.cantidad>0);
 
         contenidoScroll = `${btnVolver}
@@ -1191,8 +1222,8 @@ function _renderObjIzq() {
         <button class="pobj-btn-crear" onclick="window._pobjEjecutarTransfer()">⇄ Transferir</button>`;
 
     } else if (seccionIzq === 'imagenes') {
-        const selImg = _objState.imgSelObj || '';
-        const filt   = (_objState.imgBusq||'').toLowerCase();
+        const selImg   = _objState.imgSelObj || '';
+        const filt     = (_objState.imgBusq||'').toLowerCase();
         const listaImg = _objState.catalogo.filter(o=>!filt||o.nombre.toLowerCase().includes(filt));
 
         contenidoScroll = `${btnVolver}
@@ -1206,7 +1237,7 @@ function _renderObjIzq() {
             </div>`).join('')}
         </div>
         ${selImg ? `
-        <div style="padding:10px;background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.18);border-radius:6px;margin-bottom:8px;">
+        <div style="padding:10px;background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.18);border-radius:6px;">
             <div style="font-size:0.75em;color:#d4af37;font-weight:700;margin-bottom:6px;">📍 ${selImg}</div>
             <div id="pobj-img-drop-zone" style="border:2px dashed rgba(212,175,55,0.25);border-radius:6px;padding:20px;text-align:center;color:#3a3a58;font-size:0.72em;cursor:pointer;transition:all 0.12s;"
                 onclick="document.getElementById('pobj-img-file').click()"
@@ -1220,10 +1251,11 @@ function _renderObjIzq() {
         </div>` : `<div class="ppj-empty" style="padding:16px 0;font-size:0.7em;">← Selecciona un objeto para subir su imagen</div>`}`;
 
     } else {
-        // Catálogo normal
-        const btnNuevo = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirCrear()" style="width:100%;margin-bottom:6px;text-align:center;">✨ Nuevo objeto</button>` : '';
-        const btnTransf= esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirTransfer()" style="flex:1;">⇄ Mover</button>` : '';
-        const btnImg   = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirImagenes()" style="flex:1;">🖼️ Imágenes</button>` : '';
+        // ── Catálogo normal ──
+        const btnNuevo  = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirCrear()" style="flex:1;">✨ Nuevo</button>` : '';
+        const btnForja  = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirForja()" style="flex:1;">⚒️ Forja</button>` : '';
+        const btnTransf = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirTransfer()" style="flex:1;">⇄ Mover</button>` : '';
+        const btnImg    = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirImagenes()" style="flex:1;">🖼️ Imgs</button>` : '';
 
         const listaHTML = lista.length === 0
             ? `<div class="ppj-empty" style="padding:20px 0;font-size:0.72em;">Sin resultados</div>`
@@ -1237,7 +1269,11 @@ function _renderObjIzq() {
                 const editBtn= esAdmin
                     ? `<button class="pobj-fbtn" style="padding:2px 6px;" onclick="window._pobjAbrirEditar('${oSafe}')">✏️</button>` : '';
 
-                return `<div class="pobj-cat-card ${enInv?'en-inv':''}">
+                // Card arrastrable al inventario
+                return `<div class="pobj-cat-card ${enInv?'en-inv':''}" 
+                    draggable="${esAdmin?'true':'false'}"
+                    ondragstart="window._pobjDragStart(event,'${oSafe}')"
+                    ondragend="event.target.style.opacity=''">
                     <img class="pobj-cat-img" src="${_imgObj(o.nombre)}" onerror="this.onerror=null;this.src='${_fall()}'" loading="lazy">
                     <div class="pobj-cat-info">
                         <div class="pobj-cat-nombre">${o.nombre}${hijos>0?`<span style="color:#6496ff;font-size:0.7em;margin-left:4px;">📦${hijos}</span>`:''}</div>
@@ -1249,13 +1285,12 @@ function _renderObjIzq() {
             }).join('');
 
         contenidoScroll = `
-        ${btnNuevo}
-        ${esAdmin ? `<div style="display:flex;gap:4px;margin-bottom:6px;">${btnTransf}${btnImg}</div>` : ''}
+        ${esAdmin ? `<div style="display:flex;gap:4px;margin-bottom:6px;">${btnNuevo}${btnForja}${btnTransf}${btnImg}</div>` : ''}
         <input class="pobj-search-izq" placeholder="Buscar en catálogo…" value="${_objState.busqCat}" oninput="window._pobjBusqCat(this.value)">
         <div class="pobj-filtros">
-            ${RAREZAS.map(r=>`<button class="pobj-fbtn ${_objState.filtroRar===r?'on':''}" onclick="window._pobjFiltroRar('${r}')">${r}</button>`).join('')}
+            ${TIPOS_FILTRO.map(t=>`<button class="pobj-fbtn ${_objState.filtroTipo===t?'on':''}" onclick="window._pobjFiltroTipo('${t.replace(/'/g,"\\'")}')">${t}</button>`).join('')}
             <span style="color:#2e2e48;font-size:0.6em;align-self:center;">·</span>
-            ${tipos.slice(0,6).map(t=>`<button class="pobj-fbtn ${_objState.filtroTipo===t?'on':''}" onclick="window._pobjFiltroTipo('${t.replace(/'/g,"\\'")}')">${t}</button>`).join('')}
+            ${RAREZAS.map(r=>`<button class="pobj-fbtn ${_objState.filtroRar===r?'on':''}" onclick="window._pobjFiltroRar('${r}')">${r}</button>`).join('')}
         </div>
         ${listaHTML}`;
     }
@@ -1276,6 +1311,8 @@ function _renderObjDer(nombre, body) {
     const safe     = nombre.replace(/'/g,"\\'");
     const EQUIPABLES = ['Equipamiento','Accesorio','Vehículo','Vehiculo'];
     const RAR_COL  = {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
+    const _imgObj  = (n) => { try{return `${window._hexConfig?.storageUrl||''}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
+    const _fall    = () => { try{return `${window._hexConfig?.storageUrl||''}/imginterfaz/no_encontrado.png`;}catch{return '';} };
 
     const sorted = [..._objState.inventario].sort((a,b)=>{
         if (a.equipado!==b.equipado) return b.equipado-a.equipado;
@@ -1301,14 +1338,18 @@ function _renderObjDer(nombre, body) {
         const expanded = _objState.expandedConts.has(item.objeto_nombre);
 
         const ctrlHTML = esAdmin ? `
-            <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
+            <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">
+                <button class="ppj-ctrl-btn" style="font-size:0.58em;width:auto;padding:0 4px;" onclick="window._pobjModCant('${safeObj}',-5)">−5</button>
                 <button class="ppj-ctrl-btn" onclick="window._pobjModCant('${safeObj}',-1)">−</button>
-                <span style="font-size:0.85em;font-weight:700;color:#d4af37;min-width:18px;text-align:center;">${item.cantidad}</span>
+                <span style="font-size:0.85em;font-weight:700;color:#d4af37;min-width:20px;text-align:center;">${item.cantidad}</span>
                 <button class="ppj-ctrl-btn" onclick="window._pobjModCant('${safeObj}',1)">+</button>
+                <button class="ppj-ctrl-btn" style="font-size:0.58em;width:auto;padding:0 4px;" onclick="window._pobjModCant('${safeObj}',5)">+5</button>
+                <button class="ppj-ctrl-btn" style="color:#ff6060;font-size:0.62em;padding:0 4px;" onclick="window._pobjQuitarTodos('${safeObj}')" title="Quitar todos">✕</button>
             </div>` : `<span style="font-size:0.85em;font-weight:700;color:#d4af37;">×${item.cantidad}</span>`;
 
         let html = `<div class="ppj-obj-card ${isEqp?'equipado':''}" data-nombre="${item.objeto_nombre.toLowerCase()}">
-            <div class="ppj-obj-header">
+            <div class="ppj-obj-header" style="gap:6px;">
+                <img src="${_imgObj(item.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:32px;height:32px;border-radius:4px;object-fit:cover;background:#111;flex-shrink:0;border:1px solid rgba(255,255,255,0.05);">
                 <span class="ppj-obj-nombre" title="${item.objeto_nombre}">${item.objeto_nombre}
                     ${isEqp?`<span style="font-size:0.6em;background:rgba(212,175,55,0.15);color:#d4af37;border:1px solid rgba(212,175,55,0.3);border-radius:3px;padding:1px 4px;margin-left:4px;">EQP</span>`:''}
                 </span>
@@ -1327,24 +1368,35 @@ function _renderObjDer(nombre, body) {
             </div>
         </div>`;
 
-        if (esContenedor && expanded && hijos.length > 0) {
-            html += `<div style="padding-left:12px;border-left:1px solid rgba(100,150,255,0.2);margin-bottom:4px;">` +
-                hijos.map(h => {
+        if (esContenedor && expanded) {
+            const contId = 'pobj-cont-' + safeObj.replace(/[^a-z0-9]/gi,'_');
+            html += `<div id="${contId}" style="padding-left:12px;border-left:2px solid rgba(100,150,255,0.2);margin-bottom:4px;transition:border-color 0.15s;"
+                ${esAdmin?`ondragover="event.preventDefault();this.style.borderLeftColor='#d4af37';" ondragleave="this.style.borderLeftColor='rgba(100,150,255,0.2)';" ondrop="window._pobjDropEnContenedor(event,'${safeObj}');this.style.borderLeftColor='rgba(100,150,255,0.2)';"`:''}>`; 
+            if (hijos.length === 0) {
+                html += `<div style="font-size:0.64em;color:#2e2e48;padding:8px 4px;font-style:italic;">${esAdmin?'Arrastra objetos del catálogo aquí para meterlos':'Contenedor vacío'}</div>`;
+            } else {
+                html += hijos.map(h => {
                     const hCat  = _objState.catalogo.find(o=>o.nombre===h)||{};
                     const hInv  = _objState.inventario.find(i=>i.objeto_nombre===h);
                     const hCant = hInv?.cantidad||0;
                     const hSafe = h.replace(/'/g,"\\'");
-                    const addBtn= esAdmin ? `<button class="ppj-ctrl-btn" onclick="window._pobjDarAlPJ('${hSafe}',1)" style="font-size:0.6em;padding:0 5px;">+</button>`:'';
-                    return `<div class="ppj-obj-card" style="opacity:${hCant>0?1:0.45};margin-bottom:3px;">
-                        <div class="ppj-obj-header">
-                            <span class="ppj-obj-nombre" style="font-size:0.75em;">${h}</span>
-                            <span style="font-size:0.72em;color:#d4af37;">×${hCant}</span>
-                            ${hCant>0&&esAdmin?`<button class="ppj-ctrl-btn" onclick="window._pobjModCant('${hSafe}',-1)">−</button>`:''}
-                            ${addBtn}
+                    return `<div class="ppj-obj-card" style="margin-bottom:3px;">
+                        <div class="ppj-obj-header" style="gap:6px;">
+                            <img src="${_imgObj(h)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:28px;height:28px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;opacity:${hCant>0?1:0.4};">
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:0.76em;font-weight:600;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h}</div>
+                                ${hCat.efecto?`<div style="font-size:0.6em;color:#3a3a58;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hCat.efecto}</div>`:''}
+                            </div>
+                            <span style="font-size:0.8em;color:#d4af37;font-weight:700;flex-shrink:0;">×${hCant}</span>
+                            ${esAdmin?`
+                            <button class="ppj-ctrl-btn" style="font-size:0.58em;width:auto;padding:0 4px;" onclick="window._pobjModCant('${hSafe}',-1)">−</button>
+                            <button class="ppj-ctrl-btn" style="font-size:0.58em;width:auto;padding:0 4px;" onclick="window._pobjDarAlPJ('${hSafe}',1)">+</button>
+                            <button class="ppj-ctrl-btn" style="color:#ff6060;font-size:0.6em;padding:0 3px;" onclick="window._pobjQuitarTodos('${hSafe}')">✕</button>`:''}
                         </div>
                     </div>`;
-                }).join('') +
-            `</div>`;
+                }).join('');
+            }
+            html += `</div>`;
         }
 
         return html;
@@ -1355,8 +1407,9 @@ function _renderObjDer(nombre, body) {
 
     body.innerHTML = `<div class="ppj-section">
         <input class="ppj-obj-search" placeholder="Buscar en inventario…" oninput="window._ppjFiltrarObjetos(this.value)">
-        <div id="ppj-obj-lista">
-            ${lista.length===0?`<div class="ppj-empty"><div class="ppj-empty-icon">🎒</div>Sin objetos</div>`:''}
+        <div id="ppj-obj-lista" style="min-height:60px;"
+            ${esAdmin?`ondragover="event.preventDefault();this.style.outline='1px dashed rgba(212,175,55,0.25)';" ondragleave="this.style.outline='';" ondrop="window._pobjDropEnInventario(event);this.style.outline='';"`:''}>
+            ${lista.length===0?`<div class="ppj-empty" style="pointer-events:none;"><div class="ppj-empty-icon">🎒</div>${esAdmin?'Arrastra objetos del catálogo aquí':'Sin objetos'}</div>`:''}
             ${equipados.length?`<div class="ppj-obj-seccion-titulo">Equipados</div>${equipados.map(_renderItem).join('')}`:''}
             ${noEquipados.length?`<div class="ppj-obj-seccion-titulo">Inventario</div>${noEquipados.map(_renderItem).join('')}`:''}
         </div>
@@ -1386,20 +1439,82 @@ async function _recargarObjetos() {
 
 // ── Funciones globales de objetos ─────────────────────────────
 window._pobjVolverCatalogo = () => {
-    _objState.modoCrear     = false;
-    _objState.objEditando   = null;
-    _objState.modoTransfer  = false;
-    _objState.modoImagenes  = false;
+    _objState.modoCrear    = false;
+    _objState.objEditando  = null;
+    _objState.modoTransfer = false;
+    _objState.modoImagenes = false;
+    _objState.modoForja    = false;
     _renderObjIzq();
 };
-window._pobjAbrirCrear    = () => { _objState.modoCrear=true; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _renderObjIzq(); };
-window._pobjAbrirEditar   = (n) => { _objState.objEditando=n; _objState.modoCrear=false; _objState.modoTransfer=false; _objState.modoImagenes=false; _renderObjIzq(); };
-window._pobjAbrirTransfer = () => { _objState.modoTransfer=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoImagenes=false; _objState.transferDest=null; _objState.transferObj=null; _objState.transferCant=1; _renderObjIzq(); };
-window._pobjAbrirImagenes = () => { _objState.modoImagenes=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.imgSelObj=null; _renderObjIzq(); };
+window._pobjAbrirCrear    = () => { _objState.modoCrear=true; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.modoForja=false; _renderObjIzq(); };
+window._pobjAbrirEditar   = (n) => { _objState.objEditando=n; _objState.modoCrear=false; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.modoForja=false; _renderObjIzq(); };
+window._pobjAbrirTransfer = () => { _objState.modoTransfer=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoImagenes=false; _objState.modoForja=false; _objState.transferDest=null; _objState.transferObj=null; _objState.transferCant=1; _renderObjIzq(); };
+window._pobjAbrirImagenes = () => { _objState.modoImagenes=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoForja=false; _objState.imgSelObj=null; _renderObjIzq(); };
+window._pobjAbrirForja    = () => { _objState.modoForja=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.forjaN=4; _renderObjIzq(); };
+window._pobjForjaSetN     = (n) => { _objState.forjaN=n; _renderObjIzq(); };
 window._pobjBusqCat       = (v) => { _objState.busqCat=v; _renderObjIzq(); };
 window._pobjFiltroRar     = (v) => { _objState.filtroRar=v; _renderObjIzq(); };
 window._pobjFiltroTipo    = (v) => { _objState.filtroTipo=v; _renderObjIzq(); };
 window._pobjToggleCont    = (n) => { if(_objState.expandedConts.has(n))_objState.expandedConts.delete(n); else _objState.expandedConts.add(n); _renderObjDer(_objState.nombrePJ); };
+
+// Drag & drop desde catálogo al inventario
+window._pobjDragStart = (e, nombre) => { e.dataTransfer.setData('text/plain', nombre); e.target.style.opacity='0.5'; };
+window._pobjDropEnInventario = async (e) => {
+    e.preventDefault();
+    const nombre = e.dataTransfer.getData('text/plain');
+    if (!nombre || !estadoUI.esAdmin) return;
+    await window._pobjDarAlPJ(nombre, 1);
+};
+window._pobjDropEnContenedor = async (e, contenedorNombre) => {
+    e.preventDefault();
+    const nombre = e.dataTransfer.getData('text/plain');
+    if (!nombre || !estadoUI.esAdmin) return;
+    // Asignar objeto al inventario del PJ
+    await window._pobjDarAlPJ(nombre, 1);
+    // Luego asignarlo al contenedor si el objeto no lo tiene ya
+    const objActual = _objState.catalogo.find(o=>o.nombre===nombre);
+    if (objActual && objActual.contenedor_padre !== contenedorNombre) {
+        await supabase.from('objetos').update({contenedor_padre:contenedorNombre}).eq('nombre',nombre);
+    }
+    await _recargarObjetos();
+};
+
+// Quitar todos de un objeto del inventario
+window._pobjQuitarTodos = async (nombreObj) => {
+    if (!estadoUI.esAdmin) return;
+    await supabase.from('inventario_objetos').delete().eq('personaje_nombre',_objState.nombrePJ).eq('objeto_nombre',nombreObj);
+    await _recargarObjetos();
+};
+
+// Forja múltiple
+window._pobjEjecutarForja = async () => {
+    const N    = _objState.forjaN || 4;
+    const dest = document.getElementById('pm-dest')?.value || '';
+    const MATS_DEFAULT = '-';
+    const objetos = [];
+    for (let i=0; i<N; i++) {
+        const nombre = (document.getElementById(`pm-nombre-${i}`)?.value||'').trim();
+        if (!nombre) continue;
+        objetos.push({
+            nombre,
+            tipo:     document.getElementById(`pm-tipo-${i}`)?.value||'-',
+            material: MATS_DEFAULT,
+            rareza:   document.getElementById(`pm-rar-${i}`)?.value||'Común',
+            efecto:   (document.getElementById(`pm-eff-${i}`)?.value||'').trim(),
+            es_propuesta: false,
+        });
+    }
+    if (objetos.length===0) { alert('No hay objetos con nombre.'); return; }
+    const {error:errCat} = await supabase.from('objetos').upsert(objetos,{onConflict:'nombre'});
+    if (errCat) { alert('Error: '+errCat.message); return; }
+    if (dest) {
+        const rows = objetos.map(o=>({personaje_nombre:dest,objeto_nombre:o.nombre,cantidad:1,equipado:false}));
+        await supabase.from('inventario_objetos').upsert(rows,{onConflict:'personaje_nombre,objeto_nombre'});
+    }
+    window.mostrarToast?.(`✨ ${objetos.length} objetos forjados`);
+    _objState.modoForja=false;
+    await _recargarObjetos();
+};
 
 // Transfer
 window._pobjSelDest  = (v) => { _objState.transferDest=v; _renderObjIzq(); };
