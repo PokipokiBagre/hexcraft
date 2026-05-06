@@ -5,7 +5,7 @@
 
 :root {
     --gold:        #d4af37;
-    --gold-dim:    #8a6e1a;
+    --gold-dim:    #a8881e;
     --gold-faint:  rgba(212, 175, 55, 0.12);
     --gold-border: rgba(212, 175, 55, 0.28);
 
@@ -19,9 +19,9 @@
     --bg3:   #161622;
     --bg4:   #1e1e2e;
 
-    --text:  #c4c4d4;
-    --dim:   #5a5a78;
-    --faint: rgba(196, 196, 212, 0.06);
+    --text:  #d4d4e6;
+    --dim:   #9494b8;
+    --faint: rgba(196, 196, 212, 0.07);
 
     --border: rgba(255, 255, 255, 0.07);
 
