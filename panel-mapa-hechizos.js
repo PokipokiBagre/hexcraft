@@ -17,7 +17,7 @@ const COLOR_APR    = 'rgba(236, 213, 154, 0.95)';   // dorado  — aprendible (t
 const COLOR_RASTR  = 'rgba(120, 110, 150, 0.6)';    // gris-vio — descubierto pero precedentes incompletos
 const COLOR_NUEVO  = '#00ffff';                      // celeste — nodo recién creado (OP)
 const COLOR_PJ     = 'rgba(0, 220, 255, 0.95)';     // celeste — hechizo poseído por el PJ activo
-const COLOR_ENFOQ_PREV = 'rgba(255, 165, 60, 0.95)'; // naranja — precedentes del nodo seleccionado
+const COLOR_ENFOQ_PREV = 'rgba(220, 140, 50, 0.9)';  // naranja suave — precedentes
 const COLOR_ENFOQ_NEXT = 'rgba(80, 220, 130, 0.95)'; // verde   — salientes del nodo seleccionado
 const COLOR_FONDO  = '#05000a';
 const COLOR_LINEA_POS  = 'rgba(150,131,200,0.45)';
@@ -566,7 +566,7 @@ function _dibujar() {
             } else if (e.source === enfocado && enfoqNext.has(e.target)) {
                 color = COLOR_ENFOQ_NEXT; lw = 2.0 / sf;
             } else {
-                color = 'rgba(80,75,100,0.12)'; lw = 0.5 / sf;
+                color = 'rgba(160,155,175,0.25)'; lw = 0.8 / sf;
             }
         } else if (sP && tP) {
             // Ambos son posesión del PJ → celeste
@@ -664,9 +664,9 @@ function _dibujar() {
                 colorNucleo = COLOR_ENFOQ_NEXT;
                 colorTexto  = COLOR_ENFOQ_NEXT;
             } else {
-                // Irrelevante — gris muy apagado
-                colorNucleo = 'rgba(60,58,72,0.5)';
-                colorTexto  = 'rgba(90,88,105,0.6)';
+                // Irrelevante — gris visible pero apagado
+                colorNucleo = 'rgba(90,85,110,0.65)';
+                colorTexto  = 'rgba(130,125,145,0.7)';
             }
         } else if (esPosesion && !esTodos) {
             // Hechizo del PJ: celeste vibrante
@@ -684,7 +684,7 @@ function _dibujar() {
         const importante = !esIrrelevante;
 
         // Alpha global
-        ctx.globalAlpha = esIrrelevante ? 0.3 : 1.0;
+        ctx.globalAlpha = esIrrelevante ? 0.55 : 1.0;
 
         // Halo de selección (nodo enfocado)
         if (esSeleccionado) {
@@ -776,7 +776,7 @@ function _dibujar() {
                 texto = m ? `Hechizo ${m[0]}` : nodo.id;
             }
 
-            ctx.globalAlpha = esIrrelevante ? 0.25 : 1.0;
+            ctx.globalAlpha = esIrrelevante ? 0.45 : 1.0;
             ctx.strokeStyle = 'rgba(0,0,0,0.95)';
             ctx.lineWidth = 5/sf;
             ctx.strokeText(texto, nodo.x, ty2);
