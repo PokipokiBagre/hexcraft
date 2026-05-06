@@ -1164,13 +1164,15 @@ window._ppjBuscarHz = (query) => {
     if (!inv) return;
 
     if (!q) {
-        // Restaurar todo
-        inv.querySelectorAll('.ppj-hz-card').forEach(c => c.classList.remove('ppj-hidden'));
+        // Sin búsqueda: restaurar todo y cerrar acordeones
+        inv.querySelectorAll('.ppj-hz-card').forEach(c => { c.style.display = ''; c.classList.remove('ppj-hidden'); });
         inv.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => a.classList.remove('open'));
         return;
     }
 
-    // 1. Marcar cards que no matchean
+    // Con búsqueda: abrir TODOS los acordeones y filtrar cards
+    inv.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => a.classList.add('open'));
+
     inv.querySelectorAll('.ppj-hz-card').forEach(c => {
         const nombre = c.getAttribute('data-hz-nombre') || '';
         const texto  = c.textContent.toLowerCase();
@@ -1179,13 +1181,11 @@ window._ppjBuscarHz = (query) => {
         c.style.display = match ? '' : 'none';
     });
 
-    // 2. Abrir ppj-cl-acc si tiene algún card visible
+    // Cerrar acordeones que quedaron completamente vacíos
     inv.querySelectorAll('.ppj-cl-acc').forEach(cl => {
         const hayVisible = [...cl.querySelectorAll('.ppj-hz-card')].some(c => !c.classList.contains('ppj-hidden'));
         cl.classList.toggle('open', hayVisible);
     });
-
-    // 3. Abrir ppj-af-acc si tiene algún card visible (en cualquier nivel)
     inv.querySelectorAll('.ppj-af-acc').forEach(af => {
         const hayVisible = [...af.querySelectorAll('.ppj-hz-card')].some(c => !c.classList.contains('ppj-hidden'));
         af.classList.toggle('open', hayVisible);
