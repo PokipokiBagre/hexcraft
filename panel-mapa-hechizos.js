@@ -603,7 +603,8 @@ function _dibujar() {
         const colorBorde = esNuevo ? COLOR_NUEVO : colorNucleo;
         const importante = esDes || esApr || esPar || esNuevo || esSeleccionado;
 
-        ctx.globalAlpha = importante ? 1.0 : 0.3;
+        // Ocultos visibles pero tenues — NO desaparecen
+        ctx.globalAlpha = importante ? 1.0 : 0.6;
 
         // Halo de selección
         if (esSeleccionado) {
@@ -665,8 +666,8 @@ function _dibujar() {
         ctx.setLineDash([]);
         ctx.globalAlpha = 1.0;
 
-        // Texto
-        if (camara.zoom > 0.1 || esSeleccionado || esDes || esApr) {
+        // Texto — siempre visible para TODOS los nodos con zoom suficiente
+        if (camara.zoom > 0.08 || esSeleccionado) {
             const fs = esDes ? 28 : 22;
             ctx.font = `bold ${fs}px sans-serif`;
             ctx.textAlign = 'center';
@@ -681,15 +682,16 @@ function _dibujar() {
                 texto = m ? `Hechizo ${m[0]}` : nodo.id;
             }
 
-            ctx.globalAlpha = importante ? 1.0 : 0.3;
+            // Ocultos con texto más tenue pero legible
+            ctx.globalAlpha = importante ? 1.0 : 0.55;
             ctx.strokeStyle = 'rgba(0,0,0,0.95)';
             ctx.lineWidth = 5/sf;
             ctx.strokeText(texto, nodo.x, ty2);
 
-            ctx.fillStyle = esNuevo   ? COLOR_NUEVO
+            ctx.fillStyle = esNuevo  ? COLOR_NUEVO
                 : esDes  ? (esPar ? COLOR_RASTR : COLOR_POS)
                 : esApr  ? COLOR_APR
-                : 'rgba(90,90,100,0.35)';
+                : 'rgba(130,130,150,0.7)';   // gris visible para ocultos
             ctx.fillText(texto, nodo.x, ty2);
             ctx.globalAlpha = 1.0;
         }
@@ -767,9 +769,12 @@ function _iniciarEventos() {
         }
 
         if (nodo) {
-            _estado.drag.nodo = _estado.esAdmin ? nodo : null;
-            _seleccionarNodo(nodo);
+            // Guardar el nodo candidato — decidir en mouseup si fue clic o drag
+            _estado.drag.nodoCandidate = nodo;
+            _estado.drag.nodo = null;          // no activar drag todavía
+            _estado.drag.hasMoved = false;
         } else {
+            _estado.drag.nodoCandidate = null;
             _estado.drag.activo = true;
             _estado.nodoSeleccionado = null;
             _renderInfo(null);
@@ -777,6 +782,8 @@ function _iniciarEventos() {
 
         _estado.drag.lastX = e.clientX;
         _estado.drag.lastY = e.clientY;
+        _estado.drag.startX = e.clientX;
+        _estado.drag.startY = e.clientY;
     });
 
     // MOUSE MOVE
@@ -791,6 +798,18 @@ function _iniciarEventos() {
             _estado.drag.lastX = e.clientX;
             _estado.drag.lastY = e.clientY;
             return;
+        }
+
+        // Detectar si el movimiento supera el umbral (4px) para activar drag
+        const totalDx = e.clientX - (_estado.drag.startX || e.clientX);
+        const totalDy = e.clientY - (_estado.drag.startY || e.clientY);
+        const movedEnough = Math.hypot(totalDx, totalDy) > 4;
+
+        if (_estado.drag.nodoCandidate && movedEnough && _estado.esAdmin) {
+            // Activar drag del nodo candidato
+            _estado.drag.nodo = _estado.drag.nodoCandidate;
+            _estado.drag.nodoCandidate = null;
+            _estado.drag.hasMoved = true;
         }
 
         if (_estado.drag.nodo) {
@@ -822,8 +841,15 @@ function _iniciarEventos() {
             _estado.tempFlecha = null;
         }
 
-        _estado.drag.activo = false;
-        _estado.drag.nodo   = null;
+        // Si había un candidato y NO hubo drag → fue un clic → seleccionar
+        if (_estado.drag.nodoCandidate && !_estado.drag.hasMoved) {
+            _seleccionarNodo(_estado.drag.nodoCandidate);
+        }
+
+        _estado.drag.activo       = false;
+        _estado.drag.nodo         = null;
+        _estado.drag.nodoCandidate= null;
+        _estado.drag.hasMoved     = false;
     });
 
     // WHEEL (zoom)
