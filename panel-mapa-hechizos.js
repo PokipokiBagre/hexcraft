@@ -258,7 +258,7 @@ function _inyectarEstilos() {
 }
 #pmh-canvas { display: block; }
 #pmh-info-panel {
-    min-height: 0;
+    min-height: 60px;
     max-height: 200px;
     overflow-y: auto;
     border-top: 1px solid rgba(255,255,255,0.06);
@@ -454,8 +454,8 @@ function _centrarCamara() {
     const H = wrap.clientHeight;
     if (!W || !H) return;
 
-    // Centrar sobre descubiertos si los hay, sino sobre todos
-    const ref = _estado.descubiertos.size > 0
+    // Centrar sobre descubiertos si los hay y hay PJ activo, sino sobre todos
+    const ref = (_estado.descubiertos.size > 0 && _estado.jugadorPanel !== 'Todos')
         ? Array.from(_estado.descubiertos)
         : _estado.nodos;
 
@@ -468,7 +468,7 @@ function _centrarCamara() {
     const h = (maxY - minY) || 800;
     const cx = minX + w / 2;
     const cy = minY + h / 2;
-    const zoom = Math.min(W / (w * 1.3), H / (h * 1.3), 1.4);
+    const zoom = Math.min(W / (w * 1.3), H / (h * 1.3), 0.9);
     _estado.camara.zoom = zoom;
     _estado.camara.x = W / 2 - cx * zoom;
     _estado.camara.y = H / 2 - cy * zoom;
@@ -540,6 +540,7 @@ function _dibujar() {
         if (sD && tD)      { color = COLOR_LINEA_POS;   lw = 1.4 / sf; }
         else if (sD && tA) { color = COLOR_LINEA_APR;   lw = 1.1 / sf; }
         else if (sP && tP) { color = COLOR_LINEA_POS;   lw = 1.4 / sf; }
+        else if (_estado.jugadorPanel === 'Todos') { color = 'rgba(120,110,160,0.45)'; lw = 1.0 / sf; }
         else if (!e.target.esConocido && !tA) { dash = [6/sf, 5/sf]; color = COLOR_LINEA_OCULTA; }
 
         ctx.beginPath();
@@ -594,14 +595,17 @@ function _dibujar() {
         const esSeleccionado = nodoSeleccionado === nodo;
         const esNuevo    = nodo.esNuevo;
 
+        // En vista "Todos" todos los nodos son visibles e importantes
+        const esTodos = _estado.jugadorPanel === 'Todos';
+
         // Color núcleo basado en estado global
-        let colorNucleo = 'rgba(60,60,70,0.3)';
+        let colorNucleo = esTodos ? 'rgba(100,95,130,0.7)' : 'rgba(60,60,70,0.3)';
         if (esNuevo)      colorNucleo = COLOR_NUEVO;
         else if (esDes)   colorNucleo = esPar ? COLOR_RASTR : COLOR_POS;
         else if (esApr)   colorNucleo = COLOR_APR;
 
         const colorBorde = esNuevo ? COLOR_NUEVO : colorNucleo;
-        const importante = esDes || esApr || esPar || esNuevo || esSeleccionado;
+        const importante = esDes || esApr || esPar || esNuevo || esSeleccionado || esTodos;
 
         // Ocultos visibles pero tenues — mínimo 0.85
         ctx.globalAlpha = importante ? 1.0 : 0.85;
@@ -647,7 +651,7 @@ function _dibujar() {
         // Núcleo
         ctx.beginPath();
         ctx.arc(nodo.x, nodo.y, Math.max(1, nodo.radio - 7), 0, Math.PI*2);
-        const rellenar = esDes || esApr || esNuevo;
+        const rellenar = esDes || esApr || esNuevo || esTodos;
         ctx.fillStyle = rellenar ? colorNucleo : '#0d0d1a';
         if (rellenar) { ctx.shadowBlur = esNuevo ? 14 : 7; ctx.shadowColor = colorNucleo; }
         ctx.fill();
@@ -658,7 +662,7 @@ function _dibujar() {
         ctx.arc(nodo.x, nodo.y, nodo.radio, 0, Math.PI*2);
         ctx.strokeStyle = colorBorde;
         ctx.lineWidth = (esSeleccionado ? 3 : 1.5) / sf;
-        if (!nodo.esConocido && !esNuevo) {
+        if (!nodo.esConocido && !esNuevo && !esTodos) {
             ctx.setLineDash([5/sf, 4/sf]);
             ctx.globalAlpha = Math.min(ctx.globalAlpha, 0.45);
         }
