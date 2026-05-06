@@ -603,8 +603,8 @@ function _dibujar() {
         const colorBorde = esNuevo ? COLOR_NUEVO : colorNucleo;
         const importante = esDes || esApr || esPar || esNuevo || esSeleccionado;
 
-        // Ocultos visibles pero tenues — NO desaparecen
-        ctx.globalAlpha = importante ? 1.0 : 0.6;
+        // Ocultos visibles pero tenues — mínimo 0.85
+        ctx.globalAlpha = importante ? 1.0 : 0.85;
 
         // Halo de selección
         if (esSeleccionado) {
@@ -683,7 +683,7 @@ function _dibujar() {
             }
 
             // Ocultos con texto más tenue pero legible
-            ctx.globalAlpha = importante ? 1.0 : 0.55;
+            ctx.globalAlpha = importante ? 1.0 : 0.85;
             ctx.strokeStyle = 'rgba(0,0,0,0.95)';
             ctx.lineWidth = 5/sf;
             ctx.strokeText(texto, nodo.x, ty2);
@@ -691,8 +691,38 @@ function _dibujar() {
             ctx.fillStyle = esNuevo  ? COLOR_NUEVO
                 : esDes  ? (esPar ? COLOR_RASTR : COLOR_POS)
                 : esApr  ? COLOR_APR
-                : 'rgba(130,130,150,0.7)';   // gris visible para ocultos
+                : 'rgba(160,155,175,0.9)';   // gris claro visible para ocultos
             ctx.fillText(texto, nodo.x, ty2);
+
+            // Medallita de HEX — solo si hay costo y zoom suficiente
+            if (nodo.hex > 0 && camara.zoom > 0.25) {
+                const hexTxt = `⬡${nodo.hex}`;
+                const fsPill = 17;
+                ctx.font = `${fsPill}px sans-serif`;
+                const pillW = ctx.measureText(hexTxt).width + 8/sf;
+                const pillH = fsPill + 4/sf;
+                const pillX = nodo.x - pillW/2;
+                const pillY = ty2 + fs + 6/sf;
+
+                // Fondo de la medallita
+                ctx.beginPath();
+                ctx.roundRect?.(pillX, pillY, pillW, pillH, 4/sf) || ctx.rect(pillX, pillY, pillW, pillH);
+                ctx.fillStyle = 'rgba(20,15,35,0.85)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(212,175,55,0.35)';
+                ctx.lineWidth = 1/sf;
+                ctx.stroke();
+
+                // Texto HEX
+                ctx.font = `bold ${fsPill}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(212,175,55,0.85)';
+                ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+                ctx.lineWidth = 3/sf;
+                ctx.strokeText(hexTxt, nodo.x, pillY + 2/sf);
+                ctx.fillText(hexTxt, nodo.x, pillY + 2/sf);
+            }
+
             ctx.globalAlpha = 1.0;
         }
     });
@@ -744,8 +774,9 @@ function _iniciarEventos() {
     if (!wrap) return;
 
     const _worldPos = (cx, cy) => {
+        const rect = _estado.canvas.getBoundingClientRect();
         const { x, y, zoom } = _estado.camara;
-        return { x: (cx - x) / zoom, y: (cy - y) / zoom };
+        return { x: (cx - rect.left - x) / zoom, y: (cy - rect.top - y) / zoom };
     };
 
     const _nodoEn = (wx, wy) => {
@@ -855,16 +886,15 @@ function _iniciarEventos() {
     // WHEEL (zoom)
     wrap.addEventListener('wheel', e => {
         e.preventDefault();
+        const rect = _estado.canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
         const delta = e.deltaY > 0 ? 0.85 : 1.15;
         const nuevoZoom = Math.max(0.05, Math.min(_estado.camara.zoom * delta, 3));
-        _estado.camara.x = e.clientX - (e.clientX - _estado.camara.x) * (nuevoZoom / _estado.camara.zoom);
-        _estado.camara.y = e.clientY - (e.clientY - _estado.camara.y) * (nuevoZoom / _estado.camara.zoom);
+        _estado.camara.x = mx - (mx - _estado.camara.x) * (nuevoZoom / _estado.camara.zoom);
+        _estado.camara.y = my - (my - _estado.camara.y) * (nuevoZoom / _estado.camara.zoom);
         _estado.camara.zoom = nuevoZoom;
     }, { passive: false });
-
-    // Corregir posición del canvas (el panel empieza en x=0)
-    // Los eventos del canvas reciben coordenadas relativas a la ventana
-    // pero el canvas también empieza en 0, entonces no hay offset
 }
 
 // ── SELECCIONAR NODO ─────────────────────────────────────────
