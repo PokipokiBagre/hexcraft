@@ -11,6 +11,7 @@ import {
 import { currentConfig, supabase } from '../hex-auth.js';
 import { encolarCambio } from './personajes-state.js';
 import { abrirMinimapa, cerrarMinimapa, centrarEnHechizo } from '../panel-mapa-hechizos.js';
+// panel-objetos-op.js se carga dinámicamente al abrir la tab Objetos como admin
 
 // ── Helpers ───────────────────────────────────────────────────
 const _sb   = () => currentConfig.storageUrl;
@@ -672,7 +673,7 @@ async function _tabHechizos(nombre, body) {
     let nodosMapInv = {};
     if (hNombres.length > 0) {
         const { data: nd } = await supabase.from('hechizos_nodos')
-            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo')
+            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id, backcast, nextcast, es_estado, es_prioridad, afecta_hechizos, afecta_usuario, afecta_objetivo')
             .in('nombre', hNombres);
         (nd||[]).forEach(n => { nodosMapInv[n.nombre] = n; });
     }
@@ -973,11 +974,19 @@ async function _cargarAprendibles(nombre, body, lista, nodosMap, _colAf) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// TAB: OBJETOS
+// TAB: OBJETOS — delega al panel-objetos.js
 // ─────────────────────────────────────────────────────────────
 async function _tabObjetos(nombre, body) {
     body.innerHTML = '<div class="ppj-loader">Cargando objetos…</div>';
 
+    // Cargar módulo OP si el admin está activo (import dinámico, solo una vez)
+    if (estadoUI.esAdmin && !window._pobjopAbrirEditor) {
+        try { await import('../panel-objetos-op.js'); } catch(e) { console.warn('panel-objetos-op.js no cargado:', e); }
+    }
+
+    const esAdmin = estadoUI.esAdmin;
+
+    // ── Cargar datos para la vista inline del tab ─────────────
     const { data: items } = await supabase
         .from('inventario_objetos')
         .select('objeto_nombre, cantidad, equipado')
@@ -985,79 +994,123 @@ async function _tabObjetos(nombre, body) {
         .gt('cantidad', 0);
 
     const lista = items || [];
-    if (lista.length === 0) {
-        body.innerHTML = `<div class="ppj-section"><div class="ppj-empty"><div class="ppj-empty-icon">🎒</div>Inventario vacío</div></div>`;
-        return;
-    }
-
     const nombres = lista.map(i => i.objeto_nombre);
-    const { data: defs } = await supabase.from('objetos')
-        .select('nombre, tipo, rareza, efecto, descripcion, vida_roja, vida_azul, contenedor_padre')
-        .in('nombre', nombres);
-    const defMap = {}; (defs||[]).forEach(o => { defMap[o.nombre] = o; });
 
-    // Contenidos de contenedores
-    const contenedores = lista.filter(i => defMap[i.objeto_nombre]?.tipo==='Contenedor').map(i=>i.objeto_nombre);
-    const contenidoMap = {};
-    if (contenedores.length > 0) {
-        const { data: cont } = await supabase.from('objetos')
-            .select('nombre, contenedor_padre').in('contenedor_padre', contenedores);
-        (cont||[]).forEach(c => {
-            if (!contenidoMap[c.contenedor_padre]) contenidoMap[c.contenedor_padre] = [];
-            contenidoMap[c.contenedor_padre].push(c.nombre);
-        });
+    let defMap = {};
+    let contenidoMap = {};
+
+    if (nombres.length > 0) {
+        const { data: defs } = await supabase.from('objetos')
+            .select('nombre, tipo, rareza, efecto, descripcion, vida_roja, vida_azul, contenedor_padre')
+            .in('nombre', nombres);
+        (defs||[]).forEach(o => { defMap[o.nombre] = o; });
+
+        const contenedores = lista.filter(i => defMap[i.objeto_nombre]?.tipo === 'Contenedor').map(i => i.objeto_nombre);
+        if (contenedores.length > 0) {
+            const { data: cont } = await supabase.from('objetos')
+                .select('nombre, contenedor_padre').in('contenedor_padre', contenedores);
+            (cont||[]).forEach(c => {
+                if (!contenidoMap[c.contenedor_padre]) contenidoMap[c.contenedor_padre] = [];
+                contenidoMap[c.contenedor_padre].push(c.nombre);
+            });
+        }
     }
 
-    const sorted = [...lista].sort((a,b) => {
-        if (a.equipado!==b.equipado) return b.equipado-a.equipado;
+    const sorted = [...lista].sort((a, b) => {
+        if (a.equipado !== b.equipado) return b.equipado - a.equipado;
         return _rarOrd(defMap[b.objeto_nombre]?.rareza) - _rarOrd(defMap[a.objeto_nombre]?.rareza);
     });
 
-    const safe = nombre.replace(/'/g,"\\'");
-    const EQUIPABLES = ['Equipamiento','Accesorio','Vehículo','Vehiculo'];
+    const safe = nombre.replace(/'/g, "\\'");
+    const EQUIPABLES = ['Equipamiento', 'Accesorio', 'Vehículo', 'Vehiculo'];
 
     const _renderObj = (item) => {
-        const def = defMap[item.objeto_nombre] || {};
-        const isEqp = item.equipado;
-        const rarCol = _rarColor(def.rareza);
-        const tipo = def.tipo || '-';
-        const safeObj = item.objeto_nombre.replace(/'/g,"\\'");
-        const esContenedor = tipo==='Contenedor';
-        const esVehiculo   = tipo==='Vehículo'||tipo==='Vehiculo';
+        const def      = defMap[item.objeto_nombre] || {};
+        const isEqp    = item.equipado;
+        const rarCol   = _rarColor(def.rareza);
+        const tipo     = def.tipo || '-';
+        const safeObj  = item.objeto_nombre.replace(/'/g, "\\'");
+        const esContenedor = tipo === 'Contenedor';
+        const esVehiculo   = tipo === 'Vehículo' || tipo === 'Vehiculo';
         const puedeEquipar = EQUIPABLES.includes(tipo);
         const contenidos   = contenidoMap[item.objeto_nombre] || [];
 
-        return `<div class="ppj-obj-card ${isEqp?'equipado':''}" data-nombre="${item.objeto_nombre.toLowerCase()}">
+        // Botón OP de editar objeto (solo admin)
+        const editBtn = esAdmin && def.nombre
+            ? `<button class="ppj-ctrl-btn" style="font-size:0.6em;margin-left:auto;" title="Editar objeto"
+                onclick="window._pobjopAbrirEditor('${safeObj}')">✏️</button>`
+            : '';
+
+        // Botón gestionar contenedor (solo admin)
+        const contBtn = esAdmin && esContenedor
+            ? `<button class="ppj-ctrl-btn" style="font-size:0.6em;" title="Gestionar contenedor"
+                onclick="window._pobjopAbrirContenedor('${safeObj}')">📦</button>`
+            : '';
+
+        return `<div class="ppj-obj-card ${isEqp ? 'equipado' : ''}" data-nombre="${item.objeto_nombre.toLowerCase()}">
             <div class="ppj-obj-header">
                 <span class="ppj-obj-cant">×${item.cantidad}</span>
                 <span class="ppj-obj-nombre" title="${item.objeto_nombre}">${item.objeto_nombre}</span>
-                <span class="ppj-obj-rar" style="background:${rarCol}22;color:${rarCol};border:1px solid ${rarCol}44;">${def.rareza||'-'}</span>
+                <span class="ppj-obj-rar" style="background:${rarCol}22;color:${rarCol};border:1px solid ${rarCol}44;">${def.rareza || '-'}</span>
+                ${editBtn}${contBtn}
             </div>
-            ${def.efecto?`<div class="ppj-obj-det">${def.efecto}</div>`:''}
-            ${esVehiculo?`<div class="ppj-obj-vehiculo">
-                ${(def.vida_roja||0)>0?`<span class="ppj-obj-vida-pill ppj-obj-vida-roja">❤ ${def.vida_roja}</span>`:''}
-                ${(def.vida_azul||0)>0?`<span class="ppj-obj-vida-pill ppj-obj-vida-azul">💙 ${def.vida_azul}</span>`:''}
-            </div>`:''}
-            ${esContenedor&&contenidos.length>0?`<div class="ppj-contenedor-items">${contenidos.map(c=>`<div class="ppj-contenedor-item">• ${c}</div>`).join('')}</div>`:''}
+            ${def.efecto ? `<div class="ppj-obj-det">${def.efecto}</div>` : ''}
+            ${esVehiculo ? `<div class="ppj-obj-vehiculo">
+                ${(def.vida_roja||0) > 0 ? `<span class="ppj-obj-vida-pill ppj-obj-vida-roja">❤ ${def.vida_roja}</span>` : ''}
+                ${(def.vida_azul||0) > 0 ? `<span class="ppj-obj-vida-pill ppj-obj-vida-azul">💙 ${def.vida_azul}</span>` : ''}
+            </div>` : ''}
+            ${esContenedor && contenidos.length > 0 ? `<div class="ppj-contenedor-items">
+                ${contenidos.map(c => `<div class="ppj-contenedor-item">• ${c}</div>`).join('')}
+            </div>` : ''}
             <div class="ppj-obj-footer">
                 <span class="ppj-obj-tipo">${tipo}</span>
-                ${puedeEquipar?`<button class="ppj-eqp-btn ${isEqp?'on':'off'}"
+                ${puedeEquipar ? `<button class="ppj-eqp-btn ${isEqp ? 'on' : 'off'}"
                     onclick="window._ppjToggleEquipar('${safe}','${safeObj}',${!isEqp})">
-                    ${isEqp?'✓ Equipado':'Equipar'}</button>`:''}
+                    ${isEqp ? '✓ Equipado' : 'Equipar'}</button>` : ''}
             </div>
         </div>`;
     };
 
-    const equipados    = sorted.filter(i=>i.equipado);
-    const noEquipados  = sorted.filter(i=>!i.equipado);
+    const equipados   = sorted.filter(i => i.equipado);
+    const noEquipados = sorted.filter(i => !i.equipado);
+
+    // ── Botones OP (solo admin) ───────────────────────────────
+    const botonesOP = esAdmin ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
+                onclick="window._pobjopAbrirCrear()">✨ Crear objeto</button>
+            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
+                onclick="window._pobjopAbrirCrearMulti()">⚒️ Forja múltiple</button>
+            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
+                onclick="window._pobjopAbrirAsignacionMasiva()">🎁 Asignar</button>
+            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
+                onclick="window._pobjopAbrirTransfer()">⇄ Mover</button>
+            <button class="ppj-btn-editar" style="font-size:0.68em;padding:6px 10px;flex:none;"
+                onclick="window._pobjopAbrirImagenes()">🖼️ Imágenes</button>
+        </div>` : '';
+
+    if (lista.length === 0) {
+        body.innerHTML = `<div class="ppj-section">
+            ${botonesOP}
+            <div class="ppj-empty"><div class="ppj-empty-icon">🎒</div>Inventario vacío</div>
+        </div>`;
+        return;
+    }
 
     body.innerHTML = `<div class="ppj-section">
+        ${botonesOP}
         <input class="ppj-obj-search" placeholder="Buscar objeto…" oninput="window._ppjFiltrarObjetos(this.value)">
         <div id="ppj-obj-lista">
-            ${equipados.length?`<div class="ppj-obj-seccion-titulo">Equipados</div>${equipados.map(_renderObj).join('')}`:''}
-            ${noEquipados.length?`<div class="ppj-obj-seccion-titulo">Inventario</div>${noEquipados.map(_renderObj).join('')}`:''}
+            ${equipados.length ? `<div class="ppj-obj-seccion-titulo">Equipados</div>${equipados.map(_renderObj).join('')}` : ''}
+            ${noEquipados.length ? `<div class="ppj-obj-seccion-titulo">Inventario</div>${noEquipados.map(_renderObj).join('')}` : ''}
         </div>
     </div>`;
+
+    // Refrescar tras operaciones OP
+    window._pobjRecargarDesdeOP = async () => {
+        const b = document.getElementById('ppj-body');
+        if (b) _tabObjetos(nombre, b);
+    };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1172,27 +1225,26 @@ window._ppjBuscarHz = (query) => {
         return;
     }
 
-    // PASO 1: Abrir TODO (necesario para que los cards sean accesibles en el DOM visual)
-    inv.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => a.classList.add('open'));
-
-    // PASO 2: Marcar cada card
+    // 1. Marcar cada card como visible u oculto
     inv.querySelectorAll('.ppj-hz-card').forEach(c => {
-        const nombre = (c.getAttribute('data-hz-nombre') || '').toLowerCase();
+        const nombre = c.getAttribute('data-hz-nombre') || '';
         const texto  = c.textContent.toLowerCase();
         const match  = nombre.includes(q) || texto.includes(q);
         c.classList.toggle('ppj-hidden', !match);
         c.style.display = match ? '' : 'none';
     });
 
-    // PASO 3: Cerrar los que no tienen ningún card visible
-    // Primero los cl-acc (hijos), luego los af-acc (padres)
-    inv.querySelectorAll('.ppj-cl-acc').forEach(cl => {
-        const tieneVisible = cl.querySelector('.ppj-hz-card:not(.ppj-hidden)') !== null;
-        cl.classList.toggle('open', tieneVisible);
-    });
+    // 2. Para cada ppj-af-acc, abrir si tiene ALGÚN card visible (en cualquier profundidad)
+    //    y también abrir sus ppj-cl-acc hijos que tengan cards visibles
     inv.querySelectorAll('.ppj-af-acc').forEach(af => {
-        const tieneVisible = af.querySelector('.ppj-hz-card:not(.ppj-hidden)') !== null;
-        af.classList.toggle('open', tieneVisible);
+        const cardsVisibles = [...af.querySelectorAll('.ppj-hz-card')].filter(c => !c.classList.contains('ppj-hidden'));
+        af.classList.toggle('open', cardsVisibles.length > 0);
+
+        // Abrir/cerrar sub-acordeones de clase según si tienen cards visibles
+        af.querySelectorAll('.ppj-cl-acc').forEach(cl => {
+            const clVisible = [...cl.querySelectorAll('.ppj-hz-card')].some(c => !c.classList.contains('ppj-hidden'));
+            cl.classList.toggle('open', clVisible);
+        });
     });
 };
 
