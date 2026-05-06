@@ -1619,7 +1619,7 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
 .ppj-hz-check-box::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#d4af37;opacity:0;transition:opacity 0.15s;}
 .ppj-hz-check-wrap input:checked+.ppj-hz-check-box{border-color:rgba(212,175,55,0.5);background:rgba(212,175,55,0.12);}
 .ppj-hz-check-wrap input:checked+.ppj-hz-check-box::after{opacity:1;}
-
+`;
         document.head.appendChild(st);
     }
 
