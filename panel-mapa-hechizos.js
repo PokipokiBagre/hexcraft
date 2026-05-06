@@ -16,11 +16,15 @@ const COLOR_POS    = 'rgba(150, 131, 200, 0.95)';   // violeta — descubierto c
 const COLOR_APR    = 'rgba(236, 213, 154, 0.95)';   // dorado  — aprendible (todos sus precedentes descubiertos)
 const COLOR_RASTR  = 'rgba(120, 110, 150, 0.6)';    // gris-vio — descubierto pero precedentes incompletos
 const COLOR_NUEVO  = '#00ffff';                      // celeste — nodo recién creado (OP)
+const COLOR_PJ     = 'rgba(0, 220, 255, 0.95)';     // celeste — hechizo poseído por el PJ activo
+const COLOR_ENFOQ_PREV = 'rgba(255, 165, 60, 0.95)'; // naranja — precedentes del nodo seleccionado
+const COLOR_ENFOQ_NEXT = 'rgba(80, 220, 130, 0.95)'; // verde   — salientes del nodo seleccionado
 const COLOR_FONDO  = '#05000a';
 const COLOR_LINEA_POS  = 'rgba(150,131,200,0.45)';
 const COLOR_LINEA_APR  = 'rgba(236,213,154,0.35)';
 const COLOR_LINEA_RASTR= 'rgba(188,180,156,0.15)';
 const COLOR_LINEA_OCULTA = 'rgba(70,70,80,0.15)';
+const COLOR_LINEA_PJ   = 'rgba(0,210,255,0.6)';     // celeste — enlace hacia/desde posesión PJ
 
 // ── Estado interno ───────────────────────────────────────────
 let _estado = {
@@ -518,6 +522,24 @@ function _dibujar() {
     ctx.translate(camara.x, camara.y);
     ctx.scale(camara.zoom, camara.zoom);
 
+    // ── 1. Calcular sets de enfoque si hay nodo seleccionado ──
+    // precedentes directos e indirectos del seleccionado, salientes directos
+    let enfocado = null;
+    let enfoqPrev = new Set(); // nodos que son precedente (apuntan al seleccionado)
+    let enfoqNext = new Set(); // nodos a los que apunta el seleccionado
+    let enfoqRel  = new Set(); // todos los relacionados (prev + next + el nodo)
+    if (nodoSeleccionado) {
+        enfocado = nodoSeleccionado;
+        enlaces.forEach(e => {
+            if (e.target === enfocado) enfoqPrev.add(e.source);
+            if (e.source === enfocado) enfoqNext.add(e.target);
+        });
+        enfoqRel.add(enfocado);
+        enfoqPrev.forEach(n => enfoqRel.add(n));
+        enfoqNext.forEach(n => enfoqRel.add(n));
+    }
+    const hayEnfoque = enfocado !== null;
+
     // ── 1. ENLACES ───────────────────────────────────────────
     enlaces.forEach(e => {
         const dx = e.target.x - e.source.x;
@@ -529,20 +551,40 @@ function _dibujar() {
         let color = COLOR_LINEA_OCULTA;
         let lw    = 0.7 / sf;
         let dash  = [];
+        let alpha = 1.0;
 
         const sD = descubiertos.has(e.source);
         const tD = descubiertos.has(e.target);
         const tA = aprendibles.has(e.target);
-        // Anillo PJ: si hay PJ activo y posee el source
         const sP = posesiones.has(e.source);
         const tP = posesiones.has(e.target);
 
-        if (sD && tD)      { color = COLOR_LINEA_POS;   lw = 1.4 / sf; }
-        else if (sD && tA) { color = COLOR_LINEA_APR;   lw = 1.1 / sf; }
-        else if (sP && tP) { color = COLOR_LINEA_POS;   lw = 1.4 / sf; }
-        else if (_estado.jugadorPanel === 'Todos') { color = 'rgba(120,110,160,0.45)'; lw = 1.0 / sf; }
-        else if (!e.target.esConocido && !tA) { dash = [6/sf, 5/sf]; color = COLOR_LINEA_OCULTA; }
+        if (hayEnfoque) {
+            // Modo enfoque: solo resaltar enlaces del nodo seleccionado
+            if (e.target === enfocado && enfoqPrev.has(e.source)) {
+                color = COLOR_ENFOQ_PREV; lw = 2.0 / sf;
+            } else if (e.source === enfocado && enfoqNext.has(e.target)) {
+                color = COLOR_ENFOQ_NEXT; lw = 2.0 / sf;
+            } else {
+                color = 'rgba(80,75,100,0.12)'; lw = 0.5 / sf;
+            }
+        } else if (sP && tP) {
+            // Ambos son posesión del PJ → celeste
+            color = COLOR_LINEA_PJ; lw = 2.0 / sf;
+        } else if (sP || tP) {
+            // Uno solo del PJ → celeste tenue
+            color = 'rgba(0,200,240,0.3)'; lw = 1.2 / sf;
+        } else if (sD && tD) {
+            color = COLOR_LINEA_POS; lw = 1.4 / sf;
+        } else if (sD && tA) {
+            color = COLOR_LINEA_APR; lw = 1.1 / sf;
+        } else if (_estado.jugadorPanel === 'Todos') {
+            color = 'rgba(120,110,160,0.45)'; lw = 1.0 / sf;
+        } else if (!e.target.esConocido && !tA) {
+            dash = [6/sf, 5/sf]; color = COLOR_LINEA_OCULTA;
+        }
 
+        ctx.globalAlpha = alpha;
         ctx.beginPath();
         ctx.moveTo(e.source.x, e.source.y);
         ctx.lineTo(tx, ty);
@@ -561,6 +603,7 @@ function _dibujar() {
         ctx.closePath();
         ctx.fillStyle = color;
         ctx.fill();
+        ctx.globalAlpha = 1.0;
     });
 
     // Flecha temporal (modo conexión)
@@ -590,31 +633,64 @@ function _dibujar() {
         const esDes      = descubiertos.has(nodo);
         const esApr      = aprendibles.has(nodo);
         const esPar      = parciales.has(nodo);
-        // Sets del PJ (para anillo extra)
+        // Sets del PJ seleccionado
         const esPosesion = posesiones.has(nodo);
         const esSeleccionado = nodoSeleccionado === nodo;
         const esNuevo    = nodo.esNuevo;
 
-        // En vista "Todos" todos los nodos son visibles e importantes
         const esTodos = _estado.jugadorPanel === 'Todos';
 
-        // Color núcleo basado en estado global
-        let colorNucleo = esTodos ? 'rgba(100,95,130,0.7)' : 'rgba(80,75,105,0.75)';
-        if (esNuevo)      colorNucleo = COLOR_NUEVO;
-        else if (esDes)   colorNucleo = esPar ? COLOR_RASTR : COLOR_POS;
-        else if (esApr)   colorNucleo = COLOR_APR;
+        // ── Modo enfoque: clasificar nodo ──
+        const esEnfocado   = hayEnfoque && esSeleccionado;
+        const esPrecedente = hayEnfoque && enfoqPrev.has(nodo);
+        const esSaliente   = hayEnfoque && enfoqNext.has(nodo);
+        const esIrrelevante = hayEnfoque && !enfoqRel.has(nodo);
 
-        const colorBorde = esNuevo ? COLOR_NUEVO : colorNucleo;
-        const importante = esDes || esApr || esPar || esNuevo || esSeleccionado || esTodos;
+        // ── Color núcleo ──
+        let colorNucleo;
+        let colorTexto;
+        if (esNuevo) {
+            colorNucleo = COLOR_NUEVO;
+            colorTexto  = COLOR_NUEVO;
+        } else if (hayEnfoque) {
+            if (esEnfocado) {
+                // El seleccionado mantiene su color normal pero brillante
+                colorNucleo = esDes ? COLOR_POS : esApr ? COLOR_APR : esPosesion ? COLOR_PJ : 'rgba(200,195,220,0.95)';
+                colorTexto  = colorNucleo;
+            } else if (esPrecedente) {
+                colorNucleo = COLOR_ENFOQ_PREV;
+                colorTexto  = COLOR_ENFOQ_PREV;
+            } else if (esSaliente) {
+                colorNucleo = COLOR_ENFOQ_NEXT;
+                colorTexto  = COLOR_ENFOQ_NEXT;
+            } else {
+                // Irrelevante — gris muy apagado
+                colorNucleo = 'rgba(60,58,72,0.5)';
+                colorTexto  = 'rgba(90,88,105,0.6)';
+            }
+        } else if (esPosesion && !esTodos) {
+            // Hechizo del PJ: celeste vibrante
+            colorNucleo = COLOR_PJ;
+            colorTexto  = COLOR_PJ;
+        } else if (esTodos) {
+            colorNucleo = esDes ? COLOR_POS : esApr ? COLOR_APR : 'rgba(100,95,130,0.7)';
+            colorTexto  = esDes ? COLOR_POS : esApr ? COLOR_APR : 'rgba(160,155,175,0.9)';
+        } else {
+            colorNucleo = esDes ? (esPar ? COLOR_RASTR : COLOR_POS) : esApr ? COLOR_APR : 'rgba(80,75,105,0.75)';
+            colorTexto  = esDes ? (esPar ? COLOR_RASTR : COLOR_POS) : esApr ? COLOR_APR : 'rgba(160,155,175,0.9)';
+        }
 
-        // Ocultos visibles pero tenues — mínimo 0.85
-        ctx.globalAlpha = importante ? 1.0 : 0.85;
+        const colorBorde = colorNucleo;
+        const importante = !esIrrelevante;
 
-        // Halo de selección
+        // Alpha global
+        ctx.globalAlpha = esIrrelevante ? 0.3 : 1.0;
+
+        // Halo de selección (nodo enfocado)
         if (esSeleccionado) {
             ctx.beginPath();
             ctx.arc(nodo.x, nodo.y, nodo.radio + 12/sf, 0, Math.PI*2);
-            ctx.strokeStyle = 'rgba(236,213,154,0.8)';
+            ctx.strokeStyle = 'rgba(236,213,154,0.9)';
             ctx.lineWidth = 2.5/sf;
             ctx.setLineDash([6/sf,4/sf]);
             ctx.stroke();
@@ -633,13 +709,29 @@ function _dibujar() {
             ctx.shadowBlur = 0;
         }
 
-        // Anillo extra si el PJ activo posee este nodo
-        if (esPosesion && _estado.jugadorPanel !== 'Todos') {
+        // Halo celeste de posesión PJ (solo cuando no hay enfoque)
+        if (esPosesion && !esTodos && !hayEnfoque) {
             ctx.beginPath();
-            ctx.arc(nodo.x, nodo.y, nodo.radio + 6/sf, 0, Math.PI*2);
-            ctx.strokeStyle = 'rgba(150,131,200,0.6)';
-            ctx.lineWidth = 1.5/sf;
+            ctx.arc(nodo.x, nodo.y, nodo.radio + 8/sf, 0, Math.PI*2);
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = 'rgba(0,210,255,0.6)';
+            ctx.strokeStyle = 'rgba(0,210,255,0.7)';
+            ctx.lineWidth = 2.5/sf;
             ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Halos de enfoque (precedentes / salientes)
+        if (esPrecedente || esSaliente) {
+            const haloColor = esPrecedente ? COLOR_ENFOQ_PREV : COLOR_ENFOQ_NEXT;
+            ctx.beginPath();
+            ctx.arc(nodo.x, nodo.y, nodo.radio + 8/sf, 0, Math.PI*2);
+            ctx.shadowBlur = 14;
+            ctx.shadowColor = haloColor;
+            ctx.strokeStyle = haloColor;
+            ctx.lineWidth = 2.5/sf;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
         }
 
         // Aro exterior (fondo)
@@ -648,12 +740,11 @@ function _dibujar() {
         ctx.fillStyle = '#0d0d1a';
         ctx.fill();
 
-        // Núcleo — siempre rellenado con su color (nunca vacío)
+        // Núcleo — siempre rellenado con su color
         ctx.beginPath();
         ctx.arc(nodo.x, nodo.y, Math.max(1, nodo.radio - 7), 0, Math.PI*2);
-        const rellenar = true; // siempre rellenar con colorNucleo
         ctx.fillStyle = colorNucleo;
-        if (esDes || esApr || esNuevo || esTodos) { ctx.shadowBlur = esNuevo ? 14 : 7; ctx.shadowColor = colorNucleo; }
+        if (!esIrrelevante) { ctx.shadowBlur = esNuevo ? 14 : (esPosesion || esPrecedente || esSaliente || esEnfocado ? 10 : 5); ctx.shadowColor = colorNucleo; }
         ctx.fill();
         ctx.shadowBlur = 0;
 
@@ -662,15 +753,14 @@ function _dibujar() {
         ctx.arc(nodo.x, nodo.y, nodo.radio, 0, Math.PI*2);
         ctx.strokeStyle = colorBorde;
         ctx.lineWidth = (esSeleccionado ? 3 : 1.5) / sf;
-        if (!nodo.esConocido && !esNuevo && !esTodos) {
+        if (!nodo.esConocido && !esNuevo && !esTodos && esIrrelevante) {
             ctx.setLineDash([5/sf, 4/sf]);
-            ctx.globalAlpha = Math.min(ctx.globalAlpha, 0.45);
         }
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.globalAlpha = 1.0;
 
-        // Texto — siempre visible para TODOS los nodos con zoom suficiente
+        // Texto
         if (camara.zoom > 0.08 || esSeleccionado) {
             const fs = esDes ? 28 : 22;
             ctx.font = `bold ${fs}px sans-serif`;
@@ -686,20 +776,15 @@ function _dibujar() {
                 texto = m ? `Hechizo ${m[0]}` : nodo.id;
             }
 
-            // Ocultos con texto más tenue pero legible
-            ctx.globalAlpha = importante ? 1.0 : 0.85;
+            ctx.globalAlpha = esIrrelevante ? 0.25 : 1.0;
             ctx.strokeStyle = 'rgba(0,0,0,0.95)';
             ctx.lineWidth = 5/sf;
             ctx.strokeText(texto, nodo.x, ty2);
-
-            ctx.fillStyle = esNuevo  ? COLOR_NUEVO
-                : esDes  ? (esPar ? COLOR_RASTR : COLOR_POS)
-                : esApr  ? COLOR_APR
-                : 'rgba(160,155,175,0.9)';   // gris claro visible para ocultos
+            ctx.fillStyle = colorTexto;
             ctx.fillText(texto, nodo.x, ty2);
 
             // Medallita de HEX — solo si hay costo y zoom suficiente
-            if (nodo.hex > 0 && camara.zoom > 0.25) {
+            if (nodo.hex > 0 && camara.zoom > 0.25 && !esIrrelevante) {
                 const hexTxt = `⬡${nodo.hex}`;
                 const fsPill = 17;
                 ctx.font = `${fsPill}px sans-serif`;
@@ -708,7 +793,6 @@ function _dibujar() {
                 const pillX = nodo.x - pillW/2;
                 const pillY = ty2 + fs + 6/sf;
 
-                // Fondo de la medallita
                 ctx.beginPath();
                 ctx.roundRect?.(pillX, pillY, pillW, pillH, 4/sf) || ctx.rect(pillX, pillY, pillW, pillH);
                 ctx.fillStyle = 'rgba(20,15,35,0.85)';
@@ -717,7 +801,6 @@ function _dibujar() {
                 ctx.lineWidth = 1/sf;
                 ctx.stroke();
 
-                // Texto HEX
                 ctx.font = `bold ${fsPill}px sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.fillStyle = 'rgba(212,175,55,0.85)';
