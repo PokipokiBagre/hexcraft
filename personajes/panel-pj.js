@@ -1258,30 +1258,6 @@ export function refreshPanelPJ() {
 // ─────────────────────────────────────────────────────────────
 // TOGGLE CONOCIDO (visibilidad pública del hechizo)
 // ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
-// BOTONES "NUEVO HECHIZO" — modo inventario (PJ) y catálogo
-// ─────────────────────────────────────────────────────────────
-
-// Nuevo hechizo para asignar directamente al PJ (modo inv)
-window._ppjNuevoHechizoPj = (nombrePJ) => {
-    if (!estadoUI.esAdmin) return;
-    // Si el minimapa está abierto, crear nodo temporal en él primero
-    if (typeof window._pmhCrearNodoParaEditor === 'function') {
-        window._pmhCrearNodoParaEditor();
-    }
-    window._ppjAbrirEditorHz(null, nombrePJ, 'inv');
-};
-
-// Nuevo hechizo en catálogo (sin asignar a nadie)
-window._ppjNuevoHechizoCat = (nombrePJ) => {
-    if (!estadoUI.esAdmin) return;
-    // Si el minimapa está abierto, crear nodo temporal en él primero
-    if (typeof window._pmhCrearNodoParaEditor === 'function') {
-        window._pmhCrearNodoParaEditor();
-    }
-    window._ppjAbrirEditorHz(null, nombrePJ, 'cat');
-};
-
 window._ppjToggleConocido = async (hechizo_id, nuevoValor, nombrePJ) => {
     if (!estadoUI.esAdmin) return;
     const { error } = await supabase.from('hechizos_nodos')
@@ -1532,6 +1508,70 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
         <label class="ppj-hz-inline-label" style="margin-top:10px;">Especial</label>
         <input class="ppj-hz-inline-input" id="hze-especial" value="${(nodo?.especial||'').replace(/"/g,'&quot;')}">
 
+        <!-- ── BACKCAST / NEXTCAST ── -->
+        <div class="ppj-hz-modal-row" style="margin-top:14px;">
+            <div>
+                <label class="ppj-hz-inline-label">⟵ Backcast</label>
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <button class="ppj-ctrl-btn" style="padding:4px 8px;font-size:1em;" onclick="
+                        const i=document.getElementById('hze-backcast');
+                        i.value=Math.max(0,(parseInt(i.value)||0)-1);">−</button>
+                    <input class="ppj-hz-inline-input" id="hze-backcast" type="number" min="0" step="1"
+                        value="${nodo?.backcast??0}" style="text-align:center;flex:1;">
+                    <button class="ppj-ctrl-btn" style="padding:4px 8px;font-size:1em;" onclick="
+                        const i=document.getElementById('hze-backcast');
+                        i.value=(parseInt(i.value)||0)+1;">+</button>
+                </div>
+                <div style="font-size:0.62em;color:#3a3a5a;margin-top:3px;">Hechizos previos que afecta</div>
+            </div>
+            <div>
+                <label class="ppj-hz-inline-label">Nextcast ⟶</label>
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <button class="ppj-ctrl-btn" style="padding:4px 8px;font-size:1em;" onclick="
+                        const i=document.getElementById('hze-nextcast');
+                        i.value=Math.max(0,(parseInt(i.value)||0)-1);">−</button>
+                    <input class="ppj-hz-inline-input" id="hze-nextcast" type="number" min="0" step="1"
+                        value="${nodo?.nextcast??0}" style="text-align:center;flex:1;">
+                    <button class="ppj-ctrl-btn" style="padding:4px 8px;font-size:1em;" onclick="
+                        const i=document.getElementById('hze-nextcast');
+                        i.value=(parseInt(i.value)||0)+1;">+</button>
+                </div>
+                <div style="font-size:0.62em;color:#3a3a5a;margin-top:3px;">Hechizos siguientes que afecta</div>
+            </div>
+        </div>
+
+        <!-- ── TIPO: normal vs estado ── -->
+        <div style="margin-top:14px;display:flex;align-items:center;gap:10px;">
+            <label style="font-size:0.65em;color:#5a5a78;text-transform:uppercase;letter-spacing:1px;">Tipo</label>
+            <label class="ppj-hz-toggle-wrap">
+                <input type="checkbox" id="hze-es-estado" ${nodo?.es_estado?'checked':''}>
+                <span class="ppj-hz-toggle-slider"></span>
+                <span class="ppj-hz-toggle-label" id="hze-es-estado-lbl">${nodo?.es_estado?'⬛ Hechizo-Estado':'⬤ Hechizo Normal'}</span>
+            </label>
+        </div>
+
+        <!-- ── OBJETIVOS AFECTADOS ── -->
+        <div style="margin-top:14px;">
+            <label class="ppj-hz-inline-label">Afecta a…</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+                <label class="ppj-hz-check-wrap">
+                    <input type="checkbox" id="hze-afecta-hechizos" ${nodo?.afecta_hechizos?'checked':''}>
+                    <span class="ppj-hz-check-box"></span>
+                    <span style="font-size:0.75em;color:#aaa;">🌀 Otros hechizos</span>
+                </label>
+                <label class="ppj-hz-check-wrap">
+                    <input type="checkbox" id="hze-afecta-usuario" ${nodo?.afecta_usuario?'checked':''}>
+                    <span class="ppj-hz-check-box"></span>
+                    <span style="font-size:0.75em;color:#aaa;">🧙 Usuario del hechizo</span>
+                </label>
+                <label class="ppj-hz-check-wrap">
+                    <input type="checkbox" id="hze-afecta-objetivo" ${nodo?.afecta_objetivo?'checked':''}>
+                    <span class="ppj-hz-check-box"></span>
+                    <span style="font-size:0.75em;color:#aaa;">🎯 Otros objetivos</span>
+                </label>
+            </div>
+        </div>
+
         <label class="ppj-hz-inline-label" style="margin-top:10px;">Precedentes — strings de entrada</label>
         <div class="ppj-hz-strings-wrap" id="ppj-hz-str-wrap-in"></div>
 
@@ -1550,7 +1590,10 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
     </div>`;
 
     // Inyectar estilos inline si no existen
-    if (!document.getElementById('ppj-hz-inline-styles')) {
+    // Siempre actualizar estilos (por si hay nueva versión)
+    const stOld = document.getElementById('ppj-hz-inline-styles');
+    if (stOld) stOld.remove();
+    {
         const st = document.createElement('style');
         st.id = 'ppj-hz-inline-styles';
         st.textContent = `
@@ -1562,13 +1605,34 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
 .ppj-hz-btn-save:hover{background:rgba(212,175,55,0.28);}
 .ppj-hz-btn-cancel{background:transparent;color:#5a5a78;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px 18px;font-size:0.8em;font-family:'Cinzel',serif;cursor:pointer;}
 .ppj-hz-btn-cancel:hover{color:#888;border-color:rgba(255,255,255,0.2);}
-.ppj-hz-btn-danger{background:rgba(200,50,50,0.12);color:#ff5555;border:1px solid rgba(200,50,50,0.35);border-radius:6px;padding:10px 18px;font-size:0.8em;font-family:'Cinzel',serif;cursor:pointer;}
-.ppj-hz-btn-danger:hover{background:rgba(200,50,50,0.25);}
-`;
+.ppj-hz-toggle-wrap{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;}
+.ppj-hz-toggle-wrap input{display:none;}
+.ppj-hz-toggle-slider{width:36px;height:20px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;}
+.ppj-hz-toggle-slider::after{content:'';position:absolute;top:3px;left:3px;width:12px;height:12px;border-radius:50%;background:#555;transition:transform 0.2s,background 0.2s;}
+.ppj-hz-toggle-wrap input:checked+.ppj-hz-toggle-slider{background:rgba(212,175,55,0.2);border-color:rgba(212,175,55,0.4);}
+.ppj-hz-toggle-wrap input:checked+.ppj-hz-toggle-slider::after{transform:translateX(16px);background:#d4af37;}
+.ppj-hz-toggle-label{font-size:0.78em;color:#888;transition:color 0.2s;}
+.ppj-hz-toggle-wrap input:checked~.ppj-hz-toggle-label{color:#d4af37;}
+.ppj-hz-check-wrap{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;}
+.ppj-hz-check-wrap input{display:none;}
+.ppj-hz-check-box{width:16px;height:16px;border:1px solid rgba(255,255,255,0.2);border-radius:3px;background:rgba(255,255,255,0.04);position:relative;flex-shrink:0;transition:border-color 0.15s,background 0.15s;}
+.ppj-hz-check-box::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#d4af37;opacity:0;transition:opacity 0.15s;}
+.ppj-hz-check-wrap input:checked+.ppj-hz-check-box{border-color:rgba(212,175,55,0.5);background:rgba(212,175,55,0.12);}
+.ppj-hz-check-wrap input:checked+.ppj-hz-check-box::after{opacity:1;}
+
         document.head.appendChild(st);
     }
 
     _renderStrTags();
+
+    // Listener del toggle tipo hechizo-estado
+    const toggleEstado = document.getElementById('hze-es-estado');
+    const labelEstado  = document.getElementById('hze-es-estado-lbl');
+    if (toggleEstado && labelEstado) {
+        toggleEstado.addEventListener('change', () => {
+            labelEstado.textContent = toggleEstado.checked ? '⬛ Hechizo-Estado' : '⬤ Hechizo Normal';
+        });
+    }
 };
 
 // Volver a la tab de hechizos desde el editor inline
@@ -1593,6 +1657,13 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
     const undercast=document.getElementById('hze-undercast')?.value.trim();
     const especial= document.getElementById('hze-especial')?.value.trim();
 
+    const backcast  = parseInt(document.getElementById('hze-backcast')?.value) || 0;
+    const nextcast  = parseInt(document.getElementById('hze-nextcast')?.value) || 0;
+    const esEstado  = document.getElementById('hze-es-estado')?.checked || false;
+    const afHechizos= document.getElementById('hze-afecta-hechizos')?.checked || false;
+    const afUsuario = document.getElementById('hze-afecta-usuario')?.checked || false;
+    const afObjetivo= document.getElementById('hze-afecta-objetivo')?.checked || false;
+
     // ── FIX: usar _ppjHzGetStrs() (antes _ppjHzStrsSel no estaba definida) ──
     const strs       = window._ppjHzGetStrs?.() || { entrada: [], salida: [] };
     const strsEntrada = strs.entrada;   // precedentes
@@ -1605,7 +1676,11 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
     const payload = {
         hechizo_id: id, nombre, afinidad, clase,
         hex_cost: hexCost, es_conocido: conocido,
-        resumen, efecto, overcast, undercast, especial
+        resumen, efecto, overcast, undercast, especial,
+        backcast, nextcast, es_estado: esEstado,
+        afecta_hechizos: afHechizos,
+        afecta_usuario:  afUsuario,
+        afecta_objetivo: afObjetivo,
     };
 
     // Upsert del nodo
