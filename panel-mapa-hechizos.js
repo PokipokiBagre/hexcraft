@@ -970,6 +970,22 @@ function _iniciarEventos() {
         _estado.drag.hasMoved     = false;
     });
 
+    // DOBLE CLICK — abrir editor del nodo
+    wrap.addEventListener('dblclick', e => {
+        const wp = _worldPos(e.clientX, e.clientY);
+        const nodo = _nodoEn(wp.x, wp.y);
+        if (!nodo || !_estado.esAdmin) return;
+        // Seleccionar primero para que el panel derecho esté en contexto
+        _seleccionarNodo(nodo);
+        // Abrir el editor inline del panel-pj
+        if (typeof window._ppjAbrirEditorHz === 'function') {
+            const idReal = nodo.esNuevo ? null : nodo.id;
+            // Si es nodo nuevo temporal, asegurarnos de que _pmhNodoTempActual esté seteado
+            if (nodo.esNuevo) window._pmhNodoTempActual = nodo;
+            window._ppjAbrirEditorHz(idReal, _estado.jugadorPanel, 'cat');
+        }
+    });
+
     // WHEEL (zoom)
     wrap.addEventListener('wheel', e => {
         e.preventDefault();
