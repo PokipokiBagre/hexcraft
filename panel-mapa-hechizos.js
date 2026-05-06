@@ -12,15 +12,15 @@
 import { supabase } from './hex-auth.js';
 
 // ── Constantes de estilo ─────────────────────────────────────
-const COLOR_POS    = 'rgba(150, 131, 200, 0.95)';   // violeta — posesión
-const COLOR_APR    = 'rgba(236, 213, 154, 0.95)';   // dorado  — aprendible
-const COLOR_RASTR  = 'rgba(188, 180, 156, 0.4)';    // tenue   — rastreo
+const COLOR_POS    = 'rgba(150, 131, 200, 0.95)';   // violeta — descubierto completo
+const COLOR_APR    = 'rgba(236, 213, 154, 0.95)';   // dorado  — aprendible (todos sus precedentes descubiertos)
+const COLOR_RASTR  = 'rgba(120, 110, 150, 0.6)';    // gris-vio — descubierto pero precedentes incompletos
 const COLOR_NUEVO  = '#00ffff';                      // celeste — nodo recién creado (OP)
 const COLOR_FONDO  = '#05000a';
-const COLOR_LINEA_POS  = 'rgba(150,131,200,0.5)';
-const COLOR_LINEA_APR  = 'rgba(236,213,154,0.4)';
+const COLOR_LINEA_POS  = 'rgba(150,131,200,0.45)';
+const COLOR_LINEA_APR  = 'rgba(236,213,154,0.35)';
 const COLOR_LINEA_RASTR= 'rgba(188,180,156,0.15)';
-const COLOR_LINEA_OCULTA = 'rgba(80,80,80,0.2)';
+const COLOR_LINEA_OCULTA = 'rgba(70,70,80,0.15)';
 
 // ── Estado interno ───────────────────────────────────────────
 let _estado = {
@@ -30,21 +30,25 @@ let _estado = {
     nodos:         [],
     enlaces:       [],
     colores:       {},           // afinidad → { t, b }
+    // Sets globales (basados en esConocido, independientes del PJ)
+    descubiertos:  new Set(),    // esConocido=true y todos sus precedentes también
+    aprendibles:   new Set(),    // esConocido=false pero TODOS sus precedentes sí
+    parciales:     new Set(),    // esConocido=true pero ≥1 precedente no descubierto
+    // Sets del PJ seleccionado (para anillo extra)
     posesiones:    new Set(),
-    aprendibles:   new Set(),
     rastreo:       new Set(),
     camara:        { x: 0, y: 0, zoom: 0.6 },
     drag:          { activo: false, lastX: 0, lastY: 0, nodo: null },
     nodoSeleccionado: null,
-    nodoNuevo:     null,         // nodo recién creado pendiente de guardar
-    modoConexion:  false,        // OP está dibujando flecha
-    tempFlecha:    null,         // { source, endX, endY }
-    jugadores:     [],           // lista de nombres para el selector
-    jugadorPanel:  null,         // jugador mostrado en el mini-mapa (puede diferir del pj del panel)
+    nodoNuevo:     null,
+    modoConexion:  false,
+    tempFlecha:    null,
+    jugadores:     [],
+    jugadorPanel:  null,
     raf:           null,
     canvas:        null,
     ctx:           null,
-    onNodoClick:   null,         // callback → selecciona hechizo en el grimorio
+    onNodoClick:   null,
 };
 
 // ── API PÚBLICA ──────────────────────────────────────────────
@@ -62,12 +66,18 @@ export async function abrirMinimapa(nombrePJ, esAdmin, onNodoClick) {
     _inyectarPanel();
     _inyectarEstilos();
 
-    // Cargar datos desde Supabase
     await _cargarDatos();
+    _calcularSetsGlobales();
     _calcularVista(_estado.jugadorPanel);
-    _centrarCamara();
-    _iniciarRender();
-    _renderControles();
+    _actualizarSelector();
+
+    // Esperar un frame para que el flexbox haya calculado las dimensiones
+    requestAnimationFrame(() => {
+        _redimensionar();
+        _centrarCamara();
+        _iniciarRender();
+        _renderControles();
+    });
 }
 
 export function cerrarMinimapa() {
@@ -75,6 +85,25 @@ export function cerrarMinimapa() {
     if (_estado.raf) { cancelAnimationFrame(_estado.raf); _estado.raf = null; }
     const panel = document.getElementById('pmh-panel');
     if (panel) panel.remove();
+    window.removeEventListener('resize', _redimensionar);
+}
+
+// Centra el mapa en un hechizo específico (llamado desde panel-pj al clicar en grimorio)
+export function centrarEnHechizo(hechizo_id) {
+    if (!_estado.abierto) return;
+    const nodo = _estado.nodos.find(n => n.id === hechizo_id);
+    if (!nodo) return;
+    _estado.nodoSeleccionado = nodo;
+    // Navegar cámara al nodo
+    const wrap = document.getElementById('pmh-canvas-wrap');
+    if (wrap) {
+        const W = wrap.clientWidth, H = wrap.clientHeight;
+        const z = Math.max(_estado.camara.zoom, 0.8);
+        _estado.camara.zoom = z;
+        _estado.camara.x = W / 2 - nodo.x * z;
+        _estado.camara.y = H / 2 - nodo.y * z;
+    }
+    _renderInfo(nodo);
 }
 
 // ── INYECTAR PANEL HTML ──────────────────────────────────────
@@ -104,8 +133,13 @@ function _inyectarPanel() {
     const sel = document.getElementById('pmh-pj-selector');
     if (sel) {
         sel.addEventListener('change', () => {
-            _estado.jugadorPanel = sel.value || _estado.nombrePJ;
-            _calcularVista(_estado.jugadorPanel);
+            _estado.jugadorPanel = sel.value;
+            if (_estado.jugadorPanel === 'Todos') {
+                _estado.posesiones = new Set();
+                _estado.rastreo    = new Set();
+            } else {
+                _calcularVista(_estado.jugadorPanel);
+            }
             _centrarCamara();
         });
     }
@@ -316,7 +350,12 @@ async function _cargarDatos() {
 }
 
 async function _cargarInventarioPJ(nombre) {
-    if (!nombre) return;
+    if (!nombre || nombre === 'Todos') {
+        _estado.posesiones = new Set();
+        _estado.rastreo    = new Set();
+        return;
+    }
+
     const { data } = await supabase
         .from('hechizos_inventario')
         .select('hechizo_nombre')
@@ -324,7 +363,7 @@ async function _cargarInventarioPJ(nombre) {
 
     const inv = new Set((data || []).map(h => h.hechizo_nombre.toLowerCase().trim()));
 
-    // Mapear nombres de hechizos → nodos
+    // posesiones = hechizos que tiene el PJ (para el anillo extra en el mapa)
     _estado.posesiones = new Set();
     _estado.nodos.forEach(n => {
         const nom = (n.nombre || '').toLowerCase().trim();
@@ -332,15 +371,7 @@ async function _cargarInventarioPJ(nombre) {
         if (inv.has(nom) || inv.has(id)) _estado.posesiones.add(n);
     });
 
-    // Aprendibles: nodos alcanzables desde posesiones
-    _estado.aprendibles = new Set();
-    _estado.enlaces.forEach(e => {
-        if (_estado.posesiones.has(e.source) && !_estado.posesiones.has(e.target)) {
-            _estado.aprendibles.add(e.target);
-        }
-    });
-
-    // Rastreo recursivo hacia atrás desde aprendibles
+    // Rastreo recursivo hacia atrás desde posesiones (para mostrar camino)
     _estado.rastreo = new Set();
     const rastrear = (n) => {
         _estado.enlaces.forEach(e => {
@@ -350,17 +381,40 @@ async function _cargarInventarioPJ(nombre) {
             }
         });
     };
-    _estado.aprendibles.forEach(n => rastrear(n));
+    _estado.posesiones.forEach(n => rastrear(n));
 }
 
 function _calcularVista(nombre) {
     _cargarInventarioPJ(nombre); // async, actualiza sets en background
 }
 
+// Calcula sets basados en esConocido (global, independiente del PJ)
+function _calcularSetsGlobales() {
+    _estado.descubiertos = new Set();
+    _estado.aprendibles  = new Set();
+    _estado.parciales    = new Set();
+
+    _estado.nodos.forEach(n => { if (n.esConocido) _estado.descubiertos.add(n); });
+
+    _estado.nodos.forEach(n => {
+        if (n.esConocido) {
+            // Conocido con al menos un precedente no descubierto → parcial
+            if (n.incomingSources.length > 0 && !n.incomingSources.every(s => s.esConocido))
+                _estado.parciales.add(n);
+        } else {
+            // No conocido, todos sus precedentes sí → aprendible
+            if (n.incomingSources.length > 0 && n.incomingSources.every(s => s.esConocido))
+                _estado.aprendibles.add(n);
+        }
+    });
+}
+
 function _actualizarSelector() {
     const sel = document.getElementById('pmh-pj-selector');
     if (!sel) return;
-    sel.innerHTML = _estado.jugadores.map(j =>
+    // Incluir "Todos" como primera opción
+    const opciones = ['Todos', ..._estado.jugadores];
+    sel.innerHTML = opciones.map(j =>
         `<option value="${j}" ${j === _estado.jugadorPanel ? 'selected' : ''}>${j}</option>`
     ).join('');
 }
@@ -398,10 +452,11 @@ function _centrarCamara() {
     if (!wrap || _estado.nodos.length === 0) return;
     const W = wrap.clientWidth;
     const H = wrap.clientHeight;
+    if (!W || !H) return;
 
-    // Centrar sobre posesiones si las hay, sino sobre todos
-    const ref = _estado.posesiones.size > 0
-        ? Array.from(_estado.posesiones)
+    // Centrar sobre descubiertos si los hay, sino sobre todos
+    const ref = _estado.descubiertos.size > 0
+        ? Array.from(_estado.descubiertos)
         : _estado.nodos;
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -443,7 +498,9 @@ function _iniciarRender() {
 }
 
 function _dibujar() {
-    const { canvas, ctx, camara, nodos, enlaces, posesiones, aprendibles, rastreo, nodoSeleccionado, modoConexion, tempFlecha, nodoNuevo } = _estado;
+    const { canvas, ctx, camara, nodos, enlaces,
+            descubiertos, aprendibles, parciales, posesiones, rastreo,
+            nodoSeleccionado, modoConexion, tempFlecha, nodoNuevo } = _estado;
     if (!ctx || !canvas) return;
 
     const wrap = document.getElementById('pmh-canvas-wrap');
@@ -470,18 +527,20 @@ function _dibujar() {
         const ty  = e.target.y - Math.sin(ang) * (e.target.radio + 4 / sf);
 
         let color = COLOR_LINEA_OCULTA;
-        let lw    = 0.8 / sf;
+        let lw    = 0.7 / sf;
         let dash  = [];
 
+        const sD = descubiertos.has(e.source);
+        const tD = descubiertos.has(e.target);
+        const tA = aprendibles.has(e.target);
+        // Anillo PJ: si hay PJ activo y posee el source
         const sP = posesiones.has(e.source);
         const tP = posesiones.has(e.target);
-        const tA = aprendibles.has(e.target);
-        const sR = rastreo.has(e.source);
 
-        if (sP && tP)       { color = COLOR_LINEA_POS;   lw = 1.5 / sf; }
-        else if (sP && tA)  { color = COLOR_LINEA_APR;   lw = 1.2 / sf; }
-        else if (sR)        { color = COLOR_LINEA_RASTR;  lw = 0.8 / sf; }
-        else if (!e.target.esConocido) { dash = [6/sf, 5/sf]; }
+        if (sD && tD)      { color = COLOR_LINEA_POS;   lw = 1.4 / sf; }
+        else if (sD && tA) { color = COLOR_LINEA_APR;   lw = 1.1 / sf; }
+        else if (sP && tP) { color = COLOR_LINEA_POS;   lw = 1.4 / sf; }
+        else if (!e.target.esConocido && !tA) { dash = [6/sf, 5/sf]; color = COLOR_LINEA_OCULTA; }
 
         ctx.beginPath();
         ctx.moveTo(e.source.x, e.source.y);
@@ -526,28 +585,31 @@ function _dibujar() {
 
     // ── 2. NODOS ─────────────────────────────────────────────
     nodos.forEach(nodo => {
-        const esPosesion   = posesiones.has(nodo);
-        const esAprendible = aprendibles.has(nodo);
-        const esRastreo    = rastreo.has(nodo);
+        // Sets globales (basados en esConocido)
+        const esDes      = descubiertos.has(nodo);
+        const esApr      = aprendibles.has(nodo);
+        const esPar      = parciales.has(nodo);
+        // Sets del PJ (para anillo extra)
+        const esPosesion = posesiones.has(nodo);
         const esSeleccionado = nodoSeleccionado === nodo;
-        const esNuevo      = nodo.esNuevo;
+        const esNuevo    = nodo.esNuevo;
 
-        // Color de núcleo
-        let colorNucleo = 'rgba(60,60,65,0.3)';
-        if (esPosesion)        colorNucleo = COLOR_POS;
-        else if (esAprendible) colorNucleo = COLOR_APR;
-        else if (esRastreo)    colorNucleo = COLOR_RASTR;
-        else if (esNuevo)      colorNucleo = COLOR_NUEVO;
+        // Color núcleo basado en estado global
+        let colorNucleo = 'rgba(60,60,70,0.3)';
+        if (esNuevo)      colorNucleo = COLOR_NUEVO;
+        else if (esDes)   colorNucleo = esPar ? COLOR_RASTR : COLOR_POS;
+        else if (esApr)   colorNucleo = COLOR_APR;
 
         const colorBorde = esNuevo ? COLOR_NUEVO : colorNucleo;
+        const importante = esDes || esApr || esPar || esNuevo || esSeleccionado;
 
-        ctx.globalAlpha = (!esPosesion && !esAprendible && !esRastreo && !esNuevo && !esSeleccionado) ? 0.45 : 1.0;
+        ctx.globalAlpha = importante ? 1.0 : 0.3;
 
         // Halo de selección
         if (esSeleccionado) {
             ctx.beginPath();
-            ctx.arc(nodo.x, nodo.y, nodo.radio + 10/sf, 0, Math.PI*2);
-            ctx.strokeStyle = 'rgba(236,213,154,0.7)';
+            ctx.arc(nodo.x, nodo.y, nodo.radio + 12/sf, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(236,213,154,0.8)';
             ctx.lineWidth = 2.5/sf;
             ctx.setLineDash([6/sf,4/sf]);
             ctx.stroke();
@@ -566,20 +628,27 @@ function _dibujar() {
             ctx.shadowBlur = 0;
         }
 
-        // Aro exterior
+        // Anillo extra si el PJ activo posee este nodo
+        if (esPosesion && _estado.jugadorPanel !== 'Todos') {
+            ctx.beginPath();
+            ctx.arc(nodo.x, nodo.y, nodo.radio + 6/sf, 0, Math.PI*2);
+            ctx.strokeStyle = 'rgba(150,131,200,0.6)';
+            ctx.lineWidth = 1.5/sf;
+            ctx.stroke();
+        }
+
+        // Aro exterior (fondo)
         ctx.beginPath();
         ctx.arc(nodo.x, nodo.y, nodo.radio, 0, Math.PI*2);
-        ctx.fillStyle = '#111';
+        ctx.fillStyle = '#0d0d1a';
         ctx.fill();
 
         // Núcleo
         ctx.beginPath();
         ctx.arc(nodo.x, nodo.y, Math.max(1, nodo.radio - 7), 0, Math.PI*2);
-        ctx.fillStyle = esPosesion || esAprendible || esNuevo ? colorNucleo : '#111';
-        if (esPosesion || esAprendible || esNuevo) {
-            ctx.shadowBlur = esNuevo ? 14 : 6;
-            ctx.shadowColor = colorNucleo;
-        }
+        const rellenar = esDes || esApr || esNuevo;
+        ctx.fillStyle = rellenar ? colorNucleo : '#0d0d1a';
+        if (rellenar) { ctx.shadowBlur = esNuevo ? 14 : 7; ctx.shadowColor = colorNucleo; }
         ctx.fill();
         ctx.shadowBlur = 0;
 
@@ -588,42 +657,41 @@ function _dibujar() {
         ctx.arc(nodo.x, nodo.y, nodo.radio, 0, Math.PI*2);
         ctx.strokeStyle = colorBorde;
         ctx.lineWidth = (esSeleccionado ? 3 : 1.5) / sf;
-        if (!nodo.esConocido && !esPosesion && !esNuevo) {
+        if (!nodo.esConocido && !esNuevo) {
             ctx.setLineDash([5/sf, 4/sf]);
-            ctx.globalAlpha = Math.min(ctx.globalAlpha, 0.4);
+            ctx.globalAlpha = Math.min(ctx.globalAlpha, 0.45);
         }
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.globalAlpha = 1.0;
 
         // Texto
-        if (camara.zoom > 0.12 || esSeleccionado || esPosesion) {
-            const fs = esPosesion ? 28 : 22;
+        if (camara.zoom > 0.1 || esSeleccionado || esDes || esApr) {
+            const fs = esDes ? 28 : 22;
             ctx.font = `bold ${fs}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
             const ty2 = nodo.y + nodo.radio + 10/sf;
 
             let texto;
-            if (_estado.esAdmin) {
-                texto = nodo.nombre;
-            } else if (esPosesion || nodo.esConocido) {
+            if (_estado.esAdmin || nodo.esConocido) {
                 texto = nodo.nombre;
             } else {
                 const m = nodo.id.match(/\d+/);
                 texto = m ? `Hechizo ${m[0]}` : nodo.id;
             }
 
+            ctx.globalAlpha = importante ? 1.0 : 0.3;
             ctx.strokeStyle = 'rgba(0,0,0,0.95)';
             ctx.lineWidth = 5/sf;
             ctx.strokeText(texto, nodo.x, ty2);
 
-            ctx.fillStyle = esPosesion ? COLOR_POS
-                : esAprendible ? COLOR_APR
-                : esNuevo      ? COLOR_NUEVO
-                : esRastreo    ? 'rgba(188,180,156,0.5)'
-                : 'rgba(100,100,100,0.4)';
+            ctx.fillStyle = esNuevo   ? COLOR_NUEVO
+                : esDes  ? (esPar ? COLOR_RASTR : COLOR_POS)
+                : esApr  ? COLOR_APR
+                : 'rgba(90,90,100,0.35)';
             ctx.fillText(texto, nodo.x, ty2);
+            ctx.globalAlpha = 1.0;
         }
     });
 
@@ -932,6 +1000,8 @@ window._pmhToggleConocido = async (id, nuevoValor) => {
         .eq('hechizo_id', id);
     if (error) { alert('Error: ' + error.message); return; }
     nodo.esConocido = nuevoValor;
+    nodo.radio = nuevoValor ? 35 : 28;
+    _calcularSetsGlobales();
     _renderInfo(nodo);
 };
 
