@@ -110,7 +110,7 @@ function _inyectarEstilosOP() {
 #pobj-op-titulo { font-family: 'Cinzel', serif; color: #d4af37; font-size: 0.9em; letter-spacing: 1px; margin: 0; }
 #pobj-op-close {
     background: transparent; border: 1px solid rgba(255,255,255,0.1);
-    color: #555; border-radius: 4px; width: 28px; height: 28px;
+    color: #8888a8; border-radius: 4px; width: 28px; height: 28px;
     cursor: pointer; font-size: 0.9em; transition: all 0.12s;
 }
 #pobj-op-close:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
@@ -118,7 +118,7 @@ function _inyectarEstilosOP() {
 
 /* Formulario OP */
 .pobj-op-field { margin-bottom: 12px; }
-.pobj-op-label { font-size: 0.65em; color: #5a5a78; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px; }
+.pobj-op-label { font-size: 0.65em; color: #9090b0; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px; }
 .pobj-op-input {
     width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
     border-radius: 6px; color: #ccc; padding: 8px 10px; font-size: 0.82em;
@@ -149,7 +149,7 @@ select.pobj-op-input { cursor: pointer; }
 .pobj-op-footer { display: flex; gap: 8px; margin-top: 20px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap; }
 
 /* Separador de sección */
-.pobj-op-sep { font-size: 0.62em; letter-spacing: 1.5px; text-transform: uppercase; color: #3a3a58; font-weight: 700; margin: 16px 0 8px; }
+.pobj-op-sep { font-size: 0.62em; letter-spacing: 1.5px; text-transform: uppercase; color: #7070a0; font-weight: 700; margin: 16px 0 8px; }
 
 /* Asignación de personajes */
 .pobj-op-pj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin-top: 6px; }
@@ -183,7 +183,7 @@ select.pobj-op-input { cursor: pointer; }
 /* Upload zone */
 .pobj-upload-zone {
     border: 2px dashed rgba(212,175,55,0.3); border-radius: 8px;
-    padding: 30px; text-align: center; color: #3a3a58; font-size: 0.8em;
+    padding: 30px; text-align: center; color: #7070a0; font-size: 0.8em;
     cursor: pointer; transition: all 0.15s;
 }
 .pobj-upload-zone:hover { border-color: rgba(212,175,55,0.6); color: #888; background: rgba(212,175,55,0.04); }
@@ -216,7 +216,7 @@ function _toast(msg, ok = true) {
 // ── Helper: generar campos de personajes ─────────────────────
 function _htmlPersonajesAsignacion(mostrarNPC = false) {
     const pjs = _op.personajes.filter(p => mostrarNPC ? true : p.is_player);
-    if (pjs.length === 0) return '<div style="color:#3a3a58;font-size:0.75em;">No hay personajes cargados</div>';
+    if (pjs.length === 0) return '<div style="color:#7070a0;font-size:0.75em;">No hay personajes cargados</div>';
     return `<div class="pobj-op-pj-grid">` +
         pjs.map(p => `
             <div class="pobj-op-pj-row">
@@ -641,7 +641,7 @@ function _renderImagenes() {
                 <img src="${_imgObj(_imgSelObj)}" onerror="this.onerror=null;this.src='${_imgFall()}'" style="width:48px;height:48px;border-radius:5px;object-fit:cover;">
                 <div>
                     <div style="font-size:0.8em;font-weight:700;color:#d4af37;">${_imgSelObj}</div>
-                    <div style="font-size:0.62em;color:#555;margin-top:2px;">Archivo destino: <code style="color:#888;">${_norm(_imgSelObj)}.png</code></div>
+                    <div style="font-size:0.62em;color:#8888a8;margin-top:2px;">Archivo destino: <code style="color:#888;">${_norm(_imgSelObj)}.png</code></div>
                 </div>
             </div>
             <div class="pobj-upload-zone" id="pobj-upload-zone"
@@ -651,10 +651,10 @@ function _renderImagenes() {
                 ondrop="window._pobjImgDrop(event)">
                 <div style="font-size:2em;margin-bottom:8px;">🖼️</div>
                 <div>Haz clic o arrastra una imagen aquí</div>
-                <div style="font-size:0.75em;margin-top:4px;color:#3a3a58;">PNG, JPG, WEBP · Recomendado 256×256px</div>
+                <div style="font-size:0.75em;margin-top:4px;color:#7070a0;">PNG, JPG, WEBP · Recomendado 256×256px</div>
             </div>
             <input type="file" id="pobj-file-input" accept="image/*" style="display:none" onchange="window._pobjImgSubir(this.files[0])">
-            <div id="pobj-upload-status" style="margin-top:10px;font-size:0.75em;color:#555;"></div>
+            <div id="pobj-upload-status" style="margin-top:10px;font-size:0.75em;color:#8888a8;"></div>
             ` : `<div class="pobj-empty" style="margin-top:40px;">← Selecciona un objeto para subir su imagen</div>`}
         </div>
     </div>
