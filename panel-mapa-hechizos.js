@@ -17,7 +17,7 @@ const COLOR_APR    = 'rgba(236, 213, 154, 0.95)';   // dorado  — aprendible (t
 const COLOR_RASTR  = 'rgba(120, 110, 150, 0.6)';    // gris-vio — descubierto pero precedentes incompletos
 const COLOR_NUEVO  = '#00ffff';                      // celeste — nodo recién creado (OP)
 const COLOR_PJ     = 'rgba(0, 220, 255, 0.95)';     // celeste — hechizo poseído por el PJ activo
-const COLOR_ENFOQ_PREV = 'rgba(220, 140, 50, 0.9)';  // naranja suave — precedentes
+const COLOR_ENFOQ_PREV = 'rgba(210, 150, 80, 0.78)';  // naranja suave — precedentes
 const COLOR_ENFOQ_NEXT = 'rgba(80, 220, 130, 0.95)'; // verde   — salientes del nodo seleccionado
 const COLOR_FONDO  = '#05000a';
 const COLOR_LINEA_POS  = 'rgba(150,131,200,0.45)';
@@ -536,10 +536,20 @@ function _dibujar() {
     let enfoqRel  = new Set(); // todos los relacionados (prev + next + el nodo)
     if (nodoSeleccionado) {
         enfocado = nodoSeleccionado;
+        // Salientes directos del nodo seleccionado
         enlaces.forEach(e => {
-            if (e.target === enfocado) enfoqPrev.add(e.source);
             if (e.source === enfocado) enfoqNext.add(e.target);
         });
+        // Precedentes: expandir recursivamente toda la cadena de ancestros
+        const _expandirAncestros = (nodo) => {
+            enlaces.forEach(e => {
+                if (e.target === nodo && !enfoqPrev.has(e.source)) {
+                    enfoqPrev.add(e.source);
+                    _expandirAncestros(e.source);
+                }
+            });
+        };
+        _expandirAncestros(enfocado);
         enfoqRel.add(enfocado);
         enfoqPrev.forEach(n => enfoqRel.add(n));
         enfoqNext.forEach(n => enfoqRel.add(n));
@@ -1131,18 +1141,18 @@ async function _guardarPosiciones() {
     const sucios = _estado.nodos.filter(n => n._dirty && !n.esNuevo);
     if (sucios.length === 0) { alert('Sin cambios de posición que guardar.'); return; }
 
-    const rows = sucios.map(n => ({
-        hechizo_id: n.id,
-        pos_x: Math.round(n.x),
-        pos_y: Math.round(n.y),
-        es_conocido: n.esConocido
-    }));
+    // Usamos UPDATE (no upsert) para no violar la restricción NOT NULL de "nombre"
+    // en filas que ya existen. Las posiciones solo se guardan para nodos persistidos.
+    const errores = [];
+    for (const n of sucios) {
+        const { error } = await supabase.from('hechizos_nodos')
+            .update({ pos_x: Math.round(n.x), pos_y: Math.round(n.y) })
+            .eq('hechizo_id', n.id);
+        if (error) errores.push(n.id + ': ' + error.message);
+        else n._dirty = false;
+    }
 
-    const { error } = await supabase.from('hechizos_nodos')
-        .upsert(rows, { onConflict: 'hechizo_id' });
-
-    if (error) { alert('Error: ' + error.message); return; }
-    sucios.forEach(n => { n._dirty = false; });
+    if (errores.length > 0) { alert('Errores al guardar:\n' + errores.join('\n')); return; }
     alert(`✓ ${sucios.length} posición(es) guardadas.`);
 }
 
@@ -1230,12 +1240,30 @@ window._pmhEliminarNuevo = (id) => {
     _renderInfo(null);
 };
 
+// ── API: OBTENER NODO POR ID (para panel-pj al guardar posición) ─
+window._pmhGetNodo = (id) => {
+    if (!_estado.abierto || !id) return null;
+    return _estado.nodos.find(n => n.id === id) || null;
+};
+
 // ── API: AGREGAR ENLACE VISUAL desde el editor (sin DB) ──────
 // Llamado cuando se añade un precedente/saliente en el panel derecho
 window._pmhAgregarEnlaceVisual = (sourceId, targetId) => {
     if (!_estado.abierto) return;
-    const src = _estado.nodos.find(n => n.id === sourceId);
-    const tgt = _estado.nodos.find(n => n.id === targetId);
+    // Buscar por id normal o por el nodo temporal activo que aún no tiene su id final
+    const _findNodo = (id) => {
+        let n = _estado.nodos.find(n => n.id === id);
+        // Si no encontramos por id y hay un nodo nuevo activo, comparar con lo que
+        // el editor tiene como id actual (el usuario puede haberlo escrito en el campo)
+        if (!n && window._pmhNodoTempActual) {
+            const tempId = window._pmhNodoTempActual.id;
+            // El editor nos pasa el id que va a guardar; si coincide con el nodo temp, usarlo
+            if (id === tempId) n = window._pmhNodoTempActual;
+        }
+        return n;
+    };
+    const src = _findNodo(sourceId);
+    const tgt = _findNodo(targetId);
     if (!src || !tgt || src === tgt) return;
     const existe = _estado.enlaces.some(e => e.source === src && e.target === tgt);
     if (existe) return;
