@@ -10,7 +10,7 @@ import {
 } from './personajes-logic.js';
 import { currentConfig, supabase } from '../hex-auth.js';
 import { encolarCambio } from './personajes-state.js';
-import { abrirMinimapa, cerrarMinimapa } from '../panel-mapa-hechizos.js';
+import { abrirMinimapa, cerrarMinimapa, centrarEnHechizo } from '../panel-mapa-hechizos.js';
 
 // ── Helpers ───────────────────────────────────────────────────
 const _sb   = () => currentConfig.storageUrl;
@@ -834,7 +834,9 @@ async function _tabHechizos(nombre, body) {
 
             html += `<div class="ppj-hz-card ppj-cat-card ${isAssigned?'ppj-cat-assigned':''}"
                          data-cat-nombre="${(n.nombre||'').toLowerCase()}"
-                         data-cat-id="${n.hechizo_id||''}">
+                         data-cat-id="${n.hechizo_id||''}"
+                         onclick="centrarEnHechizo('${(n.hechizo_id||'').replace(/'/g,"\\'")}')"
+                         style="cursor:pointer;">
                 <div class="ppj-hz-header">
                     <span class="ppj-hz-nombre ${!showFull?'ppj-hz-oculto':''}">${displayNombre}</span>
                     <span class="ppj-hz-clase">${showFull?`Clase ${n.clase||'?'}`:'?'}</span>
@@ -1006,7 +1008,8 @@ async function _tabMisiones(nombre, body) {
 // ─────────────────────────────────────────────────────────────
 // FUNCIONES GLOBALES
 // ─────────────────────────────────────────────────────────────
-window.cerrarPanelPJ = cerrarPanelPJ;
+window.cerrarPanelPJ  = cerrarPanelPJ;
+window.centrarEnHechizo = centrarEnHechizo;
 
 window._ppjCambiarTab = (nombre, tab) => {
     _tabActivo[nombre] = tab;
