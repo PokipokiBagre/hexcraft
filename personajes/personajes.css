@@ -232,6 +232,17 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .fill-vida   { background: var(--gold); }
 .fill-vex    { background: var(--violet); opacity: 0.8; }
 .fill-guarda { background: var(--gold); opacity: 0.5; }
+
+/* Barras segmentadas del catálogo (seg-cell) */
+.seg-bar-wrap { display: flex; gap: 2px; width: 100%; height: 5px; border-radius: 2px; overflow: hidden; }
+.seg-bar-wrap.seg-over .seg-cell { border: 1px solid rgba(255,100,100,0.5); }
+.seg-cell { flex: 1; height: 100%; border-radius: 1px; transition: background 0.3s; }
+.seg-vida.seg-on    { background: #c8404a; }
+.seg-vida.seg-off   { background: rgba(200,64,74,0.12); }
+.seg-azul.seg-on    { background: #4ab3e8; }
+.seg-azul.seg-off   { background: rgba(74,179,232,0.1); }
+.seg-guarda.seg-on  { background: var(--gold); opacity: 0.85; }
+.seg-guarda.seg-off { background: rgba(212,175,55,0.1); }
 .recurso-xy {
     min-width: 56px; text-align: right;
     font-size: 0.75em; color: var(--text);
