@@ -229,6 +229,7 @@ function _inyectarEstilos() {
 .ppj-cat-deasign:hover{background:rgba(120,120,120,0.18);color:#bbb;}
 .ppj-hz-badge{display:inline-flex;align-items:center;gap:3px;font-size:0.62em;padding:1px 6px;border-radius:10px;border:1px solid;flex-shrink:0;white-space:nowrap;}
 .ppj-hz-badge-estado{background:rgba(212,175,55,0.08);color:#c9953a;border-color:rgba(212,175,55,0.25);}
+.ppj-hz-badge-prioridad{background:rgba(100,180,255,0.08);color:#6eb4ff;border-color:rgba(100,180,255,0.25);}
 .ppj-hz-badge-cast{background:rgba(100,180,255,0.07);color:#7ab8e8;border-color:rgba(100,180,255,0.2);}
 .ppj-hz-badge-afecta{background:rgba(140,100,220,0.07);color:#a07ad0;border-color:rgba(140,100,220,0.2);}
 .ppj-hz-btn-danger{background:rgba(200,50,50,0.12);color:#ff5555;border:1px solid rgba(200,50,50,0.35);border-radius:6px;padding:10px 18px;font-size:0.8em;font-family:'Cinzel',serif;cursor:pointer;transition:background 0.15s;}
@@ -671,14 +672,14 @@ async function _tabHechizos(nombre, body) {
     let nodosMapInv = {};
     if (hNombres.length > 0) {
         const { data: nd } = await supabase.from('hechizos_nodos')
-            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo')
+            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id, backcast, nextcast, es_estado, es_prioridad, afecta_hechizos, afecta_usuario, afecta_objetivo')
             .in('nombre', hNombres);
         (nd||[]).forEach(n => { nodosMapInv[n.nombre] = n; });
     }
 
     // ── Catálogo completo ────────────────────────────────────────
     const { data: catalogo } = await supabase.from('hechizos_nodos')
-        .select('id, nombre, hechizo_id, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo')
+        .select('id, nombre, hechizo_id, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, backcast, nextcast, es_estado, es_prioridad, afecta_hechizos, afecta_usuario, afecta_objetivo')
         .order('clase').order('nombre');
 
     // ── Strings (dependencias) ───────────────────────────────────
@@ -763,7 +764,8 @@ async function _tabHechizos(nombre, body) {
             : '';
         const hexInv   = h.hechizo_hex > 0 ? `<span class="ppj-hz-hex">⬡ ${h.hechizo_hex}</span>` : '';
         const clsBadge = cls ? `<span class="ppj-hz-clase">${cls}</span>` : '';
-        const estadoBadge = nd.es_estado ? `<span class="ppj-hz-badge ppj-hz-badge-estado">⬛ Estado</span>` : '';
+        const estadoBadge    = nd.es_estado    ? `<span class="ppj-hz-badge ppj-hz-badge-estado">⬛ Estado</span>` : '';
+        const prioridadBadge = nd.es_prioridad ? `<span class="ppj-hz-badge ppj-hz-badge-prioridad">⚡ Prioridad</span>` : '';
         const castParts = [];
         if (nd.backcast > 0) castParts.push(`←${nd.backcast}`);
         if (nd.nextcast > 0) castParts.push(`→${nd.nextcast}`);
@@ -778,7 +780,7 @@ async function _tabHechizos(nombre, body) {
                 ${hexInv}${clsBadge}
                 ${editBtn}
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">${estadoBadge}${castBadge}${afBadge}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">${estadoBadge}${prioridadBadge}${castBadge}${afBadge}</div>
             <div class="ppj-hz-fields">
                 ${_campo('Efecto',nd.efecto)}${_campo('Resumen',nd.resumen)}
                 ${_campo('Overcast',nd.overcast)}${_campo('Undercast',nd.undercast)}${_campo('Especial',nd.especial)}
@@ -898,7 +900,8 @@ async function _tabHechizos(nombre, body) {
 
             const hexBadgeCat = hexCost > 0 && showFull ? `<span class="ppj-hz-hex">⬡ ${hexCost}</span>` : '';
             const clsBadgeCat = showFull ? `<span class="ppj-hz-clase">Cl.${n.clase||'?'}</span>` : `<span class="ppj-hz-clase">?</span>`;
-            const estadoBadgeCat = showFull && n.es_estado ? `<span class="ppj-hz-badge ppj-hz-badge-estado">⬛ Estado</span>` : '';
+            const estadoBadgeCat    = showFull && n.es_estado    ? `<span class="ppj-hz-badge ppj-hz-badge-estado">⬛ Estado</span>` : '';
+            const prioridadBadgeCat = showFull && n.es_prioridad ? `<span class="ppj-hz-badge ppj-hz-badge-prioridad">⚡ Prioridad</span>` : '';
             const castPartsCat = [];
             if (showFull && n.backcast > 0) castPartsCat.push(`←${n.backcast}`);
             if (showFull && n.nextcast > 0) castPartsCat.push(`→${n.nextcast}`);
@@ -917,7 +920,7 @@ async function _tabHechizos(nombre, body) {
                     ${isAssigned?`<span class="ppj-cat-assigned-tag">✓ Aprendido</span>`:''}
                     <span style="margin-left:auto;display:flex;gap:4px;">${editBtn}${toggleKnown}</span>
                 </div>
-                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${estadoBadgeCat}${castBadgeCat}${afBadgeCat}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${estadoBadgeCat}${prioridadBadgeCat}${castBadgeCat}${afBadgeCat}</div>
                 ${showFull ? ('<div class="ppj-hz-fields">' +
                     (n.efecto    ? '<div class="ppj-hz-field"><strong>Efecto:</strong> '    + n.efecto    + '</div>' : '') +
                     (n.resumen   ? '<div class="ppj-hz-field"><strong>Resumen:</strong> '   + n.resumen   + '</div>' : '') +
@@ -1164,15 +1167,12 @@ window._ppjBuscarHz = (query) => {
     if (!inv) return;
 
     if (!q) {
-        // Sin búsqueda: restaurar todo y cerrar acordeones
         inv.querySelectorAll('.ppj-hz-card').forEach(c => { c.style.display = ''; c.classList.remove('ppj-hidden'); });
         inv.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => a.classList.remove('open'));
         return;
     }
 
-    // Con búsqueda: abrir TODOS los acordeones y filtrar cards
-    inv.querySelectorAll('.ppj-af-acc, .ppj-cl-acc').forEach(a => a.classList.add('open'));
-
+    // 1. Marcar cada card como visible u oculto
     inv.querySelectorAll('.ppj-hz-card').forEach(c => {
         const nombre = c.getAttribute('data-hz-nombre') || '';
         const texto  = c.textContent.toLowerCase();
@@ -1181,14 +1181,17 @@ window._ppjBuscarHz = (query) => {
         c.style.display = match ? '' : 'none';
     });
 
-    // Cerrar acordeones que quedaron completamente vacíos
-    inv.querySelectorAll('.ppj-cl-acc').forEach(cl => {
-        const hayVisible = [...cl.querySelectorAll('.ppj-hz-card')].some(c => !c.classList.contains('ppj-hidden'));
-        cl.classList.toggle('open', hayVisible);
-    });
+    // 2. Para cada ppj-af-acc, abrir si tiene ALGÚN card visible (en cualquier profundidad)
+    //    y también abrir sus ppj-cl-acc hijos que tengan cards visibles
     inv.querySelectorAll('.ppj-af-acc').forEach(af => {
-        const hayVisible = [...af.querySelectorAll('.ppj-hz-card')].some(c => !c.classList.contains('ppj-hidden'));
-        af.classList.toggle('open', hayVisible);
+        const cardsVisibles = [...af.querySelectorAll('.ppj-hz-card')].filter(c => !c.classList.contains('ppj-hidden'));
+        af.classList.toggle('open', cardsVisibles.length > 0);
+
+        // Abrir/cerrar sub-acordeones de clase según si tienen cards visibles
+        af.querySelectorAll('.ppj-cl-acc').forEach(cl => {
+            const clVisible = [...cl.querySelectorAll('.ppj-hz-card')].some(c => !c.classList.contains('ppj-hidden'));
+            cl.classList.toggle('open', clVisible);
+        });
     });
 };
 
@@ -1620,13 +1623,18 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
             </div>
         </div>
 
-        <!-- ── TIPO: normal vs estado ── -->
-        <div style="margin-top:14px;display:flex;align-items:center;gap:10px;">
+        <!-- ── TIPO: normal vs estado / prioridad ── -->
+        <div style="margin-top:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
             <label style="font-size:0.65em;color:#5a5a78;text-transform:uppercase;letter-spacing:1px;">Tipo</label>
             <label class="ppj-hz-toggle-wrap">
                 <input type="checkbox" id="hze-es-estado" ${nodo?.es_estado?'checked':''}>
                 <span class="ppj-hz-toggle-slider"></span>
                 <span class="ppj-hz-toggle-label" id="hze-es-estado-lbl">${nodo?.es_estado?'⬛ Hechizo-Estado':'⬤ Hechizo Normal'}</span>
+            </label>
+            <label class="ppj-hz-toggle-wrap">
+                <input type="checkbox" id="hze-es-prioridad" ${nodo?.es_prioridad?'checked':''}>
+                <span class="ppj-hz-toggle-slider" style="background:${nodo?.es_prioridad?'rgba(100,180,255,0.2)':'rgba(255,255,255,0.08)'};"></span>
+                <span class="ppj-hz-toggle-label" id="hze-es-prioridad-lbl" style="color:${nodo?.es_prioridad?'#6eb4ff':'#888'};">${nodo?.es_prioridad?'⚡ Prioridad':'— Sin prioridad'}</span>
             </label>
         </div>
 
@@ -1713,6 +1721,19 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
             labelEstado.textContent = toggleEstado.checked ? '⬛ Hechizo-Estado' : '⬤ Hechizo Normal';
         });
     }
+
+    // Listener del toggle prioridad
+    const togglePrioridad = document.getElementById('hze-es-prioridad');
+    const labelPrioridad  = document.getElementById('hze-es-prioridad-lbl');
+    if (togglePrioridad && labelPrioridad) {
+        togglePrioridad.addEventListener('change', () => {
+            const on = togglePrioridad.checked;
+            labelPrioridad.textContent = on ? '⚡ Prioridad' : '— Sin prioridad';
+            labelPrioridad.style.color = on ? '#6eb4ff' : '#888';
+            const slider = togglePrioridad.nextElementSibling;
+            if (slider) slider.style.background = on ? 'rgba(100,180,255,0.2)' : 'rgba(255,255,255,0.08)';
+        });
+    }
 };
 
 // Volver a la tab de hechizos desde el editor inline
@@ -1743,7 +1764,8 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
 
     const backcast  = parseInt(document.getElementById('hze-backcast')?.value) || 0;
     const nextcast  = parseInt(document.getElementById('hze-nextcast')?.value) || 0;
-    const esEstado  = document.getElementById('hze-es-estado')?.checked || false;
+    const esEstado    = document.getElementById('hze-es-estado')?.checked || false;
+    const esPrioridad = document.getElementById('hze-es-prioridad')?.checked || false;
     const afHechizos= document.getElementById('hze-afecta-hechizos')?.checked || false;
     const afUsuario = document.getElementById('hze-afecta-usuario')?.checked || false;
     const afObjetivo= document.getElementById('hze-afecta-objetivo')?.checked || false;
@@ -1763,7 +1785,7 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
         hechizo_id: id, nombre, afinidad, clase,
         hex_cost: hexCost, es_conocido: conocido,
         resumen, efecto, overcast, undercast, especial,
-        backcast, nextcast, es_estado: esEstado,
+        backcast, nextcast, es_estado: esEstado, es_prioridad: esPrioridad,
         afecta_hechizos: afHechizos,
         afecta_usuario:  afUsuario,
         afecta_objetivo: afObjetivo,
