@@ -67,6 +67,12 @@ export const hexAuth = {
             // session=null pero no SIGNED_OUT (refresh en progreso): mantener _perfil intacto
         });
 
+        // ── Favicon dinámico — se aplica en TODAS las páginas automáticamente ──
+        try {
+            const fav = document.getElementById('dynamic-favicon');
+            if (fav) fav.href = `${currentConfig.storageUrl}/imginterfaz/icon.png`;
+        } catch(e) {}
+
         return this.esAdmin();
     },
 
