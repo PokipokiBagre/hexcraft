@@ -302,7 +302,7 @@ function _inyectarEstilos() {
 // ── CARGA DE DATOS ───────────────────────────────────────────
 async function _cargarDatos() {
     const [nodosRes, stringsRes, afinRes, jugadoresRes] = await Promise.all([
-        supabase.from('hechizos_nodos').select('hechizo_id, nombre, afinidad, clase, hex_cost, es_conocido, pos_x, pos_y, radio, color'),
+        supabase.from('hechizos_nodos').select('hechizo_id, nombre, afinidad, clase, hex_cost, es_conocido, pos_x, pos_y, radio, color, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo'),
         supabase.from('hechizos_strings').select('source_id, target_id'),
         supabase.from('hechizos_afinidades').select('afinidad, color_t, color_b'),
         supabase.from('personajes').select('nombre').eq('is_player', true).eq('is_active', true).order('nombre'),
@@ -327,6 +327,12 @@ async function _cargarDatos() {
         radio:         n.radio || (n.es_conocido ? 35 : 28),
         color:         n.color || '#888',
         esNuevo:       false,
+        esEstado:      n.es_estado || false,
+        backcast:      n.backcast || 0,
+        nextcast:      n.nextcast || 0,
+        afectaHechizos: n.afecta_hechizos || false,
+        afectaUsuario:  n.afecta_usuario  || false,
+        afectaObjetivo: n.afecta_objetivo || false,
         incomingSources: [],
     }));
 
@@ -686,10 +692,34 @@ function _dibujar() {
         // Alpha global
         ctx.globalAlpha = esIrrelevante ? 0.55 : 1.0;
 
+        // Helper: traza la forma del nodo (círculo o cuadrado redondeado según tipo)
+        const _forma = (extraR = 0) => {
+            const R = nodo.radio + extraR;
+            if (nodo.esEstado) {
+                const half = R * 0.88;
+                const rad  = R * 0.22;
+                ctx.beginPath();
+                ctx.roundRect(nodo.x - half, nodo.y - half, half * 2, half * 2, rad);
+            } else {
+                ctx.beginPath();
+                ctx.arc(nodo.x, nodo.y, R, 0, Math.PI * 2);
+            }
+        };
+        const _formaR = (r) => {
+            if (nodo.esEstado) {
+                const half = r * 0.88;
+                const rad  = r * 0.22;
+                ctx.beginPath();
+                ctx.roundRect(nodo.x - half, nodo.y - half, half * 2, half * 2, rad);
+            } else {
+                ctx.beginPath();
+                ctx.arc(nodo.x, nodo.y, r, 0, Math.PI * 2);
+            }
+        };
+
         // Halo de selección (nodo enfocado)
         if (esSeleccionado) {
-            ctx.beginPath();
-            ctx.arc(nodo.x, nodo.y, nodo.radio + 12/sf, 0, Math.PI*2);
+            _forma(12/sf);
             ctx.strokeStyle = 'rgba(236,213,154,0.9)';
             ctx.lineWidth = 2.5/sf;
             ctx.setLineDash([6/sf,4/sf]);
@@ -699,8 +729,7 @@ function _dibujar() {
 
         // Halo de nodo nuevo (celeste pulsante)
         if (esNuevo) {
-            ctx.beginPath();
-            ctx.arc(nodo.x, nodo.y, nodo.radio + 14/sf, 0, Math.PI*2);
+            _forma(14/sf);
             ctx.shadowBlur = 20;
             ctx.shadowColor = COLOR_NUEVO;
             ctx.strokeStyle = `rgba(0,255,255,${0.4 + 0.3 * Math.sin(Date.now()/300)})`;
@@ -711,8 +740,7 @@ function _dibujar() {
 
         // Halo celeste de posesión PJ (solo cuando no hay enfoque)
         if (esPosesion && !esTodos && !hayEnfoque) {
-            ctx.beginPath();
-            ctx.arc(nodo.x, nodo.y, nodo.radio + 8/sf, 0, Math.PI*2);
+            _forma(8/sf);
             ctx.shadowBlur = 12;
             ctx.shadowColor = 'rgba(0,210,255,0.6)';
             ctx.strokeStyle = 'rgba(0,210,255,0.7)';
@@ -724,8 +752,7 @@ function _dibujar() {
         // Halos de enfoque (precedentes / salientes)
         if (esPrecedente || esSaliente) {
             const haloColor = esPrecedente ? COLOR_ENFOQ_PREV : COLOR_ENFOQ_NEXT;
-            ctx.beginPath();
-            ctx.arc(nodo.x, nodo.y, nodo.radio + 8/sf, 0, Math.PI*2);
+            _forma(8/sf);
             ctx.shadowBlur = 14;
             ctx.shadowColor = haloColor;
             ctx.strokeStyle = haloColor;
@@ -735,22 +762,19 @@ function _dibujar() {
         }
 
         // Aro exterior (fondo)
-        ctx.beginPath();
-        ctx.arc(nodo.x, nodo.y, nodo.radio, 0, Math.PI*2);
+        _forma(0);
         ctx.fillStyle = '#0d0d1a';
         ctx.fill();
 
         // Núcleo — siempre rellenado con su color
-        ctx.beginPath();
-        ctx.arc(nodo.x, nodo.y, Math.max(1, nodo.radio - 7), 0, Math.PI*2);
+        _formaR(Math.max(1, nodo.radio - 7));
         ctx.fillStyle = colorNucleo;
         if (!esIrrelevante) { ctx.shadowBlur = esNuevo ? 14 : (esPosesion || esPrecedente || esSaliente || esEnfocado ? 10 : 5); ctx.shadowColor = colorNucleo; }
         ctx.fill();
         ctx.shadowBlur = 0;
 
         // Borde exterior
-        ctx.beginPath();
-        ctx.arc(nodo.x, nodo.y, nodo.radio, 0, Math.PI*2);
+        _forma(0);
         ctx.strokeStyle = colorBorde;
         ctx.lineWidth = (esSeleccionado ? 3 : 1.5) / sf;
         if (!nodo.esConocido && !esNuevo && !esTodos && esIrrelevante) {
@@ -869,7 +893,12 @@ function _iniciarEventos() {
     const _nodoEn = (wx, wy) => {
         for (let i = _estado.nodos.length - 1; i >= 0; i--) {
             const n = _estado.nodos[i];
-            if (Math.hypot(n.x - wx, n.y - wy) <= n.radio) return n;
+            if (n.esEstado) {
+                const half = n.radio * 0.88;
+                if (Math.abs(n.x - wx) <= half && Math.abs(n.y - wy) <= half) return n;
+            } else {
+                if (Math.hypot(n.x - wx, n.y - wy) <= n.radio) return n;
+            }
         }
         return null;
     };
@@ -968,22 +997,6 @@ function _iniciarEventos() {
         _estado.drag.nodo         = null;
         _estado.drag.nodoCandidate= null;
         _estado.drag.hasMoved     = false;
-    });
-
-    // DOBLE CLICK — abrir editor del nodo
-    wrap.addEventListener('dblclick', e => {
-        const wp = _worldPos(e.clientX, e.clientY);
-        const nodo = _nodoEn(wp.x, wp.y);
-        if (!nodo || !_estado.esAdmin) return;
-        // Seleccionar primero para que el panel derecho esté en contexto
-        _seleccionarNodo(nodo);
-        // Abrir el editor inline del panel-pj
-        if (typeof window._ppjAbrirEditorHz === 'function') {
-            const idReal = nodo.esNuevo ? null : nodo.id;
-            // Si es nodo nuevo temporal, asegurarnos de que _pmhNodoTempActual esté seteado
-            if (nodo.esNuevo) window._pmhNodoTempActual = nodo;
-            window._ppjAbrirEditorHz(idReal, _estado.jugadorPanel, 'cat');
-        }
     });
 
     // WHEEL (zoom)
