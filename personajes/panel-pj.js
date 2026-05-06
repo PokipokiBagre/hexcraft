@@ -671,14 +671,14 @@ async function _tabHechizos(nombre, body) {
     let nodosMapInv = {};
     if (hNombres.length > 0) {
         const { data: nd } = await supabase.from('hechizos_nodos')
-            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id')
+            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo')
             .in('nombre', hNombres);
         (nd||[]).forEach(n => { nodosMapInv[n.nombre] = n; });
     }
 
     // ── Catálogo completo ────────────────────────────────────────
     const { data: catalogo } = await supabase.from('hechizos_nodos')
-        .select('id, nombre, hechizo_id, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido')
+        .select('id, nombre, hechizo_id, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo')
         .order('clase').order('nombre');
 
     // ── Strings (dependencias) ───────────────────────────────────
@@ -918,7 +918,13 @@ async function _tabHechizos(nombre, body) {
                     <span style="margin-left:auto;display:flex;gap:4px;">${editBtn}${toggleKnown}</span>
                 </div>
                 <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${estadoBadgeCat}${castBadgeCat}${afBadgeCat}</div>
-                ${showFull&&n.resumen?`<div class="ppj-hz-fields"><div class="ppj-hz-field">${n.resumen}</div></div>`:''}
+                ${showFull ? ('<div class="ppj-hz-fields">' +
+                    (n.efecto    ? '<div class="ppj-hz-field"><strong>Efecto:</strong> '    + n.efecto    + '</div>' : '') +
+                    (n.resumen   ? '<div class="ppj-hz-field"><strong>Resumen:</strong> '   + n.resumen   + '</div>' : '') +
+                    (n.overcast  ? '<div class="ppj-hz-field"><strong>Overcast:</strong> '  + n.overcast  + '</div>' : '') +
+                    (n.undercast ? '<div class="ppj-hz-field"><strong>Undercast:</strong> ' + n.undercast + '</div>' : '') +
+                    (n.especial  ? '<div class="ppj-hz-field"><strong>Especial:</strong> '  + n.especial  + '</div>' : '') +
+                    '</div>') : ''}
                 ${esAdmin?`<div class="ppj-cat-actions">${isAssigned?btnsDeasign:btnsAsign}</div>`:''}
             </div>`;
         });
