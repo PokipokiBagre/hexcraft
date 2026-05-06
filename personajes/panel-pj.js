@@ -1276,68 +1276,108 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
 
     // Cargar datos del hechizo existente
     let nodo = null;
-    let stringsActuales = [];
+    let stringsEntrada = []; // nodos que apuntan a este (precedentes)
+    let stringsSalida  = []; // nodos a los que este apunta (salientes)
     if (hechizo_id) {
         const { data: nd } = await supabase.from('hechizos_nodos')
             .select('*').eq('hechizo_id', hechizo_id).single();
         nodo = nd;
-        const { data: strs } = await supabase.from('hechizos_strings')
+        const { data: strsIn } = await supabase.from('hechizos_strings')
             .select('source_id').eq('target_id', hechizo_id);
-        stringsActuales = (strs || []).map(s => s.source_id);
+        stringsEntrada = (strsIn || []).map(s => s.source_id);
+        const { data: strsOut } = await supabase.from('hechizos_strings')
+            .select('target_id').eq('source_id', hechizo_id);
+        stringsSalida = (strsOut || []).map(s => s.target_id);
     }
 
     const { data: todosNodos } = await supabase.from('hechizos_nodos')
         .select('hechizo_id, nombre, afinidad, clase').order('nombre');
     const nodosList = (todosNodos || []).filter(n => n.hechizo_id !== hechizo_id);
 
+    // ── ID automático: encontrar el primer hueco ordinal ────────
+    let idSugerido = '';
+    if (!hechizo_id) {
+        const existentes = (todosNodos || []).map(n => n.hechizo_id);
+        let num = 1;
+        while (existentes.includes(`Hechizo ${num}`)) num++;
+        idSugerido = `Hechizo ${num}`;
+    }
+
     const esNuevo = !hechizo_id;
     const titulo  = esNuevo ? 'Nuevo hechizo' : `Editar · ${nodo?.nombre || hechizo_id}`;
     const esCon   = nodo ? nodo.es_conocido : (modo === 'inv');
     const asigPj  = esNuevo && modo === 'inv';
 
-    let strsSel = [...stringsActuales];
+    let strsEntSel = [...stringsEntrada];
+    let strsSalSel = [...stringsSalida];
 
     const _renderStrTags = () => {
-        const wrap = document.getElementById('ppj-hz-str-wrap');
-        if (!wrap) return;
-        const tags = strsSel.map(sid => {
-            const nd = nodosList.find(n => n.hechizo_id === sid);
-            const lbl = nd ? nd.nombre : sid;
-            return `<span class="ppj-hz-str-tag">${lbl}<span class="rm" onclick="window._ppjHzRemoveStr('${sid}')">✕</span></span>`;
-        }).join('');
-        const disponibles = nodosList.filter(n => !strsSel.includes(n.hechizo_id));
-        const opciones = disponibles.map(n =>
-            `<option value="${n.hechizo_id}">${n.nombre} (${n.afinidad||'?'} · Cl.${n.clase||'?'})</option>`
-        ).join('');
-        wrap.innerHTML = tags + `
-            <select class="ppj-hz-str-add" onchange="window._ppjHzAddStr(this.value); this.value=''">
-                <option value="">＋ Agregar precedente…</option>
-                ${opciones}
-            </select>`;
+        // Entrada
+        const wrapIn = document.getElementById('ppj-hz-str-wrap-in');
+        if (wrapIn) {
+            const tagsIn = strsEntSel.map(sid => {
+                const nd = nodosList.find(n => n.hechizo_id === sid);
+                const lbl = nd ? nd.nombre : sid;
+                return `<span class="ppj-hz-str-tag">${lbl}<span class="rm" onclick="window._ppjHzRemoveStrIn('${sid}')">✕</span></span>`;
+            }).join('');
+            const dispIn = nodosList.filter(n => !strsEntSel.includes(n.hechizo_id));
+            const optsIn = dispIn.map(n =>
+                `<option value="${n.hechizo_id}">${n.nombre} (${n.afinidad||'?'} · Cl.${n.clase||'?'})</option>`
+            ).join('');
+            wrapIn.innerHTML = tagsIn + `
+                <select class="ppj-hz-str-add" onchange="window._ppjHzAddStrIn(this.value); this.value=''">
+                    <option value="">＋ Agregar precedente…</option>
+                    ${optsIn}
+                </select>`;
+        }
+        // Salida
+        const wrapOut = document.getElementById('ppj-hz-str-wrap-out');
+        if (wrapOut) {
+            const tagsOut = strsSalSel.map(sid => {
+                const nd = nodosList.find(n => n.hechizo_id === sid);
+                const lbl = nd ? nd.nombre : sid;
+                return `<span class="ppj-hz-str-tag">${lbl}<span class="rm" onclick="window._ppjHzRemoveStrOut('${sid}')">✕</span></span>`;
+            }).join('');
+            const dispOut = nodosList.filter(n => !strsSalSel.includes(n.hechizo_id));
+            const optsOut = dispOut.map(n =>
+                `<option value="${n.hechizo_id}">${n.nombre} (${n.afinidad||'?'} · Cl.${n.clase||'?'})</option>`
+            ).join('');
+            wrapOut.innerHTML = tagsOut + `
+                <select class="ppj-hz-str-add" onchange="window._ppjHzAddStrOut(this.value); this.value=''">
+                    <option value="">＋ Agregar saliente…</option>
+                    ${optsOut}
+                </select>`;
+        }
     };
 
-    window._ppjHzAddStr = (sid) => {
-        if (sid && !strsSel.includes(sid)) { strsSel.push(sid); _renderStrTags(); }
-    };
-    window._ppjHzRemoveStr = (sid) => {
-        strsSel = strsSel.filter(s => s !== sid); _renderStrTags();
-    };
-    window._ppjHzStrsSel    = () => strsSel;
-    window._ppjHzIdOriginal = hechizo_id;
+    window._ppjHzAddStrIn    = (sid) => { if (sid && !strsEntSel.includes(sid)) { strsEntSel.push(sid); _renderStrTags(); } };
+    window._ppjHzRemoveStrIn = (sid) => { strsEntSel = strsEntSel.filter(s => s !== sid); _renderStrTags(); };
+    window._ppjHzAddStrOut    = (sid) => { if (sid && !strsSalSel.includes(sid)) { strsSalSel.push(sid); _renderStrTags(); } };
+    window._ppjHzRemoveStrOut = (sid) => { strsSalSel = strsSalSel.filter(s => s !== sid); _renderStrTags(); };
+    window._ppjHzGetStrs      = () => ({ entrada: strsEntSel, salida: strsSalSel });
+    window._ppjHzIdOriginal   = hechizo_id;
 
-    // Renderizar editor INLINE dentro del ppj-body
+    const safePJ = nombrePJ.replace(/'/g, "\\'");
+
+    // Botón eliminar solo en modo edición
+    const btnEliminar = !esNuevo ? `
+        <button class="ppj-hz-btn-danger" style="flex:1;"
+            onclick="window._ppjEliminarHz('${(hechizo_id||'').replace(/'/g,"\\'")}','${safePJ}')">
+            🗑 Eliminar hechizo
+        </button>` : '';
+
     body.innerHTML = `
     <div style="padding:14px 16px 80px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.06);">
             <button class="ppj-ctrl-btn" style="font-size:0.9em;width:28px;height:28px;"
-                onclick="window._ppjVolverHechizos('${nombrePJ.replace(/'/g,"\\'")}')">←</button>
+                onclick="window._ppjVolverHechizos('${safePJ}')">←</button>
             <span style="font-family:'Cinzel',serif;color:#d4af37;font-size:0.85em;letter-spacing:1px;">${titulo}</span>
         </div>
 
         <div class="ppj-hz-modal-row">
             <div>
                 <label class="ppj-hz-inline-label">ID único</label>
-                <input class="ppj-hz-inline-input" id="hze-id" value="${nodo?.hechizo_id||''}" placeholder="hechizo_nuevo" ${!esNuevo?'readonly':''}>
+                <input class="ppj-hz-inline-input" id="hze-id" value="${nodo?.hechizo_id || idSugerido}" placeholder="${idSugerido}" ${!esNuevo?'readonly':''}>
             </div>
             <div>
                 <label class="ppj-hz-inline-label">Nombre visible</label>
@@ -1365,7 +1405,16 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
         <div class="ppj-hz-modal-row" style="margin-top:10px;">
             <div>
                 <label class="ppj-hz-inline-label">Costo HEX</label>
-                <input class="ppj-hz-inline-input" id="hze-hex" type="number" min="0" value="${nodo?.hex_cost||0}">
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <button class="ppj-ctrl-btn" style="padding:4px 8px;font-size:1em;" onclick="
+                        const i=document.getElementById('hze-hex');
+                        i.value=Math.max(0,(parseInt(i.value)||0)-50);">−</button>
+                    <input class="ppj-hz-inline-input" id="hze-hex" type="number" min="0" step="50" value="${nodo?.hex_cost||0}"
+                        style="text-align:center;flex:1;">
+                    <button class="ppj-ctrl-btn" style="padding:4px 8px;font-size:1em;" onclick="
+                        const i=document.getElementById('hze-hex');
+                        i.value=(parseInt(i.value)||0)+50;">+</button>
+                </div>
             </div>
             <div style="display:flex;align-items:center;padding-top:20px;">
                 <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.75em;color:#888;">
@@ -1390,14 +1439,18 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
         <label class="ppj-hz-inline-label" style="margin-top:10px;">Especial</label>
         <input class="ppj-hz-inline-input" id="hze-especial" value="${(nodo?.especial||'').replace(/"/g,'&quot;')}">
 
-        <label class="ppj-hz-inline-label" style="margin-top:10px;">Precedentes (strings de entrada)</label>
-        <div class="ppj-hz-strings-wrap" id="ppj-hz-str-wrap"></div>
+        <label class="ppj-hz-inline-label" style="margin-top:10px;">Precedentes — strings de entrada</label>
+        <div class="ppj-hz-strings-wrap" id="ppj-hz-str-wrap-in"></div>
+
+        <label class="ppj-hz-inline-label" style="margin-top:10px;">Salientes — strings de salida</label>
+        <div class="ppj-hz-strings-wrap" id="ppj-hz-str-wrap-out"></div>
 
         <div style="display:flex;gap:8px;margin-top:20px;">
             <button class="ppj-hz-btn-cancel" style="flex:1;"
-                onclick="window._ppjVolverHechizos('${nombrePJ.replace(/'/g,"\\'")}')">Cancelar</button>
+                onclick="window._ppjVolverHechizos('${safePJ}')">Cancelar</button>
+            ${btnEliminar}
             <button class="ppj-hz-btn-save" style="flex:2;"
-                onclick="window._ppjGuardarHz('${nombrePJ.replace(/'/g,"\\'")}',${JSON.stringify(asigPj)})">
+                onclick="window._ppjGuardarHz('${safePJ}',${JSON.stringify(asigPj)})">
                 ${esNuevo ? '✨ Crear hechizo' : '💾 Guardar cambios'}
             </button>
         </div>
@@ -1416,6 +1469,8 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
 .ppj-hz-btn-save:hover{background:rgba(212,175,55,0.28);}
 .ppj-hz-btn-cancel{background:transparent;color:#5a5a78;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:10px 18px;font-size:0.8em;font-family:'Cinzel',serif;cursor:pointer;}
 .ppj-hz-btn-cancel:hover{color:#888;border-color:rgba(255,255,255,0.2);}
+.ppj-hz-btn-danger{background:rgba(200,50,50,0.12);color:#ff5555;border:1px solid rgba(200,50,50,0.35);border-radius:6px;padding:10px 18px;font-size:0.8em;font-family:'Cinzel',serif;cursor:pointer;}
+.ppj-hz-btn-danger:hover{background:rgba(200,50,50,0.25);}
 `;
         document.head.appendChild(st);
     }
