@@ -345,25 +345,53 @@ function _renderTab(nombre, tab) {
 async function _tabHechizosConMapa(nombre, body) {
     abrirMinimapa(nombre, estadoUI.esAdmin, (nodo) => {
         // Cuando se selecciona un nodo en el mapa, hacer scroll+flash en el grimorio
-        const cardEl = document.querySelector(
-            `[data-cat-id="${nodo.id}"], [data-cat-nombre="${(nodo.nombre||'').toLowerCase()}"]`
-        );
-        if (cardEl) {
+        const af = (nodo.afinidad || '').toLowerCase();
+
+        // Función helper para flashear una tarjeta
+        const _flash = (cardEl) => {
+            if (!cardEl) return;
             cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             cardEl.style.outline = '2px solid rgba(212,175,55,0.8)';
             cardEl.style.background = 'rgba(212,175,55,0.08)';
             setTimeout(() => { cardEl.style.outline = ''; cardEl.style.background = ''; }, 1800);
-        } else {
-            // Abrir acordeón de la afinidad si está cerrado
-            const af = (nodo.afinidad || '').toLowerCase();
-            const acc = document.querySelector(`[data-cat-af="${af}"]`);
+        };
+
+        // Abrir acordeón genérico si está cerrado
+        const _abrirAcc = (acc) => {
             if (acc && !acc.classList.contains('open')) {
                 acc.classList.add('open');
-                setTimeout(() => {
-                    const c2 = document.querySelector(`[data-cat-id="${nodo.id}"]`);
-                    if (c2) c2.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 150);
             }
+        };
+
+        // Buscar en hechizos aprendidos primero
+        const invCard = document.querySelector(`[data-hz-nombre="${(nodo.nombre||'').toLowerCase()}"]`);
+        if (invCard) {
+            // Abrir su acordeón padre si está cerrado
+            const accPadre = invCard.closest('.ppj-af-acc, .ppj-cl-acc');
+            if (accPadre) _abrirAcc(accPadre);
+            setTimeout(() => _flash(invCard), 80);
+            return;
+        }
+
+        // Buscar en grimorio completo
+        const catCard = document.querySelector(
+            `[data-cat-id="${nodo.id}"], [data-cat-nombre="${(nodo.nombre||'').toLowerCase()}"]`
+        );
+        if (catCard) {
+            const accPadre = catCard.closest('.ppj-af-acc, .ppj-cat-acc');
+            if (accPadre) _abrirAcc(accPadre);
+            setTimeout(() => _flash(catCard), 80);
+            return;
+        }
+
+        // Último recurso: abrir acordeón de la afinidad por nombre
+        const acc = document.querySelector(`[data-cat-af="${af}"]`);
+        if (acc) {
+            _abrirAcc(acc);
+            setTimeout(() => {
+                const c2 = document.querySelector(`[data-cat-id="${nodo.id}"]`);
+                if (c2) _flash(c2);
+            }, 150);
         }
     });
     await _tabHechizos(nombre, body);
@@ -722,7 +750,9 @@ async function _tabHechizos(nombre, body) {
         const editBtn = esAdmin && nd.hechizo_id
             ? `<button class="ppj-ctrl-btn" style="margin-left:auto;font-size:0.65em;" onclick="window._ppjAbrirEditorHz('${safeHzId}','${safe}','inv')">✏️</button>`
             : '';
-        return `<div class="ppj-hz-card" data-hz-nombre="${(h.hechizo_nombre||'').toLowerCase()}">
+        return `<div class="ppj-hz-card" data-hz-nombre="${(h.hechizo_nombre||'').toLowerCase()}"
+            style="cursor:pointer;"
+            onclick="if(window.centrarEnHechizo && '${safeHzId}') window.centrarEnHechizo('${safeHzId}')">
             <div class="ppj-hz-header">
                 <span class="ppj-hz-nombre">${h.hechizo_nombre}</span>
                 <span class="ppj-hz-clase">${cls}</span>
