@@ -21,7 +21,7 @@ const _norm = (s) => s ? s.toString().trim().toLowerCase()
 const _imgObj = (nombre) => `${_sb()}/imgobjetos/${_norm(nombre)}.png`;
 const _imgFallback = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
-const RAR_COLOR = { 'Legendario': '#d4af37', 'Raro': '#9a50dc', 'Común': '#6a6a8a', '-': '#4a4a68' };
+const RAR_COLOR = { 'Legendario': '#d4af37', 'Raro': '#9a50dc', 'Común': '#9090b0', '-': '#7070a0' };
 const RAR_BG    = { 'Legendario': 'rgba(212,175,55,0.08)', 'Raro': 'rgba(154,80,220,0.08)', 'Común': 'rgba(100,100,130,0.06)', '-': 'rgba(60,60,80,0.05)' };
 
 // ── Estado ───────────────────────────────────────────────────
@@ -331,8 +331,8 @@ function _inyectarEstilos() {
 }
 .pobj-cat-info { flex: 1; min-width: 0; }
 .pobj-cat-nombre { font-size: 0.82em; font-weight: 700; color: #d0d0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pobj-cat-meta { font-size: 0.65em; color: #555; margin-top: 2px; }
-.pobj-cat-eff { font-size: 0.68em; color: #4a4a68; margin-top: 3px; line-height: 1.4; }
+.pobj-cat-meta { font-size: 0.65em; color: #9090b0; margin-top: 2px; }
+.pobj-cat-eff { font-size: 0.68em; color: #8888a8; margin-top: 3px; line-height: 1.4; }
 .pobj-rar-badge {
     font-size: 0.58em; font-weight: 700; letter-spacing: 0.5px;
     padding: 2px 6px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
@@ -547,7 +547,7 @@ function _renderInventario() {
             <img class="pobj-cat-img" src="${_imgObj(nombre)}" onerror="this.onerror=null;this.src='${_imgFallback()}'" loading="lazy">
             <div style="flex:1;min-width:0;">
                 <div class="pobj-inv-nombre ${isEqp?'equipado':''}">${nombre}${isEqp?'<span class="pobj-inv-badge-eqp">EQP</span>':''}</div>
-                <div style="font-size:0.62em;color:#3a3a58;margin-top:1px;">${cat.tipo||''} · <span style="color:${rarColor};">${cat.rareza||''}</span></div>
+                <div style="font-size:0.62em;color:#7070a0;margin-top:1px;">${cat.tipo||''} · <span style="color:${rarColor};">${cat.rareza||''}</span></div>
             </div>
             ${ctrlHTML}
             ${esContenedor ? `<button class="pobj-ctrl-btn" onclick="window._pobjToggleContenedor('${oSafe}')" title="Ver contenido">${expanded?'▲':'▼'}</button>` : ''}
