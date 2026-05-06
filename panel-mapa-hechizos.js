@@ -854,12 +854,42 @@ function _renderInfo(nodo) {
 
     const nombre = mostrarFull ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
 
-    let html = `<h4 style="color:${color}">${nombre}</h4>`;
+    // Fila superior: nombre + hex inline
+    const hexTag = mostrarFull && nodo.hex > 0
+        ? `<span style="display:inline-flex;align-items:center;font-size:0.82em;color:#c9953a;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.25);border-radius:4px;padding:1px 6px;margin-left:6px;font-family:'Cinzel',serif;">⬡ ${nodo.hex}</span>`
+        : '';
+
+    let html = `<h4 style="color:${color};display:flex;align-items:center;gap:4px;margin:0 0 6px;">${nombre}${hexTag}</h4>`;
+
     if (mostrarFull) {
+        html += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">`;
         html += `<span class="pmh-tag" style="border-color:${color};color:${color}">${nodo.afinidad}</span>`;
         html += `<span class="pmh-tag" style="border-color:#555;color:#aaa">Cl.${nodo.clase}</span>`;
-        html += `<span class="pmh-tag" style="border-color:#555;color:#aaa">⬡ ${nodo.hex}</span>`;
         if (esPosesion) html += `<span class="pmh-tag" style="border-color:rgba(150,131,200,0.5);color:rgba(150,131,200,1)">✓ Aprendido</span>`;
+
+        // Hechizo-Estado badge
+        if (nodo.esEstado) {
+            html += `<span class="pmh-tag" style="border-color:rgba(212,175,55,0.3);color:#c9953a;">⬛ Estado</span>`;
+        }
+
+        // Back/Next cast
+        const castParts = [];
+        if (nodo.backcast > 0) castParts.push(`←${nodo.backcast}`);
+        if (nodo.nextcast > 0) castParts.push(`→${nodo.nextcast}`);
+        if (castParts.length) {
+            html += `<span class="pmh-tag" style="border-color:rgba(100,180,255,0.25);color:#7ab8e8;">⟳ ${castParts.join(' ')}</span>`;
+        }
+
+        // Afecta a
+        const af = [
+            nodo.afectaHechizos ? '🌀 Hechizos' : '',
+            nodo.afectaUsuario  ? '🧙 Usuario'  : '',
+            nodo.afectaObjetivo ? '🎯 Objetivo' : '',
+        ].filter(Boolean);
+        if (af.length) {
+            html += `<span class="pmh-tag" style="border-color:rgba(140,100,220,0.25);color:#a07ad0;">${af.join(' · ')}</span>`;
+        }
+        html += `</div>`;
     } else {
         html += `<span style="color:#444;font-size:0.85em;font-style:italic;">Sellado — requisitos insuficientes</span>`;
     }
@@ -867,7 +897,6 @@ function _renderInfo(nodo) {
     // Acciones de OP
     if (_estado.esAdmin && !nodo.isHexNode) {
         const safe = nodo.id.replace(/'/g, "\\'");
-        const safeNombre = nodo.nombre.replace(/'/g, "\\'");
         html += `<div class="pmh-acciones">`;
         html += `<button class="pmh-btn gold" onclick="window._pmhToggleConocido('${safe}',${!nodo.esConocido})">${nodo.esConocido ? '🔒 Ocultar' : '👁 Publicar'}</button>`;
         if (nodo.esNuevo) {
