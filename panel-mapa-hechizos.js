@@ -130,7 +130,8 @@ function _inyectarEstilos() {
 #pmh-panel {
     position: fixed;
     left: 0; top: 0; bottom: 0;
-    width: 420px;
+    width: 50vw;
+    min-width: 560px;
     background: rgba(5,0,12,0.97);
     border-right: 1px solid rgba(212,175,55,0.25);
     display: flex;
@@ -253,8 +254,8 @@ function _inyectarEstilos() {
     flex-wrap: wrap;
     margin-top: 8px;
 }
-@media (max-width: 600px) {
-    #pmh-panel { width: 100vw; }
+@media (max-width: 700px) {
+    #pmh-panel { width: 100vw; min-width: unset; }
 }
     `;
     document.head.appendChild(s);
