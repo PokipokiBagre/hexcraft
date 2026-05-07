@@ -210,28 +210,28 @@ async function _cargarDatos() {
 
 async function _cargarCatalogo() {
     const { data } = await supabase.from('objetos')
-        .select('id,nombre,tipo,material,efecto,rareza,descripcion,vida_roja,vida_azul,contenedor_padre,es_propuesta')
+        .select('id,nombre,tipo,material,efecto,rareza,descripcion,vida_roja,vida_azul,es_propuesta')
         .eq('es_propuesta', false)
         .order('nombre');
     _st.catalogo = data || [];
-
-    // Mapa contenedor → hijos
-    _st.contenidores = {};
-    _st.catalogo.forEach(o => {
-        if (o.contenedor_padre) {
-            if (!_st.contenidores[o.contenedor_padre]) _st.contenidores[o.contenedor_padre] = [];
-            _st.contenidores[o.contenedor_padre].push(o.nombre);
-        }
-    });
 }
 
 async function _cargarInventario() {
     if (!_st.nombrePJ) return;
     const { data } = await supabase.from('inventario_objetos')
-        .select('objeto_nombre,cantidad,equipado')
+        .select('objeto_nombre,cantidad,equipado,contenedor_padre')
         .eq('personaje_nombre', _st.nombrePJ)
         .gt('cantidad', 0);
     _st.inventario = data || [];
+
+    // Mapa contenedor → hijos basado en inventario del PJ
+    _st.contenidores = {};
+    _st.inventario.forEach(i => {
+        if (i.contenedor_padre) {
+            if (!_st.contenidores[i.contenedor_padre]) _st.contenidores[i.contenedor_padre] = [];
+            _st.contenidores[i.contenedor_padre].push(i.objeto_nombre);
+        }
+    });
 }
 
 // ── RENDER PRINCIPAL ─────────────────────────────────────────
@@ -309,7 +309,14 @@ function _renderInventario() {
     if (!cont) return;
 
     const q = _st.busqInv.toLowerCase().trim();
-    const lista = _st.inventario.filter(i => !q || i.objeto_nombre.toLowerCase().includes(q));
+
+    // Objetos dentro de un contenedor → no mostrar en raíz
+    const hijosDeContenedor = new Set(Object.values(_st.contenidores).flat());
+
+    const lista = _st.inventario.filter(i => {
+        if (hijosDeContenedor.has(i.objeto_nombre)) return false;
+        return !q || i.objeto_nombre.toLowerCase().includes(q);
+    });
 
     if (lista.length === 0) {
         cont.innerHTML = `<div class="pobj-empty"><div style="font-size:1.5em;margin-bottom:6px;opacity:0.3">🎒</div>Sin objetos en el inventario</div>`;
