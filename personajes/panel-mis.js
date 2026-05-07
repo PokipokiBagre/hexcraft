@@ -535,16 +535,17 @@ function _renderCatCard(m, nombrePJ, esAdmin) {
     const esPerso  = m.tipo === 'Personalizada';
     const selec    = _s.misionSelec === m.titulo;
 
-    // Avatares pequeños (arrastrables si admin)
+    // Avatares pequeños (arrastrables si admin y ahora clicables)
     const avsHTML = jugs.length > 0
         ? `<div class="pmis-cat-avs">
             ${jugs.map(j => `
                 <img class="pmis-av${j===nombrePJ?' yo':''}${esAdmin?' pmis-av-drag':''}"
                      ${esAdmin?`draggable="true" data-drag-pj="${j.replace(/"/g,'&quot;')}" data-drag-source="mision" data-drag-mision="${m.titulo.replace(/"/g,'&quot;')}"`:``}
+                     ${esAdmin?`onclick="event.stopPropagation();window._pmisDesapuntarPJ('${safeId}','${j.replace(/'/g, "\\'")}')" style="cursor:pointer;"`:``}
                      width="22" height="22"
                      src="${_imgIcon(j)}"
                      onerror="this.src='${_fallback()}'"
-                     title="${j}">`).join('')}
+                     title="${j}${esAdmin?' (Clic para quitar)':''}">`).join('')}
             <span class="pmis-cat-cupos">${jugs.length}/${m.cupos}</span>
            </div>`
         : `<span class="pmis-cat-cupos">Sin jugadores · cupos: ${m.cupos}</span>`;
@@ -625,16 +626,17 @@ function _renderDetalle(m, nombrePJ, esAdmin) {
     const safeId = m.titulo.replace(/'/g, "\\'");
     const safeNom= nombrePJ.replace(/'/g, "\\'");
     const esPerso= m.tipo === 'Personalizada';
-    const llena  = m.cupos > 0 && jugs.length >= m.cupos && !esAdmin;
+    const llena  = m.cupos > 0 && jugs.length >= m.cupos; // Quitamos el bloqueo restrictivo
 
     // Avatares grandes
     const avsHTML = jugs.length > 0
         ? `<div class="pmis-det-avs">
             ${jugs.map(j => `
                 <img class="pmis-det-av ${j === nombrePJ ? 'yo' : ''}"
+                     ${esAdmin?`style="cursor:pointer;" onclick="window._pmisDesapuntarPJ('${safeId}','${j.replace(/'/g, "\\'")}')"`:``}
                      src="${_imgIcon(j)}"
                      onerror="this.src='${_fallback()}'"
-                     title="${j}">`).join('')}
+                     title="${j}${esAdmin?' (Clic para quitar)':''}">`).join('')}
             <span class="pmis-det-cupos">${jugs.length}/${m.cupos} participantes</span>
            </div>`
         : `<div style="font-size:0.65em;color:#3a3a50;margin-bottom:8px;">Sin jugadores aún · cupos: ${m.cupos}</div>`;
@@ -643,22 +645,22 @@ function _renderDetalle(m, nombrePJ, esAdmin) {
     const notaHTML = esAdmin && m.nota_op
         ? `<div class="pmis-nota-op" style="margin-bottom:8px;"><strong>OP:</strong> ${m.nota_op}</div>` : '';
 
-    // Solo botón Unirse / Salir (no hay editar/borrar aquí)
+    // Solo botón Unirse / Salir
     let btnHTML = '';
     if (enMis) {
         const puede = esAdmin || esPerso;
         btnHTML = puede
             ? `<button class="pmis-btn-accion salir"
-                    onclick="window._pmisDesapuntarPJ('${safeId}','${safeNom}')">
+                    onclick="window._pmisDesapuntarPJ('${safeId}','${safeNom}', true)">
                     ✕ Salir de misión
                </button>`
             : `<div style="font-size:0.62em;color:#2e2e48;text-align:center;margin-top:8px;">El OP gestiona esta misión</div>`;
     } else {
         const puede = esAdmin || esPerso;
         btnHTML = puede
-            ? `<button class="pmis-btn-accion unirse" ${llena ? 'disabled' : ''}
+            ? `<button class="pmis-btn-accion unirse"
                     onclick="window._pmisApuntarPJ('${safeId}','${safeNom}')">
-                    ${llena ? '🔒 Misión llena' : '✦ Unirse a esta misión'}
+                    ${llena ? '⚠️ Unirse (Sobrecupo)' : '✦ Unirse a esta misión'}
                </button>`
             : '';
     }
@@ -989,18 +991,24 @@ window._pmisApuntarPJ = async (idMision, nombrePJ) => {
     await _cargar(); _reRender();
 };
 
-window._pmisDesapuntarPJ = async (idMision, nombrePJ) => {
+window._pmisDesapuntarPJ = async (idMision, nombrePJ, skipConfirm = false) => {
     const m = _s.misiones.find(x => x.titulo === idMision);
     if (!m) return;
     if ((m.tipo === 'Grande' || m.tipo === 'Normal') && !estadoUI.esAdmin) {
         window.mostrarToast?.('Solo el OP puede gestionar esta misión.', true); return;
     }
+    
+    // Confirmación para cuando se hace clic directo en el avatar (skipConfirm es false por defecto)
+    if (!skipConfirm && !confirm(`¿Quitar a ${nombrePJ} de la misión "${idMision}"?`)) return;
+
     const jugs = (Array.isArray(m.jugadores) ? m.jugadores : []).filter(j => j !== nombrePJ);
     let nuevoEstado = m.estado;
     if (nuevoEstado === 1 && m.cupos > 0 && jugs.length < m.cupos) nuevoEstado = 0;
+    
     const { error } = await supabase.from('misiones')
         .update({ jugadores: jugs, estado: nuevoEstado }).eq('titulo', idMision);
     if (error) { alert('Error: ' + error.message); return; }
+    
     window.mostrarToast?.(`✕ ${nombrePJ} removido`);
     await _cargar(); _reRender();
 };
