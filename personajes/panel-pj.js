@@ -1058,19 +1058,19 @@ select.pobj-input-sm{cursor:pointer;}
 
     // Cargar datos
     const [catRes, invRes] = await Promise.all([
-        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul,contenedor_padre').eq('es_propuesta', false).order('nombre'),
-        supabase.from('inventario_objetos').select('objeto_nombre,cantidad,equipado').eq('personaje_nombre', nombre).gt('cantidad', 0),
+        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul').eq('es_propuesta', false).order('nombre'),
+        supabase.from('inventario_objetos').select('objeto_nombre,cantidad,equipado,contenedor_padre').eq('personaje_nombre', nombre).gt('cantidad', 0),
     ]);
 
     _objState.catalogo   = catRes.data || [];
     _objState.inventario = invRes.data || [];
 
-    // Mapa contenedor → hijos
+    // Mapa contenedor → hijos (basado en inventario del PJ, no en catálogo global)
     _objState.contenidores = {};
-    _objState.catalogo.forEach(o => {
-        if (o.contenedor_padre) {
-            if (!_objState.contenidores[o.contenedor_padre]) _objState.contenidores[o.contenedor_padre] = [];
-            _objState.contenidores[o.contenedor_padre].push(o.nombre);
+    _objState.inventario.forEach(i => {
+        if (i.contenedor_padre) {
+            if (!_objState.contenidores[i.contenedor_padre]) _objState.contenidores[i.contenedor_padre] = [];
+            _objState.contenidores[i.contenedor_padre].push(i.objeto_nombre);
         }
     });
 
@@ -1430,16 +1430,16 @@ async function _recargarObjetos() {
     const nombre = _objState.nombrePJ;
     if (!nombre) return;
     const [catRes, invRes] = await Promise.all([
-        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul,contenedor_padre').eq('es_propuesta', false).order('nombre'),
-        supabase.from('inventario_objetos').select('objeto_nombre,cantidad,equipado').eq('personaje_nombre', nombre).gt('cantidad', 0),
+        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul').eq('es_propuesta', false).order('nombre'),
+        supabase.from('inventario_objetos').select('objeto_nombre,cantidad,equipado,contenedor_padre').eq('personaje_nombre', nombre).gt('cantidad', 0),
     ]);
     _objState.catalogo   = catRes.data || [];
     _objState.inventario = invRes.data || [];
     _objState.contenidores = {};
-    _objState.catalogo.forEach(o => {
-        if (o.contenedor_padre) {
-            if (!_objState.contenidores[o.contenedor_padre]) _objState.contenidores[o.contenedor_padre] = [];
-            _objState.contenidores[o.contenedor_padre].push(o.nombre);
+    _objState.inventario.forEach(i => {
+        if (i.contenedor_padre) {
+            if (!_objState.contenidores[i.contenedor_padre]) _objState.contenidores[i.contenedor_padre] = [];
+            _objState.contenidores[i.contenedor_padre].push(i.objeto_nombre);
         }
     });
     _renderObjIzq();
@@ -1477,27 +1477,40 @@ window._pobjDropEnInventario = async (e) => {
     const nombre = e.dataTransfer.getData('text/plain');
     const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
     if (!nombre || !estadoUI.esAdmin) return;
-    if (fuente === 'inventario') return; // ya está en inventario, no hacer nada
-    await window._pobjDarAlPJ(nombre, 1);
+
+    const yaEnInv = _objState.inventario.find(i => i.objeto_nombre === nombre);
+    if (yaEnInv) {
+        // Si estaba dentro de un contenedor, sacarlo al nivel raíz
+        if (yaEnInv.contenedor_padre) {
+            await supabase.from('inventario_objetos')
+                .update({ contenedor_padre: null })
+                .eq('personaje_nombre', _objState.nombrePJ)
+                .eq('objeto_nombre', nombre);
+            await _recargarObjetos();
+        }
+    } else {
+        // No estaba en inventario — añadir en raíz
+        await window._pobjDarAlPJ(nombre, 1);
+    }
 };
 window._pobjDropEnContenedor = async (e, contenedorNombre) => {
     e.preventDefault();
     const nombre = e.dataTransfer.getData('text/plain');
     const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
     if (!nombre || !estadoUI.esAdmin) return;
+    if (nombre === contenedorNombre) return; // no meter un contenedor en sí mismo
 
-    // Verificar que el objeto pertenece a este contenedor en el catálogo
-    const objCat = _objState.catalogo.find(o => o.nombre === nombre);
-    if (!objCat || objCat.contenedor_padre !== contenedorNombre) {
-        window.mostrarToast?.('⚠️ Ese objeto no pertenece a este contenedor en el catálogo');
-        return;
-    }
-
-    // Solo añadir al inventario si no está ya (sin cambiar cantidad si ya existe)
     const yaEnInv = _objState.inventario.find(i => i.objeto_nombre === nombre);
-    if (!yaEnInv) {
+    if (yaEnInv) {
+        // Ya está en el inventario — solo actualizar contenedor_padre
+        await supabase.from('inventario_objetos')
+            .update({ contenedor_padre: contenedorNombre })
+            .eq('personaje_nombre', _objState.nombrePJ)
+            .eq('objeto_nombre', nombre);
+    } else {
+        // No está en el inventario — añadir con cantidad 1 dentro del contenedor
         await supabase.from('inventario_objetos').upsert(
-            { personaje_nombre: _objState.nombrePJ, objeto_nombre: nombre, cantidad: 1, equipado: false },
+            { personaje_nombre: _objState.nombrePJ, objeto_nombre: nombre, cantidad: 1, equipado: false, contenedor_padre: contenedorNombre },
             { onConflict: 'personaje_nombre,objeto_nombre' }
         );
     }
