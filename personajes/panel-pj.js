@@ -1403,6 +1403,11 @@ function _renderObjIzq() {
 function _renderObjDer(nombre, body) {
     if (!body) { body = document.getElementById('ppj-body'); }
     if (!body) return;
+    // En modo transfer, usar renderizado especial con drop zones
+    if (_objState.modoTransfer && _objState.transferDest) {
+        _renderTransferDer(nombre);
+        return;
+    }
 
     const esAdmin  = estadoUI.esAdmin;
     const safe     = nombre.replace(/'/g,"\\'");
@@ -1540,6 +1545,17 @@ async function _recargarObjetos() {
     });
     _renderObjIzq();
     _renderObjDer(nombre, document.getElementById('ppj-body'));
+    // Si en modo transfer, también refrescar inventario del destino desde BD
+    if (_objState.modoTransfer && _objState.transferDest) {
+        supabase.from('inventario_objetos')
+            .select('id,objeto_nombre,cantidad,equipado,contenedor_padre')
+            .eq('personaje_nombre', _objState.transferDest)
+            .gt('cantidad', 0)
+            .then(({data}) => {
+                _objState.transferInvDest = data || [];
+                _renderObjIzq();
+            });
+    }
 }
 
 // ── Funciones globales de objetos ─────────────────────────────
@@ -2181,65 +2197,6 @@ window._pobjTransferDragStart = (e, slotId, nombre, origen) => {
     e.target.style.opacity = '0.5';
 };
 
-window._pobjTransferDrop = async (e, zonaDestino, contenedorDestino) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!estadoUI.esAdmin) return;
-
-    const slotId  = parseInt(e.dataTransfer.getData('text/plain'));
-    const nombre  = e.dataTransfer.getData('application/x-nombre');
-    const origen  = e.dataTransfer.getData('application/x-origen');
-    if (!nombre || origen === zonaDestino) return; // mismo lado, no hacer nada
-
-    const destNombre = _objState.transferDest;
-    const srcPJ  = origen  === 'local' ? _objState.nombrePJ : destNombre;
-    const dstPJ  = zonaDestino === 'local' ? _objState.nombrePJ : destNombre;
-    const srcInv = origen === 'local' ? _objState.inventario : _objState.transferInvDest;
-    const slot   = srcInv.find(i => i.id === slotId);
-    if (!slot) return;
-
-    const moverSlot = async (cant) => {
-        if (cant <= 0) return;
-        const dstInv = zonaDestino === 'local' ? _objState.inventario : _objState.transferInvDest;
-        const slotDestExistente = dstInv.find(i =>
-            i.objeto_nombre === nombre && (i.contenedor_padre||null) === (contenedorDestino||null)
-        );
-
-        if (cant === slot.cantidad) {
-            // Mover todo: cambiar personaje_nombre (y contenedor si aplica)
-            if (slotDestExistente) {
-                await supabase.from('inventario_objetos').update({ cantidad: slotDestExistente.cantidad + cant }).eq('id', slotDestExistente.id);
-                await supabase.from('inventario_objetos').delete().eq('id', slotId);
-            } else {
-                await supabase.from('inventario_objetos').update({
-                    personaje_nombre: dstPJ,
-                    contenedor_padre: contenedorDestino || null
-                }).eq('id', slotId);
-            }
-        } else {
-            // Dividir: restar del origen, añadir al destino
-            await supabase.from('inventario_objetos').update({ cantidad: slot.cantidad - cant }).eq('id', slotId);
-            if (slotDestExistente) {
-                await supabase.from('inventario_objetos').update({ cantidad: slotDestExistente.cantidad + cant }).eq('id', slotDestExistente.id);
-            } else {
-                await supabase.from('inventario_objetos').insert({
-                    personaje_nombre: dstPJ, objeto_nombre: nombre,
-                    cantidad: cant, equipado: false, contenedor_padre: contenedorDestino || null
-                });
-            }
-        }
-
-        // Recargar ambos inventarios
-        await _recargarObjetos();
-        await window._pobjIniciarTransfer(destNombre);
-    };
-
-    if (slot.cantidad > 1) {
-        _modalCantidad(slot.cantidad, moverSlot);
-    } else {
-        await moverSlot(1);
-    }
-};
 
 
 window._pobjImgDrop = (e) => { e.preventDefault(); e.currentTarget.style.borderColor='rgba(212,175,55,0.25)'; e.currentTarget.style.color='#3a3a58'; const f=e.dataTransfer?.files?.[0]; if(f) window._pobjImgSubir(f); };
