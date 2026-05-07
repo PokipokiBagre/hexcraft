@@ -22,7 +22,7 @@ const _imgObj = (nombre) => `${_sb()}/imgobjetos/${_norm(nombre)}.png`;
 const _imgFallback = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
 const RAR_COLOR = { 'Legendario': '#f5d020', 'Raro': '#ffffff', 'Común': '#ffffff', '-': '#dddddd' };
-const RAR_BG    = { 'Legendario': 'rgba(245,208,32,0.25)', 'Raro': 'rgba(140,60,210,0.70)', 'Común': 'rgba(100,100,130,0.55)', '-': 'rgba(80,80,100,0.45)' };
+const RAR_BG    = { 'Legendario': 'rgba(245,208,32,0.25)', 'Raro': 'rgba(140,60,210,0.75)', 'Común': 'rgba(100,100,140,0.60)', '-': 'rgba(80,80,100,0.45)' };
 
 // ── Estado ───────────────────────────────────────────────────
 let _st = {
@@ -267,9 +267,9 @@ function _renderCatalogo() {
         return `<div class="pobj-cat-card ${enInv?'en-inv':''}">
             <img class="pobj-cat-img" src="${imgSrc}" onerror="this.onerror=null;this.src='${_imgFallback()}'" loading="lazy">
             <div class="pobj-cat-info">
-                <div class="pobj-cat-nombre">${o.nombre}${contBadge}</div>
-                <div class="pobj-cat-meta">${o.tipo||'-'} · ${o.material||'-'}</div>
-                <div class="pobj-cat-eff">${o.efecto||''}</div>
+                <div class="pobj-cat-nombre" style="color:#ffffff;font-weight:700;">${o.nombre}${contBadge}</div>
+                <div class="pobj-cat-meta" style="color:#cccccc;">${o.tipo||'-'} · ${o.material||'-'}</div>
+                <div class="pobj-cat-eff" style="color:#ffffff;">${o.efecto||''}</div>
             </div>
             <span class="pobj-rar-badge" style="color:${rarColor(o.rareza)};background:${rarBg(o.rareza)};border:1px solid ${rarColor(o.rareza)}44;">${o.rareza||'-'}</span>
             ${_st.esAdmin ? `<div class="pobj-cat-actions">${addBtn}${editBtn}</div>` : ''}
