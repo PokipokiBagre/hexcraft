@@ -21,8 +21,8 @@ const _norm = (s) => s ? s.toString().trim().toLowerCase()
 const _imgObj = (nombre) => `${_sb()}/imgobjetos/${_norm(nombre)}.png`;
 const _imgFallback = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
-const RAR_COLOR = { 'Legendario': '#d4af37', 'Raro': '#9a50dc', 'Común': '#b0b0cc', '-': '#9898b8' };
-const RAR_BG    = { 'Legendario': 'rgba(212,175,55,0.28)', 'Raro': 'rgba(154,80,220,0.28)', 'Común': 'rgba(130,130,160,0.28)', '-': 'rgba(90,90,120,0.26)' };
+const RAR_COLOR = { 'Legendario': '#f0c840', 'Raro': '#cc88ff', 'Común': '#d8d8f8', '-': '#a8a8c8' };
+const RAR_BG    = { 'Legendario': 'rgba(240,200,64,0.22)', 'Raro': 'rgba(180,100,255,0.22)', 'Común': 'rgba(150,150,190,0.18)', '-': 'rgba(90,90,120,0.18)' };
 
 // ── Estado ───────────────────────────────────────────────────
 let _st = {
@@ -321,7 +321,7 @@ function _renderInventario() {
             <img class="pobj-cat-img" src="${_imgObj(nombre)}" onerror="this.onerror=null;this.src='${_imgFallback()}'" loading="lazy">
             <div style="flex:1;min-width:0;">
                 <div class="pobj-inv-nombre ${isEqp?'equipado':''}">${nombre}${isEqp?'<span class="pobj-inv-badge-eqp">EQP</span>':''}</div>
-                <div style="font-size:0.62em;color:#7070a0;margin-top:1px;">${cat.tipo||''} · <span style="color:${rarColor};">${cat.rareza||''}</span></div>
+                <div style="font-size:0.62em;color:#a8a8c8;margin-top:1px;">${cat.tipo||''} · <span style="color:${rarColor};">${cat.rareza||''}</span></div>
             </div>
             ${ctrlHTML}
             ${esContenedor ? `<button class="pobj-ctrl-btn" onclick="window._pobjToggleContenedor('${oSafe}')" title="Ver contenido">${expanded?'▲':'▼'}</button>` : ''}
