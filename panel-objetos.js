@@ -21,7 +21,7 @@ const _norm = (s) => s ? s.toString().trim().toLowerCase()
 const _imgObj = (nombre) => `${_sb()}/imgobjetos/${_norm(nombre)}.png`;
 const _imgFallback = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
-const RAR_COLOR = { 'Legendario': '#d4af37', 'Raro': '#9a50dc', 'Común': '#9090b0', '-': '#7070a0' };
+const RAR_COLOR = { 'Legendario': '#d4af37', 'Raro': '#9a50dc', 'Común': '#b0b0cc', '-': '#9898b8' };
 const RAR_BG    = { 'Legendario': 'rgba(212,175,55,0.08)', 'Raro': 'rgba(154,80,220,0.08)', 'Común': 'rgba(130,130,160,0.08)', '-': 'rgba(90,90,120,0.06)' };
 
 // ── Estado ───────────────────────────────────────────────────
