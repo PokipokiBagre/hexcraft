@@ -5,18 +5,18 @@
 
 :root {
     /* ── Texto ────────────────────────────────────────────── */
-    --pobj-text:        #d0d0e0;   /* nombres de objetos          */
-    --pobj-meta:        #9090b0;   /* tipo · material             */
-    --pobj-eff:         #8888a8;   /* descripción / efecto        */
-    --pobj-dim:         #7070a0;   /* separadores, labels vacíos  */
-    --pobj-label:       #9090b0;   /* etiquetas de campo (OP)     */
-    --pobj-muted:       #6060a0;   /* placeholder, hint           */
+    --pobj-text:        #e8e8f0;   /* nombres de objetos          */
+    --pobj-meta:        #c0c0d8;   /* tipo · material             */
+    --pobj-eff:         #b4b4cc;   /* descripción / efecto        */
+    --pobj-dim:         #a0a0c0;   /* separadores, labels vacíos  */
+    --pobj-label:       #b8b8d0;   /* etiquetas de campo (OP)     */
+    --pobj-muted:       #8888b0;   /* placeholder, hint           */
 
     /* ── Rarezas ──────────────────────────────────────────── */
     --pobj-rar-legendario: #d4af37;
-    --pobj-rar-raro:       #9a50dc;
-    --pobj-rar-comun:      #9090b0;
-    --pobj-rar-sin:        #7070a0;
+    --pobj-rar-raro:       #b06aec;
+    --pobj-rar-comun:      #b0b0cc;
+    --pobj-rar-sin:        #9898b8;
 
     /* ── Acento dorado ────────────────────────────────────── */
     --pobj-gold:        #d4af37;
