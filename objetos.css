@@ -5,18 +5,18 @@
 
 :root {
     /* ── Texto ────────────────────────────────────────────── */
-    --pobj-text:        #f5f5ff;   /* nombres de objetos          */
-    --pobj-meta:        #c8c8e8;   /* tipo · material             */
-    --pobj-eff:         #e0dff8;   /* descripción / efecto        */
-    --pobj-dim:         #b0b0d0;   /* separadores, labels vacíos  */
-    --pobj-label:       #d8d8f0;   /* etiquetas de campo (OP)     */
-    --pobj-muted:       #8888b0;   /* placeholder, hint           */
+    --pobj-text:        #ffffff;   /* nombres de objetos          */
+    --pobj-meta:        #ffffff;   /* tipo · material             */
+    --pobj-eff:         #ffffff;   /* descripción / efecto        */
+    --pobj-dim:         #e0e0e0;   /* separadores, labels vacíos  */
+    --pobj-label:       #ffffff;   /* etiquetas de campo (OP)     */
+    --pobj-muted:       #b0b0b0;   /* placeholder, hint           */
 
     /* ── Rarezas ──────────────────────────────────────────── */
-    --pobj-rar-legendario: #f0c840;
-    --pobj-rar-raro:       #d090ff;
-    --pobj-rar-comun:      #e0e0f8;
-    --pobj-rar-sin:        #c0c0dc;
+    --pobj-rar-legendario: #f5d020;
+    --pobj-rar-raro:       #ffffff;
+    --pobj-rar-comun:      #ffffff;
+    --pobj-rar-sin:        #e0e0e0;
 
     /* ── Acento dorado ────────────────────────────────────── */
     --pobj-gold:        #d4af37;
@@ -173,12 +173,12 @@
     padding: 8px 10px;
     border-radius: 7px;
     margin-bottom: 5px;
-    border: 1px solid rgba(255,255,255,0.18);
-    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.32);
+    background: rgba(255,255,255,0.07);
     transition: background 0.12s, border-color 0.12s;
     cursor: default;
 }
-.pobj-cat-card:hover  { background: rgba(255,255,255,0.10); }
+.pobj-cat-card:hover  { background: rgba(255,255,255,0.11); }
 .pobj-cat-card.en-inv { border-color: rgba(212,175,55,0.35); }
 
 .pobj-cat-img {
@@ -190,14 +190,13 @@
     border: 1px solid rgba(255,255,255,0.26);
 }
 .pobj-cat-info   { flex: 1; min-width: 0; }
-.pobj-cat-nombre { font-size: 0.82em; font-weight: 700; color: var(--pobj-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pobj-cat-meta   { font-size: 0.65em; color: #b8b8e0; margin-top: 2px; }
-.pobj-cat-eff    { font-size: 0.68em; color: #dcdcf5; margin-top: 3px; line-height: 1.4; }
+.pobj-cat-nombre { font-size: 0.82em; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pobj-cat-meta   { font-size: 0.65em; color: #cccccc; margin-top: 2px; }
+.pobj-cat-eff    { font-size: 0.68em; color: #ffffff; margin-top: 3px; line-height: 1.4; }
 
 .pobj-rar-badge {
-    font-size: 0.60em; font-weight: 700; letter-spacing: 0.5px;
-    padding: 2px 7px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    font-size: 0.58em; font-weight: 700; letter-spacing: 0.5px;
+    padding: 2px 6px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
 }
 .pobj-cat-actions { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
 .pobj-btn-sm {
