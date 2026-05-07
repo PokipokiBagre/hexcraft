@@ -22,7 +22,7 @@ const _imgObj = (nombre) => `${_sb()}/imgobjetos/${_norm(nombre)}.png`;
 const _imgFallback = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
 const RAR_COLOR = { 'Legendario': '#d4af37', 'Raro': '#9a50dc', 'Común': '#9090b0', '-': '#7070a0' };
-const RAR_BG    = { 'Legendario': 'rgba(212,175,55,0.08)', 'Raro': 'rgba(154,80,220,0.08)', 'Común': 'rgba(100,100,130,0.06)', '-': 'rgba(60,60,80,0.05)' };
+const RAR_BG    = { 'Legendario': 'rgba(212,175,55,0.08)', 'Raro': 'rgba(154,80,220,0.08)', 'Común': 'rgba(130,130,160,0.08)', '-': 'rgba(90,90,120,0.06)' };
 
 // ── Estado ───────────────────────────────────────────────────
 let _st = {
@@ -165,242 +165,16 @@ function _inyectarPanel() {
 
 function _onEsc(e) { if (e.key === 'Escape') cerrarPanelObjetos(); }
 
-// ── ESTILOS ──────────────────────────────────────────────────
+// ── ESTILOS — cargados desde objetos.css (raíz del proyecto) ─
 function _inyectarEstilos() {
-    if (document.getElementById('pobj-styles')) return;
-    const s = document.createElement('style');
-    s.id = 'pobj-styles';
-    s.textContent = `
-#pobj-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 10100;
-    animation: pobj-fade-in 0.2s ease;
-}
-#pobj-panel {
-    position: fixed;
-    inset: 0;
-    z-index: 10200;
-    display: flex;
-    flex-direction: column;
-    background: #07050f;
-    font-family: 'Inter', system-ui, sans-serif;
-    animation: pobj-slide-up 0.24s cubic-bezier(0.4,0,0.2,1);
-}
-@keyframes pobj-fade-in { from { opacity:0; } to { opacity:1; } }
-@keyframes pobj-slide-up { from { transform: translateY(30px); opacity:0; } to { transform: translateY(0); opacity:1; } }
-
-#pobj-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 18px;
-    background: #0b0816;
-    border-bottom: 1px solid rgba(212,175,55,0.2);
-    flex-shrink: 0;
-}
-#pobj-header-left { display: flex; align-items: center; gap: 12px; }
-#pobj-title { font-family: 'Cinzel', serif; color: #d4af37; font-size: 0.9em; letter-spacing: 1.5px; font-weight: 700; }
-#pobj-pj-name { font-size: 0.75em; color: #888; letter-spacing: 0.5px; }
-#pobj-close {
-    background: transparent; border: 1px solid rgba(255,255,255,0.1);
-    color: #555; border-radius: 4px; width: 28px; height: 28px;
-    cursor: pointer; font-size: 1em; transition: color 0.15s, border-color 0.15s;
-}
-#pobj-close:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
-
-#pobj-body {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-    min-height: 0;
+    if (document.getElementById('pobj-styles-link')) return;
+    const link = document.createElement('link');
+    link.id   = 'pobj-styles-link';
+    link.rel  = 'stylesheet';
+    link.href = '/objetos.css';   // ← ajustar ruta si cambia la estructura
+    document.head.appendChild(link);
 }
 
-/* ── IZQUIERDA: Catálogo ── */
-#pobj-left {
-    flex: 0 0 55%;
-    border-right: 1px solid rgba(255,255,255,0.06);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-#pobj-cat-header {
-    padding: 10px 14px 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    flex-shrink: 0;
-    background: rgba(0,0,0,0.2);
-}
-#pobj-cat-filtros {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
-    margin-top: 8px;
-}
-#pobj-cat-lista {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 12px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(212,175,55,0.2) transparent;
-}
-
-/* ── DERECHA: Inventario ── */
-#pobj-right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-#pobj-inv-header {
-    padding: 10px 14px 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    flex-shrink: 0;
-    background: rgba(0,0,0,0.2);
-}
-#pobj-inv-lista {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 12px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(212,175,55,0.2) transparent;
-}
-
-/* ── Compartidos ── */
-.pobj-section-label {
-    font-size: 0.62em;
-    letter-spacing: 1.8px;
-    text-transform: uppercase;
-    color: #3a3a58;
-    font-weight: 700;
-    display: block;
-    margin-bottom: 6px;
-}
-.pobj-search {
-    width: 100%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 5px;
-    color: #ccc;
-    padding: 6px 10px;
-    font-size: 0.78em;
-    outline: none;
-    box-sizing: border-box;
-    font-family: inherit;
-    transition: border-color 0.15s;
-}
-.pobj-search:focus { border-color: rgba(212,175,55,0.35); }
-.pobj-search::placeholder { color: #3a3a58; }
-
-.pobj-filtro-btn {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #555;
-    border-radius: 4px;
-    padding: 3px 9px;
-    font-size: 0.62em;
-    cursor: pointer;
-    font-family: inherit;
-    letter-spacing: 0.5px;
-    transition: all 0.12s;
-}
-.pobj-filtro-btn:hover { color: #888; border-color: rgba(255,255,255,0.15); }
-.pobj-filtro-btn.activo { color: #d4af37; border-color: rgba(212,175,55,0.4); background: rgba(212,175,55,0.08); }
-
-/* ── Tarjeta de catálogo ── */
-.pobj-cat-card {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: 7px;
-    margin-bottom: 5px;
-    border: 1px solid rgba(255,255,255,0.04);
-    background: rgba(255,255,255,0.02);
-    transition: background 0.12s, border-color 0.12s;
-    cursor: default;
-}
-.pobj-cat-card:hover { background: rgba(255,255,255,0.04); }
-.pobj-cat-card.en-inv { border-color: rgba(212,175,55,0.18); }
-.pobj-cat-img {
-    width: 44px; height: 44px;
-    border-radius: 5px;
-    object-fit: cover;
-    background: #111;
-    flex-shrink: 0;
-    border: 1px solid rgba(255,255,255,0.06);
-}
-.pobj-cat-info { flex: 1; min-width: 0; }
-.pobj-cat-nombre { font-size: 0.82em; font-weight: 700; color: #d0d0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pobj-cat-meta { font-size: 0.65em; color: #9090b0; margin-top: 2px; }
-.pobj-cat-eff { font-size: 0.68em; color: #8888a8; margin-top: 3px; line-height: 1.4; }
-.pobj-rar-badge {
-    font-size: 0.58em; font-weight: 700; letter-spacing: 0.5px;
-    padding: 2px 6px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
-}
-.pobj-cat-actions { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
-.pobj-btn-sm {
-    font-size: 0.62em; padding: 3px 7px; border-radius: 4px;
-    cursor: pointer; border: 1px solid; font-family: inherit;
-    white-space: nowrap; transition: all 0.12s;
-}
-.pobj-btn-add { background: rgba(62,207,110,0.1); color: #3ecf6e; border-color: rgba(62,207,110,0.3); }
-.pobj-btn-add:hover { background: rgba(62,207,110,0.22); }
-.pobj-btn-edit { background: rgba(100,150,255,0.08); color: #6496ff; border-color: rgba(100,150,255,0.25); }
-.pobj-btn-edit:hover { background: rgba(100,150,255,0.18); }
-
-/* ── Tarjeta de inventario ── */
-.pobj-inv-card {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: 7px;
-    margin-bottom: 5px;
-    border: 1px solid rgba(255,255,255,0.04);
-    background: rgba(255,255,255,0.02);
-    transition: background 0.12s;
-}
-.pobj-inv-card.equipado { border-color: rgba(212,175,55,0.3); background: rgba(212,175,55,0.04); }
-.pobj-inv-card.contenedor { border-color: rgba(100,150,255,0.2); }
-.pobj-inv-nombre { font-size: 0.82em; font-weight: 700; color: #d0d0e0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pobj-inv-nombre.equipado { color: #d4af37; }
-.pobj-inv-badge-eqp { font-size: 0.58em; background: rgba(212,175,55,0.15); color: #d4af37; border: 1px solid rgba(212,175,55,0.3); border-radius: 3px; padding: 1px 5px; margin-left: 4px; }
-.pobj-inv-ctrl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.pobj-ctrl-btn {
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
-    color: #888; border-radius: 4px; width: 22px; height: 22px;
-    cursor: pointer; font-size: 0.85em; display: flex; align-items: center; justify-content: center;
-    transition: all 0.12s;
-}
-.pobj-ctrl-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
-.pobj-cant { font-size: 0.88em; font-weight: 700; color: #d4af37; min-width: 20px; text-align: center; }
-.pobj-btn-eqp {
-    font-size: 0.58em; padding: 2px 6px; border-radius: 4px;
-    cursor: pointer; border: 1px solid; font-family: inherit; transition: all 0.12s;
-}
-.pobj-btn-eqp.on { background: rgba(212,175,55,0.15); color: #d4af37; border-color: rgba(212,175,55,0.4); }
-.pobj-btn-eqp.off { background: rgba(255,255,255,0.03); color: #3a3a58; border-color: rgba(255,255,255,0.07); }
-
-/* ── Contenedor toggle ── */
-.pobj-contenedor-toggle {
-    display: flex; align-items: center; gap: 6px;
-    cursor: pointer; font-size: 0.7em; color: #6496ff;
-    padding: 3px 0;
-    user-select: none;
-}
-.pobj-contenedor-hijos { padding-left: 14px; margin-top: 3px; border-left: 1px solid rgba(100,150,255,0.2); }
-
-/* ── Empty state ── */
-.pobj-empty { text-align: center; color: #2e2e48; font-size: 0.75em; padding: 24px 0; }
-
-/* ── Responsive ── */
-@media (max-width: 600px) {
-    #pobj-body { flex-direction: column; }
-    #pobj-left { flex: 0 0 50%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
-}
-    `;
-    document.head.appendChild(s);
-}
 
 // ── CARGA DE DATOS ───────────────────────────────────────────
 async function _cargarDatos() {
@@ -451,7 +225,7 @@ function _renderFiltros() {
 
     cont.innerHTML =
         rars.map(r => `<button class="pobj-filtro-btn ${_st.filtroCatRar===r?'activo':''}" onclick="window._pobjFiltroRar('${r}')">${r}</button>`).join('') +
-        `<span style="color:#2e2e48;font-size:0.65em;margin:0 2px;">·</span>` +
+        `<span style="color:#7070a0;font-size:0.65em;margin:0 2px;">·</span>` +
         tipos.map(t => `<button class="pobj-filtro-btn ${_st.filtroCatTipo===t?'activo':''}" onclick="window._pobjFiltroTipo('${t.replace(/'/g,"\\'")}')">${t}</button>`).join('');
 }
 
