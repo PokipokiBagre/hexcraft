@@ -1282,12 +1282,19 @@ function _renderObjIzq() {
             <span style="color:#2e2e48;font-size:0.6em;align-self:center;">·</span>
             ${RAREZAS.map(r=>`<button class="pobj-fbtn ${_objState.filtroRar===r?'on':''}" onclick="window._pobjFiltroRar('${r}')">${r}</button>`).join('')}
         </div>
+        ${esAdmin ? `<div id="pobj-cat-dropzone"
+            style="border:1px dashed rgba(220,60,60,0.3);border-radius:6px;padding:5px 8px;margin-bottom:6px;font-size:0.6em;color:#7a3a3a;text-align:center;transition:all 0.18s;cursor:default;"
+            ondragover="event.preventDefault();this.style.borderColor='rgba(220,60,60,0.7)';this.style.color='#ff7070';this.style.background='rgba(220,60,60,0.08)';"
+            ondragleave="this.style.borderColor='rgba(220,60,60,0.3)';this.style.color='#7a3a3a';this.style.background='';"
+            ondrop="window._pobjDropEnCatalogo(event);this.style.borderColor='rgba(220,60,60,0.3)';this.style.color='#7a3a3a';this.style.background='';">
+            🗑 Arrastrar objeto del inventario aquí para quitarlo
+        </div>` : ''}
         ${listaHTML}`;
     }
 
     izq.innerHTML = `
         <div class="pobj-izq-header">
-            <span style="font-size:0.6em;letter-spacing:1.8px;text-transform:uppercase;color:#3a3a58;font-weight:700;">🎒 Catálogo de Objetos</span>
+            <span style="font-size:0.6em;letter-spacing:1.8px;text-transform:uppercase;color:#7878a0;font-weight:700;">🎒 Catálogo de Objetos</span>
         </div>
         <div class="pobj-izq-scroll">${contenidoScroll}</div>`;
 }
@@ -1337,7 +1344,10 @@ function _renderObjDer(nombre, body) {
                 <button class="ppj-ctrl-btn" style="color:#ff6060;font-size:0.62em;padding:0 4px;" onclick="window._pobjQuitarTodos('${safeObj}')" title="Quitar todos">✕</button>
             </div>` : `<span style="font-size:0.85em;font-weight:700;color:#d4af37;">×${item.cantidad}</span>`;
 
-        let html = `<div class="ppj-obj-card ${isEqp?'equipado':''}" data-nombre="${item.objeto_nombre.toLowerCase()}">
+        let html = `<div class="ppj-obj-card ${isEqp?'equipado':''}" data-nombre="${item.objeto_nombre.toLowerCase()}"
+            draggable="${esAdmin?'true':'false'}"
+            ondragstart="window._pobjDragStart(event,'${safeObj}','inventario')"
+            ondragend="event.target.style.opacity=''">
             <div class="ppj-obj-header" style="gap:6px;">
                 <img src="${_imgObj(item.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:32px;height:32px;border-radius:4px;object-fit:cover;background:#111;flex-shrink:0;border:1px solid rgba(255,255,255,0.05);">
                 <span class="ppj-obj-nombre" title="${item.objeto_nombre}">${item.objeto_nombre}
@@ -1363,7 +1373,7 @@ function _renderObjDer(nombre, body) {
             html += `<div id="${contId}" style="padding-left:12px;border-left:2px solid rgba(100,150,255,0.2);margin-bottom:4px;transition:border-color 0.15s;"
                 ${esAdmin?`ondragover="event.preventDefault();this.style.borderLeftColor='#d4af37';" ondragleave="this.style.borderLeftColor='rgba(100,150,255,0.2)';" ondrop="window._pobjDropEnContenedor(event,'${safeObj}');this.style.borderLeftColor='rgba(100,150,255,0.2)';"`:''}>`; 
             if (hijos.length === 0) {
-                html += `<div style="font-size:0.64em;color:#2e2e48;padding:8px 4px;font-style:italic;">${esAdmin?'Arrastra objetos del catálogo aquí para meterlos':'Contenedor vacío'}</div>`;
+                html += `<div style="font-size:0.64em;color:#5a5a80;padding:8px 4px;font-style:italic;">${esAdmin?'Arrastra objetos del catálogo aquí para meterlos':'Contenedor vacío'}</div>`;
             } else {
                 html += hijos.map(h => {
                     const hCat  = _objState.catalogo.find(o=>o.nombre===h)||{};
@@ -1375,7 +1385,7 @@ function _renderObjDer(nombre, body) {
                             <img src="${_imgObj(h)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:28px;height:28px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;opacity:${hCant>0?1:0.4};">
                             <div style="flex:1;min-width:0;">
                                 <div style="font-size:0.76em;font-weight:600;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h}</div>
-                                ${hCat.efecto?`<div style="font-size:0.6em;color:#3a3a58;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hCat.efecto}</div>`:''}
+                                ${hCat.efecto?`<div style="font-size:0.6em;color:#8888a8;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${hCat.efecto}</div>`:''}
                             </div>
                             <span style="font-size:0.8em;color:#d4af37;font-weight:700;flex-shrink:0;">×${hCant}</span>
                             ${esAdmin?`
@@ -1447,25 +1457,55 @@ window._pobjFiltroRar     = (v) => { _objState.filtroRar=v; _renderObjIzq(); };
 window._pobjFiltroTipo    = (v) => { _objState.filtroTipo=v; _renderObjIzq(); };
 window._pobjToggleCont    = (n) => { if(_objState.expandedConts.has(n))_objState.expandedConts.delete(n); else _objState.expandedConts.add(n); _renderObjDer(_objState.nombrePJ); };
 
-// Drag & drop desde catálogo al inventario
-window._pobjDragStart = (e, nombre) => { e.dataTransfer.setData('text/plain', nombre); e.target.style.opacity='0.5'; };
+// Drag & drop — fuente puede ser 'catalogo' o 'inventario'
+window._pobjDragStart = (e, nombre, fuente) => {
+    e.dataTransfer.setData('text/plain', nombre);
+    e.dataTransfer.setData('application/x-fuente', fuente || 'catalogo');
+    e.target.style.opacity = '0.5';
+};
 window._pobjDropEnInventario = async (e) => {
     e.preventDefault();
     const nombre = e.dataTransfer.getData('text/plain');
+    const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
     if (!nombre || !estadoUI.esAdmin) return;
+    if (fuente === 'inventario') return; // ya está en inventario, no hacer nada
     await window._pobjDarAlPJ(nombre, 1);
 };
 window._pobjDropEnContenedor = async (e, contenedorNombre) => {
     e.preventDefault();
     const nombre = e.dataTransfer.getData('text/plain');
+    const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
     if (!nombre || !estadoUI.esAdmin) return;
-    // Asignar objeto al inventario del PJ
-    await window._pobjDarAlPJ(nombre, 1);
-    // Luego asignarlo al contenedor si el objeto no lo tiene ya
-    const objActual = _objState.catalogo.find(o=>o.nombre===nombre);
-    if (objActual && objActual.contenedor_padre !== contenedorNombre) {
-        await supabase.from('objetos').update({contenedor_padre:contenedorNombre}).eq('nombre',nombre);
+
+    // Si viene del catálogo y no está aún en el inventario, añadirlo con cantidad 1
+    if (fuente === 'catalogo') {
+        const yaEnInv = _objState.inventario.find(i => i.objeto_nombre === nombre);
+        if (!yaEnInv) {
+            await supabase.from('inventario_objetos').upsert(
+                { personaje_nombre: _objState.nombrePJ, objeto_nombre: nombre, cantidad: 1, equipado: false },
+                { onConflict: 'personaje_nombre,objeto_nombre' }
+            );
+        }
+        // Si viene del catálogo ya estaba en inventario: no sumar cantidad extra
     }
+    // Si viene del inventario: ya tiene la cantidad correcta, solo mover al contenedor
+
+    // Actualizar contenedor_padre en catálogo global
+    const objActual = _objState.catalogo.find(o => o.nombre === nombre);
+    if (objActual && objActual.contenedor_padre !== contenedorNombre) {
+        await supabase.from('objetos').update({ contenedor_padre: contenedorNombre }).eq('nombre', nombre);
+    }
+    await _recargarObjetos();
+};
+// Drop en la zona del catálogo — quita el objeto del inventario del PJ
+window._pobjDropEnCatalogo = async (e) => {
+    e.preventDefault();
+    const nombre = e.dataTransfer.getData('text/plain');
+    const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
+    if (!nombre || !estadoUI.esAdmin || fuente !== 'inventario') return;
+    await supabase.from('inventario_objetos').delete()
+        .eq('personaje_nombre', _objState.nombrePJ)
+        .eq('objeto_nombre', nombre);
     await _recargarObjetos();
 };
 
