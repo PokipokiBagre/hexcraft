@@ -5,18 +5,18 @@
 
 :root {
     /* ── Texto ────────────────────────────────────────────── */
-    --pobj-text:        #ffffff;   /* nombres de objetos          */
-    --pobj-meta:        #ffffff;   /* tipo · material             */
-    --pobj-eff:          #ffffff;   /* descripción / efecto        */
-    --pobj-dim:          #e0e0e0;   /* separadores, labels vacíos  */
-    --pobj-label:        #ffffff;   /* etiquetas de campo (OP)     */
-    --pobj-muted:        #b0b0b0;   /* placeholder, hint           */
+    --pobj-text:        #f0f0fa;   /* nombres de objetos          */
+    --pobj-meta:        #d8d8f0;   /* tipo · material             */
+    --pobj-eff:         #d0d0e8;   /* descripción / efecto        */
+    --pobj-dim:         #c0c0dc;   /* separadores, labels vacíos  */
+    --pobj-label:       #d0d0e8;   /* etiquetas de campo (OP)     */
+    --pobj-muted:       #9898c0;   /* placeholder, hint           */
 
     /* ── Rarezas ──────────────────────────────────────────── */
-    --pobj-rar-legendario: #f5d020;
-    --pobj-rar-raro:       #ffffff;
-    --pobj-rar-comun:      #ffffff;
-    --pobj-rar-sin:        #e0e0e0;
+    --pobj-rar-legendario: #d4af37;
+    --pobj-rar-raro:       #c080ff;
+    --pobj-rar-comun:      #d0d0e8;
+    --pobj-rar-sin:        #b8b8d8;
 
     /* ── Acento dorado ────────────────────────────────────── */
     --pobj-gold:        #d4af37;
@@ -190,9 +190,9 @@
     border: 1px solid rgba(255,255,255,0.26);
 }
 .pobj-cat-info   { flex: 1; min-width: 0; }
-.pobj-cat-nombre { font-size: 0.82em; font-weight: 700; color: var(--pobj-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pobj-cat-meta   { font-size: 0.65em; color: #cccccc; margin-top: 2px; }
-.pobj-cat-eff    { font-size: 0.68em; color: #ffffff; margin-top: 3px; line-height: 1.4; }
+.pobj-cat-nombre { font-size: 0.82em; font-weight: 700; color: #ffffff !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pobj-cat-meta   { font-size: 0.65em; color: #cccccc !important; margin-top: 2px; }
+.pobj-cat-eff    { font-size: 0.68em; color: #ffffff !important; margin-top: 3px; line-height: 1.4; }
 
 .pobj-rar-badge {
     font-size: 0.58em; font-weight: 700; letter-spacing: 0.5px;
