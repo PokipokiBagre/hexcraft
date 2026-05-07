@@ -96,18 +96,6 @@ function _inyectarEstilos() {
 .pmis-fbtn:hover { color: #aaa; border-color: rgba(255,255,255,0.15); }
 .pmis-fbtn.on { color: #d4af37; border-color: rgba(212,175,55,0.35); background: rgba(212,175,55,0.07); }
 
-/* Modo asignación OP */
-.pmis-btn-asig {
-    font-size: 0.62em; padding: 3px 9px; border-radius: 4px; cursor: pointer;
-    font-family: inherit; border: 1px solid rgba(120,80,200,0.3);
-    color: #7a60b0; background: rgba(120,80,200,0.06); transition: all 0.12s;
-    white-space: nowrap;
-}
-.pmis-btn-asig.on {
-    background: rgba(120,80,200,0.18); color: #c090ff;
-    border-color: rgba(160,100,240,0.45);
-}
-.pmis-btn-asig:hover { background: rgba(120,80,200,0.14); color: #b080ee; }
 
 /* Lista izq */
 .pmis-izq-list {
@@ -181,35 +169,62 @@ function _inyectarEstilos() {
 .pmis-av.yo { border-color: rgba(212,175,55,0.55); }
 
 /* ═══════════════════════════════════════════════
-   TOOLTIP DE ASIGNACIÓN (modo OP)
+   POOL DE PERSONAJES (drag & drop asignación)
 ═══════════════════════════════════════════════ */
-.pmis-asig-tooltip {
-    position: absolute; left: calc(100% + 6px); top: 0;
-    background: rgba(8,4,20,0.98); border: 1px solid rgba(120,80,200,0.4);
-    border-radius: 8px; padding: 8px 10px;
-    z-index: 1400; width: 200px; box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-    animation: pmis-tooltip-in 0.12s ease;
+.pmis-pool {
+    padding: 7px 10px 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(0,0,0,0.18);
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s;
 }
-@keyframes pmis-tooltip-in { from { opacity:0; transform:translateX(-4px); } to { opacity:1; transform:none; } }
-.pmis-asig-tt-title {
-    font-size: 0.6em; color: #7a60b0; letter-spacing: 1.2px;
-    text-transform: uppercase; font-weight: 700; margin-bottom: 7px;
+.pmis-pool-label {
+    font-size: 0.54em; color: #3a3a55; text-transform: uppercase;
+    letter-spacing: 1.4px; margin-bottom: 5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: space-between;
 }
-.pmis-asig-tt-grid {
-    display: flex; flex-direction: column; gap: 3px;
-    max-height: 220px; overflow-y: auto;
-    scrollbar-width: thin; scrollbar-color: rgba(120,80,200,0.2) transparent;
+.pmis-pool-label-hint {
+    font-size: 0.95em; color: #2a2a45; text-transform: none; letter-spacing: 0; font-weight: 400;
 }
-.pmis-asig-tt-pj {
-    display: flex; align-items: center; gap: 7px;
-    padding: 4px 6px; border-radius: 5px; cursor: pointer;
-    border: 1px solid transparent; transition: all 0.1s;
+.pmis-pool-scroll {
+    display: flex; gap: 5px; overflow-x: auto; padding-bottom: 3px;
+    scrollbar-width: none;
 }
-.pmis-asig-tt-pj:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07); }
-.pmis-asig-tt-pj.en { background: rgba(120,80,200,0.08); border-color: rgba(120,80,200,0.25); }
-.pmis-asig-tt-nombre { font-size: 0.72em; color: #b0b0c8; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pmis-asig-tt-pj.en .pmis-asig-tt-nombre { color: #c090ff; }
-.pmis-asig-tt-check { font-size: 0.75em; color: #7a60b0; flex-shrink: 0; }
+.pmis-pool-scroll::-webkit-scrollbar { display: none; }
+.pmis-pool-av {
+    width: 30px; height: 30px; border-radius: 50%; object-fit: cover;
+    object-position: top; border: 2px solid rgba(255,255,255,0.08);
+    background: #111; cursor: grab; flex-shrink: 0; transition: all 0.12s;
+    user-select: none;
+}
+.pmis-pool-av:hover { border-color: rgba(212,175,55,0.45); transform: scale(1.1); }
+.pmis-pool-av.en-mision { opacity: 0.45; border-color: rgba(212,175,55,0.15); }
+.pmis-pool-av.dragging  { opacity: 0.3; }
+/* Remove zone (pool en modo remove) */
+.pmis-pool.remove-mode {
+    background: rgba(160,35,35,0.1);
+    border-bottom-color: rgba(180,60,60,0.28);
+}
+.pmis-pool.remove-mode .pmis-pool-label { color: #884040; }
+.pmis-pool.remove-mode .pmis-pool-scroll { opacity: 0.28; pointer-events: none; }
+.pmis-pool-remove-hint {
+    display: none; text-align: center; padding: 5px 0 2px;
+    font-size: 0.63em; color: #884040; letter-spacing: 0.2px;
+}
+.pmis-pool.remove-mode .pmis-pool-remove-hint { display: block; }
+.pmis-pool.remove-mode.drop-over {
+    background: rgba(200,50,50,0.18) !important;
+    border-bottom-color: rgba(230,80,80,0.45) !important;
+}
+/* Drop targets en cards */
+.pmis-cat-card.drop-target { transition: border-color 0.1s, background 0.1s; }
+.pmis-cat-card.drop-over   {
+    border-color: rgba(212,175,55,0.55) !important;
+    background: rgba(212,175,55,0.09) !important;
+}
+/* Avatares en misión draggables */
+.pmis-av-drag { cursor: grab; transition: border-color 0.12s, transform 0.12s; }
+.pmis-av-drag:hover { border-color: rgba(212,175,55,0.55) !important; transform: scale(1.12); }
 
 /* ═══════════════════════════════════════════════
    PANEL DERECHO (detalle de misión)
@@ -352,17 +367,19 @@ function _inyectarEstilos() {
 
 // ── Estado local ───────────────────────────────────────────────
 const _s = {
-    misiones:       [],
-    filtro:         'todos',
-    busqueda:       '',
-    verFin:         false,
-    formActivo:     false,
-    editandoId:     null,
-    nombrePJ:       null,
-    misionSelec:    null,   // titulo de la misión seleccionada en el catálogo
-    modoAsig:       false,  // modo asignación OP activo
-    tooltipMision:  null,   // titulo de la misión con tooltip abierto
+    misiones:    [],
+    filtro:      'todos',
+    busqueda:    '',
+    verFin:      false,
+    formActivo:  false,
+    editandoId:  null,
+    nombrePJ:    null,
+    misionSelec: null,   // titulo de la misión seleccionada en el catálogo
 };
+
+// Drag & drop state
+let _dragState = null;
+let _globalDragListenersAttached = false;
 
 // ── Carga ──────────────────────────────────────────────────────
 async function _cargar() {
@@ -380,7 +397,6 @@ export async function renderTabMisiones(nombre, body) {
     _s.formActivo = false;
     _s.editandoId = null;
     _s.misionSelec= null;
-    _s.tooltipMision = null;
 
     document.getElementById('ppj-mis-panel-izq')?.remove();
     document.getElementById('panel-pj-root')?.classList.add('obj-mode');
@@ -404,8 +420,6 @@ export async function renderTabMisiones(nombre, body) {
 export function cerrarTabMisiones() {
     document.getElementById('ppj-mis-panel-izq')?.remove();
     document.getElementById('panel-pj-root')?.classList.remove('obj-mode');
-    _s.modoAsig = false;
-    _s.tooltipMision = null;
 }
 
 // ── Panel izquierdo (catálogo completo) ───────────────────────
@@ -454,14 +468,41 @@ function _montarPanelIzq(nombre) {
 
     const safeNombre = nombre.replace(/'/g, "\\'");
 
+    // Pool: todos los personajes activos para drag & drop (solo admin)
+    const todosLosPjs = Object.entries(personajes)
+        .filter(([, p]) => p.isActive !== false)
+        .sort(([a], [b]) => a.localeCompare(b));
+    const pjsEnMision = new Set();
+    _s.misiones.forEach(m => {
+        (Array.isArray(m.jugadores) ? m.jugadores : []).forEach(j => pjsEnMision.add(j));
+    });
+
+    const poolHTML = esAdmin ? `
+        <div class="pmis-pool" id="pmis-pool">
+            <div class="pmis-pool-label">
+                <span>Personajes</span>
+                <span class="pmis-pool-label-hint">↑ arrastra a misión · desde misión: arrastra aquí para quitar</span>
+            </div>
+            <div class="pmis-pool-scroll">
+                ${todosLosPjs.map(([nom, p]) => {
+                    const icono = p.iconoOverride || nom;
+                    const enMis = pjsEnMision.has(nom);
+                    return `<img class="pmis-pool-av${enMis?' en-mision':''}"
+                                 draggable="true"
+                                 data-drag-pj="${nom.replace(/"/g,'&quot;')}"
+                                 data-drag-source="pool"
+                                 src="${_imgIcon(icono)}"
+                                 onerror="this.src='${_fallback()}'"
+                                 title="${nom}${enMis?' (en misión)':''}">`;
+                }).join('')}
+            </div>
+            <div class="pmis-pool-remove-hint">⊖ Soltar aquí para quitar de la misión</div>
+        </div>` : '';
+
     izq.innerHTML = `
         <div class="pmis-izq-header">
             <div class="pmis-izq-toprow">
                 <span class="pmis-izq-title">Catálogo de Misiones</span>
-                ${esAdmin ? `<button class="pmis-btn-asig ${_s.modoAsig ? 'on' : ''}"
-                    onclick="window._pmisToggleModoAsig('${safeNombre}')">
-                    ${_s.modoAsig ? '✦ Asignando' : '⊕ Asignar'}
-                </button>` : ''}
             </div>
             <input class="pmis-izq-search" placeholder="Buscar misión…"
                 value="${_s.busqueda.replace(/"/g,'&quot;')}"
@@ -477,14 +518,12 @@ function _montarPanelIzq(nombre) {
                     onclick="window._pmisIzqToggleFin('${safeNombre}')">Finalizadas</button>
             </div>
         </div>
+        ${poolHTML}
         <div class="pmis-izq-list">${gruposHTML}</div>`;
 
     document.body.appendChild(izq);
-
-    // Si hay tooltip abierto, reabrirlo
-    if (_s.modoAsig && _s.tooltipMision) {
-        _abrirTooltipAsig(_s.tooltipMision, nombre);
-    }
+    _attachDragHandlers(izq, nombre);
+    _attachGlobalDragListeners();
 }
 
 // ── Card del catálogo izquierdo ────────────────────────────────
@@ -496,10 +535,16 @@ function _renderCatCard(m, nombrePJ, esAdmin) {
     const esPerso  = m.tipo === 'Personalizada';
     const selec    = _s.misionSelec === m.titulo;
 
-    // Avatares pequeños
+    // Avatares pequeños (arrastrables si admin)
     const avsHTML = jugs.length > 0
         ? `<div class="pmis-cat-avs">
-            ${_avatares(jugs, nombrePJ, 22)}
+            ${jugs.map(j => `
+                <img class="pmis-av${j===nombrePJ?' yo':''}${esAdmin?' pmis-av-drag':''}"
+                     ${esAdmin?`draggable="true" data-drag-pj="${j.replace(/"/g,'&quot;')}" data-drag-source="mision" data-drag-mision="${m.titulo.replace(/"/g,'&quot;')}"`:``}
+                     width="22" height="22"
+                     src="${_imgIcon(j)}"
+                     onerror="this.src='${_fallback()}'"
+                     title="${j}">`).join('')}
             <span class="pmis-cat-cupos">${jugs.length}/${m.cupos}</span>
            </div>`
         : `<span class="pmis-cat-cupos">Sin jugadores · cupos: ${m.cupos}</span>`;
@@ -519,14 +564,10 @@ function _renderCatCard(m, nombrePJ, esAdmin) {
         </div>`;
     }
 
-    // Clic en la card: si modo asig OP → tooltip; si no → mostrar detalle derecho
-    const clickFn = _s.modoAsig && esAdmin
-        ? `window._pmisClickCatAsig('${safeId}','${safeNom}')`
-        : `window._pmisSeleccionar('${safeId}','${safeNom}')`;
-
-    return `<div class="pmis-cat-card${enMision ? ' participando' : ''}${selec ? ' seleccionada' : ''}"
+    return `<div class="pmis-cat-card${enMision ? ' participando' : ''}${selec ? ' seleccionada' : ''}${esAdmin ? ' drop-target' : ''}"
                  id="pmis-cat-${_norm(m.titulo)}"
-                 onclick="${clickFn}">
+                 data-drop-mision="${m.titulo.replace(/"/g,'&quot;')}"
+                 onclick="window._pmisSeleccionar('${safeId}','${safeNom}')">
         <div class="pmis-cat-card-header">
             <span class="pmis-cat-card-titulo">${m.titulo}</span>
             <span class="pmis-cat-card-clase">C-${m.clase}</span>
@@ -632,61 +673,130 @@ function _renderDetalle(m, nombrePJ, esAdmin) {
     </div>`;
 }
 
-// ── Tooltip de asignación (modo OP) ───────────────────────────
-function _abrirTooltipAsig(titulo, nombrePJ) {
-    // Cerrar tooltip previo
-    document.querySelector('.pmis-asig-tooltip')?.remove();
+// ── Drag & Drop handlers ──────────────────────────────────
+function _attachGlobalDragListeners() {
+    if (_globalDragListenersAttached) return;
+    _globalDragListenersAttached = true;
 
-    const card = document.getElementById(`pmis-cat-${_norm(titulo)}`);
-    if (!card) return;
+    document.addEventListener('dragstart', (e) => {
+        const el = e.target.closest('[data-drag-pj]');
+        if (!el) return;
+        _dragState = {
+            pjNombre:     el.dataset.dragPj,
+            source:       el.dataset.dragSource,
+            misionOrigen: el.dataset.dragMision || null
+        };
+        e.dataTransfer.setData('text/plain', el.dataset.dragPj);
+        e.dataTransfer.effectAllowed = 'move';
+        el.classList.add('dragging');
+        if (_dragState.source === 'mision') {
+            document.getElementById('pmis-pool')?.classList.add('remove-mode');
+        }
+    });
 
-    const m    = _s.misiones.find(x => x.titulo === titulo);
-    if (!m) return;
-
-    const jugs = Array.isArray(m.jugadores) ? m.jugadores : [];
-
-    // Obtener todos los personajes activos
-    const todosLosPjs = Object.entries(personajes)
-        .filter(([, p]) => p.isActive !== false)
-        .sort(([a], [b]) => a.localeCompare(b));
-
-    const safeId  = titulo.replace(/'/g, "\\'");
-    const safeNom = nombrePJ.replace(/'/g, "\\'");
-
-    const tooltip = document.createElement('div');
-    tooltip.className = 'pmis-asig-tooltip';
-    tooltip.innerHTML = `
-        <div class="pmis-asig-tt-title">Asignar a misión</div>
-        <div class="pmis-asig-tt-grid">
-            ${todosLosPjs.map(([nom, p]) => {
-                const enMis = jugs.includes(nom);
-                const icono = p.iconoOverride || nom;
-                return `<div class="pmis-asig-tt-pj ${enMis ? 'en' : ''}"
-                             onclick="event.stopPropagation();window._pmisToggleAsigPj('${safeId}','${nom.replace(/'/g,"\\'")}','${safeNom}')">
-                    <img class="pmis-av" width="20" height="20"
-                         src="${_imgIcon(icono)}"
-                         onerror="this.src='${_fallback()}'"
-                         style="width:20px;height:20px;">
-                    <span class="pmis-asig-tt-nombre">${nom}</span>
-                    <span class="pmis-asig-tt-check">${enMis ? '✓' : ''}</span>
-                </div>`;
-            }).join('')}
-        </div>`;
-
-    // Posicionar relativo a la card
-    card.style.position = 'relative';
-    card.appendChild(tooltip);
-    _s.tooltipMision = titulo;
-
-    // Cerrar al hacer click fuera
-    setTimeout(() => {
-        document.addEventListener('click', _cerrarTooltip, { once: true });
-    }, 50);
+    document.addEventListener('dragend', (e) => {
+        e.target.classList?.remove('dragging');
+        _dragState = null;
+        document.getElementById('pmis-pool')?.classList.remove('remove-mode', 'drop-over');
+        document.querySelectorAll('.pmis-cat-card.drop-over').forEach(c => c.classList.remove('drop-over'));
+    });
 }
 
-function _cerrarTooltip() {
-    document.querySelector('.pmis-asig-tooltip')?.remove();
-    _s.tooltipMision = null;
+function _attachDragHandlers(panelEl, nombre) {
+    if (!estadoUI.esAdmin) return;
+
+    panelEl.addEventListener('dragover', (e) => {
+        if (!_dragState) return;
+        const card   = e.target.closest('[data-drop-mision]');
+        const poolEl = e.target.closest('#pmis-pool');
+        if (card) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+        else if (poolEl && _dragState.source === 'mision') { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+    });
+
+    panelEl.addEventListener('dragenter', (e) => {
+        if (!_dragState) return;
+        const card   = e.target.closest('[data-drop-mision]');
+        const poolEl = e.target.closest('#pmis-pool');
+        if (card) card.classList.add('drop-over');
+        if (poolEl && _dragState.source === 'mision') poolEl.classList.add('drop-over');
+    });
+
+    panelEl.addEventListener('dragleave', (e) => {
+        const card   = e.target.closest('[data-drop-mision]');
+        const poolEl = e.target.closest('#pmis-pool');
+        if (card   && !card.contains(e.relatedTarget))   card.classList.remove('drop-over');
+        if (poolEl && !poolEl.contains(e.relatedTarget)) poolEl.classList.remove('drop-over');
+    });
+
+    panelEl.addEventListener('drop', async (e) => {
+        if (!_dragState) return;
+        const card   = e.target.closest('[data-drop-mision]');
+        const poolEl = e.target.closest('#pmis-pool');
+
+        if (card) {
+            e.preventDefault(); e.stopPropagation();
+            card.classList.remove('drop-over');
+            const dest = card.dataset.dropMision;
+            const ds = { ..._dragState };
+            _dragState = null;
+            await _handleDrop(nombre, dest, ds);
+        } else if (poolEl && _dragState.source === 'mision') {
+            e.preventDefault();
+            poolEl.classList.remove('drop-over');
+            const ds = { ..._dragState };
+            _dragState = null;
+            await _handleRemove(ds);
+        }
+    });
+}
+
+async function _handleDrop(nombre, misionDestino, ds) {
+    const { pjNombre, source, misionOrigen } = ds;
+    const m = _s.misiones.find(x => x.titulo === misionDestino);
+    if (!m) return;
+
+    const jugsDestino = Array.isArray(m.jugadores) ? [...m.jugadores] : [];
+    if (jugsDestino.includes(pjNombre)) {
+        window.mostrarToast?.(`${pjNombre} ya está en esta misión`); return;
+    }
+
+    // Si viene de otra misión, quitarlo primero
+    if (source === 'mision' && misionOrigen && misionOrigen !== misionDestino) {
+        await _removerDeMision(pjNombre, misionOrigen);
+    }
+
+    jugsDestino.push(pjNombre);
+    let nuevoEstado = m.estado;
+    if (nuevoEstado === 0 && m.cupos > 0 && jugsDestino.length >= m.cupos) nuevoEstado = 1;
+
+    const { error } = await supabase.from('misiones')
+        .update({ jugadores: jugsDestino, estado: nuevoEstado })
+        .eq('titulo', misionDestino);
+
+    if (error) { window.mostrarToast?.('Error: ' + error.message, true); return; }
+    window.mostrarToast?.(`✦ ${pjNombre} → ${misionDestino}`);
+    await _cargar(); _reRender();
+}
+
+async function _handleRemove(ds) {
+    const { pjNombre, misionOrigen } = ds;
+    if (!misionOrigen) return;
+    await _removerDeMision(pjNombre, misionOrigen);
+    window.mostrarToast?.(`✕ ${pjNombre} removido`);
+    await _cargar(); _reRender();
+}
+
+async function _removerDeMision(pjNombre, tituloMision) {
+    const m = _s.misiones.find(x => x.titulo === tituloMision);
+    if (!m) return;
+    const jugs = (Array.isArray(m.jugadores) ? m.jugadores : []).filter(j => j !== pjNombre);
+    let nuevoEstado = m.estado;
+    if (nuevoEstado === 1 && m.cupos > 0 && jugs.length < m.cupos) nuevoEstado = 0;
+    await supabase.from('misiones')
+        .update({ jugadores: jugs, estado: nuevoEstado })
+        .eq('titulo', tituloMision);
+}
+
 }
 
 // ── Formulario ────────────────────────────────────────────────
@@ -793,52 +903,9 @@ function _reRender() {
 window._pmisIzqBuscar     = (v) => { _s.busqueda = v; _reRender(); };
 window._pmisIzqFiltro     = (v) => { _s.filtro   = v; _reRender(); };
 window._pmisIzqToggleFin  = ()  => { _s.verFin   = !_s.verFin; _reRender(); };
-window._pmisToggleModoAsig= ()  => {
-    _s.modoAsig = !_s.modoAsig;
-    if (!_s.modoAsig) _s.tooltipMision = null;
-    _reRender();
-};
-
-// Click en card catálogo: modo normal → seleccionar; modo asig → tooltip
+// Click en card catálogo → seleccionar detalle
 window._pmisSeleccionar = (titulo, nombrePJ) => {
     _s.misionSelec = titulo;
-    _reRender();
-};
-
-window._pmisClickCatAsig = (titulo, nombrePJ) => {
-    if (_s.tooltipMision === titulo) {
-        _cerrarTooltip();
-    } else {
-        _cerrarTooltip();
-        _abrirTooltipAsig(titulo, nombrePJ);
-    }
-};
-
-// Asignar/quitar un PJ desde el tooltip
-window._pmisToggleAsigPj = async (idMision, pjNombre, nombrePjActivo) => {
-    const m = _s.misiones.find(x => x.titulo === idMision);
-    if (!m) return;
-    const jugs = Array.isArray(m.jugadores) ? [...m.jugadores] : [];
-    let nuevoEstado = m.estado;
-
-    if (jugs.includes(pjNombre)) {
-        // Quitar
-        const idx = jugs.indexOf(pjNombre);
-        jugs.splice(idx, 1);
-        if (nuevoEstado === 1 && m.cupos > 0 && jugs.length < m.cupos) nuevoEstado = 0;
-    } else {
-        // Añadir
-        jugs.push(pjNombre);
-        if (nuevoEstado === 0 && m.cupos > 0 && jugs.length >= m.cupos) nuevoEstado = 1;
-    }
-
-    const { error } = await supabase.from('misiones')
-        .update({ jugadores: jugs, estado: nuevoEstado }).eq('titulo', idMision);
-    if (error) { alert('Error: ' + error.message); return; }
-
-    window.mostrarToast?.(jugs.includes(pjNombre) ? `✦ ${pjNombre} apuntado` : `✕ ${pjNombre} removido`);
-    _s.tooltipMision = null; // se reabre tras re-render si _modoAsig activo
-    await _cargar();
     _reRender();
 };
 
