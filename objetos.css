@@ -1,0 +1,402 @@
+/* ============================================================
+   objetos.css — Panel de Objetos HEX ROL
+   Edita las variables de :root para ajustar colores fácilmente
+   ============================================================ */
+
+:root {
+    /* ── Texto ────────────────────────────────────────────── */
+    --pobj-text:        #d0d0e0;   /* nombres de objetos          */
+    --pobj-meta:        #9090b0;   /* tipo · material             */
+    --pobj-eff:         #8888a8;   /* descripción / efecto        */
+    --pobj-dim:         #7070a0;   /* separadores, labels vacíos  */
+    --pobj-label:       #9090b0;   /* etiquetas de campo (OP)     */
+    --pobj-muted:       #6060a0;   /* placeholder, hint           */
+
+    /* ── Rarezas ──────────────────────────────────────────── */
+    --pobj-rar-legendario: #d4af37;
+    --pobj-rar-raro:       #9a50dc;
+    --pobj-rar-comun:      #9090b0;
+    --pobj-rar-sin:        #7070a0;
+
+    /* ── Acento dorado ────────────────────────────────────── */
+    --pobj-gold:        #d4af37;
+    --pobj-gold-bg:     rgba(212,175,55,0.08);
+    --pobj-gold-border: rgba(212,175,55,0.35);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PANEL PRINCIPAL  (panel-objetos.js)
+═══════════════════════════════════════════════════════════ */
+
+#pobj-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 10100;
+    animation: pobj-fade-in 0.2s ease;
+}
+#pobj-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 10200;
+    display: flex;
+    flex-direction: column;
+    background: #07050f;
+    font-family: 'Inter', system-ui, sans-serif;
+    animation: pobj-slide-up 0.24s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes pobj-fade-in  { from { opacity:0; }                      to { opacity:1; } }
+@keyframes pobj-slide-up { from { transform:translateY(30px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+
+/* ── Header ── */
+#pobj-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: #0b0816;
+    border-bottom: 1px solid rgba(212,175,55,0.2);
+    flex-shrink: 0;
+}
+#pobj-header-left { display: flex; align-items: center; gap: 12px; }
+#pobj-title    { font-family: 'Cinzel', serif; color: var(--pobj-gold); font-size: 0.9em; letter-spacing: 1.5px; font-weight: 700; }
+#pobj-pj-name  { font-size: 0.75em; color: var(--pobj-meta); letter-spacing: 0.5px; }
+#pobj-close {
+    background: transparent; border: 1px solid rgba(255,255,255,0.1);
+    color: var(--pobj-meta); border-radius: 4px; width: 28px; height: 28px;
+    cursor: pointer; font-size: 1em; transition: color 0.15s, border-color 0.15s;
+}
+#pobj-close:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+
+/* ── Body split ── */
+#pobj-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* ── Izquierda: Catálogo ── */
+#pobj-left {
+    flex: 0 0 55%;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#pobj-cat-header {
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.2);
+}
+#pobj-cat-filtros {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+#pobj-cat-lista {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212,175,55,0.2) transparent;
+}
+
+/* ── Derecha: Inventario ── */
+#pobj-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#pobj-inv-header {
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.2);
+}
+#pobj-inv-lista {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212,175,55,0.2) transparent;
+}
+
+/* ── Compartidos ── */
+.pobj-section-label {
+    font-size: 0.62em;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: var(--pobj-dim);
+    font-weight: 700;
+    display: block;
+    margin-bottom: 6px;
+}
+.pobj-search {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 5px;
+    color: #ccc;
+    padding: 6px 10px;
+    font-size: 0.78em;
+    outline: none;
+    box-sizing: border-box;
+    font-family: inherit;
+    transition: border-color 0.15s;
+}
+.pobj-search:focus { border-color: var(--pobj-gold-border); }
+.pobj-search::placeholder { color: var(--pobj-muted); }
+
+.pobj-filtro-btn {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--pobj-meta);
+    border-radius: 4px;
+    padding: 3px 9px;
+    font-size: 0.62em;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    transition: all 0.12s;
+}
+.pobj-filtro-btn:hover { color: #ccc; border-color: rgba(255,255,255,0.2); }
+.pobj-filtro-btn.activo { color: var(--pobj-gold); border-color: var(--pobj-gold-border); background: var(--pobj-gold-bg); }
+
+/* ── Tarjeta de catálogo ── */
+.pobj-cat-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    margin-bottom: 5px;
+    border: 1px solid rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.02);
+    transition: background 0.12s, border-color 0.12s;
+    cursor: default;
+}
+.pobj-cat-card:hover  { background: rgba(255,255,255,0.04); }
+.pobj-cat-card.en-inv { border-color: rgba(212,175,55,0.18); }
+
+.pobj-cat-img {
+    width: 44px; height: 44px;
+    border-radius: 5px;
+    object-fit: cover;
+    background: #111;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.pobj-cat-info   { flex: 1; min-width: 0; }
+.pobj-cat-nombre { font-size: 0.82em; font-weight: 700; color: var(--pobj-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pobj-cat-meta   { font-size: 0.65em; color: var(--pobj-meta); margin-top: 2px; }
+.pobj-cat-eff    { font-size: 0.68em; color: var(--pobj-eff);  margin-top: 3px; line-height: 1.4; }
+
+.pobj-rar-badge {
+    font-size: 0.58em; font-weight: 700; letter-spacing: 0.5px;
+    padding: 2px 6px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
+}
+.pobj-cat-actions { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.pobj-btn-sm {
+    font-size: 0.62em; padding: 3px 7px; border-radius: 4px;
+    cursor: pointer; border: 1px solid; font-family: inherit;
+    white-space: nowrap; transition: all 0.12s;
+}
+.pobj-btn-add  { background: rgba(62,207,110,0.1);  color: #3ecf6e; border-color: rgba(62,207,110,0.3); }
+.pobj-btn-add:hover  { background: rgba(62,207,110,0.22); }
+.pobj-btn-edit { background: rgba(100,150,255,0.08); color: #6496ff; border-color: rgba(100,150,255,0.25); }
+.pobj-btn-edit:hover { background: rgba(100,150,255,0.18); }
+
+/* ── Tarjeta de inventario ── */
+.pobj-inv-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    margin-bottom: 5px;
+    border: 1px solid rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.02);
+    transition: background 0.12s;
+}
+.pobj-inv-card.equipado   { border-color: rgba(212,175,55,0.3);   background: rgba(212,175,55,0.04); }
+.pobj-inv-card.contenedor { border-color: rgba(100,150,255,0.2); }
+.pobj-inv-nombre          { font-size: 0.82em; font-weight: 700; color: var(--pobj-text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pobj-inv-nombre.equipado { color: var(--pobj-gold); }
+.pobj-inv-badge-eqp       { font-size: 0.58em; background: rgba(212,175,55,0.15); color: var(--pobj-gold); border: 1px solid rgba(212,175,55,0.3); border-radius: 3px; padding: 1px 5px; margin-left: 4px; }
+.pobj-inv-ctrl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.pobj-ctrl-btn {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
+    color: #888; border-radius: 4px; width: 22px; height: 22px;
+    cursor: pointer; font-size: 0.85em; display: flex; align-items: center; justify-content: center;
+    transition: all 0.12s;
+}
+.pobj-ctrl-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+.pobj-cant { font-size: 0.88em; font-weight: 700; color: var(--pobj-gold); min-width: 20px; text-align: center; }
+
+.pobj-btn-eqp {
+    font-size: 0.58em; padding: 2px 6px; border-radius: 4px;
+    cursor: pointer; border: 1px solid; font-family: inherit; transition: all 0.12s;
+}
+.pobj-btn-eqp.on  { background: rgba(212,175,55,0.15); color: var(--pobj-gold); border-color: rgba(212,175,55,0.4); }
+.pobj-btn-eqp.off { background: rgba(255,255,255,0.03); color: var(--pobj-dim); border-color: rgba(255,255,255,0.07); }
+
+/* ── Contenedor expand ── */
+.pobj-contenedor-toggle {
+    display: flex; align-items: center; gap: 6px;
+    cursor: pointer; font-size: 0.7em; color: #6496ff;
+    padding: 3px 0; user-select: none;
+}
+.pobj-contenedor-hijos { padding-left: 14px; margin-top: 3px; border-left: 1px solid rgba(100,150,255,0.2); }
+
+/* ── Subtexto de inventario (inline en JS) ── */
+.pobj-inv-sub {
+    font-size: 0.62em;
+    color: var(--pobj-dim);
+    margin-top: 1px;
+}
+
+/* ── Empty state ── */
+.pobj-empty { text-align: center; color: var(--pobj-dim); font-size: 0.75em; padding: 24px 0; }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+    #pobj-body  { flex-direction: column; }
+    #pobj-left  { flex: 0 0 50%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PANEL OP  (panel-objetos-op.js)
+═══════════════════════════════════════════════════════════ */
+
+#pobj-op-modal {
+    position: fixed; inset: 0; z-index: 20000;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px; box-sizing: border-box;
+    animation: pobj-op-in 0.18s ease;
+}
+@keyframes pobj-op-in { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+
+#pobj-op-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.78);
+    backdrop-filter: blur(4px);
+}
+#pobj-op-box {
+    position: relative;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: linear-gradient(160deg, #0d0b1a, #090714);
+    border: 1px solid rgba(212,175,55,0.28);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    font-family: 'Inter', system-ui, sans-serif;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212,175,55,0.2) transparent;
+}
+#pobj-op-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    position: sticky; top: 0; background: #0d0b1a; z-index: 1;
+}
+#pobj-op-titulo { font-family: 'Cinzel', serif; color: var(--pobj-gold); font-size: 0.9em; letter-spacing: 1px; margin: 0; }
+#pobj-op-close {
+    background: transparent; border: 1px solid rgba(255,255,255,0.1);
+    color: var(--pobj-meta); border-radius: 4px; width: 28px; height: 28px;
+    cursor: pointer; font-size: 0.9em; transition: all 0.12s;
+}
+#pobj-op-close:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+#pobj-op-body { padding: 18px 20px 20px; }
+
+/* ── Formulario OP ── */
+.pobj-op-field { margin-bottom: 12px; }
+.pobj-op-label {
+    font-size: 0.65em; color: var(--pobj-label);
+    text-transform: uppercase; letter-spacing: 1px;
+    display: block; margin-bottom: 4px;
+}
+.pobj-op-input {
+    width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px; color: #ccc; padding: 8px 10px; font-size: 0.82em;
+    box-sizing: border-box; outline: none; font-family: inherit; transition: border-color 0.15s;
+}
+.pobj-op-input:focus { border-color: rgba(212,175,55,0.4); }
+.pobj-op-input[readonly] { opacity: 0.5; cursor: not-allowed; }
+textarea.pobj-op-input { resize: vertical; min-height: 60px; }
+select.pobj-op-input   { cursor: pointer; }
+.pobj-op-grid2 { display: grid; grid-template-columns: 1fr 1fr;     gap: 10px; }
+.pobj-op-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+/* ── Botones OP ── */
+.pobj-op-btn {
+    padding: 9px 16px; border-radius: 6px; font-size: 0.8em;
+    font-family: 'Cinzel', serif; cursor: pointer; border: 1px solid;
+    transition: all 0.12s; letter-spacing: 0.5px;
+}
+.pobj-op-btn-primary { background: rgba(212,175,55,0.15); color: var(--pobj-gold);  border-color: rgba(212,175,55,0.4); }
+.pobj-op-btn-primary:hover { background: rgba(212,175,55,0.28); }
+.pobj-op-btn-danger  { background: rgba(220,60,60,0.1);   color: #ff6060; border-color: rgba(220,60,60,0.35); }
+.pobj-op-btn-danger:hover  { background: rgba(220,60,60,0.22); }
+.pobj-op-btn-ghost   { background: transparent; color: var(--pobj-label); border-color: rgba(255,255,255,0.1); }
+.pobj-op-btn-ghost:hover   { color: #ccc; border-color: rgba(255,255,255,0.2); }
+.pobj-op-btn-green   { background: rgba(62,207,110,0.1);  color: #3ecf6e; border-color: rgba(62,207,110,0.35); }
+.pobj-op-btn-green:hover   { background: rgba(62,207,110,0.22); }
+
+.pobj-op-footer { display: flex; gap: 8px; margin-top: 20px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap; }
+
+/* ── Separadores OP ── */
+.pobj-op-sep { font-size: 0.62em; letter-spacing: 1.5px; text-transform: uppercase; color: var(--pobj-dim); font-weight: 700; margin: 16px 0 8px; }
+
+/* ── Grid de personajes ── */
+.pobj-op-pj-grid  { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin-top: 6px; }
+.pobj-op-pj-row   { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 5px; padding: 5px 8px; }
+.pobj-op-pj-name  { font-size: 0.72em; color: #aaa; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pobj-op-pj-cant  { width: 50px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); color: var(--pobj-gold); border-radius: 4px; text-align: center; font-size: 0.8em; padding: 3px; }
+
+/* ── Multi-forja ── */
+.pobj-multi-card       { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+.pobj-multi-card-title { font-size: 0.72em; color: var(--pobj-gold); font-family: 'Cinzel', serif; letter-spacing: 0.5px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; }
+
+/* ── Transferencia ── */
+.pobj-transfer-pj-card {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px; border-radius: 6px; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);
+    transition: all 0.15s; font-size: 0.7em; text-align: center;
+}
+.pobj-transfer-pj-card:hover    { border-color: rgba(212,175,55,0.3); }
+.pobj-transfer-pj-card.selected { border-color: var(--pobj-gold); background: rgba(212,175,55,0.07); color: var(--pobj-gold); }
+.pobj-transfer-pj-card img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255,255,255,0.1); }
+
+/* ── Imágenes ── */
+.pobj-img-grid  { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; margin-top: 8px; max-height: 300px; overflow-y: auto; }
+.pobj-img-card  { position: relative; cursor: pointer; border-radius: 6px; overflow: hidden; border: 2px solid transparent; transition: all 0.12s; }
+.pobj-img-card:hover    { border-color: rgba(212,175,55,0.4); }
+.pobj-img-card.selected { border-color: var(--pobj-gold); }
+.pobj-img-card img { width: 100%; height: 80px; object-fit: cover; display: block; background: #111; }
+.pobj-img-card-label { font-size: 0.55em; color: var(--pobj-dim); text-align: center; padding: 2px 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Upload zone ── */
+.pobj-upload-zone {
+    border: 2px dashed rgba(212,175,55,0.3); border-radius: 8px;
+    padding: 30px; text-align: center; color: var(--pobj-dim); font-size: 0.8em;
+    cursor: pointer; transition: all 0.15s;
+}
+.pobj-upload-zone:hover    { border-color: rgba(212,175,55,0.6); color: #aaa; background: rgba(212,175,55,0.04); }
+.pobj-upload-zone.drag-over { border-color: var(--pobj-gold); background: rgba(212,175,55,0.08); color: var(--pobj-gold); }
+
+/* ── Toast ── */
+.pobj-toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(30,25,50,0.95); border: 1px solid rgba(212,175,55,0.4);
+    color: var(--pobj-gold); padding: 10px 24px; border-radius: 8px;
+    font-family: 'Cinzel', serif; font-size: 0.82em; letter-spacing: 0.5px;
+    z-index: 99999; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    animation: pobj-op-in 0.18s ease;
+}
