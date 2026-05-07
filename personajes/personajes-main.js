@@ -651,16 +651,16 @@ window.abrirSubirImagen = function(nombre) {
             <label style="display:block;margin-bottom:12px;">
                 <div style="font-size:0.75em;color:#5a5a78;margin-bottom:6px;">Seleccionar archivo</div>
                 <input type="file" id="hex-img-file" accept="image/*"
-                       style="width:100%;padding:8px;background:#161622;border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#c4c4d4;font-size:0.82em;cursor:pointer;">
+                       style="width:100%;padding:8px;background:#161622;border:1px solid rgba(255,255,255,0.28);border-radius:6px;color:#c4c4d4;font-size:0.82em;cursor:pointer;">
             </label>
             <div id="hex-img-status" style="font-size:0.78em;min-height:20px;margin-bottom:14px;"></div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button onclick="document.getElementById('hex-img-upload-modal').remove()"
-                        style="padding:7px 16px;background:transparent;border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#5a5a78;font-size:0.8em;cursor:pointer;">
+                        style="padding:7px 16px;background:transparent;border:1px solid rgba(255,255,255,0.28);border-radius:6px;color:#5a5a78;font-size:0.8em;cursor:pointer;">
                     Cancelar
                 </button>
                 <button id="hex-img-upload-btn" onclick="window._ejecutarSubidaImagen('${nombre}')"
-                        style="padding:7px 18px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:6px;color:#d4af37;font-family:Cinzel,serif;font-size:0.78em;cursor:pointer;letter-spacing:0.5px;">
+                        style="padding:7px 18px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.4);border-radius:6px;color:#d4af37;font-family:Cinzel,serif;font-size:0.78em;cursor:pointer;letter-spacing:0.5px;">
                     SUBIR
                 </button>
             </div>
