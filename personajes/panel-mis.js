@@ -1,10 +1,51 @@
 // ============================================================
-// panel-mis.js — Tab de Misiones (split: catálogo izq / PJ der)
+// panel-mis.js — Tab de Misiones (catálogo izq / detalle der)
 // /personajes/panel-mis.js
 // ============================================================
 
-import { supabase }  from '../hex-auth.js';
-import { estadoUI }  from './personajes-state.js';
+import { supabase }   from '../hex-auth.js';
+import { estadoUI, personajes } from './personajes-state.js';
+
+// ── Helpers ────────────────────────────────────────────────────
+function _norm(s) {
+    return s ? s.toString().trim().toLowerCase()
+        .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+        .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
+        .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') : '';
+}
+function _sb() { return window._hexConfig?.storageUrl || ''; }
+function _imgIcon(nombre) {
+    return `${_sb()}/imgpersonajes/${_norm(nombre)}icon.png`;
+}
+function _fallback() {
+    return `${_sb()}/imginterfaz/no_encontrado.png`;
+}
+
+const _ESTADO_LABEL = ['Inactiva', 'Pendiente', 'En Proceso', 'Finalizada'];
+const _ESTADO_CLS   = ['pmis-badge-0','pmis-badge-1','pmis-badge-2','pmis-badge-3'];
+
+function _badge(estado) {
+    return `<span class="pmis-badge ${_ESTADO_CLS[estado]||'pmis-badge-0'}">${_ESTADO_LABEL[estado]||'?'}</span>`;
+}
+function _tipoBadge(tipo) {
+    const map = {
+        'Grande':        ['pmis-tipo-grande','Grande'],
+        'Normal':        ['pmis-tipo-normal','Normal'],
+        'Personalizada': ['pmis-tipo-perso','Perso.'],
+    };
+    const [cls, label] = map[tipo] || ['pmis-tipo-perso', tipo];
+    return `<span class="pmis-tipo-badge ${cls}">${label}</span>`;
+}
+function _avatares(jugadores, resaltarPJ, size = 26) {
+    if (!jugadores || jugadores.length === 0) return '';
+    return jugadores.map(j => `
+        <img class="pmis-av ${j === resaltarPJ ? 'yo' : ''}"
+             width="${size}" height="${size}"
+             src="${_imgIcon(j)}"
+             onerror="this.src='${_fallback()}'"
+             title="${j}">`
+    ).join('');
+}
 
 // ── Estilos ────────────────────────────────────────────────────
 function _inyectarEstilos() {
@@ -12,10 +53,12 @@ function _inyectarEstilos() {
     const st = document.createElement('style');
     st.id = 'panel-mis-styles';
     st.textContent = `
-/* ── Panel izquierdo (catálogo) ── */
+/* ═══════════════════════════════════════════════
+   PANEL IZQUIERDO (catálogo)
+═══════════════════════════════════════════════ */
 #ppj-mis-panel-izq {
     position: fixed; left: 0; top: 0; bottom: 0;
-    width: calc(100vw - 50vw); max-width: calc(100vw - 480px);
+    width: calc(50vw - 220px); max-width: 560px; min-width: 280px;
     display: flex; flex-direction: column;
     background: rgba(5,0,12,0.97);
     border-right: 1px solid rgba(212,175,55,0.15);
@@ -23,13 +66,18 @@ function _inyectarEstilos() {
 }
 @media(max-width:900px) { #ppj-mis-panel-izq { display: none; } }
 
+/* Header izq */
 .pmis-izq-header {
-    padding: 14px 16px 10px; border-bottom: 1px solid rgba(255,255,255,0.05);
-    flex-shrink: 0;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;
+}
+.pmis-izq-toprow {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; gap: 8px;
 }
 .pmis-izq-title {
-    font-family: 'Cinzel', serif; font-size: 0.72em; color: #888;
-    letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;
+    font-family: 'Cinzel', serif; font-size: 0.68em; color: #888;
+    letter-spacing: 1.5px; text-transform: uppercase;
 }
 .pmis-izq-search {
     width: 100%; background: rgba(255,255,255,0.04);
@@ -48,46 +96,124 @@ function _inyectarEstilos() {
 .pmis-fbtn:hover { color: #aaa; border-color: rgba(255,255,255,0.15); }
 .pmis-fbtn.on { color: #d4af37; border-color: rgba(212,175,55,0.35); background: rgba(212,175,55,0.07); }
 
+/* Modo asignación OP */
+.pmis-btn-asig {
+    font-size: 0.62em; padding: 3px 9px; border-radius: 4px; cursor: pointer;
+    font-family: inherit; border: 1px solid rgba(120,80,200,0.3);
+    color: #7a60b0; background: rgba(120,80,200,0.06); transition: all 0.12s;
+    white-space: nowrap;
+}
+.pmis-btn-asig.on {
+    background: rgba(120,80,200,0.18); color: #c090ff;
+    border-color: rgba(160,100,240,0.45);
+}
+.pmis-btn-asig:hover { background: rgba(120,80,200,0.14); color: #b080ee; }
+
+/* Lista izq */
 .pmis-izq-list {
-    flex: 1; overflow-y: auto; padding: 10px 12px;
-    scrollbar-width: thin; scrollbar-color: rgba(212,175,55,0.15) transparent;
+    flex: 1; overflow-y: auto; padding: 8px 10px 16px;
+    scrollbar-width: thin; scrollbar-color: rgba(212,175,55,0.12) transparent;
 }
 .pmis-izq-list::-webkit-scrollbar { width: 3px; }
-.pmis-izq-list::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.15); border-radius: 2px; }
+.pmis-izq-list::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.12); border-radius: 2px; }
 
-/* ── Fila del catálogo ── */
-.pmis-cat-row {
-    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-    border-radius: 6px; cursor: pointer; border: 1px solid transparent;
-    transition: background 0.12s, border-color 0.12s; margin-bottom: 3px;
+/* Separador de grupo */
+.pmis-grupo-label {
+    font-size: 0.57em; letter-spacing: 1.8px; text-transform: uppercase;
+    color: #3a3a58; font-weight: 700; padding: 10px 4px 5px;
+    border-bottom: 1px solid rgba(255,255,255,0.04); margin-bottom: 5px;
 }
-.pmis-cat-row:hover { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); }
-.pmis-cat-row.participando {
-    background: rgba(212,175,55,0.04); border-color: rgba(212,175,55,0.15);
-}
-.pmis-cat-titulo {
-    flex: 1; font-size: 0.8em; color: #c0c0d0; line-height: 1.3;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.pmis-cat-row.participando .pmis-cat-titulo { color: #d8d0b0; }
-.pmis-cat-clase {
-    font-size: 0.6em; color: #3a3a58; flex-shrink: 0;
-}
-.pmis-cat-dots { display: flex; gap: 2px; flex-shrink: 0; }
-.pmis-cat-dot { width: 5px; height: 5px; border-radius: 50%; }
-.pmis-cat-dot.filled { background: #d4af37; }
-.pmis-cat-dot.empty  { background: rgba(212,175,55,0.15); }
 
-/* Estado badges pequeños */
-.pmis-estado-dot {
-    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+/* Card del catálogo izquierdo */
+.pmis-cat-card {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 7px; padding: 9px 11px; margin-bottom: 5px;
+    cursor: pointer; transition: background 0.12s, border-color 0.12s;
+    position: relative;
 }
-.pmis-estado-dot-0 { background: #3a3a50; }
-.pmis-estado-dot-1 { background: #a08020; }
-.pmis-estado-dot-2 { background: #4a90c8; }
-.pmis-estado-dot-3 { background: #4a9a60; }
+.pmis-cat-card:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.09); }
+.pmis-cat-card.seleccionada { border-color: rgba(212,175,55,0.35); background: rgba(212,175,55,0.04); }
+.pmis-cat-card.participando { border-color: rgba(212,175,55,0.18); }
 
-/* ── Panel derecho: secciones ── */
+.pmis-cat-card-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 6px; margin-bottom: 5px;
+}
+.pmis-cat-card-titulo {
+    font-size: 0.82em; font-weight: 600; color: #c8c8d8; line-height: 1.3; flex: 1;
+}
+.pmis-cat-card-clase { font-size: 0.6em; color: #4a4a60; flex-shrink: 0; align-self: center; }
+.pmis-cat-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
+.pmis-cat-desc {
+    font-size: 0.68em; color: #4a4a68; line-height: 1.45; margin-bottom: 5px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.pmis-cat-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 6px; margin-top: 4px;
+}
+.pmis-cat-avs { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
+.pmis-cat-cupos { font-size: 0.6em; color: #3a3a50; }
+.pmis-cat-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.pmis-cat-btn {
+    font-size: 0.58em; padding: 2px 7px; border-radius: 4px; cursor: pointer;
+    font-family: inherit; border: 1px solid; transition: all 0.12s;
+}
+.pmis-cat-btn-edit { color: #9a9a60; border-color: rgba(160,160,60,0.25); background: rgba(160,160,60,0.05); }
+.pmis-cat-btn-edit:hover { background: rgba(160,160,60,0.14); }
+.pmis-cat-btn-del  { color: #904040; border-color: rgba(160,60,60,0.25); background: rgba(160,60,60,0.05); }
+.pmis-cat-btn-del:hover { background: rgba(160,60,60,0.14); }
+
+/* Nota OP en card catálogo */
+.pmis-nota-op {
+    background: rgba(30,10,50,0.5); border-left: 2px solid rgba(140,80,200,0.3);
+    padding: 3px 7px; font-size: 0.63em; margin: 4px 0;
+    color: #9a8ab0; border-radius: 0 4px 4px 0;
+}
+.pmis-nota-op strong { color: #a080c0; }
+
+/* Avatar compartido */
+.pmis-av {
+    width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
+    object-position: top; border: 2px solid rgba(255,255,255,0.08); background: #111;
+    flex-shrink: 0;
+}
+.pmis-av.yo { border-color: rgba(212,175,55,0.55); }
+
+/* ═══════════════════════════════════════════════
+   TOOLTIP DE ASIGNACIÓN (modo OP)
+═══════════════════════════════════════════════ */
+.pmis-asig-tooltip {
+    position: absolute; left: calc(100% + 6px); top: 0;
+    background: rgba(8,4,20,0.98); border: 1px solid rgba(120,80,200,0.4);
+    border-radius: 8px; padding: 8px 10px;
+    z-index: 1400; width: 200px; box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    animation: pmis-tooltip-in 0.12s ease;
+}
+@keyframes pmis-tooltip-in { from { opacity:0; transform:translateX(-4px); } to { opacity:1; transform:none; } }
+.pmis-asig-tt-title {
+    font-size: 0.6em; color: #7a60b0; letter-spacing: 1.2px;
+    text-transform: uppercase; font-weight: 700; margin-bottom: 7px;
+}
+.pmis-asig-tt-grid {
+    display: flex; flex-direction: column; gap: 3px;
+    max-height: 220px; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: rgba(120,80,200,0.2) transparent;
+}
+.pmis-asig-tt-pj {
+    display: flex; align-items: center; gap: 7px;
+    padding: 4px 6px; border-radius: 5px; cursor: pointer;
+    border: 1px solid transparent; transition: all 0.1s;
+}
+.pmis-asig-tt-pj:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.07); }
+.pmis-asig-tt-pj.en { background: rgba(120,80,200,0.08); border-color: rgba(120,80,200,0.25); }
+.pmis-asig-tt-nombre { font-size: 0.72em; color: #b0b0c8; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pmis-asig-tt-pj.en .pmis-asig-tt-nombre { color: #c090ff; }
+.pmis-asig-tt-check { font-size: 0.75em; color: #7a60b0; flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════
+   PANEL DERECHO (detalle de misión)
+═══════════════════════════════════════════════ */
 .pmis-section { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .pmis-section-title {
     font-size: 0.6em; letter-spacing: 1.5px; text-transform: uppercase;
@@ -99,93 +225,45 @@ function _inyectarEstilos() {
     padding: 1px 7px; border-radius: 10px; font-size: 0.9em;
 }
 
-/* ── Tarjeta de misión (panel derecho) ── */
-.pmis-card {
-    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 7px; padding: 10px 12px; margin-bottom: 6px;
+/* Detalle grande */
+.pmis-det-card {
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(212,175,55,0.18);
+    border-radius: 8px; padding: 14px 16px;
 }
-.pmis-card.participando { border-color: rgba(212,175,55,0.18); background: rgba(212,175,55,0.02); }
-.pmis-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 5px; }
-.pmis-titulo { font-size: 0.82em; font-weight: 600; color: #c8c8d8; flex: 1; line-height: 1.3; }
-.pmis-clase  { font-size: 0.62em; color: #3a3a58; flex-shrink: 0; align-self: center; }
-.pmis-meta   { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; flex-wrap: wrap; }
+.pmis-det-titulo { font-family: 'Cinzel', serif; font-size: 1.05em; color: #ddd; margin-bottom: 7px; line-height: 1.35; }
+.pmis-det-meta   { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.pmis-det-desc   { font-size: 0.78em; color: #7a7a98; line-height: 1.6; margin-bottom: 10px; }
+.pmis-det-avs    { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.pmis-det-cupos  { font-size: 0.65em; color: #4a4a60; margin-left: 4px; }
 
-/* Estado badge (derecha) */
-.pmis-badge {
-    font-size: 0.6em; padding: 2px 7px; border-radius: 8px;
-    display: inline-flex; align-items: center; gap: 3px;
+.pmis-det-av {
+    width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
+    object-position: top; border: 2px solid rgba(255,255,255,0.1); background: #111;
+    cursor: default;
 }
-.pmis-badge-0 { background: rgba(255,255,255,0.04); color: #4a4a60; border: 1px solid rgba(255,255,255,0.06); }
-.pmis-badge-1 { background: rgba(180,150,30,0.08); color: #a08828; border: 1px solid rgba(180,150,30,0.18); }
-.pmis-badge-2 { background: rgba(60,130,200,0.08); color: #5080a0; border: 1px solid rgba(60,130,200,0.18); }
-.pmis-badge-3 { background: rgba(50,150,80,0.08);  color: #508060; border: 1px solid rgba(50,150,80,0.18); }
+.pmis-det-av.yo { border-color: rgba(212,175,55,0.55); }
 
-/* Tipo badge */
-.pmis-tipo-badge {
-    font-size: 0.58em; padding: 1px 6px; border-radius: 6px; border: 1px solid;
-}
-.pmis-tipo-grande { color: #887040; border-color: rgba(180,140,60,0.25); background: rgba(180,140,60,0.06); }
-.pmis-tipo-normal { color: #407080; border-color: rgba(60,120,180,0.25); background: rgba(60,120,180,0.06); }
-.pmis-tipo-perso  { color: #507060; border-color: rgba(80,160,100,0.25); background: rgba(80,160,100,0.06); }
-
-.pmis-desc { font-size: 0.7em; color: #4a4a68; line-height: 1.5; margin-top: 4px;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-
-/* Avatares */
-.pmis-jugadores { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
-.pmis-avatar {
-    width: 24px; height: 24px; border-radius: 50%; object-fit: cover;
-    object-position: top; border: 2px solid rgba(255,255,255,0.08); background: #111;
-}
-.pmis-avatar.yo { border-color: rgba(212,175,55,0.5); }
-.pmis-cupos-txt { font-size: 0.6em; color: #3a3a58; margin-left: 2px; }
-
-/* Botón apuntar/salir */
-.pmis-btn-apuntar {
-    display: flex; align-items: center; justify-content: center; gap: 5px;
-    padding: 5px 10px; border-radius: 5px; font-size: 0.68em;
+/* Botones de acción (derecha) */
+.pmis-btn-accion {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; padding: 7px 10px; border-radius: 6px; font-size: 0.72em;
     font-family: 'Cinzel', serif; cursor: pointer; border: 1px solid;
-    transition: all 0.12s; letter-spacing: 0.3px; margin-top: 7px;
-    width: 100%; box-sizing: border-box;
+    transition: all 0.12s; letter-spacing: 0.3px; margin-top: 8px;
+    box-sizing: border-box;
 }
-.pmis-btn-apuntar.unirse {
-    background: rgba(212,175,55,0.06); color: #c8a830;
-    border-color: rgba(212,175,55,0.22);
+.pmis-btn-accion.unirse {
+    background: rgba(212,175,55,0.06); color: #c8a830; border-color: rgba(212,175,55,0.22);
 }
-.pmis-btn-apuntar.unirse:hover { background: rgba(212,175,55,0.14); }
-.pmis-btn-apuntar.salir {
-    background: rgba(180,50,50,0.05); color: #a85050;
-    border-color: rgba(180,50,50,0.2);
+.pmis-btn-accion.unirse:hover { background: rgba(212,175,55,0.14); }
+.pmis-btn-accion.salir {
+    background: rgba(180,50,50,0.05); color: #a85050; border-color: rgba(180,50,50,0.2);
 }
-.pmis-btn-apuntar.salir:hover { background: rgba(180,50,50,0.12); }
-.pmis-btn-apuntar:disabled { opacity: 0.3; cursor: default; }
+.pmis-btn-accion.salir:hover { background: rgba(180,50,50,0.14); }
+.pmis-btn-accion:disabled { opacity: 0.3; cursor: default; }
 
-/* OP actions */
-.pmis-op-actions { display: flex; gap: 4px; margin-top: 7px; flex-wrap: wrap; }
-.pmis-op-btn {
-    font-size: 0.6em; padding: 3px 8px; border-radius: 4px; cursor: pointer;
-    font-family: inherit; border: 1px solid; transition: all 0.12s;
-}
-.pmis-op-edit   { color: #9a9a60; border-color: rgba(160,160,60,0.25); background: rgba(160,160,60,0.05); }
-.pmis-op-edit:hover   { background: rgba(160,160,60,0.12); }
-.pmis-op-del    { color: #904040; border-color: rgba(160,60,60,0.25); background: rgba(160,60,60,0.05); }
-.pmis-op-del:hover    { background: rgba(160,60,60,0.12); }
-.pmis-op-apuntar{ color: #507060; border-color: rgba(80,140,90,0.25); background: rgba(80,140,90,0.05); }
-.pmis-op-apuntar:hover{ background: rgba(80,140,90,0.12); }
-.pmis-op-quitar { color: #806040; border-color: rgba(160,110,50,0.25); background: rgba(160,110,50,0.05); }
-.pmis-op-quitar:hover { background: rgba(160,110,50,0.12); }
-
-/* Nota OP */
-.pmis-nota-op {
-    background: rgba(30,10,50,0.5); border-left: 2px solid rgba(140,80,200,0.3);
-    padding: 4px 8px; font-size: 0.65em; margin-top: 5px;
-    color: #9a8ab0; border-radius: 0 4px 4px 0;
-}
-.pmis-nota-op strong { color: #a080c0; }
-
-/* Empty */
-.pmis-empty { text-align: center; color: #2e2e48; font-size: 0.75em; padding: 16px 0; }
-.pmis-empty-icon { font-size: 1.4em; margin-bottom: 5px; opacity: 0.35; }
+/* Estado vacio */
+.pmis-empty { text-align: center; color: #2e2e48; font-size: 0.75em; padding: 20px 0; }
+.pmis-empty-icon { font-size: 1.6em; margin-bottom: 6px; opacity: 0.3; }
 
 /* Loader */
 .pmis-loader {
@@ -210,6 +288,21 @@ function _inyectarEstilos() {
 }
 .pmis-btn-nueva:hover { color: #888; border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); }
 
+/* Badges */
+.pmis-badge {
+    font-size: 0.6em; padding: 2px 7px; border-radius: 8px;
+    display: inline-flex; align-items: center; gap: 3px;
+}
+.pmis-badge-0 { background: rgba(255,255,255,0.04); color: #4a4a60; border: 1px solid rgba(255,255,255,0.06); }
+.pmis-badge-1 { background: rgba(180,150,30,0.08); color: #a08828; border: 1px solid rgba(180,150,30,0.18); }
+.pmis-badge-2 { background: rgba(60,130,200,0.08); color: #5080a0; border: 1px solid rgba(60,130,200,0.18); }
+.pmis-badge-3 { background: rgba(50,150,80,0.08);  color: #508060; border: 1px solid rgba(50,150,80,0.18); }
+
+.pmis-tipo-badge { font-size: 0.58em; padding: 1px 6px; border-radius: 6px; border: 1px solid; }
+.pmis-tipo-grande { color: #887040; border-color: rgba(180,140,60,0.25); background: rgba(180,140,60,0.06); }
+.pmis-tipo-normal { color: #407080; border-color: rgba(60,120,180,0.25); background: rgba(60,120,180,0.06); }
+.pmis-tipo-perso  { color: #507060; border-color: rgba(80,160,100,0.25); background: rgba(80,160,100,0.06); }
+
 /* Formulario */
 .pmis-form {
     background: rgba(5,0,12,0.8); border: 1px solid rgba(255,255,255,0.08);
@@ -225,7 +318,7 @@ function _inyectarEstilos() {
     color: #ccc; padding: 5px 8px; font-size: 0.78em;
     box-sizing: border-box; outline: none; font-family: inherit;
 }
-.pmis-form textarea { resize: vertical; min-height: 50px; }
+.pmis-form textarea { resize: vertical; min-height: 55px; }
 .pmis-form input:focus, .pmis-form textarea:focus, .pmis-form select:focus {
     border-color: rgba(212,175,55,0.3);
 }
@@ -257,40 +350,18 @@ function _inyectarEstilos() {
     document.head.appendChild(st);
 }
 
-// ── Helpers ────────────────────────────────────────────────────
-const _ESTADO_LABEL = ['Inactiva', 'Pendiente', 'En Proceso', 'Finalizada'];
-const _ESTADO_CLS   = ['pmis-badge-0', 'pmis-badge-1', 'pmis-badge-2', 'pmis-badge-3'];
-const _ESTADO_DOT   = ['pmis-estado-dot-0','pmis-estado-dot-1','pmis-estado-dot-2','pmis-estado-dot-3'];
-
-function _badge(estado) {
-    return `<span class="pmis-badge ${_ESTADO_CLS[estado]||'pmis-badge-0'}">${_ESTADO_LABEL[estado]||'?'}</span>`;
-}
-function _tipoBadge(tipo) {
-    const map = {
-        'Grande':        ['pmis-tipo-grande', 'Grande'],
-        'Normal':        ['pmis-tipo-normal',  'Normal'],
-        'Personalizada': ['pmis-tipo-perso',   'Perso.'],
-    };
-    const [cls, label] = map[tipo] || ['pmis-tipo-perso', tipo];
-    return `<span class="pmis-tipo-badge ${cls}">${label}</span>`;
-}
-function _norm(s) {
-    return s ? s.toString().trim().toLowerCase()
-        .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
-        .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
-        .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') : '';
-}
-function _sb() { return window._hexConfig?.storageUrl || ''; }
-
 // ── Estado local ───────────────────────────────────────────────
 const _s = {
-    misiones:   [],
-    filtro:     'todos',   // 'todos' | 'participando' | 'disponibles'
-    busqueda:   '',
-    verFin:     false,
-    formActivo: false,
-    editandoId: null,
-    nombrePJ:   null,
+    misiones:       [],
+    filtro:         'todos',
+    busqueda:       '',
+    verFin:         false,
+    formActivo:     false,
+    editandoId:     null,
+    nombrePJ:       null,
+    misionSelec:    null,   // titulo de la misión seleccionada en el catálogo
+    modoAsig:       false,  // modo asignación OP activo
+    tooltipMision:  null,   // titulo de la misión con tooltip abierto
 };
 
 // ── Carga ──────────────────────────────────────────────────────
@@ -308,25 +379,36 @@ export async function renderTabMisiones(nombre, body) {
     _s.nombrePJ   = nombre;
     _s.formActivo = false;
     _s.editandoId = null;
+    _s.misionSelec= null;
+    _s.tooltipMision = null;
 
-    // Panel izquierdo
     document.getElementById('ppj-mis-panel-izq')?.remove();
-    document.getElementById('panel-pj-root')?.classList.add('obj-mode'); // reutiliza el ancho 50vw
+    document.getElementById('panel-pj-root')?.classList.add('obj-mode');
 
     body.innerHTML = `<div class="pmis-loader">Cargando misiones…</div>`;
     await _cargar();
+
+    // Si el PJ participa en al menos una, seleccionar la primera
+    if (!_s.misionSelec) {
+        const primera = _s.misiones.find(m => {
+            const j = Array.isArray(m.jugadores) ? m.jugadores : [];
+            return j.includes(nombre);
+        });
+        _s.misionSelec = primera?.titulo || null;
+    }
 
     _montarPanelIzq(nombre);
     _renderDerecho(body, nombre);
 }
 
-// ── Cierre: limpiar panel izquierdo ───────────────────────────
 export function cerrarTabMisiones() {
     document.getElementById('ppj-mis-panel-izq')?.remove();
     document.getElementById('panel-pj-root')?.classList.remove('obj-mode');
+    _s.modoAsig = false;
+    _s.tooltipMision = null;
 }
 
-// ── Panel izquierdo: catálogo ──────────────────────────────────
+// ── Panel izquierdo (catálogo completo) ───────────────────────
 function _montarPanelIzq(nombre) {
     const izq = document.createElement('div');
     izq.id = 'ppj-mis-panel-izq';
@@ -338,67 +420,128 @@ function _montarPanelIzq(nombre) {
         if (m.tipo === 'OP') return false;
         if (!_s.verFin && m.estado === 3) return false;
         if (_s.filtro === 'participando') {
-            const jugs = Array.isArray(m.jugadores) ? m.jugadores : [];
-            return jugs.includes(nombre);
+            const j = Array.isArray(m.jugadores) ? m.jugadores : [];
+            return j.includes(nombre);
         }
         if (_s.filtro === 'disponibles') {
-            const jugs = Array.isArray(m.jugadores) ? m.jugadores : [];
-            return !jugs.includes(nombre);
+            const j = Array.isArray(m.jugadores) ? m.jugadores : [];
+            return !j.includes(nombre);
         }
         return true;
     });
     if (q) lista = lista.filter(m =>
-        m.titulo.toLowerCase().includes(q) || (m.descripcion||'').toLowerCase().includes(q)
+        m.titulo.toLowerCase().includes(q) || (m.descripcion || '').toLowerCase().includes(q)
     );
 
-    const filasHTML = lista.map(m => {
-        const jugs = Array.isArray(m.jugadores) ? m.jugadores : [];
-        const enPj  = jugs.includes(nombre);
-        const llena = m.cupos > 0 && jugs.length >= m.cupos;
+    // Agrupar por tipo
+    const grupos = [
+        { key: 'Grande',        label: 'Misiones Grandes' },
+        { key: 'Normal',        label: 'Misiones Normales' },
+        { key: 'Personalizada', label: 'Misiones Personalizadas' },
+    ];
 
-        // Dots de cupos
-        const dotsMax = Math.min(m.cupos || 0, 6);
-        const dots = Array.from({length: dotsMax}, (_, i) =>
-            `<div class="pmis-cat-dot ${i < jugs.length ? 'filled' : 'empty'}"></div>`
-        ).join('');
+    let gruposHTML = '';
+    for (const g of grupos) {
+        const items = lista.filter(m => m.tipo === g.key);
+        if (items.length === 0) continue;
+        gruposHTML += `<div class="pmis-grupo-label">${g.label}</div>`;
+        gruposHTML += items.map(m => _renderCatCard(m, nombre, esAdmin)).join('');
+    }
 
-        return `<div class="pmis-cat-row ${enPj ? 'participando' : ''}"
-                    onclick="window._pmisVerMision('${m.titulo.replace(/'/g,"\\'")}','${nombre.replace(/'/g,"\\'")}')">
-            <div class="pmis-estado-dot ${_ESTADO_DOT[m.estado]||_ESTADO_DOT[0]}"></div>
-            <span class="pmis-cat-titulo">${m.titulo}</span>
-            <div class="pmis-cat-dots">${dots}</div>
-            <span class="pmis-cat-clase">C${m.clase}</span>
-        </div>`;
-    }).join('');
+    if (!gruposHTML) {
+        gruposHTML = `<div class="pmis-empty"><div class="pmis-empty-icon">🗺️</div>Sin misiones</div>`;
+    }
+
+    const safeNombre = nombre.replace(/'/g, "\\'");
 
     izq.innerHTML = `
         <div class="pmis-izq-header">
-            <div class="pmis-izq-title">Catálogo de misiones</div>
-            <input class="pmis-izq-search" placeholder="Buscar…"
+            <div class="pmis-izq-toprow">
+                <span class="pmis-izq-title">Catálogo de Misiones</span>
+                ${esAdmin ? `<button class="pmis-btn-asig ${_s.modoAsig ? 'on' : ''}"
+                    onclick="window._pmisToggleModoAsig('${safeNombre}')">
+                    ${_s.modoAsig ? '✦ Asignando' : '⊕ Asignar'}
+                </button>` : ''}
+            </div>
+            <input class="pmis-izq-search" placeholder="Buscar misión…"
                 value="${_s.busqueda.replace(/"/g,'&quot;')}"
-                oninput="window._pmisIzqBuscar(this.value,'${nombre.replace(/'/g,"\\'")}')">
+                oninput="window._pmisIzqBuscar(this.value,'${safeNombre}')">
             <div class="pmis-izq-filtros">
                 <button class="pmis-fbtn ${_s.filtro==='todos'?'on':''}"
-                    onclick="window._pmisIzqFiltro('todos','${nombre.replace(/'/g,"\\'")}')">Todas</button>
+                    onclick="window._pmisIzqFiltro('todos','${safeNombre}')">Todas</button>
                 <button class="pmis-fbtn ${_s.filtro==='participando'?'on':''}"
-                    onclick="window._pmisIzqFiltro('participando','${nombre.replace(/'/g,"\\'")}')">Participando</button>
+                    onclick="window._pmisIzqFiltro('participando','${safeNombre}')">Participando</button>
                 <button class="pmis-fbtn ${_s.filtro==='disponibles'?'on':''}"
-                    onclick="window._pmisIzqFiltro('disponibles','${nombre.replace(/'/g,"\\'")}')">Disponibles</button>
+                    onclick="window._pmisIzqFiltro('disponibles','${safeNombre}')">Disponibles</button>
                 <button class="pmis-fbtn ${_s.verFin?'on':''}"
-                    onclick="window._pmisIzqToggleFin('${nombre.replace(/'/g,"\\'")}')">Finalizadas</button>
+                    onclick="window._pmisIzqToggleFin('${safeNombre}')">Finalizadas</button>
             </div>
         </div>
-        <div class="pmis-izq-list">
-            ${lista.length === 0
-                ? `<div class="pmis-empty"><div class="pmis-empty-icon">🗺️</div>Sin misiones</div>`
-                : filasHTML
-            }
-        </div>`;
+        <div class="pmis-izq-list">${gruposHTML}</div>`;
 
     document.body.appendChild(izq);
+
+    // Si hay tooltip abierto, reabrirlo
+    if (_s.modoAsig && _s.tooltipMision) {
+        _abrirTooltipAsig(_s.tooltipMision, nombre);
+    }
 }
 
-// ── Panel derecho: misiones del PJ ────────────────────────────
+// ── Card del catálogo izquierdo ────────────────────────────────
+function _renderCatCard(m, nombrePJ, esAdmin) {
+    const jugs     = Array.isArray(m.jugadores) ? m.jugadores : [];
+    const enMision = jugs.includes(nombrePJ);
+    const safeId   = m.titulo.replace(/'/g, "\\'");
+    const safeNom  = nombrePJ.replace(/'/g, "\\'");
+    const esPerso  = m.tipo === 'Personalizada';
+    const selec    = _s.misionSelec === m.titulo;
+
+    // Avatares pequeños
+    const avsHTML = jugs.length > 0
+        ? `<div class="pmis-cat-avs">
+            ${_avatares(jugs, nombrePJ, 22)}
+            <span class="pmis-cat-cupos">${jugs.length}/${m.cupos}</span>
+           </div>`
+        : `<span class="pmis-cat-cupos">Sin jugadores · cupos: ${m.cupos}</span>`;
+
+    // Nota OP
+    const notaHTML = esAdmin && m.nota_op
+        ? `<div class="pmis-nota-op"><strong>OP:</strong> ${m.nota_op}</div>` : '';
+
+    // Acciones editar/borrar (SOLO en izquierda, solo para admin o perso propia)
+    let actionsHTML = '';
+    if (esAdmin || esPerso) {
+        actionsHTML = `<div class="pmis-cat-actions">
+            <button class="pmis-cat-btn pmis-cat-btn-edit"
+                onclick="event.stopPropagation();window._pmisAbrirFormulario('${safeNom}','${safeId}')">✏ Editar</button>
+            <button class="pmis-cat-btn pmis-cat-btn-del"
+                onclick="event.stopPropagation();window._pmisEliminar('${safeId}','${safeNom}')">✕ Borrar</button>
+        </div>`;
+    }
+
+    // Clic en la card: si modo asig OP → tooltip; si no → mostrar detalle derecho
+    const clickFn = _s.modoAsig && esAdmin
+        ? `window._pmisClickCatAsig('${safeId}','${safeNom}')`
+        : `window._pmisSeleccionar('${safeId}','${safeNom}')`;
+
+    return `<div class="pmis-cat-card${enMision ? ' participando' : ''}${selec ? ' seleccionada' : ''}"
+                 id="pmis-cat-${_norm(m.titulo)}"
+                 onclick="${clickFn}">
+        <div class="pmis-cat-card-header">
+            <span class="pmis-cat-card-titulo">${m.titulo}</span>
+            <span class="pmis-cat-card-clase">C-${m.clase}</span>
+        </div>
+        <div class="pmis-cat-meta">${_badge(m.estado)} ${_tipoBadge(m.tipo)}</div>
+        ${m.descripcion ? `<div class="pmis-cat-desc">${m.descripcion}</div>` : ''}
+        ${notaHTML}
+        <div class="pmis-cat-footer">
+            ${avsHTML}
+            ${actionsHTML}
+        </div>
+    </div>`;
+}
+
+// ── Panel derecho (detalle) ────────────────────────────────────
 function _renderDerecho(body, nombre) {
     if (_s.formActivo) {
         body.innerHTML = _renderForm(nombre);
@@ -406,24 +549,24 @@ function _renderDerecho(body, nombre) {
     }
 
     const esAdmin = estadoUI.esAdmin;
-    const participando = _s.misiones.filter(m => {
-        const jugs = Array.isArray(m.jugadores) ? m.jugadores : [];
-        return jugs.includes(nombre);
-    });
-
     let html = '';
 
-    // ── Sección: mis misiones ──
-    html += `<div class="pmis-section">
-        <div class="pmis-section-title">Participando <span>${participando.length}</span></div>`;
-    if (participando.length === 0) {
-        html += `<div class="pmis-empty"><div class="pmis-empty-icon">📋</div>Sin misiones activas</div>`;
+    // Si hay misión seleccionada → mostrar su detalle
+    if (_s.misionSelec) {
+        const m = _s.misiones.find(x => x.titulo === _s.misionSelec);
+        if (m) {
+            html += `<div class="pmis-section">
+                <div class="pmis-section-title">Detalle de misión</div>
+                ${_renderDetalle(m, nombre, esAdmin)}
+            </div>`;
+        }
     } else {
-        html += participando.map(m => _renderCard(m, nombre, esAdmin, true)).join('');
+        html += `<div class="pmis-section">
+            <div class="pmis-empty"><div class="pmis-empty-icon">📋</div>Selecciona una misión del catálogo</div>
+        </div>`;
     }
-    html += `</div>`;
 
-    // ── Botón crear ──
+    // Botón crear
     html += `<div class="pmis-section">
         <button class="pmis-btn-nueva"
             onclick="window._pmisAbrirFormulario('${nombre.replace(/'/g,"\\'")}',null)">
@@ -434,83 +577,116 @@ function _renderDerecho(body, nombre) {
     body.innerHTML = html;
 }
 
-// ── Tarjeta (panel derecho) ────────────────────────────────────
-function _renderCard(m, nombrePJ, esAdmin, enParticipando) {
-    const jugs    = Array.isArray(m.jugadores) ? m.jugadores : [];
-    const safeId  = m.titulo.replace(/'/g, "\\'");
-    const esPerso = m.tipo === 'Personalizada';
+// ── Detalle de misión (panel derecho, solo Unirse/Salir) ───────
+function _renderDetalle(m, nombrePJ, esAdmin) {
+    const jugs   = Array.isArray(m.jugadores) ? m.jugadores : [];
+    const enMis  = jugs.includes(nombrePJ);
+    const safeId = m.titulo.replace(/'/g, "\\'");
+    const safeNom= nombrePJ.replace(/'/g, "\\'");
+    const esPerso= m.tipo === 'Personalizada';
+    const llena  = m.cupos > 0 && jugs.length >= m.cupos && !esAdmin;
 
-    // Avatares
-    const avatares = jugs.length > 0 ? `
-        <div class="pmis-jugadores">
+    // Avatares grandes
+    const avsHTML = jugs.length > 0
+        ? `<div class="pmis-det-avs">
             ${jugs.map(j => `
-                <div title="${j}">
-                    <img class="pmis-avatar ${j===nombrePJ?'yo':''}"
-                        src="${_sb()}/imgpersonajes/${_norm(j)}icon.png"
-                        onerror="this.onerror=null;this.src='${_sb()}/imginterfaz/no_encontrado.png'">
-                </div>`).join('')}
-            <span class="pmis-cupos-txt">${jugs.length}/${m.cupos}</span>
-        </div>` : `<div style="font-size:0.62em;color:#3a3a50;margin-top:5px;">Sin jugadores · cupos: ${m.cupos}</div>`;
+                <img class="pmis-det-av ${j === nombrePJ ? 'yo' : ''}"
+                     src="${_imgIcon(j)}"
+                     onerror="this.src='${_fallback()}'"
+                     title="${j}">`).join('')}
+            <span class="pmis-det-cupos">${jugs.length}/${m.cupos} participantes</span>
+           </div>`
+        : `<div style="font-size:0.65em;color:#3a3a50;margin-bottom:8px;">Sin jugadores aún · cupos: ${m.cupos}</div>`;
 
-    // Botón principal
-    let btnPrincipal = '';
-    if (enParticipando) {
+    // Nota OP
+    const notaHTML = esAdmin && m.nota_op
+        ? `<div class="pmis-nota-op" style="margin-bottom:8px;"><strong>OP:</strong> ${m.nota_op}</div>` : '';
+
+    // Solo botón Unirse / Salir (no hay editar/borrar aquí)
+    let btnHTML = '';
+    if (enMis) {
         const puede = esAdmin || esPerso;
-        btnPrincipal = puede
-            ? `<button class="pmis-btn-apuntar salir"
-                    onclick="window._pmisDesapuntarPJ('${safeId}','${nombrePJ.replace(/'/g,"\\'")}')">
+        btnHTML = puede
+            ? `<button class="pmis-btn-accion salir"
+                    onclick="window._pmisDesapuntarPJ('${safeId}','${safeNom}')">
                     ✕ Salir de misión
                </button>`
-            : `<div style="font-size:0.6em;color:#2e2e48;text-align:center;margin-top:5px;">El OP gestiona esta misión</div>`;
+            : `<div style="font-size:0.62em;color:#2e2e48;text-align:center;margin-top:8px;">El OP gestiona esta misión</div>`;
     } else {
         const puede = esAdmin || esPerso;
-        const llena = m.cupos > 0 && jugs.length >= m.cupos && !esAdmin;
-        btnPrincipal = puede
-            ? `<button class="pmis-btn-apuntar unirse" ${llena ? 'disabled' : ''}
-                    onclick="window._pmisApuntarPJ('${safeId}','${nombrePJ.replace(/'/g,"\\'")}')">
-                    ${llena ? '🔒 Misión llena' : '✦ Unirse'}
+        btnHTML = puede
+            ? `<button class="pmis-btn-accion unirse" ${llena ? 'disabled' : ''}
+                    onclick="window._pmisApuntarPJ('${safeId}','${safeNom}')">
+                    ${llena ? '🔒 Misión llena' : '✦ Unirse a esta misión'}
                </button>`
             : '';
     }
 
-    // Nota OP
-    const notaHTML = esAdmin && m.nota_op
-        ? `<div class="pmis-nota-op"><strong>OP:</strong> ${m.nota_op}</div>`
-        : '';
-
-    // Acciones OP
-    let opActions = '';
-    if (esAdmin || esPerso) {
-        const opApuntar = esAdmin && !enParticipando
-            ? `<button class="pmis-op-btn pmis-op-apuntar"
-                    onclick="window._pmisApuntarPJ('${safeId}','${nombrePJ.replace(/'/g,"\\'")}')">
-                    + Apuntar</button>` : '';
-        const opQuitar = esAdmin && enParticipando
-            ? `<button class="pmis-op-btn pmis-op-quitar"
-                    onclick="window._pmisDesapuntarPJ('${safeId}','${nombrePJ.replace(/'/g,"\\'")}')">
-                    − Quitar</button>` : '';
-
-        opActions = `<div class="pmis-op-actions">
-            <button class="pmis-op-btn pmis-op-edit"
-                onclick="window._pmisAbrirFormulario('${nombrePJ.replace(/'/g,"\\'")}','${safeId}')">✏ Editar</button>
-            <button class="pmis-op-btn pmis-op-del"
-                onclick="window._pmisEliminar('${safeId}','${nombrePJ.replace(/'/g,"\\'")}')">✕ Borrar</button>
-            ${opApuntar}${opQuitar}
-        </div>`;
-    }
-
-    return `<div class="pmis-card ${enParticipando?'participando':''}">
-        <div class="pmis-card-header">
-            <span class="pmis-titulo">${m.titulo}</span>
-            <span class="pmis-clase">C-${m.clase}</span>
-        </div>
-        <div class="pmis-meta">${_badge(m.estado)} ${_tipoBadge(m.tipo)}</div>
-        ${m.descripcion ? `<div class="pmis-desc">${m.descripcion}</div>` : ''}
+    return `<div class="pmis-det-card">
+        <div class="pmis-det-titulo">${m.titulo}</div>
+        <div class="pmis-det-meta">${_badge(m.estado)} ${_tipoBadge(m.tipo)} <span style="font-size:0.6em;color:#3a3a58;">Clase ${m.clase}</span></div>
+        ${m.descripcion ? `<div class="pmis-det-desc">${m.descripcion}</div>` : ''}
         ${notaHTML}
-        ${avatares}
-        ${btnPrincipal}
-        ${opActions}
+        ${avsHTML}
+        ${btnHTML}
     </div>`;
+}
+
+// ── Tooltip de asignación (modo OP) ───────────────────────────
+function _abrirTooltipAsig(titulo, nombrePJ) {
+    // Cerrar tooltip previo
+    document.querySelector('.pmis-asig-tooltip')?.remove();
+
+    const card = document.getElementById(`pmis-cat-${_norm(titulo)}`);
+    if (!card) return;
+
+    const m    = _s.misiones.find(x => x.titulo === titulo);
+    if (!m) return;
+
+    const jugs = Array.isArray(m.jugadores) ? m.jugadores : [];
+
+    // Obtener todos los personajes activos
+    const todosLosPjs = Object.entries(personajes)
+        .filter(([, p]) => p.isActive !== false)
+        .sort(([a], [b]) => a.localeCompare(b));
+
+    const safeId  = titulo.replace(/'/g, "\\'");
+    const safeNom = nombrePJ.replace(/'/g, "\\'");
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'pmis-asig-tooltip';
+    tooltip.innerHTML = `
+        <div class="pmis-asig-tt-title">Asignar a misión</div>
+        <div class="pmis-asig-tt-grid">
+            ${todosLosPjs.map(([nom, p]) => {
+                const enMis = jugs.includes(nom);
+                const icono = p.iconoOverride || nom;
+                return `<div class="pmis-asig-tt-pj ${enMis ? 'en' : ''}"
+                             onclick="event.stopPropagation();window._pmisToggleAsigPj('${safeId}','${nom.replace(/'/g,"\\'")}','${safeNom}')">
+                    <img class="pmis-av" width="20" height="20"
+                         src="${_imgIcon(icono)}"
+                         onerror="this.src='${_fallback()}'"
+                         style="width:20px;height:20px;">
+                    <span class="pmis-asig-tt-nombre">${nom}</span>
+                    <span class="pmis-asig-tt-check">${enMis ? '✓' : ''}</span>
+                </div>`;
+            }).join('')}
+        </div>`;
+
+    // Posicionar relativo a la card
+    card.style.position = 'relative';
+    card.appendChild(tooltip);
+    _s.tooltipMision = titulo;
+
+    // Cerrar al hacer click fuera
+    setTimeout(() => {
+        document.addEventListener('click', _cerrarTooltip, { once: true });
+    }, 50);
+}
+
+function _cerrarTooltip() {
+    document.querySelector('.pmis-asig-tooltip')?.remove();
+    _s.tooltipMision = null;
 }
 
 // ── Formulario ────────────────────────────────────────────────
@@ -519,6 +695,8 @@ function _renderForm(nombrePJ) {
     const id = _s.editandoId;
     const m  = id ? _s.misiones.find(x => x.titulo === id) : null;
     const esN = !m;
+    const safeNom = nombrePJ.replace(/'/g, "\\'");
+    const safeId  = (id || '').replace(/'/g, "\\'");
 
     const TIPOS = esAdmin
         ? ['Personalizada', 'Grande', 'Normal']
@@ -537,7 +715,7 @@ function _renderForm(nombrePJ) {
     return `<div class="pmis-section">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
             <button class="pmis-btn-cancel" style="padding:4px 8px;"
-                onclick="window._pmisVolverLista('${nombrePJ.replace(/'/g,"\\'")}')">←</button>
+                onclick="window._pmisVolverLista('${safeNom}')">←</button>
             <span style="font-size:0.82em;color:#888;">
                 ${esN ? 'Nueva misión personalizada' : `Editar: ${m.titulo}`}
             </span>
@@ -592,9 +770,9 @@ function _renderForm(nombrePJ) {
 
             <div class="pmis-form-footer">
                 <button class="pmis-btn-cancel"
-                    onclick="window._pmisVolverLista('${nombrePJ.replace(/'/g,"\\'")}')">Cancelar</button>
+                    onclick="window._pmisVolverLista('${safeNom}')">Cancelar</button>
                 <button class="pmis-btn-save"
-                    onclick="window._pmisGuardar('${nombrePJ.replace(/'/g,"\\'")}','${(id||'').replace(/'/g,"\\'")}')">
+                    onclick="window._pmisGuardar('${safeNom}','${safeId}')">
                     ${esN ? '✦ Crear' : '💾 Guardar'}
                 </button>
             </div>
@@ -612,26 +790,59 @@ function _reRender() {
 }
 
 // ── Globals ───────────────────────────────────────────────────
-window._pmisIzqBuscar = (v, nombre) => { _s.busqueda = v; _reRender(); };
-window._pmisIzqFiltro = (v, nombre) => { _s.filtro = v;  _reRender(); };
-window._pmisIzqToggleFin = (nombre) => { _s.verFin = !_s.verFin; _reRender(); };
-
-// Click en fila del catálogo: muestra la misión en el panel derecho si no está ya
-window._pmisVerMision = (titulo, nombre) => {
-    // Por ahora solo scrollea a la card en el panel derecho si está participando
-    const body = document.getElementById('ppj-body');
-    if (!body) return;
-    const cards = body.querySelectorAll('.pmis-card');
-    cards.forEach(c => {
-        if (c.querySelector('.pmis-titulo')?.textContent === titulo) {
-            c.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            c.style.outline = '1px solid rgba(212,175,55,0.3)';
-            setTimeout(() => { c.style.outline = ''; }, 1200);
-        }
-    });
+window._pmisIzqBuscar     = (v) => { _s.busqueda = v; _reRender(); };
+window._pmisIzqFiltro     = (v) => { _s.filtro   = v; _reRender(); };
+window._pmisIzqToggleFin  = ()  => { _s.verFin   = !_s.verFin; _reRender(); };
+window._pmisToggleModoAsig= ()  => {
+    _s.modoAsig = !_s.modoAsig;
+    if (!_s.modoAsig) _s.tooltipMision = null;
+    _reRender();
 };
 
-window._pmisVolverLista = (nombre) => {
+// Click en card catálogo: modo normal → seleccionar; modo asig → tooltip
+window._pmisSeleccionar = (titulo, nombrePJ) => {
+    _s.misionSelec = titulo;
+    _reRender();
+};
+
+window._pmisClickCatAsig = (titulo, nombrePJ) => {
+    if (_s.tooltipMision === titulo) {
+        _cerrarTooltip();
+    } else {
+        _cerrarTooltip();
+        _abrirTooltipAsig(titulo, nombrePJ);
+    }
+};
+
+// Asignar/quitar un PJ desde el tooltip
+window._pmisToggleAsigPj = async (idMision, pjNombre, nombrePjActivo) => {
+    const m = _s.misiones.find(x => x.titulo === idMision);
+    if (!m) return;
+    const jugs = Array.isArray(m.jugadores) ? [...m.jugadores] : [];
+    let nuevoEstado = m.estado;
+
+    if (jugs.includes(pjNombre)) {
+        // Quitar
+        const idx = jugs.indexOf(pjNombre);
+        jugs.splice(idx, 1);
+        if (nuevoEstado === 1 && m.cupos > 0 && jugs.length < m.cupos) nuevoEstado = 0;
+    } else {
+        // Añadir
+        jugs.push(pjNombre);
+        if (nuevoEstado === 0 && m.cupos > 0 && jugs.length >= m.cupos) nuevoEstado = 1;
+    }
+
+    const { error } = await supabase.from('misiones')
+        .update({ jugadores: jugs, estado: nuevoEstado }).eq('titulo', idMision);
+    if (error) { alert('Error: ' + error.message); return; }
+
+    window.mostrarToast?.(jugs.includes(pjNombre) ? `✦ ${pjNombre} apuntado` : `✕ ${pjNombre} removido`);
+    _s.tooltipMision = null; // se reabre tras re-render si _modoAsig activo
+    await _cargar();
+    _reRender();
+};
+
+window._pmisVolverLista = () => {
     _s.formActivo = false; _s.editandoId = null; _reRender();
 };
 
@@ -668,8 +879,8 @@ window._pmisGuardar = async (nombre, idOriginal) => {
     const payload  = {
         titulo, tipo, clase, estado, cupos, autor,
         descripcion: desc, nota_op: notaOp,
-        jugadores:   misExist?.jugadores || [],
-        orden:       misExist?.orden ?? _s.misiones.length,
+        jugadores: misExist?.jugadores || [],
+        orden:     misExist?.orden ?? _s.misiones.length,
     };
 
     const { error } = await supabase.from('misiones').upsert(payload, { onConflict: 'titulo' });
@@ -677,6 +888,7 @@ window._pmisGuardar = async (nombre, idOriginal) => {
 
     window.mostrarToast?.(!idOriginal ? '✦ Misión creada' : '💾 Misión guardada');
     _s.formActivo = false; _s.editandoId = null;
+    _s.misionSelec = titulo;
     await _cargar(); _reRender();
 };
 
@@ -690,6 +902,7 @@ window._pmisEliminar = async (idMision, nombre) => {
     const { error } = await supabase.from('misiones').delete().eq('titulo', idMision);
     if (error) { alert('Error: ' + error.message); return; }
     window.mostrarToast?.('Misión eliminada');
+    if (_s.misionSelec === idMision) _s.misionSelec = null;
     await _cargar(); _reRender();
 };
 
