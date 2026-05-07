@@ -208,17 +208,17 @@ async function _cargarDatos() {
 
 async function _cargarCatalogo() {
     const { data } = await supabase.from('objetos')
-        .select('id,nombre,tipo,material,efecto,rareza,descripcion,vida_roja,vida_azul,contenedor_padre,es_propuesta')
+        .select('id,nombre,tipo,material,efecto,rareza,descripcion,vida_roja,vida_azul,es_propuesta')
         .eq('es_propuesta', false)
         .order('nombre');
     _st.catalogo = data || [];
 
     // Mapa contenedor → hijos
     _st.contenidores = {};
-    _st.catalogo.forEach(o => {
-        if (o.contenedor_padre) {
-            if (!_st.contenidores[o.contenedor_padre]) _st.contenidores[o.contenedor_padre] = [];
-            _st.contenidores[o.contenedor_padre].push(o.nombre);
+    _st.inventario.forEach(i => {
+        if (i.contenedor_padre) {
+            if (!_st.contenidores[i.contenedor_padre]) _st.contenidores[i.contenedor_padre] = [];
+            _st.contenidores[i.contenedor_padre].push(i.objeto_nombre);
         }
     });
 }
@@ -226,10 +226,19 @@ async function _cargarCatalogo() {
 async function _cargarInventario() {
     if (!_st.nombrePJ) return;
     const { data } = await supabase.from('inventario_objetos')
-        .select('objeto_nombre,cantidad,equipado')
+        .select('id,objeto_nombre,cantidad,equipado,contenedor_padre')
         .eq('personaje_nombre', _st.nombrePJ)
         .gt('cantidad', 0);
     _st.inventario = data || [];
+
+    // Mapa contenedor → hijos
+    _st.contenidores = {};
+    _st.inventario.forEach(i => {
+        if (i.contenedor_padre) {
+            if (!_st.contenidores[i.contenedor_padre]) _st.contenidores[i.contenedor_padre] = [];
+            _st.contenidores[i.contenedor_padre].push(i.objeto_nombre);
+        }
+    });
 }
 
 // ── RENDER PRINCIPAL ─────────────────────────────────────────
@@ -307,7 +316,8 @@ function _renderInventario() {
     if (!cont) return;
 
     const q = _st.busqInv.toLowerCase().trim();
-    const lista = _st.inventario.filter(i => !q || i.objeto_nombre.toLowerCase().includes(q));
+    // Slots raíz = sin contenedor_padre
+    const lista = _st.inventario.filter(i => !i.contenedor_padre && (!q || i.objeto_nombre.toLowerCase().includes(q)));
 
     if (lista.length === 0) {
         cont.innerHTML = `<div class="pobj-empty"><div style="font-size:1.5em;margin-bottom:6px;opacity:0.3">🎒</div>Sin objetos en el inventario</div>`;
@@ -359,15 +369,15 @@ function _renderInventario() {
                 hijos.map(hNombre => {
                     const hCat   = catMap[hNombre] || {};
                     const hSafe  = hNombre.replace(/'/g, "\\'");
-                    const hSlot  = _st.inventario.find(i => i.objeto_nombre === hNombre && i.contenedor_padre === nombre);
+                    const hSlot = _st.inventario.find(i => i.objeto_nombre === hNombre && i.contenedor_padre === nombre);
                     const hCant  = hSlot?.cantidad || 0;
-                    const hId    = hSlot?.id || null;
+                    const hSlotId = hSlot?.id;
                     const addBtn = _st.esAdmin ? `<button class="pobj-btn-sm pobj-btn-add" onclick="window._pobjAsignar('${hSafe}',1,'${oSafe}')">+1</button>` : '';
                     return `<div class="pobj-inv-card" style="opacity:${hCant>0?1:0.45}">
                         <img class="pobj-cat-img" src="${_imgObj(hNombre)}" onerror="this.onerror=null;this.src='${_imgFallback()}'" loading="lazy" style="width:32px;height:32px;">
                         <div class="pobj-inv-nombre" style="font-size:0.75em;">${hNombre}</div>
                         <span class="pobj-cant" style="font-size:0.8em;">${hCant}</span>
-                        ${_st.esAdmin && hId ? `<button class="pobj-ctrl-btn" onclick="window._pobjModCantidad(${hId},-1)">−</button>` : ''}
+                        ${_st.esAdmin && hSlotId ? `<button class="pobj-ctrl-btn" onclick="window._pobjModCantidad(${hSlotId},-1)">−</button>` : ''}
                         ${addBtn}
                     </div>`;
                 }).join('') +
