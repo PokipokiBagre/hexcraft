@@ -797,8 +797,6 @@ async function _removerDeMision(pjNombre, tituloMision) {
         .eq('titulo', tituloMision);
 }
 
-}
-
 // ── Formulario ────────────────────────────────────────────────
 function _renderForm(nombrePJ) {
     const esAdmin = estadoUI.esAdmin;
