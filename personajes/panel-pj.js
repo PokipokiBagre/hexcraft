@@ -1165,6 +1165,14 @@ function _renderObjIzq() {
                     <select id="pm-rar-${i}" class="pobj-input-sm" style="flex:1;font-size:0.68em;">${RARS_F.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
                 </div>
                 <input id="pm-eff-${i}" class="pobj-input-sm" placeholder="Efecto…" style="font-size:0.68em;">
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <span style="font-size:0.6em;color:#888;flex-shrink:0;">❤</span>
+                    <input id="pm-vr-${i}" class="pobj-input-sm" type="number" value="0" min="0" placeholder="Vida R" style="flex:1;font-size:0.68em;">
+                    <span style="font-size:0.6em;color:#4ab3e8;flex-shrink:0;">💙</span>
+                    <input id="pm-va-${i}" class="pobj-input-sm" type="number" value="0" min="0" placeholder="Vida A" style="flex:1;font-size:0.68em;">
+                    <span style="font-size:0.6em;color:#d4af37;flex-shrink:0;">×</span>
+                    <input id="pm-cant-${i}" class="pobj-input-sm" type="number" value="1" min="0" placeholder="Cant" style="flex:1;font-size:0.68em;" title="Cantidad a dar al personaje seleccionado">
+                </div>
             </div>`).join('');
 
         contenidoScroll = `${btnVolver}
@@ -1479,6 +1487,7 @@ window._pobjDragStart = (e, nombre, fuente) => {
 
 window._pobjDropEnInventario = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
     if (!estadoUI.esAdmin) return;
     if (fuente === 'inventario') {
@@ -1496,6 +1505,7 @@ window._pobjDropEnInventario = async (e) => {
 
 window._pobjDropEnContenedor = async (e, contenedorNombre) => {
     e.preventDefault();
+    e.stopPropagation(); // evita que el drop burbujee al inventario raíz
     const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
     const nombre = e.dataTransfer.getData('application/x-nombre');
     if (!nombre || !estadoUI.esAdmin || nombre === contenedorNombre) return;
