@@ -36,6 +36,14 @@
 html { font-size: 15px; }
 body { background: var(--bg); color: var(--text); font-family: var(--font-body); line-height: 1.5; min-height: 100vh; }
 
+/* ── Aislar paneles externos para que no hereden color/font de body ── */
+#pobj-panel, #pobj-panel *,
+#pobj-overlay,
+#pobj-op-modal, #pobj-op-modal * {
+    color: revert;
+    font-family: revert;
+}
+
 /* ── NAV ─────────────────────────────────────────────────── */
 .nav {
     display: flex;
