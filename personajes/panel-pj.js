@@ -1018,10 +1018,10 @@ async function _tabObjetos(nombre, body) {
 .pobj-izq-scroll{flex:1;overflow-y:auto;padding:6px 10px 80px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,0.2) transparent;}
 .pobj-search-izq{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:5px;color:#ccc;padding:6px 9px;font-size:0.76em;outline:none;font-family:inherit;box-sizing:border-box;margin-bottom:6px;}
 .pobj-search-izq:focus{border-color:rgba(212,175,55,0.35);}
-.pobj-search-izq::placeholder{color:#3a3a58;}
+.pobj-search-izq::placeholder{color:#5a5a80;}
 .pobj-filtros{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;}
-.pobj-fbtn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);color:#444;border-radius:4px;padding:2px 7px;font-size:0.6em;cursor:pointer;font-family:inherit;transition:all 0.12s;}
-.pobj-fbtn:hover{color:#888;}
+.pobj-fbtn{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#b0b0c8;border-radius:4px;padding:2px 7px;font-size:0.6em;cursor:pointer;font-family:inherit;transition:all 0.12s;}
+.pobj-fbtn:hover{color:#d4d4e8;}
 .pobj-fbtn.on{color:#d4af37;border-color:rgba(212,175,55,0.35);background:rgba(212,175,55,0.08);}
 .pobj-cat-card{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:6px;margin-bottom:4px;border:1px solid rgba(255,255,255,0.03);background:rgba(255,255,255,0.015);transition:background 0.1s;}
 .pobj-cat-card:hover{background:rgba(255,255,255,0.035);}
@@ -1029,10 +1029,10 @@ async function _tabObjetos(nombre, body) {
 .pobj-cat-img{width:38px;height:38px;border-radius:4px;object-fit:cover;background:#111;flex-shrink:0;border:1px solid rgba(255,255,255,0.05);}
 .pobj-cat-info{flex:1;min-width:0;}
 .pobj-cat-nombre{font-size:0.78em;font-weight:700;color:#d0d0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pobj-cat-sub{font-size:0.62em;color:#444;margin-top:1px;}
-.pobj-cat-eff{font-size:0.64em;color:#3a3a58;margin-top:2px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pobj-cat-sub{font-size:0.62em;color:#9898b8;margin-top:1px;}
+.pobj-cat-eff{font-size:0.64em;color:#a8a8c4;margin-top:2px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .pobj-rar-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:3px;}
-.pobj-op-label-sm{font-size:0.6em;letter-spacing:1.2px;text-transform:uppercase;color:#3a3a58;font-weight:700;display:block;margin:10px 0 4px;}
+.pobj-op-label-sm{font-size:0.6em;letter-spacing:1.2px;text-transform:uppercase;color:#7878a0;font-weight:700;display:block;margin:10px 0 4px;}
 .pobj-input-sm{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);border-radius:5px;color:#ccc;padding:6px 8px;font-size:0.76em;box-sizing:border-box;outline:none;font-family:inherit;}
 .pobj-input-sm:focus{border-color:rgba(212,175,55,0.35);}
 textarea.pobj-input-sm{resize:vertical;min-height:50px;}
@@ -1044,7 +1044,7 @@ select.pobj-input-sm{cursor:pointer;}
 .pobj-btn-gold:hover{background:rgba(212,175,55,0.2);}
 .pobj-btn-danger{background:rgba(220,60,60,0.08);border:1px solid rgba(220,60,60,0.25);color:#ff6060;border-radius:5px;padding:5px 10px;font-size:0.7em;cursor:pointer;font-family:inherit;transition:all 0.12s;}
 .pobj-btn-danger:hover{background:rgba(220,60,60,0.18);}
-.pobj-section-title{font-size:0.6em;letter-spacing:1.5px;text-transform:uppercase;color:#3a3a58;font-weight:700;margin:10px 0 5px;}
+.pobj-section-title{font-size:0.6em;letter-spacing:1.5px;text-transform:uppercase;color:#7878a0;font-weight:700;margin:10px 0 5px;}
 .pobj-transfer-row{display:flex;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:5px;margin-bottom:3px;font-size:0.72em;cursor:pointer;transition:background 0.1s;}
 .pobj-transfer-row:hover{background:rgba(255,255,255,0.05);}
 .pobj-transfer-row.sel{border-color:rgba(212,175,55,0.35);background:rgba(212,175,55,0.06);color:#d4af37;}
