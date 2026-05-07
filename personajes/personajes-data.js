@@ -121,6 +121,15 @@ export async function persistirPush(nombre, p) {
     return !error;
 }
 
+// ── Persistir campos arbitrarios de un personaje inmediatamente ──
+// Se llama tras cada cambio en el panel de stats (afinidades, vex, guarda, etc.)
+export async function persistirCampos(nombre, campos) {
+    const { error } = await supabase.from('personajes')
+        .update(campos)
+        .eq('nombre', nombre);
+    return !error;
+}
+
 // ── Guardar fórmulas de stats en DB ──────────────────────────
 export async function guardarFormulasBD() {
     const rows = Object.entries(formulas).map(([clave, f]) => ({
