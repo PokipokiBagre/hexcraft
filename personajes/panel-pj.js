@@ -164,20 +164,20 @@ function _inyectarEstilos() {
 .ppj-hz-field{font-size:0.7em;color:#5a5a78;line-height:1.4;}
 .ppj-hz-field strong{color:#888;font-weight:600;}
 .ppj-obj-search{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;color:#ccc;font-size:0.8em;padding:7px 10px;margin-bottom:10px;box-sizing:border-box;}
-.ppj-obj-search::placeholder{color:#3a3a58;}
+.ppj-obj-search::placeholder{color:#5a5a80;}
 .ppj-obj-card{background:rgba(255,255,255,0.02);border-radius:7px;border:1px solid rgba(255,255,255,0.04);padding:10px 12px;margin-bottom:6px;}
 .ppj-obj-card.equipado{border-color:rgba(212,175,55,0.2);background:rgba(212,175,55,0.03);}
 .ppj-obj-header{display:flex;align-items:center;gap:8px;}
 .ppj-obj-cant{font-size:0.8em;font-weight:700;color:#d4af37;min-width:28px;text-align:center;}
 .ppj-obj-nombre{font-size:0.82em;color:#ccc;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ppj-obj-rar{font-size:0.6em;font-weight:700;padding:1px 6px;border-radius:3px;flex-shrink:0;}
-.ppj-obj-det{font-size:0.7em;color:#5a5a78;margin-top:4px;line-height:1.4;}
+.ppj-obj-det{font-size:0.7em;color:#a8a8c4;margin-top:4px;line-height:1.4;}
 .ppj-obj-footer{display:flex;align-items:center;justify-content:space-between;margin-top:7px;}
-.ppj-obj-tipo{font-size:0.62em;color:#4a4a68;}
+.ppj-obj-tipo{font-size:0.62em;color:#9898b8;}
 .ppj-eqp-btn{font-size:0.65em;font-weight:700;padding:3px 10px;border-radius:10px;cursor:pointer;border:1px solid;transition:background 0.15s;}
 .ppj-eqp-btn.on{background:rgba(212,175,55,0.1);color:#d4af37;border-color:rgba(212,175,55,0.3);}
 .ppj-eqp-btn.off{background:rgba(255,255,255,0.03);color:#4a4a68;border-color:rgba(255,255,255,0.06);}
-.ppj-obj-seccion-titulo{font-size:0.62em;letter-spacing:1.5px;text-transform:uppercase;color:#3a3a58;font-weight:600;margin:12px 0 6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.04);}
+.ppj-obj-seccion-titulo{font-size:0.62em;letter-spacing:1.5px;text-transform:uppercase;color:#7878a0;font-weight:600;margin:12px 0 6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.04);}
 .ppj-obj-vehiculo{margin-top:5px;display:flex;gap:10px;}
 .ppj-obj-vida-pill{font-size:0.65em;padding:2px 8px;border-radius:10px;font-weight:600;}
 .ppj-obj-vida-roja{background:rgba(212,175,55,0.1);color:#d4af37;border:1px solid rgba(212,175,55,0.2);}
