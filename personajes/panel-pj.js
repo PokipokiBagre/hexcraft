@@ -1058,8 +1058,8 @@ select.pobj-input-sm{cursor:pointer;}
 
     // Cargar datos
     const [catRes, invRes] = await Promise.all([
-        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul,contenedor_padre').eq('es_propuesta', false).order('nombre'),
-        supabase.from('inventario_objetos').select('objeto_nombre,cantidad,equipado').eq('personaje_nombre', nombre).gt('cantidad', 0),
+        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul').eq('es_propuesta', false).order('nombre'),
+        supabase.from('inventario_objetos').select('id,objeto_nombre,cantidad,equipado,contenedor_padre').eq('personaje_nombre', nombre).gt('cantidad', 0),
     ]);
 
     _objState.catalogo   = catRes.data || [];
@@ -1067,10 +1067,10 @@ select.pobj-input-sm{cursor:pointer;}
 
     // Mapa contenedor → hijos
     _objState.contenidores = {};
-    _objState.catalogo.forEach(o => {
-        if (o.contenedor_padre) {
-            if (!_objState.contenidores[o.contenedor_padre]) _objState.contenidores[o.contenedor_padre] = [];
-            _objState.contenidores[o.contenedor_padre].push(o.nombre);
+    _objState.inventario.forEach(i => {
+        if (i.contenedor_padre) {
+            if (!_objState.contenidores[i.contenedor_padre]) _objState.contenidores[i.contenedor_padre] = [];
+            _objState.contenidores[i.contenedor_padre].push(i.objeto_nombre);
         }
     });
 
@@ -1305,7 +1305,7 @@ function _renderObjDer(nombre, body) {
     if (!body) return;
 
     const esAdmin  = estadoUI.esAdmin;
-    const safe     = nombre.replace(/'/g,"\'");
+    const safe     = nombre.replace(/'/g,"\\'");
     const EQUIPABLES = ['Equipamiento','Accesorio','Vehículo','Vehiculo'];
     const RAR_COL  = {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
     const _imgObj  = (n) => { try{return `${window._hexConfig?.storageUrl||''}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
@@ -1320,6 +1320,7 @@ function _renderObjDer(nombre, body) {
     });
 
     const q = (_objState.busqInv||'').toLowerCase();
+
     // Slots raíz = sin contenedor_padre
     const lista = sorted.filter(i => !i.contenedor_padre && (!q || i.objeto_nombre.toLowerCase().includes(q)));
 
@@ -1328,14 +1329,14 @@ function _renderObjDer(nombre, body) {
         const isEqp    = item.equipado;
         const rarCol   = RAR_COL[cat.rareza]||'#888';
         const tipo     = cat.tipo||'-';
-        const safeObj  = item.objeto_nombre.replace(/'/g,"\'");
-        const itemId   = item.id;
+        const safeObj  = item.objeto_nombre.replace(/'/g,"\\'");
         const puedeEqp = EQUIPABLES.includes(tipo);
         const esContenedor = tipo==='Contenedor';
         const esVehiculo   = tipo==='Vehículo'||tipo==='Vehiculo';
         const hijosSlots = _objState.inventario.filter(i => i.contenedor_padre === item.objeto_nombre);
         const expanded = _objState.expandedConts.has(item.objeto_nombre);
 
+        const itemId   = item.id;
         const ctrlHTML = esAdmin ? `
             <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">
                 <button class="ppj-ctrl-btn" style="font-size:0.58em;width:auto;padding:0 4px;" onclick="window._pobjModCantId(${itemId},-5)">−5</button>
@@ -1346,7 +1347,7 @@ function _renderObjDer(nombre, body) {
                 <button class="ppj-ctrl-btn" style="color:#ff6060;font-size:0.62em;padding:0 4px;" onclick="window._pobjEliminarSlot(${itemId})" title="Quitar todos">✕</button>
             </div>` : `<span style="font-size:0.85em;font-weight:700;color:#d4af37;">×${item.cantidad}</span>`;
 
-        let html = `<div class="ppj-obj-card ${isEqp?'equipado':''}" data-nombre="${item.objeto_nombre.toLowerCase()}" data-id="${itemId}"
+        let html = `<div class="ppj-obj-card ${isEqp?'equipado':''}" data-nombre="${item.objeto_nombre.toLowerCase()}"
             draggable="${esAdmin?'true':'false'}"
             ondragstart="window._pobjDragStartId(event,${itemId},'${safeObj}')"
             ondragend="event.target.style.opacity=''">
@@ -1412,7 +1413,7 @@ function _renderObjDer(nombre, body) {
     body.innerHTML = `<div class="ppj-section">
         <input class="ppj-obj-search" placeholder="Buscar en inventario…" oninput="window._ppjFiltrarObjetos(this.value)">
         <div id="ppj-obj-lista" style="min-height:60px;"
-            ${esAdmin?`ondragover="event.preventDefault();this.style.outline='1px dashed rgba(212,175,55,0.25)';" ondragleave="this.style.outline='';" ondrop="window._pobjDropEnInventario(event);this.style.outline='';"`:''}> 
+            ${esAdmin?`ondragover="event.preventDefault();this.style.outline='1px dashed rgba(212,175,55,0.25)';" ondragleave="this.style.outline='';" ondrop="window._pobjDropEnInventario(event);this.style.outline='';"`:''}>
             ${lista.length===0?`<div class="ppj-empty" style="pointer-events:none;"><div class="ppj-empty-icon">🎒</div>${esAdmin?'Arrastra objetos del catálogo aquí':'Sin objetos'}</div>`:''}
             ${equipados.length?`<div class="ppj-obj-seccion-titulo">Equipados</div>${equipados.map(_renderItem).join('')}`:''}
             ${noEquipados.length?`<div class="ppj-obj-seccion-titulo">Inventario</div>${noEquipados.map(_renderItem).join('')}`:''}
@@ -1425,16 +1426,16 @@ async function _recargarObjetos() {
     const nombre = _objState.nombrePJ;
     if (!nombre) return;
     const [catRes, invRes] = await Promise.all([
-        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul,contenedor_padre').eq('es_propuesta', false).order('nombre'),
-        supabase.from('inventario_objetos').select('objeto_nombre,cantidad,equipado').eq('personaje_nombre', nombre).gt('cantidad', 0),
+        supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,vida_roja,vida_azul').eq('es_propuesta', false).order('nombre'),
+        supabase.from('inventario_objetos').select('id,objeto_nombre,cantidad,equipado,contenedor_padre').eq('personaje_nombre', nombre).gt('cantidad', 0),
     ]);
     _objState.catalogo   = catRes.data || [];
     _objState.inventario = invRes.data || [];
     _objState.contenidores = {};
-    _objState.catalogo.forEach(o => {
-        if (o.contenedor_padre) {
-            if (!_objState.contenidores[o.contenedor_padre]) _objState.contenidores[o.contenedor_padre] = [];
-            _objState.contenidores[o.contenedor_padre].push(o.nombre);
+    _objState.inventario.forEach(i => {
+        if (i.contenedor_padre) {
+            if (!_objState.contenidores[i.contenedor_padre]) _objState.contenidores[i.contenedor_padre] = [];
+            _objState.contenidores[i.contenedor_padre].push(i.objeto_nombre);
         }
     });
     _renderObjIzq();
@@ -1461,16 +1462,14 @@ window._pobjFiltroRar     = (v) => { _objState.filtroRar=v; _renderObjIzq(); };
 window._pobjFiltroTipo    = (v) => { _objState.filtroTipo=v; _renderObjIzq(); };
 window._pobjToggleCont    = (n) => { if(_objState.expandedConts.has(n))_objState.expandedConts.delete(n); else _objState.expandedConts.add(n); _renderObjDer(_objState.nombrePJ); };
 
-// ── Drag & drop con soporte de slots por id ──────────────────
+// ── Drag & drop con slots por id ─────────────────────────────
 
-// Drag desde inventario (slot id conocido)
 window._pobjDragStartId = (e, slotId, nombre) => {
     e.dataTransfer.setData('text/plain', String(slotId));
     e.dataTransfer.setData('application/x-fuente', 'inventario');
     e.dataTransfer.setData('application/x-nombre', nombre);
     e.target.style.opacity = '0.5';
 };
-// Drag desde catálogo (sin id)
 window._pobjDragStart = (e, nombre, fuente) => {
     e.dataTransfer.setData('text/plain', nombre);
     e.dataTransfer.setData('application/x-fuente', fuente || 'catalogo');
@@ -1478,17 +1477,14 @@ window._pobjDragStart = (e, nombre, fuente) => {
     e.target.style.opacity = '0.5';
 };
 
-// Drop en inventario raíz — sacar del contenedor o añadir del catálogo
 window._pobjDropEnInventario = async (e) => {
     e.preventDefault();
     const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
     if (!estadoUI.esAdmin) return;
-
     if (fuente === 'inventario') {
         const slotId = parseInt(e.dataTransfer.getData('text/plain'));
         const slot = _objState.inventario.find(i => i.id === slotId);
         if (slot && slot.contenedor_padre) {
-            // Sacar del contenedor → mover a raíz
             await supabase.from('inventario_objetos').update({ contenedor_padre: null }).eq('id', slotId);
             await _recargarObjetos();
         }
@@ -1498,31 +1494,22 @@ window._pobjDropEnInventario = async (e) => {
     }
 };
 
-// Drop en contenedor — mostrar modal de cantidad si el slot ya existe en raíz
 window._pobjDropEnContenedor = async (e, contenedorNombre) => {
     e.preventDefault();
     const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
     const nombre = e.dataTransfer.getData('application/x-nombre');
-    if (!nombre || !estadoUI.esAdmin) return;
-    if (nombre === contenedorNombre) return;
+    if (!nombre || !estadoUI.esAdmin || nombre === contenedorNombre) return;
 
     if (fuente === 'inventario') {
         const slotId = parseInt(e.dataTransfer.getData('text/plain'));
         const slot = _objState.inventario.find(i => i.id === slotId);
         if (!slot) return;
-
-        // Si ya hay un slot del mismo objeto en ese contenedor, preguntar cuántos mover
-        const slotEnCont = _objState.inventario.find(i => i.objeto_nombre === nombre && i.contenedor_padre === contenedorNombre && i.id !== slotId);
-
         if (slot.cantidad === 1) {
-            // Solo hay 1, mover directamente
             await _moverSlotAContenedor(slotId, slot, contenedorNombre, 1);
         } else {
-            // Preguntar cuántos mover
             _modalCantidad(slot.cantidad, (cant) => _moverSlotAContenedor(slotId, slot, contenedorNombre, cant));
         }
     } else {
-        // Viene del catálogo → crear nuevo slot en el contenedor
         await supabase.from('inventario_objetos').insert({
             personaje_nombre: _objState.nombrePJ, objeto_nombre: nombre,
             cantidad: 1, equipado: false, contenedor_padre: contenedorNombre
@@ -1531,24 +1518,19 @@ window._pobjDropEnContenedor = async (e, contenedorNombre) => {
     }
 };
 
-// Mover N unidades de un slot a un contenedor (puede dividir el slot)
 async function _moverSlotAContenedor(slotId, slot, contenedorNombre, cant) {
     if (cant <= 0) return;
     const slotEnCont = _objState.inventario.find(i =>
         i.objeto_nombre === slot.objeto_nombre && i.contenedor_padre === contenedorNombre
     );
-
     if (cant === slot.cantidad) {
-        // Mover todo el slot
         if (slotEnCont) {
-            // Fusionar con slot existente en el contenedor
             await supabase.from('inventario_objetos').update({ cantidad: slotEnCont.cantidad + cant }).eq('id', slotEnCont.id);
             await supabase.from('inventario_objetos').delete().eq('id', slotId);
         } else {
             await supabase.from('inventario_objetos').update({ contenedor_padre: contenedorNombre }).eq('id', slotId);
         }
     } else {
-        // Dividir: reducir origen y crear/incrementar destino
         await supabase.from('inventario_objetos').update({ cantidad: slot.cantidad - cant }).eq('id', slotId);
         if (slotEnCont) {
             await supabase.from('inventario_objetos').update({ cantidad: slotEnCont.cantidad + cant }).eq('id', slotEnCont.id);
@@ -1562,61 +1544,50 @@ async function _moverSlotAContenedor(slotId, slot, contenedorNombre, cant) {
     await _recargarObjetos();
 }
 
-// Drop en catálogo — quitar slot del inventario completamente
 window._pobjDropEnCatalogo = async (e) => {
     e.preventDefault();
     const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
     if (!estadoUI.esAdmin || fuente !== 'inventario') return;
     const slotId = parseInt(e.dataTransfer.getData('text/plain'));
-    const { error } = await supabase.from('inventario_objetos').delete().eq('id', slotId);
-    if (error) { window.mostrarToast?.('❌ Error: ' + error.message); return; }
+    await supabase.from('inventario_objetos').delete().eq('id', slotId);
     _objState.inventario = _objState.inventario.filter(i => i.id !== slotId);
     _renderObjDer(_objState.nombrePJ);
     _recargarObjetos();
 };
 
-// Modal simple para seleccionar cantidad al dividir un slot
 function _modalCantidad(max, onConfirm) {
-    const existente = document.getElementById('ppj-modal-cant');
-    if (existente) existente.remove();
-
+    const ex = document.getElementById('ppj-modal-cant'); if (ex) ex.remove();
     const modal = document.createElement('div');
     modal.id = 'ppj-modal-cant';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
-    modal.innerHTML = `
-        <div style="background:#12101e;border:1px solid rgba(212,175,55,0.3);border-radius:10px;padding:20px 24px;min-width:240px;font-family:inherit;">
-            <div style="font-size:0.78em;color:#d4af37;font-weight:700;margin-bottom:12px;letter-spacing:0.5px;">¿Cuántos mover?</div>
-            <input id="ppj-cant-input" type="number" min="1" max="${max}" value="${max}"
-                style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:5px;color:#fff;padding:6px 10px;font-size:0.9em;box-sizing:border-box;outline:none;">
-            <div style="display:flex;gap:8px;margin-top:12px;">
-                <button onclick="document.getElementById('ppj-modal-cant').remove()"
-                    style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#888;border-radius:5px;padding:6px;cursor:pointer;font-size:0.75em;">Cancelar</button>
-                <button id="ppj-cant-ok"
-                    style="flex:1;background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.4);color:#d4af37;border-radius:5px;padding:6px;cursor:pointer;font-size:0.75em;font-weight:700;">Mover</button>
-            </div>
-        </div>`;
+    modal.innerHTML = `<div style="background:#12101e;border:1px solid rgba(212,175,55,0.3);border-radius:10px;padding:20px 24px;min-width:240px;font-family:inherit;">
+        <div style="font-size:0.78em;color:#d4af37;font-weight:700;margin-bottom:12px;">¿Cuántos mover? (máx ${max})</div>
+        <input id="ppj-cant-input" type="number" min="1" max="${max}" value="${max}"
+            style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:5px;color:#fff;padding:6px 10px;font-size:0.9em;box-sizing:border-box;outline:none;">
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            <button onclick="document.getElementById('ppj-modal-cant').remove()"
+                style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#888;border-radius:5px;padding:6px;cursor:pointer;font-size:0.75em;">Cancelar</button>
+            <button id="ppj-cant-ok"
+                style="flex:1;background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.4);color:#d4af37;border-radius:5px;padding:6px;cursor:pointer;font-size:0.75em;font-weight:700;">Mover</button>
+        </div></div>`;
     document.body.appendChild(modal);
     const inp = document.getElementById('ppj-cant-input');
     inp.focus(); inp.select();
     document.getElementById('ppj-cant-ok').onclick = () => {
         const v = Math.min(max, Math.max(1, parseInt(inp.value)||1));
-        modal.remove();
-        onConfirm(v);
+        modal.remove(); onConfirm(v);
     };
-    inp.onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('ppj-cant-ok')?.click(); };
+    inp.onkeydown = (e) => { if (e.key==='Enter') document.getElementById('ppj-cant-ok')?.click(); };
 }
 
-// Eliminar slot por id
 window._pobjEliminarSlot = async (slotId) => {
     if (!estadoUI.esAdmin) return;
-    const { error } = await supabase.from('inventario_objetos').delete().eq('id', slotId);
-    if (error) { window.mostrarToast?.('❌ Error: ' + error.message); return; }
+    await supabase.from('inventario_objetos').delete().eq('id', slotId);
     _objState.inventario = _objState.inventario.filter(i => i.id !== slotId);
     _renderObjDer(_objState.nombrePJ);
     _recargarObjetos();
 };
 
-// Modificar cantidad de un slot por id
 window._pobjModCantId = async (slotId, delta) => {
     if (!estadoUI.esAdmin) return;
     const slot = _objState.inventario.find(i => i.id === slotId);
@@ -1624,15 +1595,15 @@ window._pobjModCantId = async (slotId, delta) => {
     if (nueva === 0) {
         await window._pobjEliminarSlot(slotId);
     } else {
-        const { error } = await supabase.from('inventario_objetos').update({ cantidad: nueva }).eq('id', slotId);
-        if (error) { window.mostrarToast?.('❌ Error: ' + error.message); return; }
+        await supabase.from('inventario_objetos').update({ cantidad: nueva }).eq('id', slotId);
         if (slot) slot.cantidad = nueva;
         _renderObjDer(_objState.nombrePJ);
         _recargarObjetos();
     }
 };
 
-// Quitar todos (retrocompat) — elimina todos los slots de ese objeto para el PJ
+window._pobjModCant = window._pobjModCantId; // retrocompat alias
+
 window._pobjQuitarTodos = async (nombreObj) => {
     if (!estadoUI.esAdmin) return;
     await supabase.from('inventario_objetos').delete()
@@ -1640,6 +1611,20 @@ window._pobjQuitarTodos = async (nombreObj) => {
     _objState.inventario = _objState.inventario.filter(i => i.objeto_nombre !== nombreObj);
     _renderObjDer(_objState.nombrePJ);
     _recargarObjetos();
+};
+
+window._pobjDarAlPJ = async (nombreObj, cantidad) => {
+    if (!estadoUI.esAdmin) return;
+    const slotRaiz = _objState.inventario.find(i => i.objeto_nombre === nombreObj && !i.contenedor_padre);
+    if (slotRaiz) {
+        await supabase.from('inventario_objetos').update({ cantidad: slotRaiz.cantidad + cantidad }).eq('id', slotRaiz.id);
+    } else {
+        await supabase.from('inventario_objetos').insert({
+            personaje_nombre: _objState.nombrePJ, objeto_nombre: nombreObj,
+            cantidad, equipado: false, contenedor_padre: null
+        });
+    }
+    await _recargarObjetos();
 };
 
 // Guardar objeto (crear o editar)
