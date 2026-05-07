@@ -118,42 +118,40 @@ function _inyectarPanel() {
         else _st.expandedContainers.add(nombre);
         _renderInventario();
     };
-    window._pobjAsignar = async (objNombre, cantidad = 1) => {
+    window._pobjAsignar = async (objNombre, cantidad = 1, contenedorPadre = null) => {
         if (!_st.esAdmin) return;
-        const { error } = await supabase.from('inventario_objetos').upsert({
-            personaje_nombre: _st.nombrePJ,
-            objeto_nombre: objNombre,
-            cantidad,
-            equipado: false
-        }, { onConflict: 'personaje_nombre,objeto_nombre' });
+        const slotExistente = _st.inventario.find(i => i.objeto_nombre === objNombre && (i.contenedor_padre||null) === contenedorPadre);
+        let error;
+        if (slotExistente) {
+            ({ error } = await supabase.from('inventario_objetos').update({ cantidad: slotExistente.cantidad + cantidad }).eq('id', slotExistente.id));
+        } else {
+            ({ error } = await supabase.from('inventario_objetos').insert({ personaje_nombre: _st.nombrePJ, objeto_nombre: objNombre, cantidad, equipado: false, contenedor_padre: contenedorPadre }));
+        }
         if (error) { alert('Error: ' + error.message); return; }
         await _cargarInventario();
         _renderInventario();
-        _renderCatalogo(); // actualiza badge "en inventario"
+        _renderCatalogo();
     };
-    window._pobjModCantidad = async (objNombre, delta) => {
-        const item = _st.inventario.find(i => i.objeto_nombre === objNombre);
-        const nuevaCant = Math.max(0, (item?.cantidad || 0) + delta);
+    window._pobjModCantidad = async (slotId, delta) => {
+        const item = _st.inventario.find(i => i.id === slotId);
+        if (!item) return;
+        const nuevaCant = Math.max(0, item.cantidad + delta);
         if (nuevaCant === 0) {
-            const { error } = await supabase.from('inventario_objetos')
-                .delete().eq('personaje_nombre', _st.nombrePJ).eq('objeto_nombre', objNombre);
+            const { error } = await supabase.from('inventario_objetos').delete().eq('id', slotId);
             if (error) { alert(error.message); return; }
         } else {
-            const { error } = await supabase.from('inventario_objetos').upsert({
-                personaje_nombre: _st.nombrePJ, objeto_nombre: objNombre, cantidad: nuevaCant
-            }, { onConflict: 'personaje_nombre,objeto_nombre' });
+            const { error } = await supabase.from('inventario_objetos').update({ cantidad: nuevaCant }).eq('id', slotId);
             if (error) { alert(error.message); return; }
         }
         await _cargarInventario();
         _renderInventario();
         _renderCatalogo();
     };
-    window._pobjToggleEquip = async (objNombre) => {
-        const item = _st.inventario.find(i => i.objeto_nombre === objNombre);
+    window._pobjToggleEquip = async (slotId) => {
+        const item = _st.inventario.find(i => i.id === slotId);
         if (!item) return;
         const { error } = await supabase.from('inventario_objetos')
-            .update({ equipado: !item.equipado })
-            .eq('personaje_nombre', _st.nombrePJ).eq('objeto_nombre', objNombre);
+            .update({ equipado: !item.equipado }).eq('id', slotId);
         if (error) { alert(error.message); return; }
         await _cargarInventario();
         _renderInventario();
@@ -210,28 +208,28 @@ async function _cargarDatos() {
 
 async function _cargarCatalogo() {
     const { data } = await supabase.from('objetos')
-        .select('id,nombre,tipo,material,efecto,rareza,descripcion,vida_roja,vida_azul,es_propuesta')
+        .select('id,nombre,tipo,material,efecto,rareza,descripcion,vida_roja,vida_azul,contenedor_padre,es_propuesta')
         .eq('es_propuesta', false)
         .order('nombre');
     _st.catalogo = data || [];
+
+    // Mapa contenedor → hijos
+    _st.contenidores = {};
+    _st.catalogo.forEach(o => {
+        if (o.contenedor_padre) {
+            if (!_st.contenidores[o.contenedor_padre]) _st.contenidores[o.contenedor_padre] = [];
+            _st.contenidores[o.contenedor_padre].push(o.nombre);
+        }
+    });
 }
 
 async function _cargarInventario() {
     if (!_st.nombrePJ) return;
     const { data } = await supabase.from('inventario_objetos')
-        .select('objeto_nombre,cantidad,equipado,contenedor_padre')
+        .select('objeto_nombre,cantidad,equipado')
         .eq('personaje_nombre', _st.nombrePJ)
         .gt('cantidad', 0);
     _st.inventario = data || [];
-
-    // Mapa contenedor → hijos basado en inventario del PJ
-    _st.contenidores = {};
-    _st.inventario.forEach(i => {
-        if (i.contenedor_padre) {
-            if (!_st.contenidores[i.contenedor_padre]) _st.contenidores[i.contenedor_padre] = [];
-            _st.contenidores[i.contenedor_padre].push(i.objeto_nombre);
-        }
-    });
 }
 
 // ── RENDER PRINCIPAL ─────────────────────────────────────────
@@ -309,14 +307,7 @@ function _renderInventario() {
     if (!cont) return;
 
     const q = _st.busqInv.toLowerCase().trim();
-
-    // Objetos dentro de un contenedor → no mostrar en raíz
-    const hijosDeContenedor = new Set(Object.values(_st.contenidores).flat());
-
-    const lista = _st.inventario.filter(i => {
-        if (hijosDeContenedor.has(i.objeto_nombre)) return false;
-        return !q || i.objeto_nombre.toLowerCase().includes(q);
-    });
+    const lista = _st.inventario.filter(i => !q || i.objeto_nombre.toLowerCase().includes(q));
 
     if (lista.length === 0) {
         cont.innerHTML = `<div class="pobj-empty"><div style="font-size:1.5em;margin-bottom:6px;opacity:0.3">🎒</div>Sin objetos en el inventario</div>`;
@@ -343,10 +334,10 @@ function _renderInventario() {
 
         const ctrlHTML = _st.esAdmin ? `
             <div class="pobj-inv-ctrl">
-                <button class="pobj-ctrl-btn" onclick="window._pobjModCantidad('${oSafe}',-1)">−</button>
+                <button class="pobj-ctrl-btn" onclick="window._pobjModCantidad(${item.id},-1)">−</button>
                 <span class="pobj-cant">${item.cantidad}</span>
-                <button class="pobj-ctrl-btn" onclick="window._pobjModCantidad('${oSafe}',1)">+</button>
-                <button class="pobj-btn-eqp ${isEqp?'on':'off'}" onclick="window._pobjToggleEquip('${oSafe}')">${isEqp?'EQP':'Eqp.'}</button>
+                <button class="pobj-ctrl-btn" onclick="window._pobjModCantidad(${item.id},1)">+</button>
+                <button class="pobj-btn-eqp ${isEqp?'on':'off'}" onclick="window._pobjToggleEquip(${item.id})">${isEqp?'EQP':'Eqp.'}</button>
             </div>` : `<span class="pobj-cant">${item.cantidad}</span>`;
 
         const rarColor = RAR_COLOR[cat.rareza] || '#888';
@@ -368,14 +359,15 @@ function _renderInventario() {
                 hijos.map(hNombre => {
                     const hCat   = catMap[hNombre] || {};
                     const hSafe  = hNombre.replace(/'/g, "\\'");
-                    const hInvItem = _st.inventario.find(i => i.objeto_nombre === hNombre);
-                    const hCant  = hInvItem?.cantidad || 0;
-                    const addBtn = _st.esAdmin ? `<button class="pobj-btn-sm pobj-btn-add" onclick="window._pobjAsignar('${hSafe}',1)">+1</button>` : '';
+                    const hSlot  = _st.inventario.find(i => i.objeto_nombre === hNombre && i.contenedor_padre === nombre);
+                    const hCant  = hSlot?.cantidad || 0;
+                    const hId    = hSlot?.id || null;
+                    const addBtn = _st.esAdmin ? `<button class="pobj-btn-sm pobj-btn-add" onclick="window._pobjAsignar('${hSafe}',1,'${oSafe}')">+1</button>` : '';
                     return `<div class="pobj-inv-card" style="opacity:${hCant>0?1:0.45}">
                         <img class="pobj-cat-img" src="${_imgObj(hNombre)}" onerror="this.onerror=null;this.src='${_imgFallback()}'" loading="lazy" style="width:32px;height:32px;">
                         <div class="pobj-inv-nombre" style="font-size:0.75em;">${hNombre}</div>
                         <span class="pobj-cant" style="font-size:0.8em;">${hCant}</span>
-                        ${_st.esAdmin && hCant > 0 ? `<button class="pobj-ctrl-btn" onclick="window._pobjModCantidad('${hSafe}',-1)">−</button>` : ''}
+                        ${_st.esAdmin && hId ? `<button class="pobj-ctrl-btn" onclick="window._pobjModCantidad(${hId},-1)">−</button>` : ''}
                         ${addBtn}
                     </div>`;
                 }).join('') +
