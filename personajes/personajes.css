@@ -6,24 +6,24 @@
 :root {
     --gold:        #d4af37;
     --gold-dim:    #a8881e;
-    --gold-faint:  rgba(212, 175, 55, 0.12);
+    --gold-faint:  rgba(212, 175, 55, 0.18);
     --gold-border: rgba(212, 175, 55, 0.28);
 
     --violet:      #7c4daa;
     --violet-dim:  #4a2870;
-    --violet-faint:rgba(124, 77, 170, 0.14);
+    --violet-faint:rgba(124, 77, 170, 0.18);
     --violet-border:rgba(124, 77, 170, 0.35);
 
     --bg:    #08080e;
-    --bg2:   #0f0f18;
-    --bg3:   #161622;
-    --bg4:   #1e1e2e;
+    --bg2:   #111120;
+    --bg3:   #1a1a2a;
+    --bg4:   #242436;
 
-    --text:  #d4d4e6;
-    --dim:   #9494b8;
-    --faint: rgba(196, 196, 212, 0.07);
+    --text:  #e8e8f8;
+    --dim:   #b0b0d0;
+    --faint: rgba(196, 196, 212, 0.24);
 
-    --border: rgba(255, 255, 255, 0.07);
+    --border: rgba(255, 255, 255, 0.20);
 
     --font-display: 'Cinzel', serif;
     --font-body:    'Inter', system-ui, sans-serif;
