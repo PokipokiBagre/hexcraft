@@ -371,7 +371,7 @@ async function _renderTransfer() {
                 const sel = _trState.objSeleccionado === i.objeto_nombre;
                 return `<div onclick="window._pobjopSelObj('${i.objeto_nombre.replace(/'/g,"\\'")}' )"
                     style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:5px;cursor:pointer;
-                    border:1px solid ${sel?'#d4af37':'rgba(255,255,255,0.07)'};background:${sel?'rgba(212,175,55,0.1)':'rgba(255,255,255,0.02)'};
+                    border:1px solid ${sel?'#d4af37':'rgba(255,255,255,0.27)'};background:${sel?'rgba(212,175,55,0.1)':'rgba(255,255,255,0.22)'};
                     font-size:0.75em;color:${sel?'#d4af37':'#ccc'};">
                     <img src="${_imgObj(i.objeto_nombre)}" onerror="this.onerror=null;this.src='${_imgFall()}'" style="width:28px;height:28px;border-radius:3px;object-fit:cover;">
                     ${i.objeto_nombre} <b style="color:#d4af37;">×${i.cantidad}</b>
@@ -393,7 +393,7 @@ async function _renderTransfer() {
         </div>
     </div>
     ${_trState.objSeleccionado ? `
-    <div style="margin-top:14px;padding:12px;background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.2);border-radius:7px;">
+    <div style="margin-top:14px;padding:12px;background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.4);border-radius:7px;">
         <div class="pobj-op-sep" style="margin-top:0;">Cantidad a transferir</div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             ${[1,3,5,10,'TODO'].map(n=>`<button onclick="window._pobjopSetCant('${n}')" class="pobj-op-btn ${_trState.cant===n||(_trState.cant==='TODO'&&n==='TODO')?'pobj-op-btn-primary':'pobj-op-btn-ghost'}">×${n}</button>`).join('')}
@@ -515,7 +515,7 @@ function _renderImagenes() {
         <div style="flex:1;display:flex;flex-direction:column;">
             <div class="pobj-op-sep" style="margin-top:0;">Subir imagen</div>
             ${_imgSelObj ? `
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px;background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.2);border-radius:6px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px;background:rgba(212,175,55,0.26);border:1px solid rgba(212,175,55,0.4);border-radius:6px;">
                 <img src="${_imgObj(_imgSelObj)}" onerror="this.onerror=null;this.src='${_imgFall()}'" style="width:48px;height:48px;border-radius:5px;object-fit:cover;">
                 <div>
                     <div style="font-size:0.8em;font-weight:700;color:#d4af37;">${_imgSelObj}</div>
@@ -611,14 +611,14 @@ window._pobjopAbrirContenedor = async (nombreContenedor) => {
             <div id="pobj-cont-hijos">
             ${hijos.length === 0 ? '<div class="pobj-empty">Contenedor vacío</div>' :
                 hijos.map(h => `
-                <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);margin-bottom:5px;">
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.25);margin-bottom:5px;">
                     <img src="${_imgObj(h.nombre)}" onerror="this.onerror=null;this.src='${_imgFall()}'" style="width:32px;height:32px;border-radius:4px;object-fit:cover;">
                     <span style="flex:1;font-size:0.8em;color:#ccc;">${h.nombre}</span>
                     <button class="pobj-op-btn pobj-op-btn-danger" style="padding:3px 8px;font-size:0.6em;" onclick="window._pobjContQuitarHijo('${h.nombre.replace(/'/g,"\\'")}','${nombreContenedor.replace(/'/g,"\\'")}')">Quitar</button>
                 </div>`).join('')}
             </div>
         </div>
-        <div style="flex:1;border-left:1px solid rgba(255,255,255,0.06);padding-left:14px;">
+        <div style="flex:1;border-left:1px solid rgba(255,255,255,0.26);padding-left:14px;">
             <div class="pobj-op-sep" style="margin-top:0;">Agregar objeto al contenedor</div>
             <select id="pobj-cont-add-sel" class="pobj-op-input">
                 <option value="">-- Seleccionar --</option>
