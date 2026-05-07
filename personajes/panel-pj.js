@@ -11,6 +11,7 @@ import {
 import { currentConfig, supabase } from '../hex-auth.js';
 import { encolarCambio } from './personajes-state.js';
 import { abrirMinimapa, cerrarMinimapa, centrarEnHechizo } from '../panel-mapa-hechizos.js';
+import { renderTabMisiones } from './panel-mis.js';
 // panel-objetos-op.js se carga dinámicamente al abrir la tab Objetos como admin
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -355,7 +356,7 @@ function _renderTab(nombre, tab) {
         case 'stats':    body.innerHTML = _tabStats(nombre);  break;
         case 'hechizos': _tabHechizosConMapa(nombre, body);   break;
         case 'objetos':  _tabObjetos(nombre, body);            break;
-        case 'misiones': _tabMisiones(nombre, body);           break;
+        case 'misiones': renderTabMisiones(nombre, body);       break;
     }
 }
 
@@ -2224,33 +2225,6 @@ window._pobjImgSubir = async (file) => {
 };
 
 window._pobjRecargarDesdeOP = _recargarObjetos;
-
-// ─────────────────────────────────────────────────────────────
-// TAB: MISIONES
-// ─────────────────────────────────────────────────────────────
-async function _tabMisiones(nombre, body) {
-    body.innerHTML = '<div class="ppj-loader">Cargando misiones…</div>';
-    const { data: misiones } = await supabase.from('misiones')
-        .select('titulo, tipo, clase, estado, descripcion, cupos, jugadores').order('orden');
-
-    const misP = (misiones||[]).filter(m=>(Array.isArray(m.jugadores)?m.jugadores:[]).includes(nombre));
-    const misD = (misiones||[]).filter(m=>m.estado<3&&!(Array.isArray(m.jugadores)?m.jugadores:[]).includes(nombre));
-
-    const _badge = (e) => `<span class="ppj-mis-badge ppj-mis-${e}">${['Inactiva','Pendiente','En Proceso','Finalizada'][e]||'?'}</span>`;
-    const _card  = (m) => `<div class="ppj-mision-card">
-        <div class="ppj-mis-header"><span class="ppj-mis-titulo">${m.titulo}</span><span class="ppj-mis-clase">C-${m.clase}</span></div>
-        ${_badge(m.estado)}
-        ${m.descripcion?`<div class="ppj-mis-desc">${m.descripcion.slice(0,130)}${m.descripcion.length>130?'…':''}</div>`:''}
-    </div>`;
-
-    if (!misP.length&&!misD.length) {
-        body.innerHTML = `<div class="ppj-section"><div class="ppj-empty"><div class="ppj-empty-icon">📋</div>Sin misiones</div></div>`;
-        return;
-    }
-    body.innerHTML = `
-    ${misP.length?`<div class="ppj-section"><div class="ppj-section-title">Participando (${misP.length})</div>${misP.map(_card).join('')}</div>`:''}
-    ${misD.length?`<div class="ppj-section"><div class="ppj-section-title">Disponibles (${misD.length})</div>${misD.map(_card).join('')}</div>`:''}`;
-}
 
 // ─────────────────────────────────────────────────────────────
 // FUNCIONES GLOBALES
