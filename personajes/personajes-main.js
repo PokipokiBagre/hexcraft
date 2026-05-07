@@ -12,7 +12,7 @@ import { calcularStats, buildContext, evalExpr,
          calcularPushDisponibles, calcularValorPush, calcularCooldownPush } from './personajes-logic.js';
 import { cargarDatos, sincronizarCola, guardarFormulasBD,
          guardarPushFormulasBD, guardarPushUmbralesBD, eliminarUmbralDB,
-         persistirPush } from './personajes-data.js';
+         persistirPush, persistirCampos } from './personajes-data.js';
 import { renderCatalogo, renderFormulas,
          previsualizarFormulaConPJ, renderPreviewCompleto } from './personajes-ui.js';
 import { abrirPanelPJ, cerrarPanelPJ, refreshPanelPJ } from './panel-pj.js';
@@ -122,9 +122,8 @@ window.modStat = function(nombre, campo, delta) {
     const caps = { vex_actual: s.vex_max, vida_azul_actual: s.vida_azul_max, guarda_actual: s.guarda_max };
     const max = caps[campo] ?? Infinity;
     p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
-    encolarCambio(nombre, campo, p[campo]);
+    persistirCampos(nombre, { [campo]: p[campo] });
     renderCatalogo();
-    actualizarBtnSync();
     refreshPanelPJ();
 };
 
@@ -146,9 +145,9 @@ window.modStatMax = function(nombre, campo, delta) {
     }
 
     p[campo] = Math.max(0, (p[campo] || 0) + delta);
-    encolarCambio(nombre, campo, p[campo]);
+    const _dbMap1 = { vida_roja_max_override: 'vida_roja_max_op', vida_azul_max_override: 'vida_azul_max_op', guarda_max_override: 'guarda_max_op' };
+    persistirCampos(nombre, { [_dbMap1[campo] || campo]: p[campo] });
     renderCatalogo();
-    actualizarBtnSync();
     refreshPanelPJ();
 };
 
@@ -156,9 +155,9 @@ window.resetStatMax = function(nombre, campo) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
     p[campo] = 0;
-    encolarCambio(nombre, campo, 0);
+    const _dbMap2 = { vida_roja_max_override: 'vida_roja_max_op', vida_azul_max_override: 'vida_azul_max_op', guarda_max_override: 'guarda_max_op' };
+    persistirCampos(nombre, { [_dbMap2[campo] || campo]: 0 });
     renderCatalogo();
-    actualizarBtnSync();
     mostrarToast('Máximo restaurado a fórmula');
     refreshPanelPJ();
 };
@@ -174,8 +173,9 @@ window.modAfin = function(nombre, afinKey, delta) {
     // mantener alias legacy en sincronía
     if (!p.afinidadesBase) p.afinidadesBase = {};
     p.afinidadesBase[afinKey] = p.afin_base[afinKey];
-    encolarCambio(nombre, 'afin_base', { ...p.afin_base });
-    renderCatalogo(); actualizarBtnSync(); refreshPanelPJ();
+    persistirCampos(nombre, { afin_base: { ...p.afin_base } });
+    renderCatalogo(); refreshPanelPJ();
+    _autoSync();
 };
 
 window.modBf = function(nombre, afinKey, delta) {
@@ -185,8 +185,9 @@ window.modBf = function(nombre, afinKey, delta) {
     p.afin_extra[afinKey] = Math.max(-999, (p.afin_extra[afinKey] || 0) + delta);
     if (!p.afinidadesBf) p.afinidadesBf = {};
     p.afinidadesBf[afinKey] = p.afin_extra[afinKey];
-    encolarCambio(nombre, 'afin_extra', { ...p.afin_extra });
-    renderCatalogo(); actualizarBtnSync(); refreshPanelPJ();
+    persistirCampos(nombre, { afin_extra: { ...p.afin_extra } });
+    renderCatalogo(); refreshPanelPJ();
+    _autoSync();
 };
 
 window.modEf = function(nombre, afinKey, delta) {
@@ -196,8 +197,9 @@ window.modEf = function(nombre, afinKey, delta) {
     p.afin_alter[afinKey] = Math.max(-999, (p.afin_alter[afinKey] || 0) + delta);
     if (!p.afinidadesEf) p.afinidadesEf = {};
     p.afinidadesEf[afinKey] = p.afin_alter[afinKey];
-    encolarCambio(nombre, 'afin_alter', { ...p.afin_alter });
-    renderCatalogo(); actualizarBtnSync(); refreshPanelPJ();
+    persistirCampos(nombre, { afin_alter: { ...p.afin_alter } });
+    renderCatalogo(); refreshPanelPJ();
+    _autoSync();
 };
 
 // Aliases usados desde el panel de stats
@@ -273,9 +275,9 @@ window.modPushExtra = function(nombre, recurso, delta) {
     const p = personajes[nombre]; if (!p) return;
     const limitKey = recurso === 'vex' ? 'push_vex_limit' : 'push_guarda_limit';
     p[limitKey] = Math.max(0, (p[limitKey] || 0) + delta);
-    encolarCambio(nombre, limitKey, p[limitKey]);
-    actualizarBtnSync();
+    persistirCampos(nombre, { [limitKey]: p[limitKey] });
     refreshPanelPJ();
+    _autoSync();
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -590,6 +592,13 @@ window.eliminarUmbral = async function(recurso, idx) {
 // ─────────────────────────────────────────────────────────────
 // SYNC
 // ─────────────────────────────────────────────────────────────
+// Auto-sincroniza en segundo plano tras cada cambio de stat.
+// Si falla, el botón de sync permanece visible como fallback.
+async function _autoSync() {
+    const res = await sincronizarCola();
+    if (res.ok) actualizarBtnSync();
+}
+
 function actualizarBtnSync() {
     const btn = document.getElementById('btn-sync');
     const n   = Object.keys(colaCambios).length;
