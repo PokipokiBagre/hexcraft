@@ -2172,6 +2172,8 @@ window._pobjIniciarTransfer = async (destNombre) => {
         }
     });
     _renderObjIzq();
+    // Refrescar panel derecho para añadir drop zones
+    _renderTransferDer(_objState.nombrePJ);
 };
 
 window._pobjCambiarDestinoTransfer = () => {
@@ -2180,6 +2182,7 @@ window._pobjCambiarDestinoTransfer = () => {
     _objState.transferContenedoresDest = {};
     _objState.transferExpandedDest = new Set();
     _renderObjIzq();
+    _renderTransferDer(_objState.nombrePJ);
 };
 
 window._pobjTransferToggleCont = (origen, nombre) => {
