@@ -1202,27 +1202,102 @@ function _renderObjIzq() {
         <button class="pobj-btn-crear" onclick="window._pobjEjecutarForja()">⚒️ Forjar todos</button>`;
 
     } else if (seccionIzq === 'transfer') {
-        const CANTS   = [1,3,5,10,'TODO'];
         const personajesDisp = Object.keys(personajes).filter(p => p !== _objState.nombrePJ).sort();
         const selDest = _objState.transferDest || '';
-        const selObj  = _objState.transferObj  || '';
-        const selCant = _objState.transferCant || 1;
-        const invItems = _objState.inventario.filter(i=>i.cantidad>0);
 
-        contenidoScroll = `${btnVolver}
-        <div class="pobj-section-title">Mover objeto a otro inventario</div>
-        <label class="pobj-op-label-sm">1. Destino</label>
-        <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;">
-            ${personajesDisp.map(p=>`<div class="pobj-transfer-row ${selDest===p?'sel':''}" onclick="window._pobjSelDest('${p.replace(/'/g,"\\'")}')">
-                <span style="flex:1;color:${personajes[p]?.isPlayer?'#ccc':'#777'}">${p}</span>
-            </div>`).join('')}
-        </div>
-        <label class="pobj-op-label-sm">2. Objeto</label>
-        <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;">
-            ${invItems.map(i=>`<div class="pobj-transfer-row ${selObj===i.objeto_nombre?'sel':''}" onclick="window._pobjSelObj('${i.objeto_nombre.replace(/'/g,"\\'")}')">
-                <span style="flex:1;">${i.objeto_nombre}</span><b style="color:#d4af37">×${i.cantidad}</b>
-            </div>`).join('')}
-        </div>
+        if (!selDest) {
+            contenidoScroll = `${btnVolver}
+            <div class="pobj-section-title" style="margin-bottom:10px;">Transferir objetos</div>
+            <div style="font-size:0.65em;color:#7878a0;margin-bottom:8px;">Elige el personaje con quien intercambiar:</div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+                ${personajesDisp.map(p=>`<div class="pobj-transfer-row" onclick="window._pobjIniciarTransfer('${p.replace(/'/g,"\'")}')">
+                    <span style="flex:1;color:${personajes[p]?.isPlayer?'#d0d0e0':'#7878a0'};font-size:0.82em;">${p}</span>
+                    <span style="font-size:0.6em;color:#555;">${personajes[p]?.isPlayer?'Jugador':'NPC'}</span>
+                </div>`).join('')}
+            </div>`;
+        } else {
+            const destInv      = _objState.transferInvDest;
+            const destExpanded = _objState.transferExpandedDest;
+
+            const _imgObjT = (n) => { try{return `${window._hexConfig?.storageUrl||''}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
+            const _fallT   = () => { try{return `${window._hexConfig?.storageUrl||''}/imginterfaz/no_encontrado.png`;}catch{return '';} };
+
+            const _renderSlotT = (slot, origen) => {
+                const cat  = _objState.catalogo.find(o=>o.nombre===slot.objeto_nombre)||{};
+                const tipo = cat.tipo||'-';
+                const esContenedor = tipo === 'Contenedor';
+                const safe = slot.objeto_nombre.replace(/'/g,"\'");
+                const hijosSlots = origen === 'local'
+                    ? _objState.inventario.filter(i => i.contenedor_padre === slot.objeto_nombre)
+                    : destInv.filter(i => i.contenedor_padre === slot.objeto_nombre);
+                const expanded = destExpanded.has(`${origen}:${slot.objeto_nombre}`);
+
+                let html = `<div class="ppj-obj-card" style="margin-bottom:3px;"
+                    draggable="true"
+                    ondragstart="window._pobjTransferDragStart(event,${slot.id},'${safe}','${origen}')"
+                    ondragend="event.target.style.opacity=''">
+                    <div class="ppj-obj-header" style="gap:5px;">
+                        <img src="${_imgObjT(slot.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fallT()}'" style="width:28px;height:28px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:0.74em;font-weight:600;color:#d0d0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${slot.objeto_nombre}</div>
+                            ${cat.efecto?`<div style="font-size:0.58em;color:#8888a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cat.efecto}</div>`:''}
+                        </div>
+                        <span style="font-size:0.8em;font-weight:700;color:#d4af37;flex-shrink:0;">x${slot.cantidad}</span>
+                        ${esContenedor?`<button class="ppj-ctrl-btn" style="font-size:0.6em;padding:0 4px;" onclick="window._pobjTransferToggleCont('${origen}','${safe}')">${expanded?'▲':'▼'}</button>`:''}
+                    </div>
+                </div>`;
+
+                if (esContenedor && expanded && hijosSlots.length > 0) {
+                    html += `<div style="padding-left:10px;border-left:2px solid rgba(100,150,255,0.2);margin-bottom:3px;"
+                        ondragover="event.preventDefault();event.stopPropagation();this.style.borderLeftColor='#d4af37';"
+                        ondragleave="this.style.borderLeftColor='rgba(100,150,255,0.2)';"
+                        ondrop="window._pobjTransferDrop(event,'${origen==='local'?'dest':'local'}','${safe}');this.style.borderLeftColor='rgba(100,150,255,0.2)';">`;
+                    html += hijosSlots.map(h => {
+                        const hSafe = h.objeto_nombre.replace(/'/g,"\'");
+                        const hCat  = _objState.catalogo.find(o=>o.nombre===h.objeto_nombre)||{};
+                        return `<div class="ppj-obj-card" style="margin-bottom:2px;" draggable="true"
+                            ondragstart="window._pobjTransferDragStart(event,${h.id},'${hSafe}','${origen}')"
+                            ondragend="event.target.style.opacity=''">
+                            <div class="ppj-obj-header" style="gap:5px;">
+                                <img src="${_imgObjT(h.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fallT()}'" style="width:24px;height:24px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;">
+                                <div style="flex:1;min-width:0;font-size:0.72em;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.objeto_nombre}</div>
+                                <span style="font-size:0.75em;color:#d4af37;font-weight:700;">x${h.cantidad}</span>
+                            </div>
+                        </div>`;
+                    }).join('');
+                    html += `</div>`;
+                }
+                return html;
+            };
+
+            const localRaiz = _objState.inventario.filter(i => !i.contenedor_padre);
+            const destRaiz  = destInv.filter(i => !i.contenedor_padre);
+
+            const renderCol = (slots, origen, label) => `
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:0;">
+                    <div style="font-size:0.58em;color:#d4af37;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 6px;background:rgba(212,175,55,0.06);border-radius:4px;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div>
+                    <div style="flex:1;min-height:120px;padding:4px;border-radius:5px;border:1px dashed rgba(255,255,255,0.08);transition:border-color 0.15s;"
+                        ondragover="event.preventDefault();event.stopPropagation();this.style.borderColor='rgba(212,175,55,0.4)';"
+                        ondragleave="this.style.borderColor='rgba(255,255,255,0.08)';"
+                        ondrop="window._pobjTransferDrop(event,'${origen}',null);this.style.borderColor='rgba(255,255,255,0.08)';">
+                        ${slots.length===0?`<div style="font-size:0.62em;color:#3a3a58;padding:12px 4px;text-align:center;">Inventario vacío</div>`:''}
+                        ${slots.map(s => _renderSlotT(s, origen)).join('')}
+                    </div>
+                </div>`;
+
+            contenidoScroll = `${btnVolver}
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <div style="font-size:0.6em;color:#d4af37;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Transferir objetos</div>
+                <button class="pobj-fbtn" onclick="window._pobjCambiarDestinoTransfer()" style="font-size:0.58em;">Cambiar ⇄</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:flex-start;">
+                ${renderCol(localRaiz, 'local', _objState.nombrePJ)}
+                <div style="color:#3a3a58;font-size:1em;padding-top:50px;flex-shrink:0;">⇄</div>
+                ${renderCol(destRaiz, 'dest', selDest)}
+            </div>
+            <div style="margin-top:6px;font-size:0.58em;color:#5a5a78;text-align:center;">Arrastra objetos entre columnas · Expande contenedores con ▼</div>`;
+        }
+
     } else if (seccionIzq === 'imagenes') {
         const selImg   = _objState.imgSelObj || '';
         const filt     = (_objState.imgBusq||'').toLowerCase();
