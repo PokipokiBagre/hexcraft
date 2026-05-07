@@ -11,7 +11,7 @@ import {
 import { currentConfig, supabase } from '../hex-auth.js';
 import { encolarCambio } from './personajes-state.js';
 import { abrirMinimapa, cerrarMinimapa, centrarEnHechizo } from '../panel-mapa-hechizos.js';
-import { renderTabMisiones } from './panel-mis.js';
+import { renderTabMisiones, cerrarTabMisiones } from './panel-mis.js';
 // panel-objetos-op.js se carga dinámicamente al abrir la tab Objetos como admin
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -278,6 +278,7 @@ export function cerrarPanelPJ() {
     document.getElementById('panel-pj-overlay')?.classList.remove('open');
     cerrarMinimapa();
     _cerrarPanelObjetos();
+    cerrarTabMisiones();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -349,6 +350,9 @@ function _renderTab(nombre, tab) {
     }
     if (tab !== 'objetos') {
         _cerrarPanelObjetos();
+    }
+    if (tab !== 'misiones') {
+        cerrarTabMisiones();
     }
 
     switch(tab) {
