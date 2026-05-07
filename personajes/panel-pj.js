@@ -1206,44 +1206,64 @@ function _renderObjIzq() {
         const selDest = _objState.transferDest || '';
 
         if (!selDest) {
+            // ── Selector de personaje: grid con imagen ──
+            const _imgPjT = (nombre) => {
+                const p = personajes[nombre];
+                const icono = p?.iconoOverride || nombre;
+                return `${window._hexConfig?.storageUrl||''}/imgpersonajes/${icono.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;
+            };
+            const jugadores = personajesDisp.filter(p => personajes[p]?.isPlayer);
+            const npcs      = personajesDisp.filter(p => !personajes[p]?.isPlayer);
+
+            const renderGrid = (lista) => lista.map(p => {
+                const safe = p.replace(/'/g,"\'");
+                return `<div onclick="window._pobjIniciarTransfer('${safe}')"
+                    style="cursor:pointer;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:7px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;transition:all 0.15s;"
+                    onmouseover="this.style.borderColor='rgba(212,175,55,0.35)';this.style.background='rgba(212,175,55,0.06)'"
+                    onmouseout="this.style.borderColor='rgba(255,255,255,0.07)';this.style.background='rgba(255,255,255,0.03)'">
+                    <img src="${_imgPjT(p)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:44px;height:44px;border-radius:50%;object-fit:cover;background:#111;border:2px solid rgba(255,255,255,0.08);">
+                    <span style="font-size:0.62em;color:#d0d0e0;text-align:center;line-height:1.2;word-break:break-word;max-width:70px;">${p}</span>
+                </div>`;
+            }).join('');
+
             contenidoScroll = `${btnVolver}
-            <div class="pobj-section-title" style="margin-bottom:10px;">Transferir objetos</div>
-            <div style="font-size:0.65em;color:#7878a0;margin-bottom:8px;">Elige el personaje con quien intercambiar:</div>
-            <div style="display:flex;flex-direction:column;gap:3px;">
-                ${personajesDisp.map(p=>`<div class="pobj-transfer-row" onclick="window._pobjIniciarTransfer('${p.replace(/'/g,"\'")}')">
-                    <span style="flex:1;color:${personajes[p]?.isPlayer?'#d0d0e0':'#7878a0'};font-size:0.82em;">${p}</span>
-                    <span style="font-size:0.6em;color:#555;">${personajes[p]?.isPlayer?'Jugador':'NPC'}</span>
-                </div>`).join('')}
+            <div style="font-size:0.72em;color:#d4af37;font-weight:700;letter-spacing:0.5px;margin-bottom:10px;">Transferir objetos</div>
+            <input class="pobj-search-izq" placeholder="Buscar personaje…" oninput="window._pobjFiltrarDestTransfer(this.value)" style="margin-bottom:8px;">
+            <div id="pobj-dest-grid">
+            ${jugadores.length ? `<div style="font-size:0.58em;color:#7878a0;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;">Jugadores</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;margin-bottom:10px;">${renderGrid(jugadores)}</div>` : ''}
+            ${npcs.length ? `<div style="font-size:0.58em;color:#7878a0;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;">NPCs</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;">${renderGrid(npcs)}</div>` : ''}
             </div>`;
         } else {
+            // ── Inventario del destino en panel izquierdo ──
             const destInv      = _objState.transferInvDest;
             const destExpanded = _objState.transferExpandedDest;
+            const pDest        = personajes[selDest] || {};
+            const _imgPjT2 = (nombre) => {
+                const p = personajes[nombre]; const icono = p?.iconoOverride || nombre;
+                return `${window._hexConfig?.storageUrl||''}/imgpersonajes/${icono.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;
+            };
 
-            const _imgObjT = (n) => { try{return `${window._hexConfig?.storageUrl||''}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
-            const _fallT   = () => { try{return `${window._hexConfig?.storageUrl||''}/imginterfaz/no_encontrado.png`;}catch{return '';} };
-
-            const _renderSlotT = (slot, origen) => {
+            const _renderSlotDest = (slot) => {
                 const cat  = _objState.catalogo.find(o=>o.nombre===slot.objeto_nombre)||{};
-                const tipo = cat.tipo||'-';
-                const esContenedor = tipo === 'Contenedor';
+                const esContenedor = (cat.tipo||'-') === 'Contenedor';
                 const safe = slot.objeto_nombre.replace(/'/g,"\'");
-                const hijosSlots = origen === 'local'
-                    ? _objState.inventario.filter(i => i.contenedor_padre === slot.objeto_nombre)
-                    : destInv.filter(i => i.contenedor_padre === slot.objeto_nombre);
-                const expanded = destExpanded.has(`${origen}:${slot.objeto_nombre}`);
+                const hijosSlots = destInv.filter(i => i.contenedor_padre === slot.objeto_nombre);
+                const expanded   = destExpanded.has(slot.objeto_nombre);
 
                 let html = `<div class="ppj-obj-card" style="margin-bottom:3px;"
                     draggable="true"
-                    ondragstart="window._pobjTransferDragStart(event,${slot.id},'${safe}','${origen}')"
+                    ondragstart="window._pobjTransferDragStart(event,${slot.id},'${safe}','dest')"
                     ondragend="event.target.style.opacity=''">
                     <div class="ppj-obj-header" style="gap:5px;">
-                        <img src="${_imgObjT(slot.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fallT()}'" style="width:28px;height:28px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;">
+                        <img src="${_imgObj(slot.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:28px;height:28px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;">
                         <div style="flex:1;min-width:0;">
                             <div style="font-size:0.74em;font-weight:600;color:#d0d0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${slot.objeto_nombre}</div>
                             ${cat.efecto?`<div style="font-size:0.58em;color:#8888a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cat.efecto}</div>`:''}
                         </div>
                         <span style="font-size:0.8em;font-weight:700;color:#d4af37;flex-shrink:0;">x${slot.cantidad}</span>
-                        ${esContenedor?`<button class="ppj-ctrl-btn" style="font-size:0.6em;padding:0 4px;" onclick="window._pobjTransferToggleCont('${origen}','${safe}')">${expanded?'▲':'▼'}</button>`:''}
+                        ${esContenedor?`<button class="ppj-ctrl-btn" style="font-size:0.6em;padding:0 4px;" onclick="window._pobjTransferToggleCont('${safe}')">${expanded?'▲':'▼'}</button>`:''}
                     </div>
                 </div>`;
 
@@ -1251,15 +1271,15 @@ function _renderObjIzq() {
                     html += `<div style="padding-left:10px;border-left:2px solid rgba(100,150,255,0.2);margin-bottom:3px;"
                         ondragover="event.preventDefault();event.stopPropagation();this.style.borderLeftColor='#d4af37';"
                         ondragleave="this.style.borderLeftColor='rgba(100,150,255,0.2)';"
-                        ondrop="window._pobjTransferDrop(event,'${origen==='local'?'dest':'local'}','${safe}');this.style.borderLeftColor='rgba(100,150,255,0.2)';">`;
+                        ondrop="window._pobjTransferDropEnContenedor(event,'dest','${safe}');this.style.borderLeftColor='rgba(100,150,255,0.2)';">`;
                     html += hijosSlots.map(h => {
                         const hSafe = h.objeto_nombre.replace(/'/g,"\'");
                         const hCat  = _objState.catalogo.find(o=>o.nombre===h.objeto_nombre)||{};
                         return `<div class="ppj-obj-card" style="margin-bottom:2px;" draggable="true"
-                            ondragstart="window._pobjTransferDragStart(event,${h.id},'${hSafe}','${origen}')"
+                            ondragstart="window._pobjTransferDragStart(event,${h.id},'${hSafe}','dest')"
                             ondragend="event.target.style.opacity=''">
                             <div class="ppj-obj-header" style="gap:5px;">
-                                <img src="${_imgObjT(h.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fallT()}'" style="width:24px;height:24px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;">
+                                <img src="${_imgObj(h.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:24px;height:24px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;">
                                 <div style="flex:1;min-width:0;font-size:0.72em;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.objeto_nombre}</div>
                                 <span style="font-size:0.75em;color:#d4af37;font-weight:700;">x${h.cantidad}</span>
                             </div>
@@ -1270,32 +1290,25 @@ function _renderObjIzq() {
                 return html;
             };
 
-            const localRaiz = _objState.inventario.filter(i => !i.contenedor_padre);
-            const destRaiz  = destInv.filter(i => !i.contenedor_padre);
-
-            const renderCol = (slots, origen, label) => `
-                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:0;">
-                    <div style="font-size:0.58em;color:#d4af37;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 6px;background:rgba(212,175,55,0.06);border-radius:4px;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div>
-                    <div style="flex:1;min-height:120px;padding:4px;border-radius:5px;border:1px dashed rgba(255,255,255,0.08);transition:border-color 0.15s;"
-                        ondragover="event.preventDefault();event.stopPropagation();this.style.borderColor='rgba(212,175,55,0.4)';"
-                        ondragleave="this.style.borderColor='rgba(255,255,255,0.08)';"
-                        ondrop="window._pobjTransferDrop(event,'${origen}',null);this.style.borderColor='rgba(255,255,255,0.08)';">
-                        ${slots.length===0?`<div style="font-size:0.62em;color:#3a3a58;padding:12px 4px;text-align:center;">Inventario vacío</div>`:''}
-                        ${slots.map(s => _renderSlotT(s, origen)).join('')}
-                    </div>
-                </div>`;
+            const destRaiz = destInv.filter(i => !i.contenedor_padre);
 
             contenidoScroll = `${btnVolver}
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-                <div style="font-size:0.6em;color:#d4af37;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Transferir objetos</div>
-                <button class="pobj-fbtn" onclick="window._pobjCambiarDestinoTransfer()" style="font-size:0.58em;">Cambiar ⇄</button>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:6px 8px;background:rgba(255,255,255,0.03);border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                <img src="${_imgPjT2(selDest)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;background:#111;flex-shrink:0;border:2px solid rgba(212,175,55,0.3);">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.78em;font-weight:700;color:#d4af37;">${selDest}</div>
+                    <div style="font-size:0.6em;color:#7878a0;">${pDest.isPlayer?'Jugador':'NPC'} · ${destRaiz.length} objeto${destRaiz.length!==1?'s':''}</div>
+                </div>
+                <button class="pobj-fbtn" onclick="window._pobjCambiarDestinoTransfer()" style="font-size:0.6em;flex-shrink:0;">Cambiar</button>
             </div>
-            <div style="display:flex;gap:6px;align-items:flex-start;">
-                ${renderCol(localRaiz, 'local', _objState.nombrePJ)}
-                <div style="color:#3a3a58;font-size:1em;padding-top:50px;flex-shrink:0;">⇄</div>
-                ${renderCol(destRaiz, 'dest', selDest)}
-            </div>
-            <div style="margin-top:6px;font-size:0.58em;color:#5a5a78;text-align:center;">Arrastra objetos entre columnas · Expande contenedores con ▼</div>`;
+            <div style="font-size:0.6em;color:#5a5a78;margin-bottom:8px;text-align:center;">← Arrastra aquí desde ${_objState.nombrePJ} · Arrastra al panel derecho para enviar →</div>
+            <div id="ppj-transfer-dest-drop" style="min-height:80px;padding:4px;border-radius:5px;border:1px dashed rgba(255,255,255,0.08);transition:border-color 0.15s;"
+                ondragover="event.preventDefault();event.stopPropagation();this.style.borderColor='rgba(212,175,55,0.4)';"
+                ondragleave="this.style.borderColor='rgba(255,255,255,0.08)';"
+                ondrop="window._pobjTransferDrop(event,'dest',null);this.style.borderColor='rgba(255,255,255,0.08)';">
+                ${destRaiz.length===0?`<div style="font-size:0.62em;color:#3a3a58;padding:16px;text-align:center;">Inventario vacío</div>`:''}
+                ${destRaiz.map(_renderSlotDest).join('')}
+            </div>`;
         }
 
     } else if (seccionIzq === 'imagenes') {
@@ -1668,6 +1681,375 @@ function _modalCantidad(max, onConfirm) {
     };
     inp.onkeydown = (e) => { if (e.key==='Enter') document.getElementById('ppj-cant-ok')?.click(); };
 }
+
+window._pobjEliminarSlot = async (slotId) => {
+    if (!estadoUI.esAdmin) return;
+    await supabase.from('inventario_objetos').delete().eq('id', slotId);
+    _objState.inventario = _objState.inventario.filter(i => i.id !== slotId);
+    _renderObjDer(_objState.nombrePJ);
+    _recargarObjetos();
+};
+
+window._pobjModCantId = async (slotId, delta) => {
+    if (!estadoUI.esAdmin) return;
+    const slot = _objState.inventario.find(i => i.id === slotId);
+    const nueva = Math.max(0, (slot?.cantidad||0) + delta);
+    if (nueva === 0) {
+        await window._pobjEliminarSlot(slotId);
+    } else {
+        await supabase.from('inventario_objetos').update({ cantidad: nueva }).eq('id', slotId);
+        if (slot) slot.cantidad = nueva;
+        _renderObjDer(_objState.nombrePJ);
+        _recargarObjetos();
+    }
+};
+
+window._pobjModCant = window._pobjModCantId; // retrocompat alias
+
+window._pobjQuitarTodos = async (nombreObj) => {
+    if (!estadoUI.esAdmin) return;
+    await supabase.from('inventario_objetos').delete()
+        .eq('personaje_nombre', _objState.nombrePJ).eq('objeto_nombre', nombreObj);
+    _objState.inventario = _objState.inventario.filter(i => i.objeto_nombre !== nombreObj);
+    _renderObjDer(_objState.nombrePJ);
+    _recargarObjetos();
+};
+
+window._pobjDarAlPJ = async (nombreObj, cantidad) => {
+    if (!estadoUI.esAdmin) return;
+    const slotRaiz = _objState.inventario.find(i => i.objeto_nombre === nombreObj && !i.contenedor_padre);
+    if (slotRaiz) {
+        await supabase.from('inventario_objetos').update({ cantidad: slotRaiz.cantidad + cantidad }).eq('id', slotRaiz.id);
+    } else {
+        await supabase.from('inventario_objetos').insert({
+            personaje_nombre: _objState.nombrePJ, objeto_nombre: nombreObj,
+            cantidad, equipado: false, contenedor_padre: null
+        });
+    }
+    await _recargarObjetos();
+};
+
+// Guardar objeto (crear o editar)
+window._pobjGuardarObjeto = async (nombreExistente) => {
+    const esNuevo = !nombreExistente;
+    const nombre  = (document.getElementById('pobj-f-nombre')?.value||'').trim();
+    const tipo    = document.getElementById('pobj-f-tipo')?.value||'-';
+    const mat     = document.getElementById('pobj-f-mat')?.value||'-';
+    const rar     = document.getElementById('pobj-f-rar')?.value||'Común';
+    const eff     = (document.getElementById('pobj-f-eff')?.value||'').trim();
+    const vr      = parseInt(document.getElementById('pobj-f-vr')?.value)||0;
+    const va      = parseInt(document.getElementById('pobj-f-va')?.value)||0;
+    const cont    = document.getElementById('pobj-f-cont')?.value||null;
+    if (!nombre) { alert('El nombre es obligatorio.'); return; }
+    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,contenedor_padre:cont||null,es_propuesta:false};
+    let error;
+    if (esNuevo) { ({error}=await supabase.from('objetos').insert(payload)); }
+    else         { ({error}=await supabase.from('objetos').update(payload).eq('nombre',nombreExistente)); }
+    if (error) { alert('Error: '+error.message); return; }
+    if (esNuevo) {
+        const cantPJ = parseInt(document.getElementById('pobj-f-cant-pj')?.value)||0;
+        if (cantPJ>0) await supabase.from('inventario_objetos').upsert({personaje_nombre:_objState.nombrePJ,objeto_nombre:nombre,cantidad:cantPJ,equipado:false},{onConflict:'personaje_nombre,objeto_nombre'});
+    }
+    window.mostrarToast?.(esNuevo?'✨ Objeto creado':'💾 Guardado');
+    _objState.modoCrear=false; _objState.objEditando=null;
+    await _recargarObjetos();
+};
+
+window._pobjEliminarObjeto = async (nombre) => {
+    if (!confirm(`¿Eliminar "${nombre}" del catálogo? Se quitará de todos los inventarios.`)) return;
+    const {error}=await supabase.from('objetos').delete().eq('nombre',nombre);
+    if (error) { alert('Error: '+error.message); return; }
+    window.mostrarToast?.('🗑 Eliminado');
+    _objState.objEditando=null;
+    await _recargarObjetos();
+};
+
+// Imágenes
+window._pobjImgSeleccionar = (n) => { _objState.imgSelObj=n; _renderObjIzq(); };
+window._pobjImgBuscar = (v) => { _objState.imgBusq=v; _renderObjIzq(); };
+// ── TRANSFER EN VIVO ─────────────────────────────────────────
+
+window._pobjIniciarTransfer = async (destNombre) => {
+    _objState.transferDest = destNombre;
+    _objState.transferExpandedDest = new Set();
+    const { data } = await supabase.from('inventario_objetos')
+        .select('id,objeto_nombre,cantidad,equipado,contenedor_padre')
+        .eq('personaje_nombre', destNombre).gt('cantidad', 0);
+    _objState.transferInvDest = data || [];
+    _renderObjIzq();
+    // Refrescar panel derecho para añadir drop zones
+    _renderTransferDer(_objState.nombrePJ);
+};
+
+window._pobjCambiarDestinoTransfer = () => {
+    _objState.transferDest = null;
+    _objState.transferInvDest = [];
+    _objState.transferExpandedDest = new Set();
+    _renderObjIzq();
+    // Restaurar panel derecho normal
+    _renderObjDer(_objState.nombrePJ);
+};
+
+window._pobjFiltrarDestTransfer = (q) => {
+    const grid = document.getElementById('pobj-dest-grid');
+    if (!grid) return;
+    const items = grid.querySelectorAll('[onclick]');
+    items.forEach(el => {
+        const nombre = el.querySelector('span')?.textContent || '';
+        el.style.display = nombre.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+    });
+};
+
+window._pobjTransferToggleCont = (nombre) => {
+    const key = nombre;
+    if (_objState.transferExpandedDest.has(key)) _objState.transferExpandedDest.delete(key);
+    else _objState.transferExpandedDest.add(key);
+    _renderObjIzq();
+};
+
+window._pobjTransferDragStart = (e, slotId, nombre, origen) => {
+    e.dataTransfer.setData('text/plain', String(slotId));
+    e.dataTransfer.setData('application/x-nombre', nombre);
+    e.dataTransfer.setData('application/x-origen', origen);
+    e.stopPropagation();
+    e.target.style.opacity = '0.5';
+};
+
+// Drop en zona raíz del destino (izq=dest, der=local)
+window._pobjTransferDrop = async (e, zonaDestino, contenedorDestino) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!estadoUI.esAdmin) return;
+
+    const slotId = parseInt(e.dataTransfer.getData('text/plain'));
+    const nombre = e.dataTransfer.getData('application/x-nombre');
+    const origen = e.dataTransfer.getData('application/x-origen');
+    if (!nombre || origen === zonaDestino) return;
+
+    const destNombre = _objState.transferDest;
+    const srcPJ  = origen  === 'local' ? _objState.nombrePJ : destNombre;
+    const dstPJ  = zonaDestino === 'local' ? _objState.nombrePJ : destNombre;
+    const srcInv = origen === 'local' ? _objState.inventario : _objState.transferInvDest;
+    const slot   = srcInv.find(i => i.id === slotId);
+    if (!slot) return;
+
+    const ejecutarMover = async (cant) => {
+        if (cant <= 0) return;
+        const dstInv = zonaDestino === 'local' ? _objState.inventario : _objState.transferInvDest;
+        const slotDestExistente = dstInv.find(i =>
+            i.objeto_nombre === nombre && (i.contenedor_padre||null) === (contenedorDestino||null)
+        );
+        if (cant === slot.cantidad) {
+            if (slotDestExistente) {
+                await supabase.from('inventario_objetos').update({ cantidad: slotDestExistente.cantidad + cant }).eq('id', slotDestExistente.id);
+                await supabase.from('inventario_objetos').delete().eq('id', slotId);
+            } else {
+                await supabase.from('inventario_objetos').update({
+                    personaje_nombre: dstPJ,
+                    contenedor_padre: contenedorDestino || null
+                }).eq('id', slotId);
+            }
+        } else {
+            await supabase.from('inventario_objetos').update({ cantidad: slot.cantidad - cant }).eq('id', slotId);
+            if (slotDestExistente) {
+                await supabase.from('inventario_objetos').update({ cantidad: slotDestExistente.cantidad + cant }).eq('id', slotDestExistente.id);
+            } else {
+                await supabase.from('inventario_objetos').insert({
+                    personaje_nombre: dstPJ, objeto_nombre: nombre,
+                    cantidad: cant, equipado: false, contenedor_padre: contenedorDestino || null
+                });
+            }
+        }
+        await _recargarObjetos();
+        await window._pobjIniciarTransfer(destNombre);
+    };
+
+    if (slot.cantidad > 1) {
+        _modalCantidad(slot.cantidad, ejecutarMover);
+    } else {
+        await ejecutarMover(1);
+    }
+};
+
+// Drop en contenedor del panel izquierdo (destino)
+window._pobjTransferDropEnContenedor = async (e, zonaDestino, contenedorNombre) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await window._pobjTransferDrop(e, zonaDestino, contenedorNombre);
+};
+
+// Renderizar el panel derecho en modo transfer (inventario local con drop zones)
+function _renderTransferDer(nombre) {
+    const body = document.getElementById('ppj-body');
+    if (!body) return;
+
+    const esAdmin = estadoUI.esAdmin;
+    const safe    = nombre.replace(/'/g,"\'");
+    const RAR_COL = {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
+    const _imgObj2 = (n) => { try{return `${window._hexConfig?.storageUrl||''}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
+    const _fall2   = () => { try{return `${window._hexConfig?.storageUrl||''}/imginterfaz/no_encontrado.png`;}catch{return '';} };
+
+    const sorted = [..._objState.inventario].sort((a,b) => {
+        const rOrd = {'Legendario':3,'Raro':2,'Común':1,'-':0};
+        const catA = _objState.catalogo.find(o=>o.nombre===a.objeto_nombre);
+        const catB = _objState.catalogo.find(o=>o.nombre===b.objeto_nombre);
+        return (rOrd[catB?.rareza]||0)-(rOrd[catA?.rareza]||0);
+    });
+    const raizSlots = sorted.filter(i => !i.contenedor_padre);
+
+    const _renderSlotLocal = (slot) => {
+        const cat  = _objState.catalogo.find(o=>o.nombre===slot.objeto_nombre)||{};
+        const esContenedor = (cat.tipo||'-') === 'Contenedor';
+        const safe2 = slot.objeto_nombre.replace(/'/g,"\'");
+        const hijosSlots = _objState.inventario.filter(i => i.contenedor_padre === slot.objeto_nombre);
+        const expanded   = _objState.expandedConts.has(slot.objeto_nombre);
+        const rarCol = RAR_COL[cat.rareza]||'#888';
+
+        let html = `<div class="ppj-obj-card" style="margin-bottom:3px;"
+            draggable="${esAdmin?'true':'false'}"
+            ondragstart="window._pobjTransferDragStart(event,${slot.id},'${safe2}','local')"
+            ondragend="event.target.style.opacity=''">
+            <div class="ppj-obj-header" style="gap:5px;">
+                <img src="${_imgObj2(slot.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fall2()}'" style="width:28px;height:28px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.74em;font-weight:600;color:#d0d0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${slot.objeto_nombre}</div>
+                    ${cat.efecto?`<div style="font-size:0.58em;color:#8888a8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${cat.efecto}</div>`:''}
+                </div>
+                <span class="ppj-obj-rar" style="background:${rarCol}22;color:${rarCol};border:1px solid ${rarCol}44;">${cat.rareza||'-'}</span>
+                <span style="font-size:0.8em;font-weight:700;color:#d4af37;flex-shrink:0;">x${slot.cantidad}</span>
+                ${esContenedor?`<button class="ppj-ctrl-btn" style="font-size:0.6em;padding:0 4px;" onclick="window._pobjToggleCont('${safe2}')">${expanded?'▲':'▼'}</button>`:''}
+            </div>
+        </div>`;
+
+        if (esContenedor && expanded && hijosSlots.length > 0) {
+            html += `<div style="padding-left:10px;border-left:2px solid rgba(100,150,255,0.2);margin-bottom:3px;"
+                ondragover="event.preventDefault();event.stopPropagation();this.style.borderLeftColor='#d4af37';"
+                ondragleave="this.style.borderLeftColor='rgba(100,150,255,0.2)';"
+                ondrop="window._pobjTransferDropEnContenedor(event,'local','${safe2}');this.style.borderLeftColor='rgba(100,150,255,0.2)';">`;
+            html += hijosSlots.map(h => {
+                const hSafe = h.objeto_nombre.replace(/'/g,"\'");
+                return `<div class="ppj-obj-card" style="margin-bottom:2px;" draggable="true"
+                    ondragstart="window._pobjTransferDragStart(event,${h.id},'${hSafe}','local')"
+                    ondragend="event.target.style.opacity=''">
+                    <div class="ppj-obj-header" style="gap:5px;">
+                        <img src="${_imgObj2(h.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fall2()}'" style="width:24px;height:24px;border-radius:3px;object-fit:cover;background:#111;flex-shrink:0;">
+                        <div style="flex:1;min-width:0;font-size:0.72em;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.objeto_nombre}</div>
+                        <span style="font-size:0.75em;color:#d4af37;font-weight:700;">x${h.cantidad}</span>
+                    </div>
+                </div>`;
+            }).join('');
+            html += `</div>`;
+        }
+        return html;
+    };
+
+    body.innerHTML = `<div class="ppj-section">
+        <div style="font-size:0.6em;color:#7878a0;text-align:center;margin-bottom:8px;padding:4px;background:rgba(212,175,55,0.04);border-radius:4px;">
+            ← Arrastra al panel izquierdo para enviar a ${_objState.transferDest}
+        </div>
+        <div style="min-height:80px;padding:4px;border-radius:5px;border:1px dashed rgba(255,255,255,0.08);transition:border-color 0.15s;"
+            ondragover="event.preventDefault();event.stopPropagation();this.style.borderColor='rgba(212,175,55,0.4)';"
+            ondragleave="this.style.borderColor='rgba(255,255,255,0.08)';"
+            ondrop="window._pobjTransferDrop(event,'local',null);this.style.borderColor='rgba(255,255,255,0.08)';">
+            ${raizSlots.length===0?`<div style="font-size:0.62em;color:#3a3a58;padding:16px;text-align:center;">Inventario vacío</div>`:''}
+            ${raizSlots.map(_renderSlotLocal).join('')}
+        </div>
+    </div>`;
+}
+
+
+// ── Helpers de recarga ────────────────────────────────────────
+
+// ── Funciones globales de objetos ─────────────────────────────
+window._pobjVolverCatalogo = () => {
+    _objState.modoCrear    = false;
+    _objState.objEditando  = null;
+    _objState.modoTransfer = false;
+    _objState.modoImagenes = false;
+    _objState.modoForja    = false;
+    _renderObjIzq();
+};
+window._pobjAbrirCrear    = () => { _objState.modoCrear=true; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.modoForja=false; _renderObjIzq(); };
+window._pobjAbrirEditar   = (n) => { _objState.objEditando=n; _objState.modoCrear=false; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.modoForja=false; _renderObjIzq(); };
+window._pobjAbrirTransfer = () => { _objState.modoTransfer=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoImagenes=false; _objState.modoForja=false; _objState.transferDest=null; _objState.transferInvDest=[]; _objState.transferContenedoresDest={}; _objState.transferExpandedDest=new Set(); _renderObjIzq(); };
+window._pobjAbrirImagenes = () => { _objState.modoImagenes=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoForja=false; _objState.imgSelObj=null; _renderObjIzq(); };
+window._pobjAbrirForja    = () => { _objState.modoForja=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.forjaN=4; _renderObjIzq(); };
+window._pobjForjaSetN     = (n) => { _objState.forjaN=n; _renderObjIzq(); };
+window._pobjBusqCat       = (v) => { _objState.busqCat=v; _renderObjIzq(); };
+window._pobjFiltroRar     = (v) => { _objState.filtroRar=v; _renderObjIzq(); };
+window._pobjFiltroTipo    = (v) => { _objState.filtroTipo=v; _renderObjIzq(); };
+window._pobjToggleCont    = (n) => { if(_objState.expandedConts.has(n))_objState.expandedConts.delete(n); else _objState.expandedConts.add(n); _renderObjDer(_objState.nombrePJ); };
+
+// ── Drag & drop con slots por id ─────────────────────────────
+
+window._pobjDragStartId = (e, slotId, nombre) => {
+    e.dataTransfer.setData('text/plain', String(slotId));
+    e.dataTransfer.setData('application/x-fuente', 'inventario');
+    e.dataTransfer.setData('application/x-nombre', nombre);
+    e.target.style.opacity = '0.5';
+};
+window._pobjDragStart = (e, nombre, fuente) => {
+    e.dataTransfer.setData('text/plain', nombre);
+    e.dataTransfer.setData('application/x-fuente', fuente || 'catalogo');
+    e.dataTransfer.setData('application/x-nombre', nombre);
+    e.target.style.opacity = '0.5';
+};
+
+window._pobjDropEnInventario = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
+    if (!estadoUI.esAdmin) return;
+    if (fuente === 'inventario') {
+        const slotId = parseInt(e.dataTransfer.getData('text/plain'));
+        const slot = _objState.inventario.find(i => i.id === slotId);
+        if (slot && slot.contenedor_padre) {
+            await supabase.from('inventario_objetos').update({ contenedor_padre: null }).eq('id', slotId);
+            await _recargarObjetos();
+        }
+    } else {
+        const nombre = e.dataTransfer.getData('application/x-nombre');
+        if (nombre) await window._pobjDarAlPJ(nombre, 1);
+    }
+};
+
+window._pobjDropEnContenedor = async (e, contenedorNombre) => {
+    e.preventDefault();
+    e.stopPropagation(); // evita que el drop burbujee al inventario raíz
+    const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
+    const nombre = e.dataTransfer.getData('application/x-nombre');
+    if (!nombre || !estadoUI.esAdmin || nombre === contenedorNombre) return;
+
+    if (fuente === 'inventario') {
+        const slotId = parseInt(e.dataTransfer.getData('text/plain'));
+        const slot = _objState.inventario.find(i => i.id === slotId);
+        if (!slot) return;
+        if (slot.cantidad === 1) {
+            await _moverSlotAContenedor(slotId, slot, contenedorNombre, 1);
+        } else {
+            _modalCantidad(slot.cantidad, (cant) => _moverSlotAContenedor(slotId, slot, contenedorNombre, cant));
+        }
+    } else {
+        await supabase.from('inventario_objetos').insert({
+            personaje_nombre: _objState.nombrePJ, objeto_nombre: nombre,
+            cantidad: 1, equipado: false, contenedor_padre: contenedorNombre
+        });
+        await _recargarObjetos();
+    }
+};
+
+
+window._pobjDropEnCatalogo = async (e) => {
+    e.preventDefault();
+    const fuente = e.dataTransfer.getData('application/x-fuente') || 'catalogo';
+    if (!estadoUI.esAdmin || fuente !== 'inventario') return;
+    const slotId = parseInt(e.dataTransfer.getData('text/plain'));
+    await supabase.from('inventario_objetos').delete().eq('id', slotId);
+    _objState.inventario = _objState.inventario.filter(i => i.id !== slotId);
+    _renderObjDer(_objState.nombrePJ);
+    _recargarObjetos();
+};
+
 
 window._pobjEliminarSlot = async (slotId) => {
     if (!estadoUI.esAdmin) return;
