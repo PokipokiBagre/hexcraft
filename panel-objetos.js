@@ -173,6 +173,33 @@ function _inyectarEstilos() {
     link.rel  = 'stylesheet';
     link.href = '/objetos.css';   // ← ajustar ruta si cambia la estructura
     document.head.appendChild(link);
+
+    // Parche de legibilidad: sobreescribe colores oscuros que no se leen
+    if (document.getElementById('pobj-styles-patch')) return;
+    const s = document.createElement('style');
+    s.id = 'pobj-styles-patch';
+    s.textContent = `
+        .pobj-filtro-btn {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.18);
+            color: #b0b0cc;
+            border-radius: 4px;
+            padding: 2px 9px;
+            font-size: 0.68em;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.12s;
+        }
+        .pobj-filtro-btn:hover { color: #e0e0f0; background: rgba(255,255,255,0.1); }
+        .pobj-filtro-btn.activo {
+            color: #d4af37;
+            border-color: rgba(212,175,55,0.5);
+            background: rgba(212,175,55,0.12);
+        }
+        .pobj-cat-meta { color: #9898b8 !important; }
+        .pobj-cat-eff  { color: #a8a8c8 !important; }
+    `;
+    document.head.appendChild(s);
 }
 
 
