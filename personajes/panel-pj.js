@@ -977,9 +977,19 @@ let _objState = {
     catalogo: [], inventario: [], contenidores: {},
     busqCat: '', busqInv: '', filtroRar: 'Todos', filtroTipo: 'Todos',
     nombrePJ: null,
-    modoCrear: false,       // mostrando form de crear objeto
-    objEditando: null,      // nombre del objeto en edición inline
+    modoCrear: false,
+    objEditando: null,
     expandedConts: new Set(),
+    modoTransfer: false,
+    modoImagenes: false,
+    modoForja: false,
+    forjaN: 4,
+    imgSelObj: null, imgBusq: '',
+    // Transfer en vivo
+    transferDest: null,          // nombre del personaje destino
+    transferInvDest: [],         // inventario del personaje destino
+    transferContenedoresDest: {}, // contenidores del destino
+    transferExpandedDest: new Set(),
 };
 
 function _cerrarPanelObjetos() {
@@ -1213,12 +1223,6 @@ function _renderObjIzq() {
                 <span style="flex:1;">${i.objeto_nombre}</span><b style="color:#d4af37">×${i.cantidad}</b>
             </div>`).join('')}
         </div>
-        <label class="pobj-op-label-sm">3. Cantidad</label>
-        <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;">
-            ${CANTS.map(c=>`<button class="pobj-fbtn ${selCant===c?'on':''}" onclick="window._pobjSelCant('${c}')">${c==='TODO'?'Todo':'×'+c}</button>`).join('')}
-        </div>
-        <button class="pobj-btn-crear" onclick="window._pobjEjecutarTransfer()">⇄ Transferir</button>`;
-
     } else if (seccionIzq === 'imagenes') {
         const selImg   = _objState.imgSelObj || '';
         const filt     = (_objState.imgBusq||'').toLowerCase();
@@ -1461,7 +1465,7 @@ window._pobjVolverCatalogo = () => {
 };
 window._pobjAbrirCrear    = () => { _objState.modoCrear=true; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.modoForja=false; _renderObjIzq(); };
 window._pobjAbrirEditar   = (n) => { _objState.objEditando=n; _objState.modoCrear=false; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.modoForja=false; _renderObjIzq(); };
-window._pobjAbrirTransfer = () => { _objState.modoTransfer=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoImagenes=false; _objState.modoForja=false; _objState.transferDest=null; _objState.transferObj=null; _objState.transferCant=1; _renderObjIzq(); };
+window._pobjAbrirTransfer = () => { _objState.modoTransfer=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoImagenes=false; _objState.modoForja=false; _objState.transferDest=null; _objState.transferInvDest=[]; _objState.transferContenedoresDest={}; _objState.transferExpandedDest=new Set(); _renderObjIzq(); };
 window._pobjAbrirImagenes = () => { _objState.modoImagenes=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoForja=false; _objState.imgSelObj=null; _renderObjIzq(); };
 window._pobjAbrirForja    = () => { _objState.modoForja=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.forjaN=4; _renderObjIzq(); };
 window._pobjForjaSetN     = (n) => { _objState.forjaN=n; _renderObjIzq(); };
@@ -1675,6 +1679,112 @@ window._pobjEliminarObjeto = async (nombre) => {
 // Imágenes
 window._pobjImgSeleccionar = (n) => { _objState.imgSelObj=n; _renderObjIzq(); };
 window._pobjImgBuscar = (v) => { _objState.imgBusq=v; _renderObjIzq(); };
+// ── TRANSFER EN VIVO ─────────────────────────────────────────
+
+window._pobjIniciarTransfer = async (destNombre) => {
+    _objState.transferDest = destNombre;
+    _objState.transferExpandedDest = new Set();
+    // Cargar inventario del personaje destino
+    const { data } = await supabase.from('inventario_objetos')
+        .select('id,objeto_nombre,cantidad,equipado,contenedor_padre')
+        .eq('personaje_nombre', destNombre)
+        .gt('cantidad', 0);
+    _objState.transferInvDest = data || [];
+    _objState.transferContenedoresDest = {};
+    _objState.transferInvDest.forEach(i => {
+        if (i.contenedor_padre) {
+            if (!_objState.transferContenedoresDest[i.contenedor_padre])
+                _objState.transferContenedoresDest[i.contenedor_padre] = [];
+            _objState.transferContenedoresDest[i.contenedor_padre].push(i.objeto_nombre);
+        }
+    });
+    _renderObjIzq();
+};
+
+window._pobjCambiarDestinoTransfer = () => {
+    _objState.transferDest = null;
+    _objState.transferInvDest = [];
+    _objState.transferContenedoresDest = {};
+    _objState.transferExpandedDest = new Set();
+    _renderObjIzq();
+};
+
+window._pobjTransferToggleCont = (origen, nombre) => {
+    const key = `${origen}:${nombre}`;
+    if (_objState.transferExpandedDest.has(key)) _objState.transferExpandedDest.delete(key);
+    else _objState.transferExpandedDest.add(key);
+    _renderObjIzq();
+};
+
+window._pobjTransferDragStart = (e, slotId, nombre, origen) => {
+    e.dataTransfer.setData('text/plain', String(slotId));
+    e.dataTransfer.setData('application/x-nombre', nombre);
+    e.dataTransfer.setData('application/x-origen', origen);
+    e.stopPropagation();
+    e.target.style.opacity = '0.5';
+};
+
+window._pobjTransferDrop = async (e, zonaDestino, contenedorDestino) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!estadoUI.esAdmin) return;
+
+    const slotId  = parseInt(e.dataTransfer.getData('text/plain'));
+    const nombre  = e.dataTransfer.getData('application/x-nombre');
+    const origen  = e.dataTransfer.getData('application/x-origen');
+    if (!nombre || origen === zonaDestino) return; // mismo lado, no hacer nada
+
+    const destNombre = _objState.transferDest;
+    const srcPJ  = origen  === 'local' ? _objState.nombrePJ : destNombre;
+    const dstPJ  = zonaDestino === 'local' ? _objState.nombrePJ : destNombre;
+    const srcInv = origen === 'local' ? _objState.inventario : _objState.transferInvDest;
+    const slot   = srcInv.find(i => i.id === slotId);
+    if (!slot) return;
+
+    const moverSlot = async (cant) => {
+        if (cant <= 0) return;
+        const dstInv = zonaDestino === 'local' ? _objState.inventario : _objState.transferInvDest;
+        const slotDestExistente = dstInv.find(i =>
+            i.objeto_nombre === nombre && (i.contenedor_padre||null) === (contenedorDestino||null)
+        );
+
+        if (cant === slot.cantidad) {
+            // Mover todo: cambiar personaje_nombre (y contenedor si aplica)
+            if (slotDestExistente) {
+                await supabase.from('inventario_objetos').update({ cantidad: slotDestExistente.cantidad + cant }).eq('id', slotDestExistente.id);
+                await supabase.from('inventario_objetos').delete().eq('id', slotId);
+            } else {
+                await supabase.from('inventario_objetos').update({
+                    personaje_nombre: dstPJ,
+                    contenedor_padre: contenedorDestino || null
+                }).eq('id', slotId);
+            }
+        } else {
+            // Dividir: restar del origen, añadir al destino
+            await supabase.from('inventario_objetos').update({ cantidad: slot.cantidad - cant }).eq('id', slotId);
+            if (slotDestExistente) {
+                await supabase.from('inventario_objetos').update({ cantidad: slotDestExistente.cantidad + cant }).eq('id', slotDestExistente.id);
+            } else {
+                await supabase.from('inventario_objetos').insert({
+                    personaje_nombre: dstPJ, objeto_nombre: nombre,
+                    cantidad: cant, equipado: false, contenedor_padre: contenedorDestino || null
+                });
+            }
+        }
+
+        // Recargar ambos inventarios
+        await _recargarObjetos();
+        await window._pobjIniciarTransfer(destNombre);
+    };
+
+    if (slot.cantidad > 1) {
+        _modalCantidad(slot.cantidad, moverSlot);
+    } else {
+        await moverSlot(1);
+    }
+};
+
+
 window._pobjImgDrop = (e) => { e.preventDefault(); e.currentTarget.style.borderColor='rgba(212,175,55,0.25)'; e.currentTarget.style.color='#3a3a58'; const f=e.dataTransfer?.files?.[0]; if(f) window._pobjImgSubir(f); };
 window._pobjImgSubir = async (file) => {
     if (!file||!_objState.imgSelObj) return;
