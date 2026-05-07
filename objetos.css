@@ -7,10 +7,10 @@
     /* ── Texto ────────────────────────────────────────────── */
     --pobj-text:        #ffffff;   /* nombres de objetos          */
     --pobj-meta:        #ffffff;   /* tipo · material             */
-    --pobj-eff:         #ffffff;   /* descripción / efecto        */
-    --pobj-dim:         #e0e0e0;   /* separadores, labels vacíos  */
-    --pobj-label:       #ffffff;   /* etiquetas de campo (OP)     */
-    --pobj-muted:       #b0b0b0;   /* placeholder, hint           */
+    --pobj-eff:          #ffffff;   /* descripción / efecto        */
+    --pobj-dim:          #e0e0e0;   /* separadores, labels vacíos  */
+    --pobj-label:        #ffffff;   /* etiquetas de campo (OP)     */
+    --pobj-muted:        #b0b0b0;   /* placeholder, hint           */
 
     /* ── Rarezas ──────────────────────────────────────────── */
     --pobj-rar-legendario: #f5d020;
@@ -190,7 +190,7 @@
     border: 1px solid rgba(255,255,255,0.26);
 }
 .pobj-cat-info   { flex: 1; min-width: 0; }
-.pobj-cat-nombre { font-size: 0.82em; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pobj-cat-nombre { font-size: 0.82em; font-weight: 700; color: var(--pobj-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pobj-cat-meta   { font-size: 0.65em; color: #cccccc; margin-top: 2px; }
 .pobj-cat-eff    { font-size: 0.68em; color: #ffffff; margin-top: 3px; line-height: 1.4; }
 
