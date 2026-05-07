@@ -22,7 +22,7 @@ const _imgObj = (nombre) => `${_sb()}/imgobjetos/${_norm(nombre)}.png`;
 const _imgFallback = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
 const RAR_COLOR = { 'Legendario': '#f5d020', 'Raro': '#ffffff', 'Común': '#ffffff', '-': '#dddddd' };
-const RAR_BG    = { 'Legendario': 'rgba(245,208,32,0.25)', 'Raro': 'rgba(150,80,220,0.55)', 'Común': 'rgba(100,100,130,0.45)', '-': 'rgba(80,80,100,0.35)' };
+const RAR_BG    = { 'Legendario': 'rgba(245,208,32,0.25)', 'Raro': 'rgba(140,60,210,0.70)', 'Común': 'rgba(100,100,130,0.55)', '-': 'rgba(80,80,100,0.45)' };
 
 // ── Estado ───────────────────────────────────────────────────
 let _st = {
@@ -225,7 +225,7 @@ function _renderFiltros() {
 
     cont.innerHTML =
         rars.map(r => `<button class="pobj-filtro-btn ${_st.filtroCatRar===r?'activo':''}" onclick="window._pobjFiltroRar('${r}')">${r}</button>`).join('') +
-        `<span style="color:#7070a0;font-size:0.65em;margin:0 2px;">·</span>` +
+        `<span style="color:#aaaaaa;font-size:0.65em;margin:0 2px;">·</span>` +
         tipos.map(t => `<button class="pobj-filtro-btn ${_st.filtroCatTipo===t?'activo':''}" onclick="window._pobjFiltroTipo('${t.replace(/'/g,"\\'")}')">${t}</button>`).join('');
 }
 
