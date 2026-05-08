@@ -10,14 +10,14 @@
 //   _pobjopAbrirImagenes()            → gestionar imágenes
 // ============================================================
 
-import { supabase } from './hex-auth.js';
+import { supabase, currentConfig } from './hex-auth.js';
 
 // ── Helpers ──────────────────────────────────────────────────
 const _norm = (s) => s ? s.toString().trim().toLowerCase()
     .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
     .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
     .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') : '';
-const _sb = () => { try { return window._hexConfig?.storageUrl || ''; } catch { return ''; } };
+const _sb = () => { try { return currentConfig?.storageUrl || ''; } catch { return ''; } };
 const _imgObj  = (n) => `${_sb()}/imgobjetos/${_norm(n)}.png`;
 const _imgFall = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
