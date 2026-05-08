@@ -35,7 +35,7 @@ let _op = {
 // ── Cargar datos necesarios ──────────────────────────────────
 async function _cargarRefs() {
     const [pjRes, catRes] = await Promise.all([
-        supabase.from('personajes').select('nombre,is_player,is_active').order('nombre'),
+        supabase.from('personajes').select('nombre,is_player,is_active,icono_override').order('nombre'),
         supabase.from('objetos').select('nombre,tipo,material,efecto,rareza,contenedor_padre,es_propuesta').eq('es_propuesta',false).order('nombre'),
     ]);
     _op.personajes = (pjRes.data || []);
@@ -352,7 +352,7 @@ window._pobjopAbrirTransfer = async () => {
 };
 
 async function _renderTransfer() {
-    const _imgPj = (p) => `${_sb()}/imgpersonajes/${_norm(p.iconoOverride||p.nombre)}icon.png`;
+    const _imgPj = (p) => `${_sb()}/imgpersonajes/${_norm(p.icono_override||p.nombre)}icon.png`;
 
     const pjCards = (tipo) => _op.personajes.map(p => {
         const sel = _trState[tipo] === p.nombre;
