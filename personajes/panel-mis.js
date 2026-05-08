@@ -76,25 +76,25 @@ function _inyectarEstilos() {
     margin-bottom: 8px; gap: 8px;
 }
 .pmis-izq-title {
-    font-family: 'Cinzel', serif; font-size: 0.68em; color: #888;
+    font-family: 'Cinzel', serif; font-size: 0.68em; color: #aaa;
     letter-spacing: 1.5px; text-transform: uppercase;
 }
 .pmis-izq-search {
-    width: 100%; background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;
-    color: #ccc; font-size: 0.78em; padding: 6px 10px; margin-bottom: 8px;
+    width: 100%; background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 6px;
+    color: #e0e0e0; font-size: 0.78em; padding: 6px 10px; margin-bottom: 8px;
     box-sizing: border-box; outline: none; font-family: inherit;
 }
-.pmis-izq-search::placeholder { color: #3a3a58; }
-.pmis-izq-search:focus { border-color: rgba(212,175,55,0.3); }
+.pmis-izq-search::placeholder { color: #666; }
+.pmis-izq-search:focus { border-color: rgba(212,175,55,0.45); }
 .pmis-izq-filtros { display: flex; gap: 4px; flex-wrap: wrap; }
 .pmis-fbtn {
-    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-    color: #5a5a78; border-radius: 4px; padding: 3px 9px; font-size: 0.62em;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+    color: #888; border-radius: 4px; padding: 3px 9px; font-size: 0.62em;
     cursor: pointer; font-family: inherit; transition: all 0.12s; white-space: nowrap;
 }
-.pmis-fbtn:hover { color: #aaa; border-color: rgba(255,255,255,0.15); }
-.pmis-fbtn.on { color: #d4af37; border-color: rgba(212,175,55,0.35); background: rgba(212,175,55,0.07); }
+.pmis-fbtn:hover { color: #ccc; border-color: rgba(255,255,255,0.22); }
+.pmis-fbtn.on { color: #d4af37; border-color: rgba(212,175,55,0.45); background: rgba(212,175,55,0.1); }
 
 
 /* Lista izq */
@@ -108,8 +108,8 @@ function _inyectarEstilos() {
 /* Separador de grupo */
 .pmis-grupo-label {
     font-size: 0.57em; letter-spacing: 1.8px; text-transform: uppercase;
-    color: #3a3a58; font-weight: 700; padding: 10px 4px 5px;
-    border-bottom: 1px solid rgba(255,255,255,0.04); margin-bottom: 5px;
+    color: #888; font-weight: 700; padding: 10px 4px 5px;
+    border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 5px;
 }
 
 /* Card del catálogo izquierdo */
@@ -128,12 +128,12 @@ function _inyectarEstilos() {
     gap: 6px; margin-bottom: 5px;
 }
 .pmis-cat-card-titulo {
-    font-size: 0.82em; font-weight: 600; color: #c8c8d8; line-height: 1.3; flex: 1;
+    font-size: 0.82em; font-weight: 600; color: #e8e8f0; line-height: 1.3; flex: 1;
 }
-.pmis-cat-card-clase { font-size: 0.6em; color: #4a4a60; flex-shrink: 0; align-self: center; }
+.pmis-cat-card-clase { font-size: 0.6em; color: #888; flex-shrink: 0; align-self: center; }
 .pmis-cat-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
 .pmis-cat-desc {
-    font-size: 0.68em; color: #4a4a68; line-height: 1.45; margin-bottom: 5px;
+    font-size: 0.68em; color: #909090; line-height: 1.45; margin-bottom: 5px;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .pmis-cat-footer {
@@ -141,7 +141,7 @@ function _inyectarEstilos() {
     gap: 6px; margin-top: 4px;
 }
 .pmis-cat-avs { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
-.pmis-cat-cupos { font-size: 0.6em; color: #3a3a50; }
+.pmis-cat-cupos { font-size: 0.6em; color: #777; }
 .pmis-cat-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .pmis-cat-btn {
     font-size: 0.58em; padding: 2px 7px; border-radius: 4px; cursor: pointer;
@@ -179,12 +179,12 @@ function _inyectarEstilos() {
     transition: background 0.15s, border-color 0.15s;
 }
 .pmis-pool-label {
-    font-size: 0.54em; color: #3a3a55; text-transform: uppercase;
+    font-size: 0.54em; color: #999; text-transform: uppercase;
     letter-spacing: 1.4px; margin-bottom: 5px; font-weight: 700;
     display: flex; align-items: center; justify-content: space-between;
 }
 .pmis-pool-label-hint {
-    font-size: 0.95em; color: #2a2a45; text-transform: none; letter-spacing: 0; font-weight: 400;
+    font-size: 0.95em; color: #666; text-transform: none; letter-spacing: 0; font-weight: 400;
 }
 .pmis-pool-scroll {
     display: flex; gap: 5px; overflow-x: auto; padding-bottom: 3px;
@@ -232,11 +232,11 @@ function _inyectarEstilos() {
 .pmis-section { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .pmis-section-title {
     font-size: 0.6em; letter-spacing: 1.5px; text-transform: uppercase;
-    color: #3a3a58; font-weight: 700; margin-bottom: 10px;
+    color: #999; font-weight: 700; margin-bottom: 10px;
     display: flex; align-items: center; gap: 6px;
 }
 .pmis-section-title span {
-    color: #5a5a78; background: rgba(255,255,255,0.05);
+    color: #aaa; background: rgba(255,255,255,0.07);
     padding: 1px 7px; border-radius: 10px; font-size: 0.9em;
 }
 
@@ -245,11 +245,11 @@ function _inyectarEstilos() {
     background: rgba(255,255,255,0.02); border: 1px solid rgba(212,175,55,0.18);
     border-radius: 8px; padding: 14px 16px;
 }
-.pmis-det-titulo { font-family: 'Cinzel', serif; font-size: 1.05em; color: #ddd; margin-bottom: 7px; line-height: 1.35; }
+.pmis-det-titulo { font-family: 'Cinzel', serif; font-size: 1.05em; color: #f0f0f0; margin-bottom: 7px; line-height: 1.35; }
 .pmis-det-meta   { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.pmis-det-desc   { font-size: 0.78em; color: #7a7a98; line-height: 1.6; margin-bottom: 10px; }
+.pmis-det-desc   { font-size: 0.78em; color: #b0b0c0; line-height: 1.6; margin-bottom: 10px; }
 .pmis-det-avs    { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
-.pmis-det-cupos  { font-size: 0.65em; color: #4a4a60; margin-left: 4px; }
+.pmis-det-cupos  { font-size: 0.65em; color: #888; margin-left: 4px; }
 
 .pmis-det-av {
     width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
@@ -277,13 +277,13 @@ function _inyectarEstilos() {
 .pmis-btn-accion:disabled { opacity: 0.3; cursor: default; }
 
 /* Estado vacio */
-.pmis-empty { text-align: center; color: #2e2e48; font-size: 0.75em; padding: 20px 0; }
-.pmis-empty-icon { font-size: 1.6em; margin-bottom: 6px; opacity: 0.3; }
+.pmis-empty { text-align: center; color: #666; font-size: 0.75em; padding: 20px 0; }
+.pmis-empty-icon { font-size: 1.6em; margin-bottom: 6px; opacity: 0.5; }
 
 /* Loader */
 .pmis-loader {
     display: flex; align-items: center; justify-content: center;
-    padding: 20px; color: #3a3a58; font-size: 0.75em; gap: 8px;
+    padding: 20px; color: #888; font-size: 0.75em; gap: 8px;
 }
 .pmis-loader::before {
     content: ''; width: 14px; height: 14px;
@@ -294,29 +294,29 @@ function _inyectarEstilos() {
 
 /* Botón nueva misión */
 .pmis-btn-nueva {
-    width: 100%; background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.07);
-    color: #5a5a78; border-radius: 5px; padding: 8px;
+    width: 100%; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #999; border-radius: 5px; padding: 8px;
     font-size: 0.7em; font-family: 'Cinzel', serif; cursor: pointer;
     transition: all 0.12s; letter-spacing: 0.4px;
     display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-.pmis-btn-nueva:hover { color: #888; border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); }
+.pmis-btn-nueva:hover { color: #ccc; border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.07); }
 
 /* Badges */
 .pmis-badge {
     font-size: 0.6em; padding: 2px 7px; border-radius: 8px;
     display: inline-flex; align-items: center; gap: 3px;
 }
-.pmis-badge-0 { background: rgba(255,255,255,0.04); color: #4a4a60; border: 1px solid rgba(255,255,255,0.06); }
-.pmis-badge-1 { background: rgba(180,150,30,0.08); color: #a08828; border: 1px solid rgba(180,150,30,0.18); }
-.pmis-badge-2 { background: rgba(60,130,200,0.08); color: #5080a0; border: 1px solid rgba(60,130,200,0.18); }
-.pmis-badge-3 { background: rgba(50,150,80,0.08);  color: #508060; border: 1px solid rgba(50,150,80,0.18); }
+.pmis-badge-0 { background: rgba(255,255,255,0.06); color: #888; border: 1px solid rgba(255,255,255,0.12); }
+.pmis-badge-1 { background: rgba(180,150,30,0.12); color: #c8a830; border: 1px solid rgba(180,150,30,0.28); }
+.pmis-badge-2 { background: rgba(60,130,200,0.12); color: #70a0d0; border: 1px solid rgba(60,130,200,0.28); }
+.pmis-badge-3 { background: rgba(50,150,80,0.12);  color: #70b088; border: 1px solid rgba(50,150,80,0.28); }
 
 .pmis-tipo-badge { font-size: 0.58em; padding: 1px 6px; border-radius: 6px; border: 1px solid; }
-.pmis-tipo-grande { color: #887040; border-color: rgba(180,140,60,0.25); background: rgba(180,140,60,0.06); }
-.pmis-tipo-normal { color: #407080; border-color: rgba(60,120,180,0.25); background: rgba(60,120,180,0.06); }
-.pmis-tipo-perso  { color: #507060; border-color: rgba(80,160,100,0.25); background: rgba(80,160,100,0.06); }
+.pmis-tipo-grande { color: #c8a840; border-color: rgba(200,168,60,0.4); background: rgba(200,168,60,0.1); }
+.pmis-tipo-normal { color: #6aaccc; border-color: rgba(80,160,210,0.4); background: rgba(80,160,210,0.1); }
+.pmis-tipo-perso  { color: #7acc98; border-color: rgba(100,200,130,0.4); background: rgba(100,200,130,0.1); }
 
 /* Formulario */
 .pmis-form {
@@ -324,18 +324,18 @@ function _inyectarEstilos() {
     border-radius: 8px; padding: 12px 14px 14px; margin-bottom: 8px;
 }
 .pmis-form label {
-    font-size: 0.6em; color: #4a4a68; text-transform: uppercase;
+    font-size: 0.6em; color: #aaa; text-transform: uppercase;
     letter-spacing: 1px; display: block; margin-bottom: 3px; margin-top: 8px;
 }
 .pmis-form input, .pmis-form textarea, .pmis-form select {
-    width: 100%; background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;
-    color: #ccc; padding: 5px 8px; font-size: 0.78em;
+    width: 100%; background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 5px;
+    color: #e0e0e0; padding: 5px 8px; font-size: 0.78em;
     box-sizing: border-box; outline: none; font-family: inherit;
 }
 .pmis-form textarea { resize: vertical; min-height: 55px; }
 .pmis-form input:focus, .pmis-form textarea:focus, .pmis-form select:focus {
-    border-color: rgba(212,175,55,0.3);
+    border-color: rgba(212,175,55,0.45);
 }
 .pmis-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pmis-form-footer { display: flex; gap: 6px; margin-top: 10px; }
@@ -347,20 +347,20 @@ function _inyectarEstilos() {
 }
 .pmis-btn-save:hover { background: rgba(212,175,55,0.14); }
 .pmis-btn-cancel {
-    background: transparent; border: 1px solid rgba(255,255,255,0.08);
-    color: #4a4a68; border-radius: 5px; padding: 7px 12px; font-size: 0.7em;
+    background: transparent; border: 1px solid rgba(255,255,255,0.12);
+    color: #888; border-radius: 5px; padding: 7px 12px; font-size: 0.7em;
     font-family: inherit; cursor: pointer; transition: all 0.12s;
 }
-.pmis-btn-cancel:hover { color: #888; }
+.pmis-btn-cancel:hover { color: #bbb; }
 
 /* Guía recompensas */
 .pmis-guia {
-    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 6px; padding: 9px 11px; margin-bottom: 10px; font-size: 0.65em;
 }
-.pmis-guia-title { color: #6a6a50; font-weight: 700; margin-bottom: 5px; }
-.pmis-guia-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; color: #4a4a60; }
-.pmis-guia-nota { color: #3a3a50; margin-top: 5px; }
+.pmis-guia-title { color: #aaa; font-weight: 700; margin-bottom: 5px; }
+.pmis-guia-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; color: #888; }
+.pmis-guia-nota { color: #777; margin-top: 5px; }
 `;
     document.head.appendChild(st);
 }
@@ -380,6 +380,30 @@ const _s = {
 // Drag & drop state
 let _dragState = null;
 let _globalDragListenersAttached = false;
+
+// Named handlers so we can remove and re-add them cleanly
+function _onGlobalDragStart(e) {
+    const el = e.target.closest('[data-drag-pj]');
+    if (!el) return;
+    _dragState = {
+        pjNombre:     el.dataset.dragPj,
+        source:       el.dataset.dragSource,
+        misionOrigen: el.dataset.dragMision || null
+    };
+    e.dataTransfer.setData('text/plain', el.dataset.dragPj);
+    e.dataTransfer.effectAllowed = 'move';
+    el.classList.add('dragging');
+    if (_dragState.source === 'mision') {
+        document.getElementById('pmis-pool')?.classList.add('remove-mode');
+    }
+}
+
+function _onGlobalDragEnd(e) {
+    e.target.classList?.remove('dragging');
+    _dragState = null;
+    document.getElementById('pmis-pool')?.classList.remove('remove-mode', 'drop-over');
+    document.querySelectorAll('.pmis-cat-card.drop-over').forEach(c => c.classList.remove('drop-over'));
+}
 
 // ── Carga ──────────────────────────────────────────────────────
 async function _cargar() {
@@ -639,7 +663,7 @@ function _renderDetalle(m, nombrePJ, esAdmin) {
                      title="${j}${esAdmin?' (Clic para quitar)':''}">`).join('')}
             <span class="pmis-det-cupos">${jugs.length}/${m.cupos} participantes</span>
            </div>`
-        : `<div style="font-size:0.65em;color:#3a3a50;margin-bottom:8px;">Sin jugadores aún · cupos: ${m.cupos}</div>`;
+        : `<div style="font-size:0.65em;color:#888;margin-bottom:8px;">Sin jugadores aún · cupos: ${m.cupos}</div>`;
 
     // Nota OP
     const notaHTML = esAdmin && m.nota_op
@@ -654,7 +678,7 @@ function _renderDetalle(m, nombrePJ, esAdmin) {
                     onclick="window._pmisDesapuntarPJ('${safeId}','${safeNom}', true)">
                     ✕ Salir de misión
                </button>`
-            : `<div style="font-size:0.62em;color:#2e2e48;text-align:center;margin-top:8px;">El OP gestiona esta misión</div>`;
+            : `<div style="font-size:0.62em;color:#666;text-align:center;margin-top:8px;">El OP gestiona esta misión</div>`;
     } else {
         const puede = esAdmin || esPerso;
         btnHTML = puede
@@ -667,7 +691,7 @@ function _renderDetalle(m, nombrePJ, esAdmin) {
 
     return `<div class="pmis-det-card">
         <div class="pmis-det-titulo">${m.titulo}</div>
-        <div class="pmis-det-meta">${_badge(m.estado)} ${_tipoBadge(m.tipo)} <span style="font-size:0.6em;color:#3a3a58;">Clase ${m.clase}</span></div>
+        <div class="pmis-det-meta">${_badge(m.estado)} ${_tipoBadge(m.tipo)} <span style="font-size:0.6em;color:#888;">Clase ${m.clase}</span></div>
         ${m.descripcion ? `<div class="pmis-det-desc">${m.descripcion}</div>` : ''}
         ${notaHTML}
         ${avsHTML}
@@ -677,31 +701,11 @@ function _renderDetalle(m, nombrePJ, esAdmin) {
 
 // ── Drag & Drop handlers ──────────────────────────────────
 function _attachGlobalDragListeners() {
-    if (_globalDragListenersAttached) return;
-    _globalDragListenersAttached = true;
-
-    document.addEventListener('dragstart', (e) => {
-        const el = e.target.closest('[data-drag-pj]');
-        if (!el) return;
-        _dragState = {
-            pjNombre:     el.dataset.dragPj,
-            source:       el.dataset.dragSource,
-            misionOrigen: el.dataset.dragMision || null
-        };
-        e.dataTransfer.setData('text/plain', el.dataset.dragPj);
-        e.dataTransfer.effectAllowed = 'move';
-        el.classList.add('dragging');
-        if (_dragState.source === 'mision') {
-            document.getElementById('pmis-pool')?.classList.add('remove-mode');
-        }
-    });
-
-    document.addEventListener('dragend', (e) => {
-        e.target.classList?.remove('dragging');
-        _dragState = null;
-        document.getElementById('pmis-pool')?.classList.remove('remove-mode', 'drop-over');
-        document.querySelectorAll('.pmis-cat-card.drop-over').forEach(c => c.classList.remove('drop-over'));
-    });
+    // Always remove before re-adding to avoid duplicate listeners across re-renders
+    document.removeEventListener('dragstart', _onGlobalDragStart);
+    document.removeEventListener('dragend',   _onGlobalDragEnd);
+    document.addEventListener('dragstart', _onGlobalDragStart);
+    document.addEventListener('dragend',   _onGlobalDragEnd);
 }
 
 function _attachDragHandlers(panelEl, nombre) {
