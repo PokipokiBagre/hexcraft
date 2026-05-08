@@ -640,7 +640,7 @@ window.abrirSubirImagen = function(nombre) {
 
     const icono = p.iconoOverride || nombre;
     const storageBase = currentConfig.storageUrl;
-    const previewUrl  = `${storageBase}/imgpersonajes/${_normImg(icono)}.png`;
+    const previewUrl  = `${storageBase}/imgpersonajes/${_normImg(icono)}icon.png`;
 
     modal.innerHTML = `
         <div style="background:#0f0f18;border:1px solid rgba(212,175,55,0.25);border-radius:12px;padding:24px;width:100%;max-width:420px;">
@@ -653,7 +653,7 @@ window.abrirSubirImagen = function(nombre) {
                      style="width:80px;height:80px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid rgba(212,175,55,0.2);background:#161622;">
                 <div style="flex:1;font-size:0.78em;color:#5a5a78;line-height:1.6;">
                     Imagen principal del personaje.<br>
-                    Se guardará como <code style="color:#d4af37;">${_normImg(icono)}.png</code><br>
+                    Se guardará como <code style="color:#d4af37;">${_normImg(icono)}icon.png</code><br>
                     <span style="color:#3a3a52;">Recomendado: PNG cuadrado, mín 200×200px</span>
                 </div>
             </div>
@@ -706,7 +706,7 @@ window._ejecutarSubidaImagen = async function(nombre) {
 
     const file  = fileInput.files[0];
     const icono = p.iconoOverride || nombre;
-    const path  = `imgpersonajes/${_normImg(icono)}.png`;
+    const path  = `imgpersonajes/${_normImg(icono)}icon.png`;
 
     btn.textContent = 'Subiendo...';
     btn.disabled = true;
