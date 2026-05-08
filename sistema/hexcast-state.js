@@ -35,16 +35,15 @@ export const hxState = {
   busquedaHz: '',
 
   // ── Stack de hechizos del turno ─────────────────────────────
-  // [{ id, pjNombre, grupo, idx, hechizo, infalible, cobrarHex, esPrioridad,
-  //    dado, afinidadEfectiva, abierto, resultado, ncCalc, costoEfectivo, mult }]
   stack: [],
 
   // ── Catálogo de hechizos ────────────────────────────────────
   catalogoDB: [],       // hechizos_nodos completo
 
-  // ── Cooldowns acumulados en esta sesión ──────────────────────
-  // { 'NombrePJ:afinidad': contadorLanzamientos }
-  cooldownsSession: {},
+  // ── Historial de lanzamientos de turnos anteriores al activo ─
+  // Se carga al navegar a un turno. Formato:
+  // { 'NombrePJ:afinidad': count }  — solo turnos con numero < turnoActivo.numero
+  historialSesion: {},
 
   // ── Cooldown por afinidad de cada personaje ──────────────────
   // { 'NombrePJ': { fisica: 0.5, energetica: 0.5, ... } }
@@ -56,24 +55,48 @@ export const hxState = {
 
 // ── Helpers de cooldown ──────────────────────────────────────
 /**
- * Obtiene el multiplicador de cooldown para un PJ+afinidad en el stack actual.
- * Si el mismo PJ lanza el mismo hechizo N veces en el mismo turno,
- * la N-ésima lanzada aplica un factor de cooldown.
- * factor = 1 + (n_usos_previos_de_esa_afinidad) * cd_afinidad
+ * Calcula el multiplicador de cooldown para un PJ+afinidad.
+ *
+ * El CD es acumulativo a lo largo de TODA la sesión:
+ *   previosSesion  = lanzamientos de esa afinidad en turnos anteriores al turno activo
+ *   previosStack   = lanzamientos ya en el stack del turno actual (antes de este item)
+ *   totalPrevios   = previosSesion + previosStack
+ *
+ * mult = 1 + totalPrevios * cd_afinidad
+ * Si totalPrevios === 0 → mult = 1.0 (sin CD)
+ *
+ * El mult NO modifica el costo HEX. Solo eleva el NC necesario para el éxito:
+ *   NC_necesario = costoBase * mult
  */
-export function calcularMultCooldown(pjNombre, afinidad, stack) {
-  const afKey = afinidad?.toLowerCase() || 'fisica';
-  // Contar cuántos hechizos de la misma afinidad lanzó este PJ antes en el stack
-  const previos = stack.filter(item =>
+export function calcularMultCooldown(pjNombre, afinidad, stackPrevio) {
+  const afKey = (afinidad || '').toLowerCase();
+  const k = `${pjNombre}:${afKey}`;
+
+  // Lanzamientos en turnos anteriores de la sesión
+  const previosSesion = hxState.historialSesion[k] || 0;
+
+  // Lanzamientos ya en el stack del turno actual antes de este item
+  const previosStack = stackPrevio.filter(item =>
     item.pjNombre === pjNombre &&
     (item.hechizo?.afinidad || '').toLowerCase() === afKey
   ).length;
-  if (previos === 0) return 1.0;
-  // cd es el factor de incremento por repetición (ej: 0.5 → cada rep. +50%)
+
+  const totalPrevios = previosSesion + previosStack;
+  if (totalPrevios === 0) return 1.0;
+
   const cd = hxState.cdPorPj[pjNombre]?.[afKey] ?? 0.5;
-  return 1 + previos * cd;
+  return 1 + totalPrevios * cd;
 }
 
-export function costoConCooldown(costoBase, mult) {
+/**
+ * NC necesario para el éxito = costoBase × mult (redondeado).
+ * El costo HEX real siempre es costoBase, sin multiplicar.
+ */
+export function ncNecesario(costoBase, mult) {
   return Math.round(costoBase * mult);
+}
+
+// Alias de compatibilidad (no se usa para cobrar HEX)
+export function costoConCooldown(costoBase, mult) {
+  return ncNecesario(costoBase, mult);
 }

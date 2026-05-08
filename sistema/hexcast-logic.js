@@ -4,7 +4,7 @@
 
 import { supabase, currentConfig } from '../hex-auth.js';
 import { personajes } from './personajes-state.js';
-import { hxState, SLOT_COLORS, calcularMultCooldown, costoConCooldown } from './hexcast-state.js';
+import { hxState, SLOT_COLORS, calcularMultCooldown, ncNecesario } from './hexcast-state.js';
 
 // ── Helpers ──────────────────────────────────────────────────
 export function _norm(s) {
@@ -132,13 +132,41 @@ export async function cargarCatalogo() {
   hxState.catalogoDB = data || [];
 }
 
+/**
+ * Carga el historial de lanzamientos de todos los turnos con numero < turnoNumero
+ * y construye el mapa { 'PJ:afinidad': count } en hxState.historialSesion.
+ * Se llama siempre que cambia el turno activo.
+ */
+export async function cargarHistorialSesion(sesionId, turnoNumeroActivo) {
+  hxState.historialSesion = {};
+  if (!sesionId) return;
+
+  // Obtener IDs de turnos anteriores
+  const turnosAnteriores = hxState.turnos.filter(t => t.numero < turnoNumeroActivo);
+  if (!turnosAnteriores.length) return;
+
+  const ids = turnosAnteriores.map(t => t.id);
+  const { data } = await supabase
+    .from('hexcast_lanzamientos')
+    .select('personaje_nombre, hechizo_afinidad')
+    .in('turno_id', ids);
+
+  const hist = {};
+  for (const row of (data || [])) {
+    const k = `${row.personaje_nombre}:${(row.hechizo_afinidad || '').toLowerCase()}`;
+    hist[k] = (hist[k] || 0) + 1;
+  }
+  hxState.historialSesion = hist;
+}
+
 // ── Stack de hechizos ────────────────────────────────────────
 export function agregarHechizo(pjNombre, grupo, slotIdx, hechizo) {
   const color = SLOT_COLORS[grupo]?.[slotIdx] || SLOT_COLORS.A[0];
   const afinidadEfectiva = getAfinidadEfectiva(pjNombre, hechizo.afinidad);
   const mult = calcularMultCooldown(pjNombre, hechizo.afinidad, hxState.stack);
   const costoBase = hechizo.hex_cost || 0;
-  const costoEfectivo = costoConCooldown(costoBase, mult);
+  // ncNecesario = umbral para el éxito (costoBase × mult). NO es el HEX cobrado.
+  const ncNec = ncNecesario(costoBase, mult);
 
   const item = {
     id: Date.now() + Math.random(),
@@ -151,8 +179,8 @@ export function agregarHechizo(pjNombre, grupo, slotIdx, hechizo) {
     dado: '',
     afinidadEfectiva,
     mult,
-    costoEfectivo,
-    costoBase,
+    costoBase,       // HEX que se cobra si éxito (NO se multiplica por CD)
+    ncNecesario: ncNec,  // NC mínimo para el éxito (costoBase × mult)
     abierto: false,
     resultado: null,
     ncCalc: null,
@@ -177,15 +205,19 @@ export function moverAPrioridad(itemId) {
 }
 
 function _recalcCooldowns() {
-  const visto = {};
+  // Count within current stack
+  const vistoStack = {};
   hxState.stack.forEach(item => {
     const afKey = (item.hechizo?.afinidad || '').toLowerCase();
     const k = `${item.pjNombre}:${afKey}`;
-    const previos = visto[k] || 0;
+    const previosStack = vistoStack[k] || 0;
+    const previosSesion = hxState.historialSesion[k] || 0;
+    const totalPrevios = previosSesion + previosStack;
     const cd = hxState.cdPorPj[item.pjNombre]?.[afKey] ?? 0.5;
-    item.mult = previos === 0 ? 1.0 : 1 + previos * cd;
-    item.costoEfectivo = costoConCooldown(item.costoBase, item.mult);
-    visto[k] = previos + 1;
+    item.mult = totalPrevios === 0 ? 1.0 : 1 + totalPrevios * cd;
+    item.ncNecesario = ncNecesario(item.costoBase, item.mult);
+    // costoBase (HEX cobrado) NO cambia con el CD
+    vistoStack[k] = previosStack + 1;
   });
 }
 
@@ -204,7 +236,8 @@ export function evaluarItem(item) {
   if (!dado || isNaN(dado)) { item.resultado = null; item.ncCalc = null; return; }
   const nc = dado * item.afinidadEfectiva;
   item.ncCalc = nc;
-  item.resultado = nc >= item.costoEfectivo ? 'exito' : 'fallo';
+  // Éxito si NC alcanza el umbral (costoBase × mult). El HEX cobrado es siempre costoBase.
+  item.resultado = nc >= item.ncNecesario ? 'exito' : 'fallo';
 }
 
 export function evaluarStack() {
@@ -218,8 +251,9 @@ export async function confirmarTurno() {
   const rows = [];
   for (const item of hxState.stack) {
     const dado = parseInt(item.dado) || null;
+    // HEX cobrado = costoBase (sin multiplicar por CD). Solo si éxito/infalible.
     const hexGastado = (item.resultado === 'exito' || item.resultado === 'infalible') && item.cobrarHex
-      ? item.costoEfectivo : 0;
+      ? item.costoBase : 0;
     item.hexGastado = hexGastado;
 
     if (hexGastado > 0) {
@@ -248,7 +282,7 @@ export async function confirmarTurno() {
       cobrar_hex:         item.cobrarHex,
       es_prioridad:       item.esPrioridad,
       nc:                 item.ncCalc,
-      costo_efectivo:     item.costoEfectivo,
+      costo_efectivo:     item.ncNecesario,   // guardamos el NC umbral (no el HEX)
       multiplicador_cd:   item.mult,
       resultado:          item.resultado,
       hex_gastado:        hexGastado,
@@ -265,5 +299,7 @@ export async function confirmarTurno() {
   const nuevoTurno = await crearTurno(hxState.sesionActiva.id, nuevoNum);
   hxState.turnoActivo = nuevoTurno;
   hxState.stack = [];
+  // El nuevo turno no tiene previos propios, pero el historial se actualiza
+  await cargarHistorialSesion(hxState.sesionActiva.id, nuevoTurno.numero);
   return { ok: true };
 }

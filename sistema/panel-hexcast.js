@@ -8,7 +8,7 @@ import { hxState, SLOT_COLORS } from './hexcast-state.js';
 import {
   _norm, imgPj, imgFallback,
   cargarSesiones, crearSesion, seleccionarSesion, crearTurno,
-  cargarInventarioPJ, cargarCatalogo,
+  cargarInventarioPJ, cargarCatalogo, cargarHistorialSesion,
   agregarHechizo, removerHechizo, moverAPrioridad,
   evaluarItem, confirmarTurno, getAfinidadEfectiva
 } from './hexcast-logic.js';
@@ -358,38 +358,32 @@ function _renderCenter() {
 }
 
 function _calcGastoItem(item) {
-  // Only successful items with cobrarHex generate gasto
   if (!item.cobrarHex) return null;
   if (item.resultado !== 'exito' && item.resultado !== 'infalible') return null;
-  const costo = item.costoEfectivo;
+  const costo = item.costoBase; // HEX = costoBase, CD no multiplica HEX
   if (costo <= 0) return null;
   const p = personajes[item.pjNombre];
   if (!p) return null;
-  // Simulate: VEX first, then HEX
-  // We need to compute cumulative spend up to this item
   return { costo, pjNombre: item.pjNombre };
 }
 
 function _renderGastoHex(item, stackUpTo) {
-  // stackUpTo = items before this one (to compute running balance)
   if (!item.cobrarHex) return '';
   const esFallo = item.resultado === 'fallo' || item.resultado === null || item.resultado === undefined;
   if (esFallo) return `<div class="hxc-gasto-row hxc-gasto-none">Gasto: ninguno (fallo)</div>`;
 
-  const costo = item.costoEfectivo;
+  const costo = item.costoBase; // HEX cobrado = costoBase (CD solo sube dificultad, no costo)
   if (costo <= 0) return '';
 
-  // Running balance: start from current personaje values, subtract items before this
   const p = personajes[item.pjNombre];
   if (!p) return '';
   let vexDisp = p.vex_actual || 0;
   let hexDisp = p.hex || 0;
-  // Subtract hex already spent by prior items in stack for same PJ
   for (const prev of stackUpTo) {
     if (prev.pjNombre !== item.pjNombre) continue;
     if (!prev.cobrarHex) continue;
     if (prev.resultado !== 'exito' && prev.resultado !== 'infalible') continue;
-    const prevCosto = prev.costoEfectivo;
+    const prevCosto = prev.costoBase;
     const vexG = Math.min(vexDisp, prevCosto);
     const hexG = prevCosto - vexG;
     vexDisp -= vexG;
@@ -411,7 +405,6 @@ function _renderGastoHex(item, stackUpTo) {
 }
 
 function _renderBalance() {
-  // Compute balance for all PJs in stack
   const pjNames = [...new Set(hxState.stack.map(i => i.pjNombre))];
   if (!pjNames.length) return '';
   const rows = pjNames.map(nombre => {
@@ -426,7 +419,7 @@ function _renderBalance() {
       if (item.pjNombre !== nombre) continue;
       if (!item.cobrarHex) continue;
       if (item.resultado !== 'exito' && item.resultado !== 'infalible') continue;
-      const costo = item.costoEfectivo;
+      const costo = item.costoBase; // HEX = costoBase
       const vexG = Math.min(vexDisp, costo);
       const hexG = costo - vexG;
       vexDisp -= vexG;
@@ -470,7 +463,7 @@ function _renderStack(esHistorico) {
     else if (item.resultado === 'fallo')     resHtml = `<span class="hxc-item-resultado hxc-res-fallo">¡Fallo!</span>`;
     else if (item.resultado === 'infalible') resHtml = `<span class="hxc-item-resultado hxc-res-infalible">Infalible</span>`;
     else if (item.resultado === 'fallo_hex') resHtml = `<span class="hxc-item-resultado hxc-res-fallo_hex">Sin HEX</span>`;
-    else resHtml = `<span class="hxc-item-resultado" style="color:#444;">${item.costoEfectivo} HEX</span>`;
+    else resHtml = `<span class="hxc-item-resultado" style="color:#444;">${item.costoBase} HEX</span>`;
 
     const dadoInput = puedeEditar
       ? `<input class="hxc-item-dado" type="text" inputmode="numeric" placeholder="d100"
@@ -507,12 +500,12 @@ function _renderStack(esHistorico) {
         ${optBtns}
         <div class="hxc-detail-stats">
           <div>Afinidad: <span>${item.afinidadEfectiva}</span></div>
-          <div>Costo: <span>${item.costoBase}</span></div>
-          ${item.mult>1?`<div>Con CD: <span style="color:#e8a030;">${item.costoEfectivo}</span></div>`:''}
+          <div>Costo HEX: <span>${item.costoBase}</span></div>
+          ${item.mult>1?`<div>Con CD: <span style="color:#e8a030;">NC mín. ${item.ncNecesario}</span></div>`:''}
           <div>Afinidad Hz: <span>${hz.afinidad||'—'}</span></div>
           ${hz.clase?`<div>Clase: <span>${hz.clase}</span></div>`:''}
         </div>
-        ${nc!==null?`<div class="hxc-nc-calc">NC: <strong>${nc}</strong> / necesario: ${item.costoEfectivo} — ${nc>=item.costoEfectivo?'<span style="color:#3ecf6e;">ÉXITO</span>':'<span style="color:#e85050;">FALLO</span>'}</div>`:''}
+        ${nc!==null?`<div class="hxc-nc-calc">NC: <strong>${nc}</strong> / necesario: ${item.ncNecesario} — ${nc>=item.ncNecesario?'<span style="color:#3ecf6e;">ÉXITO</span>':'<span style="color:#e85050;">FALLO</span>'}</div>`:''}
         ${gastoHtml}
         ${campos.map(c=>`<div class="hxc-hz-field"><div class="hxc-hz-field-label">${c.label}</div><div class="hxc-hz-field-val">${c.val}</div></div>`).join('')}
         ${!campos.length?`<div style="font-size:0.65em;color:#2a2a3a;font-style:italic;">Sin descripción.</div>`:''}
@@ -575,7 +568,14 @@ window._hxcVolverSesiones = () => {
 };
 
 window._hxcSelSesion = async (id) => {
-  try { await seleccionarSesion(id); hxState.vistaActiva = 'cast'; _render(); }
+  try {
+    await seleccionarSesion(id);
+    // Cargar historial para el turno activo (el último al abrir)
+    if (hxState.turnoActivo) {
+      await cargarHistorialSesion(id, hxState.turnoActivo.numero);
+    }
+    hxState.vistaActiva = 'cast'; _render();
+  }
   catch(e) { _toast('Error cargando sesión', true); }
 };
 
@@ -611,6 +611,9 @@ window._hxcIrTurno = async (idxRaw) => {
   if (!turno) return;
   hxState.turnoActivo = turno;
   const esUltimo = idx === hxState.turnos.length - 1;
+
+  // Siempre recargar historial de sesión para el turno activo
+  await cargarHistorialSesion(hxState.sesionActiva?.id, turno.numero);
 
   if (!esUltimo) {
     const { data } = await supabase.from('hexcast_lanzamientos').select('*').eq('turno_id', turno.id).order('orden');
@@ -651,7 +654,9 @@ window._hxcIrTurno = async (idxRaw) => {
         infalible: row.infalible, cobrarHex: row.cobrar_hex, esPrioridad: row.es_prioridad,
         forceFallo: false,
         dado: row.dado_d100??'', afinidadEfectiva: row.afinidad_efectiva,
-        mult: row.multiplicador_cd, costoBase: row.hechizo_hex_cost, costoEfectivo: row.costo_efectivo,
+        mult: row.multiplicador_cd,
+        costoBase: row.hechizo_hex_cost,    // HEX real cobrado
+        ncNecesario: row.costo_efectivo,    // NC umbral (guardado en costo_efectivo)
         abierto: false, resultado: row.resultado, ncCalc: row.nc, hexGastado: row.hex_gastado
       };
     });
@@ -692,7 +697,7 @@ window._hxcCobrarHex = async () => {
     const item = stack[i];
     if (!item.cobrarHex) continue;
     if (item.resultado !== 'exito' && item.resultado !== 'infalible') continue;
-    const costo = item.costoEfectivo; if (costo <= 0) continue;
+    const costo = item.costoBase; if (costo <= 0) continue; // HEX cobrado = costoBase
     const b = bal[item.pjNombre]; if (!b) continue;
 
     const vexGasto = Math.min(b.vex, costo);
@@ -850,10 +855,10 @@ function _actualizarResEl(el, item) {
   else if (item.resultado==='fallo')     { resEl.innerHTML='¡Fallo!'; resEl.className='hxc-item-resultado hxc-res-fallo'; el.classList.add('res-fallo'); }
   else if (item.resultado==='infalible') { resEl.innerHTML='Infalible'; resEl.className='hxc-item-resultado hxc-res-infalible'; el.classList.add('res-infalible'); }
   else if (item.resultado==='fallo_hex') { resEl.innerHTML='Sin HEX'; resEl.className='hxc-item-resultado hxc-res-fallo_hex'; el.classList.add('res-fallo_hex'); }
-  else { resEl.textContent=`${item.costoEfectivo} HEX`; resEl.className='hxc-item-resultado'; resEl.style.color='#444'; }
+  else { resEl.textContent=`${item.costoBase} HEX`; resEl.className='hxc-item-resultado'; resEl.style.color='#444'; }
   const ncEl = el.querySelector('.hxc-nc-calc');
   if (ncEl && item.ncCalc!==null) {
-    const nc=item.ncCalc, req=item.costoEfectivo;
+    const nc=item.ncCalc, req=item.ncNecesario;
     ncEl.innerHTML=`NC: <strong>${nc}</strong> / necesario: ${req} — ${nc>=req?'<span style="color:#3ecf6e;">ÉXITO</span>':'<span style="color:#e85050;">FALLO</span>'}`;
   }
 }
@@ -901,7 +906,7 @@ window._hxcGuardarItemDB = async (item) => {
     infalible: item.infalible,
     resultado: item.resultado,
     nc: item.ncCalc,
-    costo_efectivo: item.costoEfectivo,
+    costo_efectivo: item.ncNecesario,  // NC umbral guardado en costo_efectivo
     hex_gastado: item.hexGastado || 0,
   }).eq('id', item.id);
 };
