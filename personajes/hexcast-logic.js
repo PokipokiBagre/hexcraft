@@ -2,9 +2,9 @@
 // hexcast-logic.js — Lógica de negocio del sistema HexCast
 // ============================================================
 
-import { supabase, currentConfig } from '../hex-auth.js';
-import { personajes } from '../personajes/personajes-state.js';
-import { hxState, calcularMultCooldown, costoConCooldown, SLOT_COLORS } from './hexcast-state.js';
+import { supabase, currentConfig } from '../hex-auth.js';       // ← ese sí sube un nivel
+import { personajes } from './personajes-state.js';              // ← mismo nivel
+import { hxState, ... } from './hexcast-state.js';               // ← mismo nivel
 
 // ── Helpers ──────────────────────────────────────────────────
 export function _norm(s) {
