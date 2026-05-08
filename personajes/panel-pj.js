@@ -21,7 +21,7 @@ const _norm = (s) => s ? s.toString().trim().toLowerCase()
     .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
     .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') : '';
 
-const _imgPj   = (icono) => `${_sb()}/imgpersonajes/${_norm(icono)}.png`;
+const _imgPj   = (icono) => `${_sb()}/imgpersonajes/${_norm(icono)}icon.png`;
 const _imgIcon = (icono) => `${_sb()}/imgpersonajes/${_norm(icono)}icon.png`;
 const _fallback = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
@@ -1215,7 +1215,7 @@ function _renderObjIzq() {
             const _imgPjT = (nombre) => {
                 const p = personajes[nombre];
                 const icono = p?.iconoOverride || nombre;
-                return `${window._hexConfig?.storageUrl||''}/imgpersonajes/${icono.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;
+                return `${window._hexConfig?.storageUrl||''}/imgpersonajes/${icono.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}icon.png`;
             };
             const jugadores = personajesDisp.filter(p => personajes[p]?.isPlayer);
             const npcs      = personajesDisp.filter(p => !personajes[p]?.isPlayer);
@@ -1247,7 +1247,7 @@ function _renderObjIzq() {
             const pDest        = personajes[selDest] || {};
             const _imgPjT2 = (nombre) => {
                 const p = personajes[nombre]; const icono = p?.iconoOverride || nombre;
-                return `${window._hexConfig?.storageUrl||''}/imgpersonajes/${icono.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;
+                return `${window._hexConfig?.storageUrl||''}/imgpersonajes/${icono.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}icon.png`;
             };
 
             const _renderSlotDest = (slot) => {
