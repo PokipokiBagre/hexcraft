@@ -19,7 +19,7 @@ function _imgIcon(nombre) {
 }
 // Resuelve iconoOverride del personaje antes de construir la URL
 function _imgPj(nombreJugador) {
-    const icono = personajes[nombreJugador]?.iconoOverride || nombreJugador;
+    const icono = personajes[nombreJugador]?.iconoOverride || personajes[nombreJugador]?.icono_override || nombreJugador;
     return _imgIcon(icono);
 }
 function _fallback() {
@@ -514,7 +514,7 @@ function _montarPanelIzq(nombre) {
             </div>
             <div class="pmis-pool-scroll">
                 ${todosLosPjs.map(([nom, p]) => {
-                    const icono = p.iconoOverride || nom;
+                    const icono = p.iconoOverride || p.icono_override || nom;
                     const enMis = pjsEnMision.has(nom);
                     return `<img class="pmis-pool-av${enMis?' en-mision':''}"
                                  draggable="true"
