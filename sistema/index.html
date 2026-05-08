@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="../hex-guard.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personajes — HEX ROL</title>
+    <link rel="icon" type="image/png" id="dynamic-favicon" href="../img/icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="personajes.css">
+</head>
+<body>
+
+<!-- ── NAV ─────────────────────────────────────────────────── -->
+<header class="nav">
+    <div class="nav-left">
+        <a href="../index.html" class="nav-back">← Inicio</a>
+        <nav class="tabs">
+            <button class="tab-btn active" data-vista="catalogo" onclick="mostrarVista('catalogo')">Personajes</button>
+            <button class="tab-btn" data-vista="crear"    onclick="mostrarVista('crear')">Crear</button>
+            <button class="tab-btn" data-vista="formulas" onclick="mostrarVista('formulas')">Fórmulas</button>
+        </nav>
+    </div>
+    <div class="nav-right">
+        <button class="btn-cambiar" onclick="cambiarCampaña()">cambiar campaña</button>
+        <div id="hex-session-badge"></div>
+    </div>
+</header>
+
+<!-- ── LOADER ──────────────────────────────────────────────── -->
+<div id="loader" class="loader">
+    <span class="loader-text">Cargando datos...</span>
+    <div class="loader-track"><div id="barra-progreso" class="loader-fill"></div></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     PAGE: CATÁLOGO
+═══════════════════════════════════════════════════════════════ -->
+<div class="page active" id="page-catalogo">
+    <div class="page-toolbar">
+        <div class="filtros">
+            <button class="filtro-btn filtro-rol active"  onclick="setFiltro('rol','Todos',this)">Todos</button>
+            <button class="filtro-btn filtro-rol"         onclick="setFiltro('rol','Jugador',this)">Jugadores</button>
+            <button class="filtro-btn filtro-rol"         onclick="setFiltro('rol','NPC',this)">NPCs</button>
+            <span class="filtro-sep">·</span>
+            <button class="filtro-btn filtro-act active"  onclick="setFiltro('act','Todos',this)">Ambos</button>
+            <button class="filtro-btn filtro-act"         onclick="setFiltro('act','Activo',this)">Activos</button>
+            <button class="filtro-btn filtro-act"         onclick="setFiltro('act','Inactivo',this)">Inactivos</button>
+        </div>
+        <input class="input-search" placeholder="Buscar..." oninput="buscar(this.value)">
+    </div>
+    <div class="pj-grid" id="pj-grid"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     PAGE: CREAR / EDITAR
+═══════════════════════════════════════════════════════════════ -->
+<div class="page" id="page-crear">
+    <div class="form-wrap">
+        <div class="form-header">
+            <h2 class="form-titulo" id="form-titulo">Crear personaje</h2>
+            <button class="btn-ghost" onclick="cancelarFormulario()">Cancelar</button>
+        </div>
+
+        <section class="form-section">
+            <div class="form-section-title">Identidad</div>
+            <div class="form-grid">
+                <div class="field">
+                    <label>Nombre</label>
+                    <input class="input-base" id="f-nombre" placeholder="Nombre del personaje">
+                </div>
+                <div class="field">
+                    <label>Ícono (alias de imagen)</label>
+                    <input class="input-base" id="f-icono" placeholder="Igual al nombre si coincide">
+                </div>
+            </div>
+            <div class="toggle-row">
+                <div class="toggle-group">
+                    <div class="toggle on" id="toggle-jugador" onclick="toggleJugador()"></div>
+                    <span id="lbl-jugador">Jugador (PC)</span>
+                </div>
+                <div class="toggle-group">
+                    <div class="toggle on" id="toggle-activo" onclick="toggleActivo()"></div>
+                    <span>Activo</span>
+                </div>
+                <div class="toggle-group" id="npc-tipo-row" style="display:none;">
+                    <span class="field-label-inline">Tipo NPC:</span>
+                    <select class="input-base input-sm" id="f-npc-tipo">
+                        <option value="sistema">Sistema (stats fijos)</option>
+                        <option value="jugador">Tipo Jugador (fórmulas reactivas)</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div class="form-section-title">Recursos</div>
+            <div class="form-grid">
+                <div class="field">
+                    <label>HEX</label>
+                    <input class="input-base" id="f-hex" type="number" value="1000" min="0">
+                </div>
+                <div class="field">
+                    <label>Asistencia</label>
+                    <input class="input-base" id="f-asistencia" type="number" value="1" min="1">
+                </div>
+                <div class="field">
+                    <label>Vida Roja actual</label>
+                    <input class="input-base" id="f-vida-roja" type="number" value="10" min="0">
+                </div>
+                <div class="field">
+                    <label>Vida Azul máx <span class="field-note">(base)</span></label>
+                    <input class="input-base" id="f-vida-azul" type="number" value="0" min="0">
+                </div>
+                <div class="field">
+                    <label>Guarda Dorada actual</label>
+                    <input class="input-base" id="f-guarda-act" type="number" value="0" min="0">
+                </div>
+                <div class="field">
+                    <label>Guarda Dorada máx <span class="field-note">(base)</span></label>
+                    <input class="input-base" id="f-guarda-max" type="number" value="0" min="0">
+                </div>
+                <div class="field">
+                    <label>VEX actual</label>
+                    <input class="input-base" id="f-vex-actual" type="number" value="0" min="0">
+                </div>
+                <div class="field" id="vex-max-row" style="display:none;">
+                    <label>VEX máx <span class="field-note">(fijo, solo NPC sistema)</span></label>
+                    <input class="input-base" id="f-vex-max" type="number" value="0" min="0">
+                </div>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div class="form-section-title">Afinidades base</div>
+            <div class="afin-grid">
+                <div class="afin-field"><label>Física</label>     <input class="input-base input-afin" id="afin-fisica"     type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Energética</label>  <input class="input-base input-afin" id="afin-energetica" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Espiritual</label>  <input class="input-base input-afin" id="afin-espiritual" type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Mando</label>       <input class="input-base input-afin" id="afin-mando"      type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Psíquica</label>    <input class="input-base input-afin" id="afin-psiquica"   type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+                <div class="afin-field"><label>Oscura</label>      <input class="input-base input-afin" id="afin-oscura"     type="number" value="0" min="0" oninput="actualizarPreviewFormulario()"></div>
+            </div>
+            <div class="afin-preview" id="afin-preview"></div>
+        </section>
+
+        <div class="form-footer">
+            <button class="btn-primary" onclick="guardarPersonaje()">Guardar personaje</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     PAGE: FÓRMULAS
+═══════════════════════════════════════════════════════════════ -->
+<div class="page" id="page-formulas">
+    <div class="formulas-wrap" id="formulas-cont"></div>
+</div>
+
+<!-- ── SYNC BTN ─────────────────────────────────────────────── -->
+<button class="btn-sync" id="btn-sync" style="display:none;" onclick="ejecutarSync()">Guardar cambios (0)</button>
+
+<!-- ── TOAST ────────────────────────────────────────────────── -->
+<div class="toast" id="toast" style="display:none;"></div>
+
+<!-- panel-pj.js se monta solo en el <body> al primer abrirDetalle() -->
+
+<script type="module" src="personajes-main.js"></script>
+<script type="module" src="panel-hexcast.js"></script>
+</body>
+</html>
