@@ -340,6 +340,10 @@ function _renderCenter() {
     <button class="hxc-btn-op hxc-btn-del-turno" onclick="window._hxcEliminarTurno()">🗑 Turno</button>
   ` : '';
 
+  const btnGuardarHistorico = (esHistorico && esAdmin) ? `
+    <button class="hxc-btn-guardar-hist" onclick="window._hxcGuardarHistorico()">💾 Guardar turno</button>
+  ` : '';
+
   return `<div class="hxc-center">
     <div class="hxc-center-top">
       <span class="hxc-turno-label">Turno <strong>${turnoNum}</strong> · ${turnos.length}</span>
@@ -351,6 +355,7 @@ function _renderCenter() {
       </div>
       <button class="hxc-btn-nuevo-turno" onclick="window._hxcNuevoTurno()">+ Turno</button>
       ${!esHistorico ? `<button class="hxc-btn-confirmar" onclick="window._hxcConfirmar()">Confirmar ›</button>` : ''}
+      ${btnGuardarHistorico}
       ${botonesOp}
     </div>
     <div class="hxc-stack" id="hxc-stack-list">${_renderStack(esHistorico)}</div>
