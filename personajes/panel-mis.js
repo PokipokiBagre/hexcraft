@@ -3,7 +3,7 @@
 // /personajes/panel-mis.js
 // ============================================================
 
-import { supabase }   from '../hex-auth.js';
+import { supabase, currentConfig }   from '../hex-auth.js';
 import { estadoUI, personajes } from './personajes-state.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -13,13 +13,13 @@ function _norm(s) {
         .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
         .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') : '';
 }
-function _sb() { return window._hexConfig?.storageUrl || ''; }
+function _sb() { return currentConfig?.storageUrl || ''; }
 function _imgIcon(nombre) {
     return `${_sb()}/imgpersonajes/${_norm(nombre)}icon.png`;
 }
 // Resuelve iconoOverride del personaje antes de construir la URL
 function _imgPj(nombreJugador) {
-    const icono = personajes[nombreJugador]?.iconoOverride || personajes[nombreJugador]?.icono_override || nombreJugador;
+    const icono = personajes[nombreJugador]?.iconoOverride || nombreJugador;
     return _imgIcon(icono);
 }
 function _fallback() {
@@ -514,7 +514,7 @@ function _montarPanelIzq(nombre) {
             </div>
             <div class="pmis-pool-scroll">
                 ${todosLosPjs.map(([nom, p]) => {
-                    const icono = p.iconoOverride || p.icono_override || nom;
+                    const icono = p.iconoOverride || nom;
                     const enMis = pjsEnMision.has(nom);
                     return `<img class="pmis-pool-av${enMis?' en-mision':''}"
                                  draggable="true"
