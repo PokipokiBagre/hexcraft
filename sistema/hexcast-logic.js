@@ -145,6 +145,7 @@ export function agregarHechizo(pjNombre, grupo, slotIdx, hechizo) {
     pjNombre, grupo, slotIdx, color,
     hechizo,
     infalible: false,
+    forceFallo: false,
     cobrarHex: true,
     esPrioridad: false,
     dado: '',
@@ -189,6 +190,11 @@ function _recalcCooldowns() {
 }
 
 export function evaluarItem(item) {
+  if (item.forceFallo) {
+    item.resultado = 'fallo';
+    item.ncCalc = null;
+    return;
+  }
   if (item.infalible) {
     item.resultado = 'infalible';
     item.ncCalc = null;

@@ -133,6 +133,19 @@ function _css() {
 .hxc-hz-field { margin-bottom: 5px; }
 .hxc-hz-field-label { font-size: 0.56em; letter-spacing: 1.2px; text-transform: uppercase; color: var(--slot-text); opacity: 0.75; margin-bottom: 2px; font-weight: 700; }
 .hxc-hz-field-val { font-size: 0.68em; color: #ddd; line-height: 1.55; }
+.hxc-gasto-row { font-size: 0.67em; color: #888; padding: 5px 9px; background: rgba(0,0,0,0.25); border-radius: 4px; margin-bottom: 7px; border-left: 2px solid rgba(255,255,255,0.08); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hxc-gasto-row.hxc-gasto-none { color: #333; border-left-color: rgba(255,255,255,0.04); }
+.hxc-gasto-row.hxc-gasto-insuf { color: #e85050; border-left-color: rgba(232,80,80,0.4); background: rgba(232,80,80,0.05); }
+.hxc-gasto-vex { color: #9060c0; font-weight: 600; font-family: 'Cinzel', serif; }
+.hxc-gasto-hex { color: #d4af37; font-weight: 600; font-family: 'Cinzel', serif; }
+.hxc-balance-panel { margin-top: 14px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; overflow: hidden; }
+.hxc-balance-title { font-size: 0.54em; letter-spacing: 2px; text-transform: uppercase; color: #444; padding: 7px 12px 4px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.hxc-bal-row { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); border-left: 3px solid var(--slot-border); }
+.hxc-bal-row:last-child { border-bottom: none; }
+.hxc-bal-pj { font-size: 0.68em; font-weight: 700; color: var(--slot-text); flex: 1; }
+.hxc-bal-vals { display: flex; gap: 8px; font-size: 0.66em; }
+.hxc-opt-fallo.on { background: rgba(232,80,80,0.15); border-color: rgba(232,80,80,0.5); color: #e85050; }
+.hxc-item-dado-hist { display: inline-block; width: 52px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 5px; color: #888; font-size: 0.78em; text-align: center; padding: 4px 3px; font-family: 'Cinzel', serif; }
 #hxc-view-sesiones { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .hxc-ses-wrap { max-width: 720px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; height: 100%; padding: 0 16px; box-sizing: border-box; }
 .hxc-ses-top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 12px; flex-shrink: 0; }
@@ -344,13 +357,109 @@ function _renderCenter() {
   </div>`;
 }
 
+function _calcGastoItem(item) {
+  // Only successful items with cobrarHex generate gasto
+  if (!item.cobrarHex) return null;
+  if (item.resultado !== 'exito' && item.resultado !== 'infalible') return null;
+  const costo = item.costoEfectivo;
+  if (costo <= 0) return null;
+  const p = personajes[item.pjNombre];
+  if (!p) return null;
+  // Simulate: VEX first, then HEX
+  // We need to compute cumulative spend up to this item
+  return { costo, pjNombre: item.pjNombre };
+}
+
+function _renderGastoHex(item, stackUpTo) {
+  // stackUpTo = items before this one (to compute running balance)
+  if (!item.cobrarHex) return '';
+  const esFallo = item.resultado === 'fallo' || item.resultado === null || item.resultado === undefined;
+  if (esFallo) return `<div class="hxc-gasto-row hxc-gasto-none">Gasto: ninguno (fallo)</div>`;
+
+  const costo = item.costoEfectivo;
+  if (costo <= 0) return '';
+
+  // Running balance: start from current personaje values, subtract items before this
+  const p = personajes[item.pjNombre];
+  if (!p) return '';
+  let vexDisp = p.vex_actual || 0;
+  let hexDisp = p.hex || 0;
+  // Subtract hex already spent by prior items in stack for same PJ
+  for (const prev of stackUpTo) {
+    if (prev.pjNombre !== item.pjNombre) continue;
+    if (!prev.cobrarHex) continue;
+    if (prev.resultado !== 'exito' && prev.resultado !== 'infalible') continue;
+    const prevCosto = prev.costoEfectivo;
+    const vexG = Math.min(vexDisp, prevCosto);
+    const hexG = prevCosto - vexG;
+    vexDisp -= vexG;
+    hexDisp -= hexG;
+  }
+
+  const vexGasto = Math.min(vexDisp, costo);
+  const hexGasto = costo - vexGasto;
+  const insuficiente = hexGasto > hexDisp;
+
+  if (insuficiente) {
+    return `<div class="hxc-gasto-row hxc-gasto-insuf">Gasto: insuficiente | Fallo</div>`;
+  }
+
+  const parts = [];
+  if (vexGasto > 0) parts.push(`<span class="hxc-gasto-vex">-${vexGasto.toLocaleString()} VEX</span>`);
+  if (hexGasto > 0) parts.push(`<span class="hxc-gasto-hex">-${hexGasto.toLocaleString()} HEX</span>`);
+  return `<div class="hxc-gasto-row">Gasto: ${parts.join(' ')}</div>`;
+}
+
+function _renderBalance() {
+  // Compute balance for all PJs in stack
+  const pjNames = [...new Set(hxState.stack.map(i => i.pjNombre))];
+  if (!pjNames.length) return '';
+  const rows = pjNames.map(nombre => {
+    const p = personajes[nombre];
+    if (!p) return '';
+    let vexDisp = p.vex_actual || 0;
+    let hexDisp = p.hex || 0;
+    let totalGasto = 0;
+    let totalVex = 0;
+    let totalHex = 0;
+    for (const item of hxState.stack) {
+      if (item.pjNombre !== nombre) continue;
+      if (!item.cobrarHex) continue;
+      if (item.resultado !== 'exito' && item.resultado !== 'infalible') continue;
+      const costo = item.costoEfectivo;
+      const vexG = Math.min(vexDisp, costo);
+      const hexG = costo - vexG;
+      vexDisp -= vexG;
+      hexDisp -= hexG;
+      totalVex += vexG;
+      totalHex += hexG;
+      totalGasto += costo;
+    }
+    const color = hxState.stack.find(i => i.pjNombre === nombre)?.color;
+    const vars = color ? _colorVars(color) : '';
+    return `<div class="hxc-bal-row" style="${vars}">
+      <span class="hxc-bal-pj">${nombre}</span>
+      <span class="hxc-bal-vals">
+        ${totalVex > 0 ? `<span class="hxc-gasto-vex">-${totalVex.toLocaleString()} VEX</span>` : ''}
+        ${totalHex > 0 ? `<span class="hxc-gasto-hex">-${totalHex.toLocaleString()} HEX</span>` : ''}
+        ${totalGasto === 0 ? `<span style="color:#444;">sin gasto</span>` : ''}
+      </span>
+    </div>`;
+  }).join('');
+  return `<div class="hxc-balance-panel"><div class="hxc-balance-title">Balance del turno</div>${rows}</div>`;
+}
+
 function _renderStack(esHistorico) {
   if (!hxState.stack.length) {
     if (esHistorico) return `<div class="hxc-stack-empty" style="color:#2a2a3a;">Turno histórico.<br><span style="font-size:0.85em;">Navega al último turno para lanzar hechizos.</span></div>`;
     return `<div class="hxc-stack-empty">Selecciona un personaje y un hechizo<br>de su inventario para agregarlo al turno.</div>`;
   }
 
-  return hxState.stack.map((item, i) => {
+  const esAdmin = _esAdmin();
+  // In historico, OP can still edit if admin
+  const puedeEditar = !esHistorico || esAdmin;
+
+  const items = hxState.stack.map((item, i) => {
     const vars    = _colorVars(item.color);
     const priCls  = item.esPrioridad ? 'prioridad' : '';
     const resCls  = item.resultado ? `res-${item.resultado}` : '';
@@ -363,6 +472,18 @@ function _renderStack(esHistorico) {
     else if (item.resultado === 'fallo_hex') resHtml = `<span class="hxc-item-resultado hxc-res-fallo_hex">Sin HEX</span>`;
     else resHtml = `<span class="hxc-item-resultado" style="color:#444;">${item.costoEfectivo} HEX</span>`;
 
+    const dadoInput = puedeEditar
+      ? `<input class="hxc-item-dado" type="text" inputmode="numeric" placeholder="d100"
+          value="${item.dado!==''?item.dado:''}" data-hxc-item="${i}"
+          onclick="event.stopPropagation()"
+          oninput="window._hxcSetDado(${i},this.value)"
+          onkeydown="window._hxcDadoKeydown(event,${i})">`
+      : (item.dado !== '' ? `<span class="hxc-item-dado-hist">${item.dado}</span>` : '');
+
+    const delBtn = puedeEditar
+      ? `<button class="hxc-item-del" onclick="event.stopPropagation();window._hxcRemover(${i})">×</button>`
+      : '';
+
     let detail = '';
     if (item.abierto) {
       const nc  = item.ncCalc;
@@ -373,12 +494,17 @@ function _renderStack(esHistorico) {
         { label:'Especial', val: hz.especial },
       ].filter(c => c.val && c.val.trim() && c.val !== '0');
 
-      detail = `<div class="hxc-item-detail">
-        <div class="hxc-detail-opts">
+      const gastoHtml = _renderGastoHex(item, hxState.stack.slice(0, i));
+
+      const optBtns = puedeEditar ? `<div class="hxc-detail-opts">
           <button class="hxc-opt-btn ${item.cobrarHex?'on':''}" onclick="event.stopPropagation();window._hxcToggleOpt(${i},'cobrarHex')">💰 Cobrar HEX</button>
-          <button class="hxc-opt-btn ${item.infalible?'on':''}" onclick="event.stopPropagation();window._hxcToggleOpt(${i},'infalible')">⚡ Infalible</button>
+          <button class="hxc-opt-btn ${item.infalible?'on':''}" onclick="event.stopPropagation();window._hxcToggleInfalible(${i})">⚡ Infalible</button>
+          <button class="hxc-opt-btn ${item.forceFallo?'on hxc-opt-fallo':''}" onclick="event.stopPropagation();window._hxcToggleFallo(${i})">✕ Fallo</button>
           <button class="hxc-opt-btn ${item.esPrioridad?'on':''}" onclick="event.stopPropagation();window._hxcSetPrioridad(${i})">↑ Prioridad</button>
-        </div>
+        </div>` : '';
+
+      detail = `<div class="hxc-item-detail">
+        ${optBtns}
         <div class="hxc-detail-stats">
           <div>Afinidad: <span>${item.afinidadEfectiva}</span></div>
           <div>Costo: <span>${item.costoBase}</span></div>
@@ -387,6 +513,7 @@ function _renderStack(esHistorico) {
           ${hz.clase?`<div>Clase: <span>${hz.clase}</span></div>`:''}
         </div>
         ${nc!==null?`<div class="hxc-nc-calc">NC: <strong>${nc}</strong> / necesario: ${item.costoEfectivo} — ${nc>=item.costoEfectivo?'<span style="color:#3ecf6e;">ÉXITO</span>':'<span style="color:#e85050;">FALLO</span>'}</div>`:''}
+        ${gastoHtml}
         ${campos.map(c=>`<div class="hxc-hz-field"><div class="hxc-hz-field-label">${c.label}</div><div class="hxc-hz-field-val">${c.val}</div></div>`).join('')}
         ${!campos.length?`<div style="font-size:0.65em;color:#2a2a3a;font-style:italic;">Sin descripción.</div>`:''}
       </div>`;
@@ -399,17 +526,15 @@ function _renderStack(esHistorico) {
         <span class="hxc-item-hz">${item.hechizo.nombre}</span>
         ${item.esPrioridad?`<span class="hxc-prioridad-flag">↑</span>`:''}
         ${multStr?`<span class="hxc-item-mult">${multStr}</span>`:''}
-        <input class="hxc-item-dado" type="text" inputmode="numeric" placeholder="d100"
-          value="${item.dado!==''?item.dado:''}" data-hxc-item="${i}"
-          onclick="event.stopPropagation()"
-          oninput="window._hxcSetDado(${i},this.value)"
-          onkeydown="window._hxcDadoKeydown(event,${i})">
+        ${dadoInput}
         ${resHtml}
-        ${!esHistorico?`<button class="hxc-item-del" onclick="event.stopPropagation();window._hxcRemover(${i})">×</button>`:''}
+        ${delBtn}
       </div>
       ${detail}
     </div>`;
   }).join('');
+
+  return items + _renderBalance();
 }
 
 // ── Montaje ───────────────────────────────────────────────────
@@ -510,10 +635,21 @@ window._hxcIrTurno = async (idxRaw) => {
       const arr = vistos[g];
       const si  = arr.indexOf(row.personaje_nombre);
       const color = SLOT_COLORS[g][Math.max(0, si)] || SLOT_COLORS.A[0];
+      // Enrich with catalog data if available
+      const cat = hxState.catalogoDB.find(h =>
+        _norm(h.hechizo_id) === _norm(row.hechizo_id) || _norm(h.nombre) === _norm(row.hechizo_nombre)
+      );
       return {
         id: row.id, pjNombre: row.personaje_nombre, grupo: g, slotIdx: si, color,
-        hechizo: { hechizo_id: row.hechizo_id, nombre: row.hechizo_nombre, afinidad: row.hechizo_afinidad, hex_cost: row.hechizo_hex_cost, resumen:'', efecto:'', overcast:'', undercast:'', especial:'' },
+        hechizo: {
+          hechizo_id: row.hechizo_id, nombre: row.hechizo_nombre,
+          afinidad: row.hechizo_afinidad, hex_cost: row.hechizo_hex_cost,
+          resumen: cat?.resumen || '', efecto: cat?.efecto || '',
+          overcast: cat?.overcast || '', undercast: cat?.undercast || '',
+          especial: cat?.especial || '', clase: cat?.clase || ''
+        },
         infalible: row.infalible, cobrarHex: row.cobrar_hex, esPrioridad: row.es_prioridad,
+        forceFallo: false,
         dado: row.dado_d100??'', afinidadEfectiva: row.afinidad_efectiva,
         mult: row.multiplicador_cd, costoBase: row.hechizo_hex_cost, costoEfectivo: row.costo_efectivo,
         abierto: false, resultado: row.resultado, ncCalc: row.nc, hexGastado: row.hex_gastado
@@ -693,6 +829,10 @@ window._hxcSetDado = (idx, val) => {
   item.dado = val; evaluarItem(item);
   const el = document.querySelector(`[data-hxc-idx="${idx}"]`);
   if (el) _actualizarResEl(el, item);
+  // If historico and admin, persist
+  const turnoIdx = hxState.turnos.findIndex(t => t.id === hxState.turnoActivo?.id);
+  const esHistorico = turnoIdx < hxState.turnos.length - 1;
+  if (esHistorico && _esAdmin()) window._hxcGuardarItemDB(item);
 };
 
 window._hxcDadoKeydown = (e, idx) => {
@@ -719,8 +859,52 @@ function _actualizarResEl(el, item) {
 }
 
 window._hxcToggleOpt = (idx, campo) => { const item=hxState.stack[idx]; if(!item) return; item[campo]=!item[campo]; if(campo==='infalible') evaluarItem(item); _render(); };
+
+window._hxcToggleInfalible = (idx) => {
+  const item = hxState.stack[idx]; if (!item) return;
+  item.infalible = !item.infalible;
+  if (item.infalible) item.forceFallo = false;
+  evaluarItem(item);
+  const turnoIdx = hxState.turnos.findIndex(t => t.id === hxState.turnoActivo?.id);
+  const esHistorico = turnoIdx < hxState.turnos.length - 1;
+  if (esHistorico && _esAdmin()) window._hxcGuardarItemDB(item);
+  _render();
+};
+
+window._hxcToggleFallo = (idx) => {
+  const item = hxState.stack[idx]; if (!item) return;
+  item.forceFallo = !item.forceFallo;
+  if (item.forceFallo) { item.infalible = false; }
+  evaluarItem(item);
+  const turnoIdx = hxState.turnos.findIndex(t => t.id === hxState.turnoActivo?.id);
+  const esHistorico = turnoIdx < hxState.turnos.length - 1;
+  if (esHistorico && _esAdmin()) window._hxcGuardarItemDB(item);
+  _render();
+};
 window._hxcSetPrioridad = (idx) => { moverAPrioridad(hxState.stack[idx].id); _render(); };
-window._hxcRemover = (idx) => { const item=hxState.stack[idx]; if(!item) return; removerHechizo(item.id); _render(); };
+window._hxcRemover = async (idx) => {
+  const item = hxState.stack[idx]; if (!item) return;
+  // If historico item with real DB id, delete from DB
+  if (item.id && typeof item.id === 'number') {
+    await supabase.from('hexcast_lanzamientos').delete().eq('id', item.id);
+  }
+  removerHechizo(item.id);
+  _render();
+};
+
+// Save a single historico item back to DB (OP edit)
+window._hxcGuardarItemDB = async (item) => {
+  if (!item.id || typeof item.id !== 'number') return;
+  const dado = parseInt(item.dado) || null;
+  await supabase.from('hexcast_lanzamientos').update({
+    dado_d100: dado,
+    infalible: item.infalible,
+    resultado: item.resultado,
+    nc: item.ncCalc,
+    costo_efectivo: item.costoEfectivo,
+    hex_gastado: item.hexGastado || 0,
+  }).eq('id', item.id);
+};
 
 window._hxcNuevoTurno = async () => {
   if (!hxState.sesionActiva) return;
