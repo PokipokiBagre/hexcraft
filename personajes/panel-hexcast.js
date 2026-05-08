@@ -4,7 +4,7 @@
 // ============================================================
 
 import { supabase } from '../hex-auth.js';
-import { personajes, estadoUI } from '../personajes/personajes-state.js';
+import { personajes, estadoUI } from './personajes-state.js';
 import { hxState, SLOT_COLORS } from './hexcast-state.js';
 import {
   _norm, imgPj, imgFallback,
