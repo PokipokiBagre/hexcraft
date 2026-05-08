@@ -17,6 +17,11 @@ function _sb() { return window._hexConfig?.storageUrl || ''; }
 function _imgIcon(nombre) {
     return `${_sb()}/imgpersonajes/${_norm(nombre)}icon.png`;
 }
+// Resuelve iconoOverride del personaje antes de construir la URL
+function _imgPj(nombreJugador) {
+    const icono = personajes[nombreJugador]?.iconoOverride || nombreJugador;
+    return _imgIcon(icono);
+}
 function _fallback() {
     return `${_sb()}/imginterfaz/no_encontrado.png`;
 }
@@ -41,7 +46,7 @@ function _avatares(jugadores, resaltarPJ, size = 26) {
     return jugadores.map(j => `
         <img class="pmis-av ${j === resaltarPJ ? 'yo' : ''}"
              width="${size}" height="${size}"
-             src="${_imgIcon(j)}"
+             src="${_imgPj(j)}"
              onerror="this.src='${_fallback()}'"
              title="${j}">`
     ).join('');
@@ -567,7 +572,7 @@ function _renderCatCard(m, nombrePJ, esAdmin) {
                      ${esAdmin?`draggable="true" data-drag-pj="${j.replace(/"/g,'&quot;')}" data-drag-source="mision" data-drag-mision="${m.titulo.replace(/"/g,'&quot;')}"`:``}
                      ${esAdmin?`onclick="event.stopPropagation();window._pmisDesapuntarPJ('${safeId}','${j.replace(/'/g, "\\'")}')" style="cursor:pointer;"`:``}
                      width="22" height="22"
-                     src="${_imgIcon(j)}"
+                     src="${_imgPj(j)}"
                      onerror="this.src='${_fallback()}'"
                      title="${j}${esAdmin?' (Clic para quitar)':''}">`).join('')}
             <span class="pmis-cat-cupos">${jugs.length}/${m.cupos}</span>
@@ -658,7 +663,7 @@ function _renderDetalle(m, nombrePJ, esAdmin) {
             ${jugs.map(j => `
                 <img class="pmis-det-av ${j === nombrePJ ? 'yo' : ''}"
                      ${esAdmin?`style="cursor:pointer;" onclick="window._pmisDesapuntarPJ('${safeId}','${j.replace(/'/g, "\\'")}')"`:``}
-                     src="${_imgIcon(j)}"
+                     src="${_imgPj(j)}"
                      onerror="this.src='${_fallback()}'"
                      title="${j}${esAdmin?' (Clic para quitar)':''}">`).join('')}
             <span class="pmis-det-cupos">${jugs.length}/${m.cupos} participantes</span>
