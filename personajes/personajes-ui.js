@@ -124,7 +124,12 @@ export function renderCatalogo() {
 
         return `<div class="pj-card ${esInactivo ? 'pj-inactivo' : ''}" onclick="window.abrirDetalle('${nombre.replace(/'/g,"\\'")}')">
             <div class="pj-card-top">
-                <div class="pj-inicial">${nombre[0]}</div>
+                <div class="pj-inicial">
+                    <img src="${_imgIconUrl(p.iconoOverride || nombre)}"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+                         style="width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top;display:block;">
+                    <span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--font-display);font-size:1em;color:var(--gold-dim);">${nombre[0]}</span>
+                </div>
                 <div class="pj-info">
                     <div class="pj-name">${nombre}</div>
                     <div class="pj-tags">
