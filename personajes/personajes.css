@@ -179,6 +179,8 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
     font-family: var(--font-display);
     font-size: 1em;
     color: var(--gold-dim);
+    overflow: hidden;
+    position: relative;
 }
 .pj-info { flex: 1; min-width: 0; }
 .pj-name {
