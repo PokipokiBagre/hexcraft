@@ -357,7 +357,7 @@ async function _renderTransfer() {
     const pjCards = (tipo) => _op.personajes.map(p => {
         const sel = _trState[tipo] === p.nombre;
         return `<div class="pobj-transfer-pj-card ${sel?'selected':''}" onclick="window._pobjopSelPj('${tipo}','${p.nombre.replace(/'/g,"\\'")}')" >
-            <img src="${_sb()}/imgpersonajes/${_norm(p.nombre)}icon.png" onerror="this.onerror=null;this.src='${_imgFall()}'">
+            <img src="${_imgPj(p)}" onerror="this.onerror=null;this.src='${_imgFall()}'">
             <span>${p.nombre}</span>
         </div>`;
     }).join('');
