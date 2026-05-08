@@ -2,9 +2,9 @@
 // hexcast-logic.js — Lógica de negocio del sistema HexCast
 // ============================================================
 
-import { supabase, currentConfig } from '../hex-auth.js';       // ← ese sí sube un nivel
-import { personajes } from './personajes-state.js';              // ← mismo nivel
-import { hxState, ... } from './hexcast-state.js';               // ← mismo nivel
+import { supabase, currentConfig } from '../hex-auth.js';
+import { personajes } from './personajes-state.js';
+import { hxState, SLOT_COLORS, calcularMultCooldown, costoConCooldown } from './hexcast-state.js';
 
 // ── Helpers ──────────────────────────────────────────────────
 export function _norm(s) {
@@ -15,12 +15,16 @@ export function _norm(s) {
 }
 
 function _sb() { return currentConfig?.storageUrl || ''; }
+
 export function imgPj(nombre) {
   const p = personajes[nombre];
   const icono = p?.iconoOverride || nombre;
   return `${_sb()}/imgpersonajes/${_norm(icono)}icon.png`;
 }
-export function imgFallback() { return `${_sb()}/imginterfaz/no_encontrado.png`; }
+
+export function imgFallback() {
+  return `${_sb()}/imginterfaz/no_encontrado.png`;
+}
 
 // Obtiene la afinidad efectiva del personaje para un hechizo dado
 export function getAfinidadEfectiva(pjNombre, afinidadHz) {
@@ -75,14 +79,12 @@ export async function crearSesion(nombre, descripcion = '') {
 
 export async function seleccionarSesion(sesionId) {
   hxState.sesionActiva = hxState.sesiones.find(s => s.id === sesionId) || null;
-  // Cargar turnos
   const { data } = await supabase
     .from('hexcast_turnos')
     .select('*')
     .eq('sesion_id', sesionId)
     .order('numero');
   hxState.turnos = data || [];
-  // Activar el último turno si existe, sino crear uno
   if (hxState.turnos.length > 0) {
     hxState.turnoActivo = hxState.turnos[hxState.turnos.length - 1];
   } else {
@@ -104,12 +106,11 @@ export async function crearTurno(sesionId, numero, nombre = '') {
 }
 
 export async function cargarInventarioPJ(pjNombre) {
-  if (hxState.inventarioPJ[pjNombre]) return; // ya cargado
+  if (hxState.inventarioPJ[pjNombre]) return;
   const { data } = await supabase
     .from('hechizos_inventario')
     .select('hechizo_nombre, hechizo_afinidad, hechizo_hex')
     .eq('personaje_nombre', pjNombre);
-  // Enriquecer con datos del catálogo
   const inv = (data || []).map(row => {
     const cat = hxState.catalogoDB.find(h =>
       _norm(h.nombre || h.hechizo_id) === _norm(row.hechizo_nombre) ||
@@ -152,7 +153,7 @@ export function agregarHechizo(pjNombre, grupo, slotIdx, hechizo) {
     costoEfectivo,
     costoBase,
     abierto: false,
-    resultado: null, // null | 'exito' | 'fallo' | 'infalible'
+    resultado: null,
     ncCalc: null,
     hexGastado: 0
   };
@@ -170,14 +171,12 @@ export function moverAPrioridad(itemId) {
   if (idx <= 0) return;
   const [item] = hxState.stack.splice(idx, 1);
   item.esPrioridad = true;
-  // Insertar al inicio (o después del último de prioridad)
   hxState.stack.unshift(item);
   _recalcCooldowns();
 }
 
-// Recalcula multiplicadores cooldown para todo el stack
 function _recalcCooldowns() {
-  const visto = {}; // 'pjNombre:afinidad' → count
+  const visto = {};
   hxState.stack.forEach(item => {
     const afKey = (item.hechizo?.afinidad || '').toLowerCase();
     const k = `${item.pjNombre}:${afKey}`;
@@ -189,7 +188,6 @@ function _recalcCooldowns() {
   });
 }
 
-// Evalúa resultado de un ítem del stack con el dado actual
 export function evaluarItem(item) {
   if (item.infalible) {
     item.resultado = 'infalible';
@@ -203,12 +201,10 @@ export function evaluarItem(item) {
   item.resultado = nc >= item.costoEfectivo ? 'exito' : 'fallo';
 }
 
-// Evalúa todo el stack
 export function evaluarStack() {
   hxState.stack.forEach(item => evaluarItem(item));
 }
 
-// Confirma el turno: aplica gastos y persiste en DB
 export async function confirmarTurno() {
   if (!hxState.turnoActivo) return { ok: false, msg: 'Sin turno activo' };
   evaluarStack();
@@ -220,7 +216,6 @@ export async function confirmarTurno() {
       ? item.costoEfectivo : 0;
     item.hexGastado = hexGastado;
 
-    // Descontar HEX del personaje en DB
     if (hexGastado > 0) {
       const p = personajes[item.pjNombre];
       if (p) {
@@ -260,7 +255,6 @@ export async function confirmarTurno() {
     if (error) return { ok: false, msg: error.message };
   }
 
-  // Preparar nuevo turno automáticamente
   const nuevoNum = hxState.turnos.length + 1;
   const nuevoTurno = await crearTurno(hxState.sesionActiva.id, nuevoNum);
   hxState.turnoActivo = nuevoTurno;
