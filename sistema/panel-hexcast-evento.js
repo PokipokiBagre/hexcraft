@@ -198,6 +198,34 @@ function _renderStats(p, s) {
 
   const safe = evState.pjNombre.replace(/'/g, "\\'");
 
+  // Bloque para stats con máximo (actual/max) + modificador del bonus manual de max
+  function statBlockConMax(label, campoActual, actual, max, color, deltasActual, deltasMax, campoMaxOverride, maxOverride) {
+    const posA = deltasActual.map(d =>
+      `<button class="hxev-stat-btn pos" onclick="window._hxevAddStat('${safe}','${campoActual}',+${d},'${label} +${d}')">+${d}</button>`).join('');
+    const negA = deltasActual.map(d =>
+      `<button class="hxev-stat-btn neg" onclick="window._hxevAddStat('${safe}','${campoActual}',-${d},'${label} -${d}')">-${d}</button>`).join('');
+    const posM = deltasMax.map(d =>
+      `<button class="hxev-stat-btn pos" onclick="window._hxevAddStat('${safe}','${campoMaxOverride}',+${d},'Máx ${label} +${d}')">+${d}</button>`).join('');
+    const negM = deltasMax.map(d =>
+      `<button class="hxev-stat-btn neg" onclick="window._hxevAddStat('${safe}','${campoMaxOverride}',-${d},'Máx ${label} -${d}')">-${d}</button>`).join('');
+    return `<div class="hxev-stat-block">
+      <div class="hxev-stat-label">${label}</div>
+      <div class="hxev-stat-val" style="color:${color};">${Number(actual).toLocaleString()}<span style="color:#444;font-size:0.6em;font-family:'Inter',sans-serif;"> / </span><span style="font-size:0.7em;color:#888;">${Number(max).toLocaleString()}</span></div>
+      <div style="font-size:0.5em;letter-spacing:1px;color:#555;margin-bottom:2px;text-transform:uppercase;">Actual</div>
+      <div class="hxev-stat-btns">${negA}${posA}</div>
+      <div class="hxev-stat-custom">
+        <input class="hxev-stat-custom-input" id="hxev-c-${campoActual}" type="number" placeholder="custom" onclick="event.stopPropagation()">
+        <button class="hxev-stat-custom-btn" onclick="window._hxevAddStatCustom('${safe}','${campoActual}','${label}')">ok</button>
+      </div>
+      <div style="font-size:0.5em;letter-spacing:1px;color:#555;margin:6px 0 2px;text-transform:uppercase;">Máx manual${maxOverride!==0?` <span style="color:#d4af37;">(+${maxOverride})</span>`:''}</div>
+      <div class="hxev-stat-btns">${negM}${posM}</div>
+      <div class="hxev-stat-custom">
+        <input class="hxev-stat-custom-input" id="hxev-c-${campoMaxOverride}" type="number" placeholder="custom" onclick="event.stopPropagation()">
+        <button class="hxev-stat-custom-btn" onclick="window._hxevAddStatCustom('${safe}','${campoMaxOverride}','Máx ${label}')">ok</button>
+      </div></div>`;
+  }
+
+  // Bloque simple para stats sin máximo (vida azul, hex)
   function statBlock(label, campo, val, color, deltas) {
     const pos = deltas.map(d =>
       `<button class="hxev-stat-btn pos" onclick="window._hxevAddStat('${safe}','${campo}',+${d},'${label} +${d}')">+${d}</button>`).join('');
@@ -215,11 +243,14 @@ function _renderStats(p, s) {
 
   const vaTotal = (s.vida_azul_base || 0) + (p.vida_azul_actual ?? 0);
   const statsHtml = [
-    statBlock('Vida Roja',     'vida_roja_actual', p.vida_roja_actual ?? 0, '#e06060', [1,3,5,10]),
-    statBlock('Vida Azul',     'vida_azul_actual', vaTotal,                 '#4ab3e8', [1,3,5]),
-    statBlock('Guarda Dorada', 'guarda_actual',    p.guarda_actual ?? 0,    '#d4af37', [1,3,5]),
-    statBlock('VEX',           'vex_actual',       p.vex_actual ?? 0,       '#9060c0', [50,100,200]),
-    statBlock('HEX',           'hex',              p.hex ?? 0,              '#d4af37', [100,500,1000]),
+    statBlockConMax('Vida Roja', 'vida_roja_actual', p.vida_roja_actual ?? 0, s.vida_roja_max, '#e06060',
+      [1,3,5,10], [1,3,5,10], 'vida_roja_max_override', s.vida_roja_max_override || 0),
+    statBlock('Vida Azul', 'vida_azul_actual', vaTotal, '#4ab3e8', [1,3,5]),
+    statBlockConMax('Guarda Dorada', 'guarda_actual', p.guarda_actual ?? 0, s.guarda_max, '#d4af37',
+      [1,3,5], [1,3,5], 'guarda_max_override', s.guarda_max_override || 0),
+    statBlockConMax('VEX', 'vex_actual', p.vex_actual ?? 0, s.vex_max, '#9060c0',
+      [50,100,200], [50,100,200], 'vex_max_override', p.vex_max_override || 0),
+    statBlock('HEX', 'hex', p.hex ?? 0, '#d4af37', [100,500,1000]),
   ].join('<hr class="hxev-stat-divider">');
 
   const AFINS = ['fisica','energetica','espiritual','mando','psiquica','oscura'];
@@ -456,7 +487,6 @@ window._hxevGuardar = () => {
     lineas.push(`Hechizos olvidados (${pj}) : ${porTipo.hz_rem.map(c => c.hzNombre).join(' | ')}`);
   }
   if (porTipo.obj_add) {
-    // Agrupa duplicados sumando cantidad
     const mapa = {};
     for (const c of porTipo.obj_add) {
       if (!mapa[c.objNombre]) mapa[c.objNombre] = { efecto: c.efecto, cantidad: 0 };
@@ -470,7 +500,7 @@ window._hxevGuardar = () => {
     lineas.push(`Objetos retirados (${pj}) : ${porTipo.obj_rem.map(c => `${c.objNombre} x${c.cantidad}`).join(' · ')}`);
   }
 
-  hxState.stack.push({
+  const nuevoItem = {
     id:           'ev_' + Date.now(),
     tipoItem:     'evento',
     pjNombre:     pj,
@@ -482,12 +512,25 @@ window._hxevGuardar = () => {
     abierto:      false,
     _payload:     [...evState.cambios],
     _aplicado:    false,
-  });
+  };
+
+  // Si es edición: reemplazar el item existente en el stack
+  if (evState._stackIdx !== null && evState._stackIdx !== undefined) {
+    const idx = evState._stackIdx;
+    if (typeof window._hxcReplaceStackItem === 'function') {
+      window._hxcReplaceStackItem(idx, nuevoItem);
+    }
+    _toast(`✦ Evento "${nombre}" actualizado`);
+  } else {
+    hxState.stack.push(nuevoItem);
+    _toast(`✦ Evento "${nombre}" guardado en el turno`);
+  }
 
   evState.cambios = [];
+  evState._stackIdx = null;
+  evState._editNombre = '';
   cerrarEventoPanel();
   if (typeof window._hxcRender === 'function') window._hxcRender();
-  _toast(`✦ Evento "${nombre}" guardado en el turno`);
 };
 
 // ── Carga de datos ────────────────────────────────────────────
@@ -505,17 +548,33 @@ async function _cargarDatos(nombre) {
 }
 
 // ── Apertura / cierre ─────────────────────────────────────────
-export async function abrirEventoPanel(pjNombre, grupo, idx) {
+export async function abrirEventoPanel(pjNombre, grupo, idx, editContext = null) {
   _montar();
   evState.pjNombre = pjNombre;
   evState.grupo    = grupo || 'A';
   evState.idx      = idx  ?? 0;
-  evState.cambios  = [];
   evState.busqueda = '';
+  // Si es edición: precargar cambios y nombre; guardar índice en stack
+  if (editContext) {
+    evState.cambios   = editContext.cambios || [];
+    evState._stackIdx = editContext.stackIdx ?? null;
+    evState._editNombre = editContext.nombre || '';
+  } else {
+    evState.cambios   = [];
+    evState._stackIdx = null;
+    evState._editNombre = '';
+  }
   await _cargarDatos(pjNombre);
   document.getElementById('hxev-overlay')?.classList.add('open');
   document.getElementById('hxev-root')?.classList.add('open');
   _render();
+  // Si es edición, poner el nombre en el input
+  if (editContext?.nombre) {
+    setTimeout(() => {
+      const inp = document.getElementById('hxev-nombre-evento');
+      if (inp) inp.value = editContext.nombre;
+    }, 50);
+  }
 }
 export function cerrarEventoPanel() {
   document.getElementById('hxev-overlay')?.classList.remove('open');
@@ -537,6 +596,15 @@ export async function aplicarPayload(payload, invertir = false) {
         if (c.campo === 'vida_azul_actual') {
           p.vida_azul_actual = (p.vida_azul_actual ?? 0) + delta;
           await persistirCampos(c.pjNombre, { vida_azul_actual: p.vida_azul_actual });
+        } else if (c.campo === 'vida_roja_max_override') {
+          p.vida_roja_max_override = (p.vida_roja_max_override || 0) + delta;
+          await persistirCampos(c.pjNombre, { vida_roja_max_op: p.vida_roja_max_override });
+        } else if (c.campo === 'guarda_max_override') {
+          p.guarda_max_override = (p.guarda_max_override || 0) + delta;
+          await persistirCampos(c.pjNombre, { guarda_max_op: p.guarda_max_override });
+        } else if (c.campo === 'vex_max_override') {
+          p.vex_max_override = (p.vex_max_override || 0) + delta;
+          await persistirCampos(c.pjNombre, { vex_max_op: p.vex_max_override });
         } else {
           const caps = { vida_roja_actual: s.vida_roja_max, guarda_actual: s.guarda_max, vex_actual: s.vex_max };
           const max = caps[c.campo] ?? Infinity;

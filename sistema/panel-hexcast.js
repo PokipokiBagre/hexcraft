@@ -277,6 +277,13 @@ function _render() {
   else _renderCast(drawer);
 }
 window._hxcRender = _render;
+window._hxcReplaceStackItem = (idx, nuevoItem) => {
+  if (idx >= 0 && idx < hxState.stack.length) {
+    // Preserve _aplicado state if it was already applied
+    nuevoItem._aplicado = hxState.stack[idx]._aplicado || false;
+    hxState.stack[idx] = nuevoItem;
+  }
+};
 
 function _renderSesiones(drawer) {
   const cards = hxState.sesiones.length > 0
@@ -611,6 +618,9 @@ function _renderStack(esHistorico) {
       const delBtn = puedeEditar
         ? `<button class="hxc-item-del" onclick="event.stopPropagation();window._hxcRemover(${i})" style="color:#666;">×</button>`
         : '';
+      const editBtn = puedeEditar
+        ? `<button class="hxc-item-del" onclick="event.stopPropagation();window._hxcEditarEvento(${i})" title="Editar evento" style="color:#9060c0;">✎</button>`
+        : '';
       const tipoLabel = { evento:'Evento', casteo:'Casteo GM', stat:'Stat', hechizo_add:'+ Hechizo', hechizo_rem:'− Hechizo', objeto:'Objeto' }[item.eventoTipo] || 'Evento';
       return `<div class="hxc-item-evento" data-hxc-idx="${i}">
         <div class="hxc-item-evento-row" onclick="window._hxcToggleItem(${i})">
@@ -618,6 +628,7 @@ function _renderStack(esHistorico) {
           <span class="hxc-item-evento-tipo">${tipoLabel}</span>
           <span class="hxc-item-evento-nombre">${item.eventoNombre || '—'}</span>
           <span class="hxc-item-evento-pj">${item.pjNombre}</span>
+          ${editBtn}
           ${delBtn}
         </div>
         ${item.abierto && item.eventoDesc ? `<div class="hxc-item-evento-desc">${item.eventoDesc}</div>` : ''}
@@ -958,7 +969,24 @@ window._hxcAbrirEvento = async (grupo, idx, pjNombre) => {
   hxState.panelSlot = { grupo, idx: parseInt(idx), tipo: null };
   try {
     const { abrirEventoPanel } = await import('./panel-hexcast-evento.js');
-    await abrirEventoPanel(pjNombre);
+    await abrirEventoPanel(pjNombre, grupo, parseInt(idx));
+  } catch(e) {
+    console.error('panel-hexcast-evento.js no disponible:', e);
+    _toast('Módulo de eventos no disponible', true);
+  }
+};
+
+window._hxcEditarEvento = async (stackIdx) => {
+  const item = hxState.stack[stackIdx];
+  if (!item || item.tipoItem !== 'evento') return;
+  try {
+    const { abrirEventoPanel } = await import('./panel-hexcast-evento.js');
+    // Pasar el índice del stack para que al guardar se reemplace en lugar de agregar
+    await abrirEventoPanel(item.pjNombre, item.grupo, item.slotIdx, {
+      stackIdx,
+      nombre: item.eventoNombre,
+      cambios: item._payload ? [...item._payload] : [],
+    });
   } catch(e) {
     console.error('panel-hexcast-evento.js no disponible:', e);
     _toast('Módulo de eventos no disponible', true);

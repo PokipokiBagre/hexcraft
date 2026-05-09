@@ -77,11 +77,10 @@ export function calcularStats(p) {
     const bonoDA = b.dano_azul || p.bono_dano_azul || 0;
 
     // ── Vida Roja ────────────────────────────────────────────────
-    // Techo máximo = fórmula + override manual (si > 0, reemplaza fórmula)
+    // Techo máximo = fórmula + override manual (suma, igual que Guarda)
     const vida_roja_max_formula = evalExpr(formulas.vida_roja_max.expr, ctx) + bonoVR;
-    const vida_roja_max = (p.vida_roja_max_override && p.vida_roja_max_override > 0)
-        ? p.vida_roja_max_override
-        : vida_roja_max_formula;
+    const vida_roja_max_override = p.vida_roja_max_override || 0;
+    const vida_roja_max = vida_roja_max_formula + vida_roja_max_override;
 
     // ── Vida Azul ─────────────────────────────────────────────────
     // vida_azul NO tiene techo. Es un único valor acumulable.
@@ -109,6 +108,8 @@ export function calcularStats(p) {
 
     return {
         vida_roja_max,
+        vida_roja_max_formula,
+        vida_roja_max_override,
         vida_azul_base,   // valor calculado por fórmula (label: "base")
         vida_azul_mod,    // modificación acumulada guardada en DB
         vida_azul_total,  // = base + mod, el número que se muestra

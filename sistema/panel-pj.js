@@ -538,16 +538,14 @@ function _tabStats(nombre) {
             </div>${barra}</div>`;
     };
 
-    const _maxOv = (label, campo, ov, fm) => {
+    const _maxOvAditivo = (label, campoOverride, override, formula, maxTotal) => {
         if (!estadoUI.esAdmin) return '';
-        const uF = ov===0;
         return `<div class="ppj-max-row">
             <span class="ppj-max-label">Máx ${label}</span>
-            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','${campo}',-1)">−</button>
-            <span class="ppj-max-val ${uF?'formula':'manual'}">${fm}</span>
-            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','${campo}',1)">+</button>
-            ${!uF?`<button class="ppj-ctrl-btn" onclick="window.resetStatMax('${safe}','${campo}')">↺</button>`:''}
-            <span class="ppj-hint ${uF?'':'manual'}">${uF?'fórmula':'manual'}</span>
+            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','${campoOverride}',-1)">−</button>
+            <span class="ppj-max-val" title="Fórmula: ${formula}${override!==0?' + '+override+' manual':''}">${maxTotal}</span>
+            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','${campoOverride}',1)">+</button>
+            ${override!==0?`<button class="ppj-ctrl-btn" onclick="window.resetStatMax('${safe}','${campoOverride}')">↺</button>`:''}
         </div>`;
     };
 
@@ -629,8 +627,8 @@ function _tabStats(nombre) {
     <div class="ppj-section">
         <div class="ppj-section-title">Recursos vitales</div>
         ${_vida('Vida Roja','vida_roja_actual',p.vida_roja_actual||0,s.vida_roja_max,'vida','#d4af37',26)}
-        ${_maxOv('Vida Roja','vida_roja_max_override',p.vida_roja_max_override||0,s.vida_roja_max)}
-        <div class="ppj-formula">${formulas.vida_roja_max?.expr||''}</div>
+        ${_maxOvAditivo('Vida Roja','vida_roja_max_override',s.vida_roja_max_override||0,s.vida_roja_max_formula,s.vida_roja_max)}
+        <div class="ppj-formula">${formulas.vida_roja_max?.expr||''} ${s.vida_roja_max_override!==0?`<span style="color:#888;">+ ${s.vida_roja_max_override} manual</span>`:''}</div>
 
         ${s.vida_azul_total > 0 || s.vida_azul_base > 0 ? `
         <div class="ppj-vida-block">
@@ -653,12 +651,7 @@ function _tabStats(nombre) {
 
         ${s.guarda_max > 0 ? `
         ${_vida('Guarda Dorada','guarda_actual',p.guarda_actual||0,s.guarda_max,'guarda','#d4af37',20)}
-        <div class="ppj-max-row">
-            <span class="ppj-max-label">Máx Guarda</span>
-            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','guarda_max_override',-1)">−</button>
-            <span class="ppj-max-val" title="Fórmula: ${s.guarda_max_formula}${s.guarda_max_override!==0?' + '+s.guarda_max_override:''}">${s.guarda_max}</span>
-            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','guarda_max_override',1)">+</button>
-        </div>
+        ${_maxOvAditivo('Guarda','guarda_max_override',s.guarda_max_override||0,s.guarda_max_formula,s.guarda_max)}
         <div class="ppj-formula">${formulas.guarda_max?.expr||''} ${s.guarda_max_override!==0?`<span style="color:#888;">+ ${s.guarda_max_override} manual</span>`:''}</div>
         ` : ''}
 

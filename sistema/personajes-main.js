@@ -126,7 +126,7 @@ window.modStat = function(nombre, campo, delta) {
         // no hay Math.max(0) — puede quedar negativo si el OP lo desea
         persistirCampos(nombre, { vida_azul_actual: p.vida_azul_actual });
     } else {
-        const caps = { vex_actual: s.vex_max, guarda_actual: s.guarda_max };
+        const caps = { vex_actual: s.vex_max, guarda_actual: s.guarda_max, vida_roja_actual: s.vida_roja_max };
         const max = caps[campo] ?? Infinity;
         p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
         persistirCampos(nombre, { [campo]: p[campo] });
@@ -147,10 +147,9 @@ window.modStatMax = function(nombre, campo, delta) {
         p.guarda_max_override = (p.guarda_max_override || 0) + delta;
         persistirCampos(nombre, { guarda_max_op: p.guarda_max_override });
     } else if (campo === 'vida_roja_max_override') {
-        const s = calcularStats(p);
-        if ((p[campo] || 0) === 0) p[campo] = s.vida_roja_max;
-        p[campo] = Math.max(0, (p[campo] || 0) + delta);
-        persistirCampos(nombre, { vida_roja_max_op: p[campo] });
+        // vida_roja_max = fórmula + override (suma). Override arranca en 0.
+        p.vida_roja_max_override = (p.vida_roja_max_override || 0) + delta;
+        persistirCampos(nombre, { vida_roja_max_op: p.vida_roja_max_override });
     }
     renderCatalogo();
     refreshPanelPJ();
@@ -162,6 +161,9 @@ window.resetStatMax = function(nombre, campo) {
     if (campo === 'guarda_max_override') {
         p.guarda_max_override = 0;
         persistirCampos(nombre, { guarda_max_op: 0 });
+    } else if (campo === 'vida_roja_max_override') {
+        p.vida_roja_max_override = 0;
+        persistirCampos(nombre, { vida_roja_max_op: 0 });
     } else {
         p[campo] = 0;
         const _dbMap2 = { vida_roja_max_override: 'vida_roja_max_op' };
