@@ -621,13 +621,22 @@ function _renderStack(esHistorico) {
       const editBtn = puedeEditar
         ? `<button class="hxc-item-del" onclick="event.stopPropagation();window._hxcEditarEvento(${i})" title="Editar evento" style="color:#9060c0;">✎</button>`
         : '';
+      const aplicadoLabel = item._aplicado
+        ? `<span class="hxc-item-evento-estado aplicado">✓ Aplicado</span>`
+        : `<span class="hxc-item-evento-estado pendiente">Pendiente</span>`;
+      const botonesAplicar = (esAdmin && puedeEditar) ? (item._aplicado
+        ? `<button class="hxc-item-del" style="color:#e8a030;font-size:0.65em;padding:2px 8px;border-radius:4px;border:1px solid rgba(232,160,48,0.35);background:rgba(232,160,48,0.07);" onclick="event.stopPropagation();window._hxcRevertirEvento(${i})">↩ Revertir</button>`
+        : `<button class="hxc-item-del" style="color:#3ecf6e;font-size:0.65em;padding:2px 8px;border-radius:4px;border:1px solid rgba(62,207,110,0.35);background:rgba(62,207,110,0.07);" onclick="event.stopPropagation();window._hxcAplicarEvento(${i})">✓ Aplicar</button>`)
+        : '';
       const tipoLabel = { evento:'Evento', casteo:'Casteo GM', stat:'Stat', hechizo_add:'+ Hechizo', hechizo_rem:'− Hechizo', objeto:'Objeto' }[item.eventoTipo] || 'Evento';
       return `<div class="hxc-item-evento" data-hxc-idx="${i}">
         <div class="hxc-item-evento-row" onclick="window._hxcToggleItem(${i})">
           <div class="hxc-item-evento-dot"></div>
           <span class="hxc-item-evento-tipo">${tipoLabel}</span>
           <span class="hxc-item-evento-nombre">${item.eventoNombre || '—'}</span>
+          ${aplicadoLabel}
           <span class="hxc-item-evento-pj">${item.pjNombre}</span>
+          ${botonesAplicar}
           ${editBtn}
           ${delBtn}
         </div>
@@ -1351,5 +1360,39 @@ async function _carryForwardEstados(turnoAnteriorId, nuevoTurnoId, sesionId) {
   }));
   await supabase.from('pj_estados').insert(rows);
 }
+
+// ── Aplicar / Revertir evento (solo OP) ──────────────────────
+window._hxcAplicarEvento = async (stackIdx) => {
+  if (!_esAdmin()) { _toast('Solo el OP puede aplicar eventos', true); return; }
+  const item = hxState.stack[stackIdx];
+  if (!item || item.tipoItem !== 'evento' || item._aplicado) return;
+  try {
+    const { aplicarPayload } = await import('./panel-hexcast-evento.js');
+    const errores = await aplicarPayload(item._payload, false);
+    if (errores && errores.length) { _toast('Errores: ' + errores.join(', '), true); return; }
+    item._aplicado = true;
+    _toast(`✦ Evento "${item.eventoNombre}" aplicado`);
+    _render();
+  } catch(e) {
+    _toast('Error al aplicar evento: ' + e.message, true);
+  }
+};
+
+window._hxcRevertirEvento = async (stackIdx) => {
+  if (!_esAdmin()) { _toast('Solo el OP puede revertir eventos', true); return; }
+  const item = hxState.stack[stackIdx];
+  if (!item || item.tipoItem !== 'evento' || !item._aplicado) return;
+  if (!confirm(`¿Revertir evento "${item.eventoNombre}"? Los cambios se desharán.`)) return;
+  try {
+    const { aplicarPayload } = await import('./panel-hexcast-evento.js');
+    const errores = await aplicarPayload(item._payload, true);
+    if (errores && errores.length) { _toast('Errores: ' + errores.join(', '), true); return; }
+    item._aplicado = false;
+    _toast(`↩ Evento "${item.eventoNombre}" revertido`);
+    _render();
+  } catch(e) {
+    _toast('Error al revertir evento: ' + e.message, true);
+  }
+};
 
 _montar();

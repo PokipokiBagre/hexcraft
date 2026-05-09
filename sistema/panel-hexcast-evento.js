@@ -141,11 +141,68 @@ function _montar() {
   document.body.appendChild(root);
 }
 
+// ── Preview helpers: aplica cambios pendientes al estado local para el render ──
+function _previewStats(p) {
+  if (!p) return p;
+  // Clonar superficialmente para el preview
+  const clone = { ...p,
+    afin_base:  { ...p.afin_base },
+    afin_extra: { ...p.afin_extra },
+    afin_alter: { ...p.afin_alter },
+  };
+  for (const c of evState.cambios) {
+    if (c.pjNombre !== evState.pjNombre) continue;
+    if (c.tipo === 'stat') {
+      clone[c.campo] = (clone[c.campo] ?? 0) + c.delta;
+    } else if (c.tipo === 'afin') {
+      if (!clone[c.afinLayer]) clone[c.afinLayer] = {};
+      clone[c.afinLayer][c.afinKey] = (clone[c.afinLayer][c.afinKey] || 0) + c.delta;
+    }
+  }
+  return clone;
+}
+
+function _previewInvHz() {
+  // Inventario "virtual": copia con hz_add/hz_rem de cambios pendientes
+  const base = evState.inventarioHz.map(h => ({ ...h }));
+  const result = [...base];
+  for (const c of evState.cambios) {
+    if (c.pjNombre !== evState.pjNombre) continue;
+    if (c.tipo === 'hz_add') {
+      if (!result.find(h => h.hechizo_nombre === c.hzNombre)) {
+        result.push({ hechizo_nombre: c.hzNombre, hechizo_afinidad: c.afinidad || '', hechizo_hex: 0, _pendiente: true });
+      }
+    } else if (c.tipo === 'hz_rem') {
+      const idx = result.findIndex(h => h.hechizo_nombre === c.hzNombre);
+      if (idx >= 0) result.splice(idx, 1);
+    }
+  }
+  return result;
+}
+
+function _previewInvObj() {
+  const base = evState.inventarioObj.map(o => ({ ...o }));
+  const result = [...base];
+  for (const c of evState.cambios) {
+    if (c.pjNombre !== evState.pjNombre) continue;
+    if (c.tipo === 'obj_add') {
+      const ex = result.find(o => o.objeto_nombre === c.objNombre);
+      if (ex) ex.cantidad += c.cantidad;
+      else result.unshift({ id: null, objeto_nombre: c.objNombre, cantidad: c.cantidad, equipado: false, _pendiente: true });
+    } else if (c.tipo === 'obj_rem') {
+      const ex = result.find(o => o.objeto_nombre === c.objNombre);
+      if (ex) { ex.cantidad -= c.cantidad; if (ex.cantidad <= 0) { const i = result.indexOf(ex); result.splice(i, 1); } }
+    }
+  }
+  return result;
+}
+
 // ── Render ────────────────────────────────────────────────────
 function _render() {
   const root = document.getElementById('hxev-root');
   if (!root) return;
-  const p = personajes[evState.pjNombre];
+  const pOrig = personajes[evState.pjNombre];
+  const p = _previewStats(pOrig);
   const s = p ? calcularStats(p) : null;
 
   const chips = evState.cambios.map((c, i) =>
@@ -198,6 +255,14 @@ function _renderStats(p, s) {
 
   const safe = evState.pjNombre.replace(/'/g, "\\'");
 
+  // Helper para mostrar delta pendiente en stats
+  function _pendienteDelta(campo) {
+    const d = evState.cambios.filter(c => c.pjNombre === evState.pjNombre && c.tipo === 'stat' && c.campo === campo)
+      .reduce((s, c) => s + c.delta, 0);
+    if (!d) return '';
+    return ` <span style="font-size:0.5em;color:${d>0?'#3ecf6e':'#e06060'};font-family:'Inter',sans-serif;">${d>0?'+':''}${d}</span>`;
+  }
+
   // Bloque para stats con máximo (actual/max) + modificador del bonus manual de max
   function statBlockConMax(label, campoActual, actual, max, color, deltasActual, deltasMax, campoMaxOverride, maxOverride) {
     const posA = deltasActual.map(d =>
@@ -210,7 +275,7 @@ function _renderStats(p, s) {
       `<button class="hxev-stat-btn neg" onclick="window._hxevAddStat('${safe}','${campoMaxOverride}',-${d},'Máx ${label} -${d}')">-${d}</button>`).join('');
     return `<div class="hxev-stat-block">
       <div class="hxev-stat-label">${label}</div>
-      <div class="hxev-stat-val" style="color:${color};">${Number(actual).toLocaleString()}<span style="color:#444;font-size:0.6em;font-family:'Inter',sans-serif;"> / </span><span style="font-size:0.7em;color:#888;">${Number(max).toLocaleString()}</span></div>
+      <div class="hxev-stat-val" style="color:${color};">${Number(actual).toLocaleString()}${_pendienteDelta(campoActual)}<span style="color:#444;font-size:0.6em;font-family:'Inter',sans-serif;"> / </span><span style="font-size:0.7em;color:#888;">${Number(max).toLocaleString()}${_pendienteDelta(campoMaxOverride)}</span></div>
       <div style="font-size:0.5em;letter-spacing:1px;color:#555;margin-bottom:2px;text-transform:uppercase;">Actual</div>
       <div class="hxev-stat-btns">${negA}${posA}</div>
       <div class="hxev-stat-custom">
@@ -233,7 +298,7 @@ function _renderStats(p, s) {
       `<button class="hxev-stat-btn neg" onclick="window._hxevAddStat('${safe}','${campo}',-${d},'${label} -${d}')">-${d}</button>`).join('');
     return `<div class="hxev-stat-block">
       <div class="hxev-stat-label">${label}</div>
-      <div class="hxev-stat-val" style="color:${color};">${Number(val).toLocaleString()}</div>
+      <div class="hxev-stat-val" style="color:${color};">${Number(val).toLocaleString()}${_pendienteDelta(campo)}</div>
       <div class="hxev-stat-btns">${neg}${pos}</div>
       <div class="hxev-stat-custom">
         <input class="hxev-stat-custom-input" id="hxev-c-${campo}" type="number" placeholder="custom" onclick="event.stopPropagation()">
@@ -286,20 +351,20 @@ function _renderStats(p, s) {
 // ── Panel Hechizos ────────────────────────────────────────────
 function _renderHechizos() {
   const busq = evState.busqueda.toLowerCase();
-  const inv  = evState.inventarioHz;
+  const inv  = _previewInvHz();
   const invNombres = new Set(inv.map(h => h.hechizo_nombre));
   const cat  = evState.catalogoHechizos.filter(h =>
     !busq || (h.nombre||'').toLowerCase().includes(busq) || (h.afinidad||'').toLowerCase().includes(busq));
   const safe = evState.pjNombre?.replace(/'/g, "\\'");
 
   const invRows = inv.length > 0
-    ? inv.map(h => `<div class="hxev-list-item">
+    ? inv.map(h => `<div class="hxev-list-item" ${h._pendiente ? 'style="opacity:0.7;border-color:rgba(62,207,110,0.25);"' : ''}>
         <div style="flex:1;min-width:0;">
-          <div class="hxev-list-item-nombre">${h.hechizo_nombre}</div>
+          <div class="hxev-list-item-nombre">${h.hechizo_nombre}${h._pendiente ? ' <span style="font-size:0.55em;color:#3ecf6e;padding:1px 5px;border-radius:3px;background:rgba(62,207,110,0.1);border:1px solid rgba(62,207,110,0.3);">pendiente</span>' : ''}</div>
           <div class="hxev-list-item-sub">${h.hechizo_afinidad||'—'}</div>
         </div>
-        <button class="hxev-obj-btn-rem"
-          onclick="window._hxevAddHzRem('${safe}','${(h.hechizo_nombre||'').replace(/'/g,"\\'")}')">−</button>
+        ${!h._pendiente ? `<button class="hxev-obj-btn-rem"
+          onclick="window._hxevAddHzRem('${(evState.pjNombre||'').replace(/'/g,"\\'")}','${(h.hechizo_nombre||'').replace(/'/g,"\\'")}')">−</button>` : ''}
       </div>`).join('')
     : `<div class="hxev-list-empty">Sin hechizos</div>`;
 
@@ -359,19 +424,19 @@ function _renderHechizos() {
 // ── Panel Objetos ─────────────────────────────────────────────
 function _renderObjetos() {
   const busq = evState.busqueda.toLowerCase();
-  const inv  = evState.inventarioObj;
+  const inv  = _previewInvObj();
   const cat  = evState.catalogoObjetos.filter(o =>
     !busq || (o.nombre||'').toLowerCase().includes(busq) || (o.tipo||'').toLowerCase().includes(busq));
   const safe = evState.pjNombre?.replace(/'/g, "\\'");
 
   const invRows = inv.length > 0
-    ? inv.map(o => `<div class="hxev-list-item">
+    ? inv.map(o => `<div class="hxev-list-item" ${o._pendiente ? 'style="border-color:rgba(62,207,110,0.25);"' : ''}>
         <div style="flex:1;min-width:0;">
-          <div class="hxev-list-item-nombre">${o.objeto_nombre} x${o.cantidad}</div>
+          <div class="hxev-list-item-nombre">${o.objeto_nombre} x${o.cantidad}${o._pendiente ? ' <span style="font-size:0.55em;color:#3ecf6e;padding:1px 5px;border-radius:3px;background:rgba(62,207,110,0.1);border:1px solid rgba(62,207,110,0.3);">pendiente</span>' : ''}</div>
           ${o.equipado ? `<div class="hxev-list-item-sub">equipado</div>` : ''}
         </div>
-        <button class="hxev-obj-btn-rem"
-          onclick="window._hxevAddObjRem('${safe}','${(o.objeto_nombre||'').replace(/'/g,"\\'")}',${o.id},1)">-1</button>
+        ${!o._pendiente ? `<button class="hxev-obj-btn-rem"
+          onclick="window._hxevAddObjRem('${safe}','${(o.objeto_nombre||'').replace(/'/g,"\\'")}',${o.id},1)">-1</button>` : ''}
       </div>`).join('')
     : `<div class="hxev-list-empty">Sin objetos</div>`;
 
