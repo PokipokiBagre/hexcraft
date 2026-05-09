@@ -42,7 +42,7 @@ function _css() {
 .hxc-body { flex: 1; display: grid; grid-template-columns: 160px 1fr 160px; overflow: hidden; }
 .hxc-col { display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.05); overflow: hidden; }
 .hxc-col-b { border-right: none; border-left: 1px solid rgba(255,255,255,0.05); }
-.hxc-col-title { font-size: 0.52em; letter-spacing: 2.5px; text-transform: uppercase; color: #444; padding: 6px 10px 4px; flex-shrink: 0; font-weight: 700; }
+.hxc-col-title { font-size: 0.52em; letter-spacing: 2.5px; text-transform: uppercase; color: #888; padding: 6px 10px 4px; flex-shrink: 0; font-weight: 700; }
 .hxc-slot { flex: 1; min-height: 0; display: flex; flex-direction: column; border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; position: relative; overflow: hidden; }
 .hxc-slot:last-child { border-bottom: none; }
 .hxc-slot-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; height: 100%; padding: 8px 10px; transition: background 0.15s; }
@@ -54,10 +54,10 @@ function _css() {
 .hxc-slot-nombre { font-size: 0.65em; font-weight: 700; color: #fff; text-align: center; line-height: 1.2; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hxc-slot-hex { font-size: 0.57em; color: #666; font-family: 'Cinzel', serif; }
 .hxc-slot-vex { font-size: 0.55em; color: #9060c0; font-family: 'Cinzel', serif; }
-.hxc-slot-plus { font-size: 1.5em; color: rgba(255,255,255,0.18); transition: color 0.15s; }
-.hxc-slot:hover .hxc-slot-plus { color: rgba(255,255,255,0.35); }
-.hxc-slot-label { font-size: 0.55em; color: #333; margin-top: 2px; }
-.hxc-slot-quit { position: absolute; top: 4px; right: 4px; background: none; border: none; color: #2a2a3a; font-size: 0.75em; cursor: pointer; padding: 2px 4px; border-radius: 3px; opacity: 0; transition: opacity 0.15s, color 0.15s; }
+.hxc-slot-plus { font-size: 1.5em; color: rgba(255,255,255,0.55); transition: color 0.15s; }
+.hxc-slot:hover .hxc-slot-plus { color: rgba(255,255,255,0.85); }
+.hxc-slot-label { font-size: 0.55em; color: #888; margin-top: 2px; }
+.hxc-slot-quit { position: absolute; top: 4px; right: 4px; background: none; border: none; color: #777; font-size: 0.75em; cursor: pointer; padding: 2px 4px; border-radius: 3px; opacity: 0; transition: opacity 0.15s, color 0.15s; }
 .hxc-slot:hover .hxc-slot-quit { opacity: 1; }
 .hxc-slot-quit:hover { color: #c44; }
 .hxc-inv-panel { position: absolute; inset: 0; background: rgba(8,7,15,0.98); display: flex; flex-direction: column; z-index: 2; border: 1px solid var(--slot-border); border-radius: 4px; overflow: hidden; }
@@ -74,7 +74,7 @@ function _css() {
 .hxc-inv-hz-nombre { font-size: 0.7em; color: #eee; flex: 1; line-height: 1.2; }
 .hxc-inv-hz-afin { font-size: 0.57em; color: #555; white-space: nowrap; }
 .hxc-inv-hz-cost { font-size: 0.62em; color: #d4af37; font-family: 'Cinzel', serif; flex-shrink: 0; }
-.hxc-inv-empty { font-size: 0.68em; color: #333; text-align: center; padding: 16px 6px; }
+.hxc-inv-empty { font-size: 0.68em; color: #666; text-align: center; padding: 16px 6px; }
 .hxc-center { display: flex; flex-direction: column; overflow: hidden; }
 .hxc-center-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding: 7px 12px 6px; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
 .hxc-turno-label { font-size: 0.62em; color: #666; flex-shrink: 0; }
@@ -97,8 +97,10 @@ function _css() {
 .hxc-btn-del-turno { background: rgba(200,60,60,0.07); border-color: rgba(200,60,60,0.3); color: #e06060; }
 .hxc-btn-del-turno:hover { background: rgba(200,60,60,0.18); }
 .hxc-badge-hist { font-size: 0.58em; color: #e8a030; background: rgba(232,160,48,0.1); border: 1px solid rgba(232,160,48,0.3); padding: 2px 7px; border-radius: 4px; }
+.hxc-btn-guardar-hist { background: rgba(212,175,55,0.12); border: 1px solid rgba(212,175,55,0.5); color: #d4af37; font-size: 0.67em; font-family: 'Cinzel', serif; letter-spacing: 0.8px; padding: 5px 13px; border-radius: 5px; cursor: pointer; transition: background 0.15s; }
+.hxc-btn-guardar-hist:hover { background: rgba(212,175,55,0.26); }
 .hxc-stack { flex: 1; overflow-y: auto; padding: 8px 12px 10px; scrollbar-width: thin; }
-.hxc-stack-empty { text-align: center; padding: 40px 16px; font-size: 0.72em; color: #2a2a3a; line-height: 1.9; }
+.hxc-stack-empty { text-align: center; padding: 40px 16px; font-size: 0.72em; color: #666; line-height: 1.9; }
 .hxc-item { border-radius: 7px; border: 1px solid var(--slot-border); background: var(--slot-bg); margin-bottom: 6px; overflow: hidden; transition: box-shadow 0.15s; }
 .hxc-item.prioridad { box-shadow: 0 0 12px var(--slot-glow); }
 .hxc-item.res-exito { border-color: rgba(62,207,110,0.5); }
@@ -119,7 +121,7 @@ function _css() {
 .hxc-res-fallo { color: #e85050; }
 .hxc-res-infalible { color: #d4af37; }
 .hxc-res-fallo_hex { color: #e8a030; }
-.hxc-item-del { background: none; border: none; color: #2a2a3a; font-size: 1em; cursor: pointer; padding: 2px 5px; border-radius: 3px; transition: color 0.15s; flex-shrink: 0; }
+.hxc-item-del { background: none; border: none; color: #666; font-size: 1em; cursor: pointer; padding: 2px 5px; border-radius: 3px; transition: color 0.15s; flex-shrink: 0; }
 .hxc-item-del:hover { color: #e04040; }
 .hxc-item-detail { border-top: 1px solid rgba(255,255,255,0.07); padding: 9px 12px 11px; background: rgba(0,0,0,0.28); }
 .hxc-detail-opts { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 9px; }
@@ -139,7 +141,7 @@ function _css() {
 .hxc-gasto-vex { color: #9060c0; font-weight: 600; font-family: 'Cinzel', serif; }
 .hxc-gasto-hex { color: #d4af37; font-weight: 600; font-family: 'Cinzel', serif; }
 .hxc-balance-panel { margin-top: 14px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; overflow: hidden; }
-.hxc-balance-title { font-size: 0.54em; letter-spacing: 2px; text-transform: uppercase; color: #444; padding: 7px 12px 4px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.hxc-balance-title { font-size: 0.54em; letter-spacing: 2px; text-transform: uppercase; color: #888; padding: 7px 12px 4px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .hxc-bal-row { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); border-left: 3px solid var(--slot-border); }
 .hxc-bal-row:last-child { border-bottom: none; }
 .hxc-bal-pj { font-size: 0.68em; font-weight: 700; color: var(--slot-text); flex: 1; }
@@ -157,9 +159,9 @@ function _css() {
 .hxc-ses-card:hover { background: rgba(212,175,55,0.05); border-color: rgba(212,175,55,0.28); }
 .hxc-ses-card-info { flex: 1; min-width: 0; }
 .hxc-ses-card-nombre { font-size: 0.82em; font-weight: 600; color: #fff; margin-bottom: 3px; }
-.hxc-ses-card-meta { font-size: 0.61em; color: #555; }
-.hxc-ses-card-chevron { color: #333; font-size: 1em; flex-shrink: 0; }
-.hxc-ses-empty { text-align: center; color: #2a2a3a; font-size: 0.73em; padding: 36px 16px; line-height: 1.9; grid-column: 1/-1; }
+.hxc-ses-card-meta { font-size: 0.61em; color: #888; }
+.hxc-ses-card-chevron { color: #888; font-size: 1em; flex-shrink: 0; }
+.hxc-ses-empty { text-align: center; color: #666; font-size: 0.73em; padding: 36px 16px; line-height: 1.9; grid-column: 1/-1; }
 .hxc-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 1300; display: flex; align-items: center; justify-content: center; }
 .hxc-modal { background: #0d0c1a; border: 1px solid rgba(212,175,55,0.25); border-radius: 12px; padding: 22px 26px; width: 370px; box-shadow: 0 8px 40px rgba(0,0,0,0.8); }
 .hxc-modal-title { font-family: 'Cinzel', serif; font-size: 0.85em; color: #d4af37; margin-bottom: 14px; letter-spacing: 1px; }
@@ -914,6 +916,82 @@ window._hxcGuardarItemDB = async (item) => {
     costo_efectivo: item.ncNecesario,  // NC umbral guardado en costo_efectivo
     hex_gastado: item.hexGastado || 0,
   }).eq('id', item.id);
+};
+
+// Guardar stack actual en un turno histórico (OP puede editar turnos pasados)
+window._hxcGuardarHistorico = async () => {
+  if (!_esAdmin()) { _toast('Solo el OP puede guardar turnos históricos', true); return; }
+  const turno = hxState.turnoActivo;
+  if (!turno) return;
+
+  // Evaluar todos los items antes de guardar
+  hxState.stack.forEach(item => evaluarItem(item));
+
+  // Separar items con ID de DB (existentes) de items nuevos (sin ID numérico)
+  const existentes = hxState.stack.filter(i => i.id && typeof i.id === 'number');
+  const nuevos     = hxState.stack.filter(i => !i.id || typeof i.id !== 'number');
+
+  // Actualizar los existentes
+  for (const item of existentes) {
+    const dado = parseInt(item.dado) || null;
+    const hexGastado = (item.resultado === 'exito' || item.resultado === 'infalible') && item.cobrarHex
+      ? item.costoBase : 0;
+    item.hexGastado = hexGastado;
+    const { error } = await supabase.from('hexcast_lanzamientos').update({
+      dado_d100:        dado,
+      infalible:        item.infalible,
+      cobrar_hex:       item.cobrarHex,
+      es_prioridad:     item.esPrioridad,
+      resultado:        item.resultado,
+      nc:               item.ncCalc,
+      costo_efectivo:   item.ncNecesario,
+      multiplicador_cd: item.mult,
+      hex_gastado:      hexGastado,
+      orden:            hxState.stack.indexOf(item)
+    }).eq('id', item.id);
+    if (error) { _toast('Error actualizando: ' + error.message, true); return; }
+  }
+
+  // Insertar los nuevos
+  if (nuevos.length > 0) {
+    const rows = nuevos.map(item => {
+      const dado = parseInt(item.dado) || null;
+      const hexGastado = (item.resultado === 'exito' || item.resultado === 'infalible') && item.cobrarHex
+        ? item.costoBase : 0;
+      item.hexGastado = hexGastado;
+      return {
+        turno_id:           turno.id,
+        sesion_id:          hxState.sesionActiva.id,
+        personaje_nombre:   item.pjNombre,
+        grupo:              item.grupo,
+        hechizo_id:         item.hechizo.hechizo_id,
+        hechizo_nombre:     item.hechizo.nombre,
+        hechizo_afinidad:   item.hechizo.afinidad || '',
+        hechizo_hex_cost:   item.costoBase,
+        dado_d100:          dado,
+        afinidad_efectiva:  item.afinidadEfectiva,
+        infalible:          item.infalible,
+        cobrar_hex:         item.cobrarHex,
+        es_prioridad:       item.esPrioridad,
+        nc:                 item.ncCalc,
+        costo_efectivo:     item.ncNecesario,
+        multiplicador_cd:   item.mult,
+        resultado:          item.resultado,
+        hex_gastado:        hexGastado,
+        orden:              hxState.stack.indexOf(item)
+      };
+    });
+    const { data: insertados, error } = await supabase
+      .from('hexcast_lanzamientos').insert(rows).select();
+    if (error) { _toast('Error guardando: ' + error.message, true); return; }
+    // Asignar IDs reales a los items nuevos para futuras ediciones
+    if (insertados) {
+      insertados.forEach((row, i) => { nuevos[i].id = row.id; });
+    }
+  }
+
+  _toast('✦ Turno guardado');
+  _render();
 };
 
 window._hxcNuevoTurno = async () => {
