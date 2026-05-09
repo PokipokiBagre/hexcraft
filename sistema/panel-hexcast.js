@@ -957,6 +957,8 @@ window._hxcAbrirEvento = async (grupo, idx, pjNombre) => {
     _toast('Módulo de eventos no disponible', true);
   }
 };
+
+window._hxcAbrirPanel = async (grupo, idx, tipo) => {
   const slots = grupo === 'A' ? hxState.grupoA : hxState.grupoB;
   const pj = slots[idx]; if (!pj) return;
   const p = hxState.panelSlot;
