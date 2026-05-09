@@ -758,10 +758,11 @@ window._hxcVolverSesiones = () => {
 window._hxcSelSesion = async (id) => {
   try {
     await seleccionarSesion(id);
-    // Cargar historial para el turno activo (el último al abrir)
     if (hxState.turnoActivo) {
       await cargarHistorialSesion(id, hxState.turnoActivo.numero);
     }
+    hxState.estadosPorPj = {};
+    await _cargarTodosEstadosTurno();
     hxState.vistaActiva = 'cast'; _render();
   }
   catch(e) { _toast('Error cargando sesión', true); }
@@ -851,6 +852,10 @@ window._hxcIrTurno = async (idxRaw) => {
   } else {
     hxState.stack = [];
   }
+
+  // Cargar estados del turno (chips en slots)
+  hxState.estadosPorPj = {};
+  await _cargarTodosEstadosTurno();
   _render();
 };
 
@@ -1035,21 +1040,49 @@ window._hxcAgregarHz = (grupo, idx, hzId) => {
   _render();
 };
 
-// ── Estados activos ────────────────────────────────────────────
+// ── Estados activos (por turno) ───────────────────────────────
+// Carga los estados del PJ para el turno activo
 async function _cargarEstadosPJ(nombre) {
+  const turnoId = hxState.turnoActivo?.id;
+  if (!turnoId) { hxState.estadosPorPj[nombre] = []; return; }
   const { data } = await supabase.from('pj_estados')
-    .select('*').eq('personaje_nombre', nombre).order('creado_en');
+    .select('*')
+    .eq('turno_id', turnoId)
+    .eq('personaje_nombre', nombre)
+    .order('creado_en');
   hxState.estadosPorPj[nombre] = data || [];
 }
 
+// Carga estados de TODOS los PJs visibles en el turno actual (para los chips del slot)
+async function _cargarTodosEstadosTurno() {
+  const turnoId = hxState.turnoActivo?.id;
+  if (!turnoId) { hxState.estadosPorPj = {}; return; }
+  const nombres = [
+    ...hxState.grupoA.filter(Boolean).map(p => p.nombre),
+    ...hxState.grupoB.filter(Boolean).map(p => p.nombre)
+  ];
+  if (!nombres.length) return;
+  const { data } = await supabase.from('pj_estados')
+    .select('*')
+    .eq('turno_id', turnoId)
+    .in('personaje_nombre', nombres);
+  hxState.estadosPorPj = {};
+  for (const row of (data || [])) {
+    if (!hxState.estadosPorPj[row.personaje_nombre]) hxState.estadosPorPj[row.personaje_nombre] = [];
+    hxState.estadosPorPj[row.personaje_nombre].push(row);
+  }
+}
+
 window._hxcAgregarEstado = async (nombre, hechizo_id, hechizo_nombre, afinidad) => {
-  // Verificar que no esté ya activo
+  const turnoId   = hxState.turnoActivo?.id;
+  const sesionId  = hxState.sesionActiva?.id;
+  if (!turnoId) { _toast('Sin turno activo', true); return; }
   const actuales = hxState.estadosPorPj[nombre] || [];
   if (actuales.find(e => e.hechizo_id === hechizo_id)) {
-    _toast('Este estado ya está activo', true); return;
+    _toast('Este estado ya está activo en este turno', true); return;
   }
   const { data, error } = await supabase.from('pj_estados')
-    .insert({ personaje_nombre: nombre, hechizo_id, hechizo_nombre, afinidad })
+    .insert({ turno_id: turnoId, sesion_id: sesionId, personaje_nombre: nombre, hechizo_id, hechizo_nombre, afinidad })
     .select().single();
   if (error) { _toast('Error: ' + error.message, true); return; }
   hxState.estadosPorPj[nombre] = [...actuales, data];
@@ -1076,7 +1109,7 @@ window._hxcConfirmarEvento = (grupo, idx) => {
 
   const color = SLOT_COLORS[grupo][idx];
   hxState.stack.push({
-    id: Date.now() + Math.random(),
+    id: 'ev_' + Date.now(),
     tipoItem: 'evento',
     pjNombre: pj.nombre,
     grupo, slotIdx: idx, color,
@@ -1253,17 +1286,47 @@ window._hxcGuardarHistorico = async () => {
 window._hxcNuevoTurno = async () => {
   if (!hxState.sesionActiva) return;
   if (hxState.stack.length > 0 && !confirm('¿Empezar nuevo turno? El stack actual se vaciará.')) return;
-  hxState.turnoActivo = await crearTurno(hxState.sesionActiva.id, hxState.turnos.length + 1);
-  hxState.stack = []; _render();
+  const turnoAnteriorId = hxState.turnoActivo?.id;
+  const nuevoTurno = await crearTurno(hxState.sesionActiva.id, hxState.turnos.length + 1);
+  hxState.turnoActivo = nuevoTurno;
+  hxState.stack = [];
+  // Carry-forward: copiar estados del turno anterior al nuevo
+  await _carryForwardEstados(turnoAnteriorId, nuevoTurno.id, hxState.sesionActiva.id);
+  await _cargarTodosEstadosTurno();
+  _render();
 };
 
 window._hxcConfirmar = async () => {
   const hechizos = hxState.stack.filter(i => i.tipoItem !== 'evento');
   if (!hechizos.length) { _toast('Stack vacío (solo eventos, sin hechizos)', true); return; }
+  const turnoAnteriorId = hxState.turnoActivo?.id;
   const res = await confirmarTurno();
   if (!res.ok) { _toast('Error: ' + res.msg, true); return; }
-  _toast('✦ Turno ' + (hxState.turnoActivo?.numero??'') + ' confirmado');
+  // Carry-forward: copiar estados al nuevo turno creado por confirmarTurno
+  const nuevoTurno = hxState.turnoActivo; // confirmarTurno ya actualizó turnoActivo
+  await _carryForwardEstados(turnoAnteriorId, nuevoTurno.id, hxState.sesionActiva.id);
+  await _cargarTodosEstadosTurno();
+  _toast('✦ Turno ' + (nuevoTurno?.numero??'') + ' confirmado');
   _render();
 };
+
+// Copia los estados activos del turno anterior al turno nuevo (carry-forward)
+async function _carryForwardEstados(turnoAnteriorId, nuevoTurnoId, sesionId) {
+  if (!turnoAnteriorId || !nuevoTurnoId) return;
+  const { data } = await supabase.from('pj_estados')
+    .select('personaje_nombre, hechizo_id, hechizo_nombre, afinidad, notas')
+    .eq('turno_id', turnoAnteriorId);
+  if (!data || !data.length) return;
+  const rows = data.map(e => ({
+    turno_id:         nuevoTurnoId,
+    sesion_id:        sesionId,
+    personaje_nombre: e.personaje_nombre,
+    hechizo_id:       e.hechizo_id,
+    hechizo_nombre:   e.hechizo_nombre,
+    afinidad:         e.afinidad || '',
+    notas:            e.notas || ''
+  }));
+  await supabase.from('pj_estados').insert(rows);
+}
 
 _montar();
