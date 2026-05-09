@@ -141,6 +141,8 @@ function _toast(msg, err = false) {
 function _tipoLabel(tipo) {
   return {
     stat:        'Modificación de stat',
+    stat_max:    'Modificación de máximo',
+    afin:        'Modificación de afinidad',
     hechizo_add: 'Hechizo aprendido',
     hechizo_rem: 'Hechizo olvidado',
     obj_add:     'Objeto obtenido',
@@ -191,62 +193,129 @@ function _renderPanelStats(p, s) {
 
   const safe = evState.pjNombre.replace(/'/g, "\\'");
 
-  // Estadísticas editables
-  const stats = [
-    { label: 'Vida Roja', campo: 'vida_roja_actual', val: p.vida_roja_actual ?? 0, max: s.vida_roja_max, deltas: [1, 3, 5, 10], color: '#e06060' },
-    { label: 'Vida Azul', campo: 'vida_azul_actual', val: p.vida_azul_actual ?? 0, max: s.vida_azul_max, deltas: [1, 3, 5], color: '#4ab3e8' },
-    { label: 'Guarda Dorada', campo: 'guarda_actual', val: p.guarda_actual ?? 0, max: s.guarda_max, deltas: [1, 3, 5], color: '#d4af37' },
-    { label: 'VEX', campo: 'vex_actual', val: p.vex_actual ?? 0, max: s.vex_max, deltas: [50, 100, 200], color: '#9060c0' },
-    { label: 'HEX', campo: 'hex', val: p.hex ?? 0, max: null, deltas: [100, 500, 1000], color: '#d4af37' },
-  ];
+  // Calcular valores proyectados (actual + deltas pendientes en la cola)
+  function proyectado(campo) {
+    const base = p[campo] ?? 0;
+    return evState.cola
+      .filter(e => e.tipo === 'stat' && e.campo === campo && e.pjNombre === evState.pjNombre)
+      .reduce((acc, e) => acc + e.delta, base);
+  }
+  function proyectadoMax(campo) {
+    const base = p[campo] ?? 0;
+    return evState.cola
+      .filter(e => e.tipo === 'stat_max' && e.campo === campo && e.pjNombre === evState.pjNombre)
+      .reduce((acc, e) => acc + e.delta, base);
+  }
+  function proyectadoAfin(layer, key) {
+    const base = (p[layer] || {})[key] ?? 0;
+    return evState.cola
+      .filter(e => e.tipo === 'afin' && e.afinLayer === layer && e.afinKey === key && e.pjNombre === evState.pjNombre)
+      .reduce((acc, e) => acc + e.delta, base);
+  }
 
-  const afins = [
-    { label: 'Física', key: 'fisica' }, { label: 'Energética', key: 'energetica' },
-    { label: 'Espiritual', key: 'espiritual' }, { label: 'Mando', key: 'mando' },
-    { label: 'Psíquica', key: 'psiquica' }, { label: 'Oscura', key: 'oscura' },
-  ];
+  // ── Valores actuales proyectados ──
+  const vrAct  = proyectado('vida_roja_actual');
+  const vaAct  = proyectado('vida_azul_actual');   // vida azul ACTUAL (perdible)
+  const gaAct  = proyectado('guarda_actual');
+  const vexAct = proyectado('vex_actual');
+  const hexAct = proyectado('hex');
 
-  const statsHtml = stats.map(st => {
-    const maxStr = st.max != null ? ` / ${st.max}` : '';
-    const btnsPos = st.deltas.map(d =>
-      `<button class="hxev-stat-btn pos" onclick="window._hxevQueueStat('${safe}','${st.campo}',+${d},'+${d} ${st.label}')">+${d}</button>`
+  // Máximos: override > fórmula. Proyectar override si hay cambios pendientes
+  const vrMaxOv  = proyectadoMax('vida_roja_max_override')  || 0;
+  const vaMaxOv  = proyectadoMax('vida_azul_max_override')  || 0;
+  const gaMaxOv  = proyectadoMax('guarda_max_override')     || 0;
+  const vexMaxOv = proyectadoMax('vex_max_override')        || 0;  // vex override custom
+
+  const vrMax  = vrMaxOv  > 0 ? vrMaxOv  : s.vida_roja_max;
+  const vaMax  = vaMaxOv  > 0 ? vaMaxOv  : s.vida_azul_max;
+  const gaMax  = gaMaxOv  > 0 ? gaMaxOv  : s.guarda_max;
+  const vexMax = vexMaxOv > 0 ? vexMaxOv : s.vex_max;
+
+  // Helper para resaltar si hay cambios pendientes
+  const pendiente = (campo) => evState.cola.some(e => (e.tipo==='stat'||e.tipo==='stat_max') && e.campo===campo && e.pjNombre===evState.pjNombre);
+  const pendienteAfin = (layer, key) => evState.cola.some(e => e.tipo==='afin' && e.afinLayer===layer && e.afinKey===key && e.pjNombre===evState.pjNombre);
+
+  function statBlock({ label, campo, val, max, deltas, color, maxCampo, maxVal, maxLabel }) {
+    const hasPend = pendiente(campo);
+    const valStr = `<span style="${hasPend?'color:#f0d060;':'color:'+color+';'}">${val.toLocaleString()}</span>`;
+    const maxStr = max != null ? ` <span style="color:#555;font-size:0.7em;">/ ${max}</span>` : '';
+    const btnsPos = deltas.map(d =>
+      `<button class="hxev-stat-btn pos" onclick="window._hxevQueueStat('${safe}','${campo}',+${d},'+${d} ${label}')">+${d}</button>`
     ).join('');
-    const btnsNeg = st.deltas.map(d =>
-      `<button class="hxev-stat-btn neg" onclick="window._hxevQueueStat('${safe}','${st.campo}',-${d},'-${d} ${st.label}')">-${d}</button>`
+    const btnsNeg = deltas.map(d =>
+      `<button class="hxev-stat-btn neg" onclick="window._hxevQueueStat('${safe}','${campo}',-${d},'-${d} ${label}')">-${d}</button>`
     ).join('');
+
+    let maxEditor = '';
+    if (maxCampo) {
+      const hasPendMax = pendiente(maxCampo);
+      maxEditor = `
+        <div style="display:flex;align-items:center;gap:4px;margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.04);">
+          <span style="font-size:0.56em;color:#555;text-transform:uppercase;letter-spacing:1px;flex:1;">${maxLabel||'Máx override'}</span>
+          <span style="font-size:0.7em;color:${hasPendMax?'#f0d060':'#777'};">${maxVal}</span>
+          <button class="hxev-stat-btn neg" style="padding:2px 5px;" onclick="window._hxevQueueStatMax('${safe}','${maxCampo}',-1,'${label}')">-1</button>
+          <button class="hxev-stat-btn neg" style="padding:2px 5px;" onclick="window._hxevQueueStatMax('${safe}','${maxCampo}',-5,'${label}')">-5</button>
+          <button class="hxev-stat-btn pos" style="padding:2px 5px;" onclick="window._hxevQueueStatMax('${safe}','${maxCampo}',+1,'${label}')">+1</button>
+          <button class="hxev-stat-btn pos" style="padding:2px 5px;" onclick="window._hxevQueueStatMax('${safe}','${maxCampo}',+5,'${label}')">+5</button>
+        </div>`;
+    }
+
     return `
       <div class="hxev-stat-block">
-        <div class="hxev-stat-label">${st.label}</div>
-        <div class="hxev-stat-val" style="color:${st.color};">${(st.val).toLocaleString()}${maxStr}</div>
+        <div class="hxev-stat-label">${label}${hasPend?` <span style="color:#f0d060;font-size:0.85em;">●</span>`:''}  </div>
+        <div class="hxev-stat-val" style="font-size:1.1em;">${valStr}${maxStr}</div>
         <div class="hxev-stat-btns">${btnsNeg}${btnsPos}</div>
         <div class="hxev-stat-custom">
-          <input class="hxev-stat-custom-input" id="hxev-custom-${st.campo}" type="number" placeholder="custom">
-          <button class="hxev-stat-custom-btn" onclick="window._hxevQueueStatCustom('${safe}','${st.campo}','${st.label}')">✓</button>
+          <input class="hxev-stat-custom-input" id="hxev-custom-${campo}" type="number" placeholder="custom">
+          <button class="hxev-stat-custom-btn" onclick="window._hxevQueueStatCustom('${safe}','${campo}','${label}')">✓</button>
         </div>
+        ${maxEditor}
       </div>`;
-  }).join('<hr class="hxev-stat-divider">');
+  }
 
-  const afinsHtml = `
-    <div class="hxev-stat-label" style="margin-top:12px;">Afinidades (base)</div>
-    ${afins.map(a => {
-      const val = (p.afin_base || {})[a.key] || 0;
-      return `<div class="hxev-stat-block" style="margin-bottom:8px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
-          <span style="font-size:0.68em;color:#aaa;">${a.label}</span>
-          <span style="font-size:0.75em;font-weight:700;color:#d4af37;font-family:'Cinzel',serif;">${val}</span>
-        </div>
-        <div class="hxev-stat-btns">
-          <button class="hxev-stat-btn neg" onclick="window._hxevQueueAfin('${safe}','${a.key}',-1,'${a.label} -1')">-1</button>
-          <button class="hxev-stat-btn neg" onclick="window._hxevQueueAfin('${safe}','${a.key}',-5,'${a.label} -5')">-5</button>
-          <button class="hxev-stat-btn pos" onclick="window._hxevQueueAfin('${safe}','${a.key}',+1,'${a.label} +1')">+1</button>
-          <button class="hxev-stat-btn pos" onclick="window._hxevQueueAfin('${safe}','${a.key}',+5,'${a.label} +5')">+5</button>
-        </div>
-      </div>`;
-    }).join('')}`;
+  const statsHtml = [
+    statBlock({ label:'Vida Roja', campo:'vida_roja_actual', val:vrAct, max:vrMax, deltas:[1,3,5,10], color:'#e06060',
+                maxCampo:'vida_roja_max_override', maxVal:vrMaxOv||vrMax, maxLabel:'Máx VR' }),
+    statBlock({ label:'Vida Azul', campo:'vida_azul_actual', val:vaAct, max:vaMax, deltas:[1,3,5], color:'#4ab3e8',
+                maxCampo:'vida_azul_max_override', maxVal:vaMaxOv||vaMax, maxLabel:'Máx VA' }),
+    statBlock({ label:'Guarda Dorada', campo:'guarda_actual', val:gaAct, max:gaMax, deltas:[1,3,5], color:'#d4af37',
+                maxCampo:'guarda_max_override', maxVal:gaMaxOv||gaMax, maxLabel:'Máx Guarda' }),
+    statBlock({ label:'VEX', campo:'vex_actual', val:vexAct, max:vexMax, deltas:[50,100,200], color:'#9060c0' }),
+    statBlock({ label:'HEX', campo:'hex', val:hexAct, max:null, deltas:[100,500,1000], color:'#d4af37' }),
+  ].join('<hr class="hxev-stat-divider">');
+
+  // ── Afinidades: 3 capas ──
+  const afins = [
+    { label:'Física', key:'fisica' }, { label:'Energética', key:'energetica' },
+    { label:'Espiritual', key:'espiritual' }, { label:'Mando', key:'mando' },
+    { label:'Psíquica', key:'psiquica' }, { label:'Oscura', key:'oscura' },
+  ];
+  const afinLayers = [
+    { id:'afin_base',  label:'Base',       color:'#d4af37' },
+    { id:'afin_extra', label:'Buff (Ext)', color:'#50c88c' },
+    { id:'afin_alter', label:'Alter (Ef)', color:'#60a8e8' },
+  ];
+
+  const afinsHtml = afinLayers.map(layer => `
+    <div style="margin-top:10px;">
+      <div class="hxev-stat-label" style="color:${layer.color};">${layer.label}</div>
+      ${afins.map(a => {
+        const val = proyectadoAfin(layer.id, a.key);
+        const hasPend = pendienteAfin(layer.id, a.key);
+        return `<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+          <span style="font-size:0.65em;color:#aaa;width:70px;flex-shrink:0;">${a.label}</span>
+          <span style="font-size:0.72em;font-weight:700;color:${hasPend?'#f0d060':layer.color};min-width:28px;text-align:right;">${val}</span>
+          <button class="hxev-stat-btn neg" style="padding:2px 5px;" onclick="window._hxevQueueAfin('${safe}','${layer.id}','${a.key}',-1)">-1</button>
+          <button class="hxev-stat-btn neg" style="padding:2px 5px;" onclick="window._hxevQueueAfin('${safe}','${layer.id}','${a.key}',-5)">-5</button>
+          <button class="hxev-stat-btn pos" style="padding:2px 5px;" onclick="window._hxevQueueAfin('${safe}','${layer.id}','${a.key}',+1)">+1</button>
+          <button class="hxev-stat-btn pos" style="padding:2px 5px;" onclick="window._hxevQueueAfin('${safe}','${layer.id}','${a.key}',+5)">+5</button>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
 
   return `<div class="hxev-panel">
     <div class="hxev-panel-title">Stats</div>
-    <div class="hxev-stats-body">${statsHtml}${afinsHtml}</div>
+    <div class="hxev-stats-body">${statsHtml}<hr class="hxev-stat-divider">${afinsHtml}</div>
   </div>`;
 }
 
@@ -443,8 +512,31 @@ window._hxevQueueStatCustom = (nombre, campo, label) => {
   _render();
 };
 
-window._hxevQueueAfin = (nombre, afinKey, delta, resumen) => {
-  evState.cola.push({ tipo: 'afin', afinKey, delta, pjNombre: nombre, resumen: `Afinidad ${resumen} (${nombre})` });
+window._hxevQueueStatMax = (nombre, campo, delta, label) => {
+  const p = personajes[nombre]; if (!p) return;
+  const s = calcularStats(p);
+  // Si el override es 0 (no activo), inicializar desde fórmula antes de acumular
+  const _baseMax = { vida_roja_max_override: s.vida_roja_max, vida_azul_max_override: s.vida_azul_max,
+                     guarda_max_override: s.guarda_max, vex_max_override: s.vex_max };
+  const yaEnCola = evState.cola.find(e => e.tipo==='stat_max' && e.campo===campo && e.pjNombre===nombre);
+  if (!yaEnCola && (p[campo]||0) === 0) {
+    // primera vez: agregar base desde fórmula como punto de partida implícito
+    evState.cola.push({ tipo: 'stat_max', campo, delta, pjNombre: nombre,
+      resumen: `${label} Máx ${delta>0?'+':''}${delta} (${nombre})`,
+      _baseInicial: _baseMax[campo] || 0 });
+  } else {
+    evState.cola.push({ tipo: 'stat_max', campo, delta, pjNombre: nombre,
+      resumen: `${label} Máx ${delta>0?'+':''}${delta} (${nombre})` });
+  }
+  _render();
+};
+
+// afinLayer = 'afin_base' | 'afin_extra' | 'afin_alter'
+window._hxevQueueAfin = (nombre, afinLayer, afinKey, delta) => {
+  const labels = { fisica:'Física', energetica:'Energética', espiritual:'Espiritual', mando:'Mando', psiquica:'Psíquica', oscura:'Oscura' };
+  const layerLabel = { afin_base:'Base', afin_extra:'Buff', afin_alter:'Alter' };
+  const resumen = `${layerLabel[afinLayer]||afinLayer} ${labels[afinKey]||afinKey} ${delta>0?'+':''}${delta} (${nombre})`;
+  evState.cola.push({ tipo: 'afin', afinLayer, afinKey, delta, pjNombre: nombre, resumen });
   _render();
 };
 
@@ -495,43 +587,66 @@ window._hxevAplicar = async () => {
         const p = personajes[ev.pjNombre];
         if (p) {
           const s = calcularStats(p);
-          const caps = { vex_actual: s.vex_max, vida_azul_actual: s.vida_azul_max, guarda_actual: s.guarda_max };
+          // Caps de máximo por campo (vida_azul_actual cap = vida_azul_max)
+          const caps = {
+            vida_roja_actual: s.vida_roja_max,
+            vida_azul_actual: s.vida_azul_max,
+            guarda_actual:    s.guarda_max,
+            vex_actual:       s.vex_max
+          };
           const max = caps[ev.campo] ?? Infinity;
-          p[ev.campo] = Math.max(0, Math.min(max, (p[ev.campo] || 0) + ev.delta));
+          p[ev.campo] = Math.max(0, Math.min(max, (p[ev.campo] ?? 0) + ev.delta));
           await persistirCampos(ev.pjNombre, { [ev.campo]: p[ev.campo] });
+        }
+
+      } else if (ev.tipo === 'stat_max') {
+        const p = personajes[ev.pjNombre];
+        if (p) {
+          // Mapa de override a columna DB
+          const dbMap = {
+            vida_roja_max_override: 'vida_roja_max_op',
+            vida_azul_max_override: 'vida_azul_max_op',
+            guarda_max_override:    'guarda_max_op',
+            vex_max_override:       null  // no hay columna dedicada, usar campo directo
+          };
+          // Si el override estaba en 0 y es la primera operación, partir desde la fórmula
+          if ((p[ev.campo] || 0) === 0 && ev._baseInicial) {
+            p[ev.campo] = ev._baseInicial;
+          }
+          p[ev.campo] = Math.max(0, (p[ev.campo] || 0) + ev.delta);
+          const dbCampo = dbMap[ev.campo] || ev.campo;
+          await persistirCampos(ev.pjNombre, { [dbCampo]: p[ev.campo] });
         }
 
       } else if (ev.tipo === 'afin') {
         const p = personajes[ev.pjNombre];
         if (p) {
-          if (!p.afin_base) p.afin_base = {};
-          p.afin_base[ev.afinKey] = Math.max(0, (p.afin_base[ev.afinKey] || 0) + ev.delta);
-          if (!p.afinidadesBase) p.afinidadesBase = {};
-          p.afinidadesBase[ev.afinKey] = p.afin_base[ev.afinKey];
-          await persistirCampos(ev.pjNombre, { afin_base: { ...p.afin_base } });
+          const layer = ev.afinLayer; // 'afin_base' | 'afin_extra' | 'afin_alter'
+          if (!p[layer]) p[layer] = {};
+          p[layer][ev.afinKey] = Math.max(-999, (p[layer][ev.afinKey] || 0) + ev.delta);
+          // mantener alias legacy en sincronía
+          const aliasMap = { afin_base:'afinidadesBase', afin_extra:'afinidadesBf', afin_alter:'afinidadesEf' };
+          const alias = aliasMap[layer];
+          if (alias) { if (!p[alias]) p[alias] = {}; p[alias][ev.afinKey] = p[layer][ev.afinKey]; }
+          await persistirCampos(ev.pjNombre, { [layer]: { ...p[layer] } });
         }
 
       } else if (ev.tipo === 'hechizo_add') {
         const { error } = await supabase.from('hechizos_inventario').insert({
-          personaje_nombre: ev.pjNombre,
-          hechizo_nombre:   ev.hzNombre,
-          hechizo_afinidad: ev.afinidad || '',
-          hechizo_hex:      0,
-          tipo:             'Normal',
-          origen:           'HexCast Evento'
+          personaje_nombre: ev.pjNombre, hechizo_nombre: ev.hzNombre,
+          hechizo_afinidad: ev.afinidad || '', hechizo_hex: 0,
+          tipo: 'Normal', origen: 'HexCast Evento'
         });
         if (error) errores.push(`Hz ${ev.hzNombre}: ${error.message}`);
 
       } else if (ev.tipo === 'hechizo_rem') {
         const { error } = await supabase.from('hechizos_inventario')
-          .delete()
-          .eq('personaje_nombre', ev.pjNombre)
-          .eq('hechizo_nombre', ev.hzNombre);
+          .delete().eq('personaje_nombre', ev.pjNombre).eq('hechizo_nombre', ev.hzNombre);
         if (error) errores.push(`Quitar Hz ${ev.hzNombre}: ${error.message}`);
 
       } else if (ev.tipo === 'obj_add') {
         const { data: exist } = await supabase.from('inventario_objetos')
-          .select('id,cantidad').eq('personaje_nombre', ev.pjNombre).eq('objeto_nombre', ev.objNombre).single();
+          .select('id,cantidad').eq('personaje_nombre', ev.pjNombre).eq('objeto_nombre', ev.objNombre).maybeSingle();
         if (exist) {
           await supabase.from('inventario_objetos').update({ cantidad: exist.cantidad + 1 }).eq('id', exist.id);
         } else {
@@ -539,7 +654,7 @@ window._hxevAplicar = async () => {
         }
 
       } else if (ev.tipo === 'obj_rem') {
-        const { data: slot } = await supabase.from('inventario_objetos').select('cantidad').eq('id', ev.slotId).single();
+        const { data: slot } = await supabase.from('inventario_objetos').select('cantidad').eq('id', ev.slotId).maybeSingle();
         if (slot) {
           if (slot.cantidad <= 1) await supabase.from('inventario_objetos').delete().eq('id', ev.slotId);
           else await supabase.from('inventario_objetos').update({ cantidad: slot.cantidad - 1 }).eq('id', ev.slotId);
@@ -564,7 +679,6 @@ window._hxevAplicar = async () => {
     const { SLOT_COLORS } = await import('./hexcast-state.js');
     const color = SLOT_COLORS[grupo]?.[idx] || SLOT_COLORS.A[0];
 
-    // Agrupar resúmenes por tipo para el bloque del stack
     const porTipo = {};
     for (const ev of cola) {
       if (!porTipo[ev.tipo]) porTipo[ev.tipo] = [];
@@ -572,39 +686,28 @@ window._hxevAplicar = async () => {
     }
     const resumenBloque = Object.entries(porTipo).map(([tipo, evs]) => {
       const label = _tipoLabel(tipo);
-      const nombres = evs.map(e => e.hzNombre || e.objNombre || (e.delta > 0 ? `+${e.delta} ${e.campo}` : `${e.delta} ${e.campo}`));
+      const nombres = evs.map(e => e.hzNombre || e.objNombre || (e.delta > 0 ? `+${e.delta} ${e.campo||e.afinKey}` : `${e.delta} ${e.campo||e.afinKey}`));
       return `${label}: ${nombres.join(', ')}`;
     }).join(' | ');
 
     hxState.stack.push({
       id: 'ev_' + Date.now(),
-      tipoItem: 'evento',
-      pjNombre: evState.pjNombre,
+      tipoItem: 'evento', pjNombre: evState.pjNombre,
       grupo, slotIdx: idx, color,
       eventoTipo: 'aplicado',
       eventoNombre: resumenBloque,
       eventoDesc: resumenesAplicados.join('\n'),
       abierto: false,
-      _eventosAplicados: cola,
     });
   }
 
-  if (errores.length) {
-    _toast('Errores: ' + errores[0], true);
-  } else {
-    _toast(`✦ ${resumenesAplicados.length} cambio(s) aplicados`);
-  }
+  if (errores.length) _toast('Errores: ' + errores[0], true);
+  else _toast(`✦ ${resumenesAplicados.length} cambio(s) aplicados`);
 
-  // Recargar datos y limpiar cola
   evState.cola = [];
   await _cargarDatos(evState.pjNombre);
-
-  // Refrescar panel de personajes si está visible
   if (typeof window.refreshPanelPJ === 'function') window.refreshPanelPJ();
   if (typeof window.renderCatalogo === 'function') window.renderCatalogo();
-
-  // Refrescar el panel hexcast
   if (typeof window._hxcRender === 'function') window._hxcRender();
-
   _render();
 };
