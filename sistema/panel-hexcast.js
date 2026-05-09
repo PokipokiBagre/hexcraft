@@ -12,7 +12,6 @@ import {
   agregarHechizo, removerHechizo, moverAPrioridad,
   evaluarItem, confirmarTurno, getAfinidadEfectiva
 } from './hexcast-logic.js';
-import { abrirEventoPanel } from './panel-hexcast-evento.js';
 
 // ── CSS ───────────────────────────────────────────────────────
 function _css() {
@@ -950,7 +949,13 @@ window._hxcClickSlot = async (grupo, idx) => {
 
 window._hxcAbrirEvento = async (grupo, idx, pjNombre) => {
   hxState.panelSlot = { grupo, idx: parseInt(idx), tipo: null };
-  await abrirEventoPanel(pjNombre);
+  try {
+    const { abrirEventoPanel } = await import('./panel-hexcast-evento.js');
+    await abrirEventoPanel(pjNombre);
+  } catch(e) {
+    console.error('panel-hexcast-evento.js no disponible:', e);
+    _toast('Módulo de eventos no disponible', true);
+  }
 };
   const slots = grupo === 'A' ? hxState.grupoA : hxState.grupoB;
   const pj = slots[idx]; if (!pj) return;
