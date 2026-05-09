@@ -12,6 +12,7 @@ import {
   agregarHechizo, removerHechizo, moverAPrioridad,
   evaluarItem, confirmarTurno, getAfinidadEfectiva
 } from './hexcast-logic.js';
+import { abrirEventoPanel } from './panel-hexcast-evento.js';
 
 // ── CSS ───────────────────────────────────────────────────────
 function _css() {
@@ -269,6 +270,7 @@ function _render() {
   if (hxState.vistaActiva === 'sesiones') _renderSesiones(drawer);
   else _renderCast(drawer);
 }
+window._hxcRender = _render;
 
 function _renderSesiones(drawer) {
   const cards = hxState.sesiones.length > 0
@@ -352,7 +354,7 @@ function _renderSlot(pj, grupo, idx) {
 
     const btnHz  = `<button class="hxc-slot-action-btn ${esteActivo&&panel?.tipo==='hechizos'?'activo':''}" onclick="event.stopPropagation();window._hxcAbrirPanel('${grupo}',${idx},'hechizos')">Hz</button>`;
     const btnEst = `<button class="hxc-slot-action-btn ${esteActivo&&panel?.tipo==='estados'?'activo':''}" onclick="event.stopPropagation();window._hxcAbrirPanel('${grupo}',${idx},'estados')">Estado${estados.length>0?` (${estados.length})`:''}</button>`;
-    const btnEv  = `<button class="hxc-slot-action-btn btn-evento ${esteActivo&&panel?.tipo==='evento'?'activo':''}" onclick="event.stopPropagation();window._hxcAbrirPanel('${grupo}',${idx},'evento')">Evento</button>`;
+    const btnEv  = `<button class="hxc-slot-action-btn btn-evento" onclick="event.stopPropagation();window._hxcAbrirEvento('${grupo}',${idx},'${pj.nombre.replace(/'/g,"\\'")}')">Evento</button>`;
 
     inner = `<div class="hxc-slot-inner" onclick="event.stopPropagation()">
       <img class="hxc-slot-avatar" src="${imgPj(pj.nombre)}" onerror="this.src='${imgFallback()}'" title="${pj.nombre}">
@@ -450,37 +452,13 @@ function _renderLateralPanel() {
       </div>`;
 
   } else if (tipo === 'evento') {
-    body = `
-      <div class="hxc-lat-body">
-        <div class="hxc-evento-form">
-          <div>
-            <div class="hxc-evento-label">Tipo de evento</div>
-            <select class="hxc-evento-input" id="hxc-ev-tipo">
-              <option value="evento">Evento general</option>
-              <option value="casteo">Casteo (GM)</option>
-              <option value="stat">Cambio de stat</option>
-              <option value="hechizo_add">Agregar hechizo</option>
-              <option value="hechizo_rem">Quitar hechizo</option>
-              <option value="objeto">Objeto/Inventario</option>
-            </select>
-          </div>
-          <div>
-            <div class="hxc-evento-label">Nombre del evento</div>
-            <input class="hxc-evento-input" id="hxc-ev-nombre" placeholder="Ej: Veneno de araña, Curación..." onclick="event.stopPropagation()">
-          </div>
-          <div>
-            <div class="hxc-evento-label">Descripción (opcional)</div>
-            <textarea class="hxc-evento-textarea" id="hxc-ev-desc" placeholder="Detalle del evento..." onclick="event.stopPropagation()"></textarea>
-          </div>
-          <button class="hxc-evento-btn" onclick="window._hxcConfirmarEvento('${p.grupo}',${p.idx})">✦ Agregar al turno</button>
-        </div>
-      </div>`;
+    body = '';
   }
 
   return `<div id="hxc-lateral-panel" class="${ladoCls}" style="--lat-color:${latColor};" onclick="event.stopPropagation()">
     <div class="hxc-lat-header">
       <span class="hxc-lat-titulo">${pj.nombre}</span>
-      <span class="hxc-lat-subtitulo">${tipo === 'hechizos' ? 'Inventario' : tipo === 'estados' ? 'Estados' : 'Evento'}</span>
+      <span class="hxc-lat-subtitulo">${tipo === 'hechizos' ? 'Inventario' : 'Estados'}</span>
       <button class="hxc-lat-close" onclick="window._hxcCerrarPanel()">×</button>
     </div>
     ${body}
@@ -500,8 +478,8 @@ function _renderCenter() {
   ).join('');
 
   const botonesOp = esAdmin ? `
-    <button class="hxc-btn-op hxc-btn-cobrar" onclick="window._hxcCobrarHex()" title="Cobra VEX primero, luego HEX">💰 Cobrar HEX</button>
-    <button class="hxc-btn-op hxc-btn-devolver" onclick="window._hxcDevolverHex()">↩ Devolver HEX</button>
+    <button class="hxc-btn-op hxc-btn-cobrar" onclick="window._hxcCobrarHex()" title="Cobra VEX primero, luego HEX">⚡ Cobrar hechizos</button>
+    <button class="hxc-btn-op hxc-btn-devolver" onclick="window._hxcDevolverHex()">↩ Devolver</button>
     <button class="hxc-btn-op hxc-btn-del-turno" onclick="window._hxcEliminarTurno()">🗑 Turno</button>
   ` : '';
 
@@ -970,7 +948,10 @@ window._hxcClickSlot = async (grupo, idx) => {
   _render();
 };
 
-window._hxcAbrirPanel = async (grupo, idx, tipo) => {
+window._hxcAbrirEvento = async (grupo, idx, pjNombre) => {
+  hxState.panelSlot = { grupo, idx: parseInt(idx), tipo: null };
+  await abrirEventoPanel(pjNombre);
+};
   const slots = grupo === 'A' ? hxState.grupoA : hxState.grupoB;
   const pj = slots[idx]; if (!pj) return;
   const p = hxState.panelSlot;
