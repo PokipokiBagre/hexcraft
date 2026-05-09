@@ -119,7 +119,8 @@ export function renderCatalogo() {
 
         // Barras de recursos con celdas segmentadas
         const barraVidaRoja = _barraSegmentada(p.vida_roja_actual, s.vida_roja_max, 'vida', 28);
-        const barraVidaAzul = s.vida_azul_max > 0 ? _barraSegmentada(s.vida_azul_max, s.vida_azul_max, 'azul', 28) : null;
+        // Vida azul: valor único sin techo, mostrar solo el total
+        const barraVidaAzul = s.vida_azul_total > 0 ? true : null;
         const barraGuarda   = s.guarda_max > 0 ? _barraSegmentada(p.guarda_actual || 0, s.guarda_max, 'guarda', 20) : null;
 
         return `<div class="pj-card ${esInactivo ? 'pj-inactivo' : ''}" onclick="window.abrirDetalle('${nombre.replace(/'/g,"\\'")}')">
@@ -152,8 +153,8 @@ export function renderCatalogo() {
                 </div>
                 ${barraVidaAzul ? `<div class="recurso-row">
                     <span class="recurso-label">Azul</span>
-                    ${barraVidaAzul}
-                    <span class="recurso-xy">${s.vida_azul_max}</span>
+                    <div class="recurso-bar-track" style="flex:1;"></div>
+                    <span class="recurso-xy" style="color:#4ab3e8;">${s.vida_azul_total}</span>
                 </div>` : ''}
                 ${s.vex_max > 0 ? `<div class="recurso-row">
                     <span class="recurso-label">VEX</span>

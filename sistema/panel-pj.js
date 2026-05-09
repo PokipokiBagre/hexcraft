@@ -631,8 +631,37 @@ function _tabStats(nombre) {
         ${_vida('Vida Roja','vida_roja_actual',p.vida_roja_actual||0,s.vida_roja_max,'vida','#d4af37',26)}
         ${_maxOv('Vida Roja','vida_roja_max_override',p.vida_roja_max_override||0,s.vida_roja_max)}
         <div class="ppj-formula">${formulas.vida_roja_max?.expr||''}</div>
-        ${s.vida_azul_max>0?`${_vida('Vida Azul','vida_azul_actual',s.vida_azul_actual,s.vida_azul_max,'azul','#4ab3e8',26)}<div class="ppj-formula">${formulas.vida_azul_max?.expr||''}</div>`:''}
-        ${s.guarda_max>0?`${_vida('Guarda Dorada','guarda_actual',p.guarda_actual||0,s.guarda_max,'guarda','#d4af37',20)}${_maxOv('Guarda','guarda_max_override',p.guarda_max_override||0,s.guarda_max)}<div class="ppj-formula">${formulas.guarda_max?.expr||''}</div>`:''}
+
+        ${s.vida_azul_total > 0 || s.vida_azul_base > 0 ? `
+        <div class="ppj-vida-block">
+            <div class="ppj-vida-header">
+                <span class="ppj-vida-label" style="color:#4ab3e8;">Vida Azul</span>
+                <div class="ppj-vida-ctrl">
+                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vida_azul_actual',-1)">−</button>`:''}
+                    <span class="ppj-vida-xy">
+                        <span class="actual" style="color:#4ab3e8;">${s.vida_azul_total}</span>
+                        <span style="font-size:0.7em;color:#3a3a58;margin-left:4px;">(base ${s.vida_azul_base}${s.vida_azul_mod!==0?` ${s.vida_azul_mod>0?'+':''}${s.vida_azul_mod}`:''})
+                        </span>
+                    </span>
+                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vida_azul_actual',1)">+</button>`:''}
+                </div>
+            </div>
+            <div style="font-size:0.6em;color:#3a3a58;padding:2px 0 4px;">Valor libre · no tiene techo</div>
+        </div>
+        <div class="ppj-formula">${formulas.vida_azul_max?.expr||''} <span style="color:#3a3a58;">(base)</span></div>
+        ` : ''}
+
+        ${s.guarda_max > 0 ? `
+        ${_vida('Guarda Dorada','guarda_actual',p.guarda_actual||0,s.guarda_max,'guarda','#d4af37',20)}
+        <div class="ppj-max-row">
+            <span class="ppj-max-label">Máx Guarda</span>
+            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','guarda_max_override',-1)">−</button>
+            <span class="ppj-max-val" title="Fórmula: ${s.guarda_max_formula}${s.guarda_max_override!==0?' + '+s.guarda_max_override:''}">${s.guarda_max}</span>
+            <button class="ppj-ctrl-btn" onclick="window.modStatMax('${safe}','guarda_max_override',1)">+</button>
+        </div>
+        <div class="ppj-formula">${formulas.guarda_max?.expr||''} ${s.guarda_max_override!==0?`<span style="color:#888;">+ ${s.guarda_max_override} manual</span>`:''}</div>
+        ` : ''}
+
         ${s.vex_max>0?`<div class="ppj-vida-block">
             <div class="ppj-vida-header"><span class="ppj-vida-label" style="color:#9a50dc;">VEX</span>
                 <div class="ppj-vida-ctrl">

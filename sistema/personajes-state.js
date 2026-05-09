@@ -38,7 +38,7 @@ export const VARS_FORMULA = [
 
 export const FORMULAS_DEFAULT = {
     vida_roja_max: { label: 'Vida Roja máxima',    expr: 'Math.floor(FisB / 2) + 10',                   aplica: 'todos' },
-    vida_azul_max: { label: 'Vida Azul máxima',    expr: 'Math.floor((EneB + EspB + ManB + PsiB) / 4)', aplica: 'todos' },
+    vida_azul_max: { label: 'Vida Azul base (valor libre)',    expr: 'Math.floor((EneB + EspB + ManB + PsiB) / 4)', aplica: 'todos' },
     guarda_max:    { label: 'Guarda Dorada máx.',  expr: 'Math.floor(EspB / 3)',                         aplica: 'jugador' },
     vex_max:       { label: 'VEX máximo',          expr: 'Math.round(OscB * 75 / 50) * 50',             aplica: 'jugador' },
     dano_rojo:     { label: 'Daño Rojo base',      expr: 'Math.floor(FisB / 4)',                         aplica: 'todos' },

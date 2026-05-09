@@ -215,30 +215,28 @@ function _renderPanelStats(p, s) {
 
   // ── Valores actuales proyectados ──
   const vrAct  = proyectado('vida_roja_actual');
-  const vaAct  = proyectado('vida_azul_actual');   // vida azul ACTUAL (perdible)
+  // vida_azul: proyectar el mod acumulado y sumarlo a la base calculada
+  const vaMod  = proyectado('vida_azul_actual');  // delta acumulado (campo en DB)
+  const vaTotal = s.vida_azul_base + vaMod;       // total mostrado = base + mod
   const gaAct  = proyectado('guarda_actual');
   const vexAct = proyectado('vex_actual');
   const hexAct = proyectado('hex');
 
-  // Máximos: override > fórmula. Proyectar override si hay cambios pendientes
-  const vrMaxOv  = proyectadoMax('vida_roja_max_override')  || 0;
-  const vaMaxOv  = proyectadoMax('vida_azul_max_override')  || 0;
-  const gaMaxOv  = proyectadoMax('guarda_max_override')     || 0;
-  const vexMaxOv = proyectadoMax('vex_max_override')        || 0;  // vex override custom
+  // Máximos
+  const vrMaxPend = proyectadoMax('vida_roja_max_override') || 0;
+  const vrMax  = vrMaxPend > 0 ? vrMaxPend : s.vida_roja_max;
+  // guarda_max = fórmula + override (suma). Proyectar el override delta.
+  const gaOverridePend = proyectadoMax('guarda_max_override') || 0;
+  const gaMax  = s.guarda_max_formula + gaOverridePend;
+  const vexMax = s.vex_max;
 
-  const vrMax  = vrMaxOv  > 0 ? vrMaxOv  : s.vida_roja_max;
-  const vaMax  = vaMaxOv  > 0 ? vaMaxOv  : s.vida_azul_max;
-  const gaMax  = gaMaxOv  > 0 ? gaMaxOv  : s.guarda_max;
-  const vexMax = vexMaxOv > 0 ? vexMaxOv : s.vex_max;
-
-  // Helper para resaltar si hay cambios pendientes
   const pendiente = (campo) => evState.cola.some(e => (e.tipo==='stat'||e.tipo==='stat_max') && e.campo===campo && e.pjNombre===evState.pjNombre);
   const pendienteAfin = (layer, key) => evState.cola.some(e => e.tipo==='afin' && e.afinLayer===layer && e.afinKey===key && e.pjNombre===evState.pjNombre);
 
-  function statBlock({ label, campo, val, max, deltas, color, maxCampo, maxVal, maxLabel }) {
+  function statBlock({ label, campo, val, max, deltas, color, maxCampo, maxVal, maxLabel, noMax }) {
     const hasPend = pendiente(campo);
-    const valStr = `<span style="${hasPend?'color:#f0d060;':'color:'+color+';'}">${val.toLocaleString()}</span>`;
-    const maxStr = max != null ? ` <span style="color:#555;font-size:0.7em;">/ ${max}</span>` : '';
+    const valStr = `<span style="${hasPend?'color:#f0d060;':'color:'+color+';'}">${Number(val).toLocaleString()}</span>`;
+    const maxStr = (!noMax && max != null) ? ` <span style="color:#555;font-size:0.7em;">/ ${max}</span>` : '';
     const btnsPos = deltas.map(d =>
       `<button class="hxev-stat-btn pos" onclick="window._hxevQueueStat('${safe}','${campo}',+${d},'+${d} ${label}')">+${d}</button>`
     ).join('');
@@ -275,11 +273,10 @@ function _renderPanelStats(p, s) {
 
   const statsHtml = [
     statBlock({ label:'Vida Roja', campo:'vida_roja_actual', val:vrAct, max:vrMax, deltas:[1,3,5,10], color:'#e06060',
-                maxCampo:'vida_roja_max_override', maxVal:vrMaxOv||vrMax, maxLabel:'Máx VR' }),
-    statBlock({ label:'Vida Azul', campo:'vida_azul_actual', val:vaAct, max:vaMax, deltas:[1,3,5], color:'#4ab3e8',
-                maxCampo:'vida_azul_max_override', maxVal:vaMaxOv||vaMax, maxLabel:'Máx VA' }),
+                maxCampo:'vida_roja_max_override', maxVal:vrMaxPend||s.vida_roja_max, maxLabel:'Máx VR' }),
+    statBlock({ label:'Vida Azul', campo:'vida_azul_actual', val:vaTotal, max:null, deltas:[1,3,5], color:'#4ab3e8', noMax:true }),
     statBlock({ label:'Guarda Dorada', campo:'guarda_actual', val:gaAct, max:gaMax, deltas:[1,3,5], color:'#d4af37',
-                maxCampo:'guarda_max_override', maxVal:gaMaxOv||gaMax, maxLabel:'Máx Guarda' }),
+                maxCampo:'guarda_max_override', maxVal:gaMax, maxLabel:'Máx Guarda (+/−)' }),
     statBlock({ label:'VEX', campo:'vex_actual', val:vexAct, max:vexMax, deltas:[50,100,200], color:'#9060c0' }),
     statBlock({ label:'HEX', campo:'hex', val:hexAct, max:null, deltas:[100,500,1000], color:'#d4af37' }),
   ].join('<hr class="hxev-stat-divider">');
@@ -587,35 +584,30 @@ window._hxevAplicar = async () => {
         const p = personajes[ev.pjNombre];
         if (p) {
           const s = calcularStats(p);
-          // Caps de máximo por campo (vida_azul_actual cap = vida_azul_max)
-          const caps = {
-            vida_roja_actual: s.vida_roja_max,
-            vida_azul_actual: s.vida_azul_max,
-            guarda_actual:    s.guarda_max,
-            vex_actual:       s.vex_max
-          };
-          const max = caps[ev.campo] ?? Infinity;
-          p[ev.campo] = Math.max(0, Math.min(max, (p[ev.campo] ?? 0) + ev.delta));
-          await persistirCampos(ev.pjNombre, { [ev.campo]: p[ev.campo] });
+          if (ev.campo === 'vida_azul_actual') {
+            // vida_azul_actual = delta acumulado (sin techo, puede ser negativo)
+            p.vida_azul_actual = (p.vida_azul_actual ?? 0) + ev.delta;
+            await persistirCampos(ev.pjNombre, { vida_azul_actual: p.vida_azul_actual });
+          } else {
+            const caps = { vida_roja_actual: s.vida_roja_max, guarda_actual: s.guarda_max, vex_actual: s.vex_max };
+            const max = caps[ev.campo] ?? Infinity;
+            p[ev.campo] = Math.max(0, Math.min(max, (p[ev.campo] ?? 0) + ev.delta));
+            await persistirCampos(ev.pjNombre, { [ev.campo]: p[ev.campo] });
+          }
         }
 
       } else if (ev.tipo === 'stat_max') {
         const p = personajes[ev.pjNombre];
         if (p) {
-          // Mapa de override a columna DB
-          const dbMap = {
-            vida_roja_max_override: 'vida_roja_max_op',
-            vida_azul_max_override: 'vida_azul_max_op',
-            guarda_max_override:    'guarda_max_op',
-            vex_max_override:       null  // no hay columna dedicada, usar campo directo
-          };
-          // Si el override estaba en 0 y es la primera operación, partir desde la fórmula
-          if ((p[ev.campo] || 0) === 0 && ev._baseInicial) {
-            p[ev.campo] = ev._baseInicial;
+          if (ev.campo === 'guarda_max_override') {
+            p.guarda_max_override = (p.guarda_max_override || 0) + ev.delta;
+            await persistirCampos(ev.pjNombre, { guarda_max_op: p.guarda_max_override });
+          } else if (ev.campo === 'vida_roja_max_override') {
+            const s = calcularStats(p);
+            if ((p[ev.campo] || 0) === 0 && ev._baseInicial) p[ev.campo] = ev._baseInicial;
+            p[ev.campo] = Math.max(0, (p[ev.campo] || 0) + ev.delta);
+            await persistirCampos(ev.pjNombre, { vida_roja_max_op: p[ev.campo] });
           }
-          p[ev.campo] = Math.max(0, (p[ev.campo] || 0) + ev.delta);
-          const dbCampo = dbMap[ev.campo] || ev.campo;
-          await persistirCampos(ev.pjNombre, { [dbCampo]: p[ev.campo] });
         }
 
       } else if (ev.tipo === 'afin') {

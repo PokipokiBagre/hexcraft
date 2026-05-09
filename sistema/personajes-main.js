@@ -119,10 +119,18 @@ window.cerrarDetalle = cerrarPanelPJ;
 window.modStat = function(nombre, campo, delta) {
     const p = personajes[nombre]; if (!p) return;
     const s = calcularStats(p);
-    const caps = { vex_actual: s.vex_max, vida_azul_actual: s.vida_azul_max, guarda_actual: s.guarda_max };
-    const max = caps[campo] ?? Infinity;
-    p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
-    persistirCampos(nombre, { [campo]: p[campo] });
+
+    if (campo === 'vida_azul_actual') {
+        // vida_azul_actual es el modificador acumulado (base+mod = total, sin techo)
+        p.vida_azul_actual = (p.vida_azul_actual ?? 0) + delta;
+        // no hay Math.max(0) — puede quedar negativo si el OP lo desea
+        persistirCampos(nombre, { vida_azul_actual: p.vida_azul_actual });
+    } else {
+        const caps = { vex_actual: s.vex_max, guarda_actual: s.guarda_max };
+        const max = caps[campo] ?? Infinity;
+        p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
+        persistirCampos(nombre, { [campo]: p[campo] });
+    }
     renderCatalogo();
     refreshPanelPJ();
 };
@@ -133,20 +141,17 @@ window.modStat = function(nombre, campo, delta) {
 window.modStatMax = function(nombre, campo, delta) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
-    const s = calcularStats(p);
 
-    // Si el campo de override está a 0, inicializarlo desde la fórmula al primer toque
-    if (campo === 'vida_roja_max_override' && (p[campo] || 0) === 0) {
-        p[campo] = s.vida_roja_max;
-    } else if (campo === 'vida_azul_max_override' && (p[campo] || 0) === 0) {
-        p[campo] = s.vida_azul_max;
-    } else if (campo === 'guarda_max_override' && (p[campo] || 0) === 0) {
-        p[campo] = s.guarda_max;
+    if (campo === 'guarda_max_override') {
+        // guarda_max = fórmula + override (suma). Override arranca en 0, no desde fórmula.
+        p.guarda_max_override = (p.guarda_max_override || 0) + delta;
+        persistirCampos(nombre, { guarda_max_op: p.guarda_max_override });
+    } else if (campo === 'vida_roja_max_override') {
+        const s = calcularStats(p);
+        if ((p[campo] || 0) === 0) p[campo] = s.vida_roja_max;
+        p[campo] = Math.max(0, (p[campo] || 0) + delta);
+        persistirCampos(nombre, { vida_roja_max_op: p[campo] });
     }
-
-    p[campo] = Math.max(0, (p[campo] || 0) + delta);
-    const _dbMap1 = { vida_roja_max_override: 'vida_roja_max_op', vida_azul_max_override: 'vida_azul_max_op', guarda_max_override: 'guarda_max_op' };
-    persistirCampos(nombre, { [_dbMap1[campo] || campo]: p[campo] });
     renderCatalogo();
     refreshPanelPJ();
 };
@@ -154,9 +159,14 @@ window.modStatMax = function(nombre, campo, delta) {
 window.resetStatMax = function(nombre, campo) {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
-    p[campo] = 0;
-    const _dbMap2 = { vida_roja_max_override: 'vida_roja_max_op', vida_azul_max_override: 'vida_azul_max_op', guarda_max_override: 'guarda_max_op' };
-    persistirCampos(nombre, { [_dbMap2[campo] || campo]: 0 });
+    if (campo === 'guarda_max_override') {
+        p.guarda_max_override = 0;
+        persistirCampos(nombre, { guarda_max_op: 0 });
+    } else {
+        p[campo] = 0;
+        const _dbMap2 = { vida_roja_max_override: 'vida_roja_max_op' };
+        persistirCampos(nombre, { [_dbMap2[campo] || campo]: 0 });
+    }
     renderCatalogo();
     mostrarToast('Máximo restaurado a fórmula');
     refreshPanelPJ();

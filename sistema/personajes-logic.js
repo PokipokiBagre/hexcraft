@@ -69,8 +69,6 @@ export function calcularStats(p) {
     const ctx = buildContext(p);
     const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
 
-    // Bonos del schema nuevo (trigger calcula vida_roja_max_db, etc.)
-    // Si existe vida_roja_max_op (override manual) lo usamos como tope, si no usamos fórmula + bonos_stats
     const b = p.bonos_stats || {};
     const bonoVR = b.vida_roja || p.bono_vida_roja || 0;
     const bonoVA = b.vida_azul || p.bono_vida_azul || 0;
@@ -78,24 +76,30 @@ export function calcularStats(p) {
     const bonoDR = b.dano_rojo || p.bono_dano_rojo || 0;
     const bonoDA = b.dano_azul || p.bono_dano_azul || 0;
 
+    // ── Vida Roja ────────────────────────────────────────────────
+    // Techo máximo = fórmula + override manual (si > 0, reemplaza fórmula)
     const vida_roja_max_formula = evalExpr(formulas.vida_roja_max.expr, ctx) + bonoVR;
-    // Override manual (vida_roja_max_op) tiene prioridad si > 0
     const vida_roja_max = (p.vida_roja_max_override && p.vida_roja_max_override > 0)
         ? p.vida_roja_max_override
         : vida_roja_max_formula;
 
-    const vida_azul_max_formula = evalExpr(formulas.vida_azul_max.expr, ctx) + bonoVA;
-    const vida_azul_max = (p.vida_azul_max_override && p.vida_azul_max_override > 0)
-        ? p.vida_azul_max_override
-        : vida_azul_max_formula;
+    // ── Vida Azul ─────────────────────────────────────────────────
+    // vida_azul NO tiene techo. Es un único valor acumulable.
+    // vida_azul_base = valor calculado por la fórmula (lo que "da" el personaje)
+    // vida_azul_mod  = guardado en vida_azul_actual (modificación acumulada por el OP)
+    // vida_azul_total = base + mod  ← este es el valor real mostrado
+    const vida_azul_base  = evalExpr(formulas.vida_azul_max.expr, ctx) + bonoVA;
+    const vida_azul_mod   = p.vida_azul_actual ?? 0;  // delta guardado, puede ser neg
+    const vida_azul_total = vida_azul_base + vida_azul_mod;
 
-    const vida_azul_actual = p.vida_azul_actual ?? vida_azul_max;
-
+    // ── Guarda Dorada ─────────────────────────────────────────────
+    // guarda_max_total = fórmula + override (suma, no reemplaza)
+    // guarda_actual    = valor perdible (0 … guarda_max_total)
     const guarda_max_formula = evalExpr(formulas.guarda_max.expr, ctx) + bonoG;
-    const guarda_max = (p.guarda_max_override && p.guarda_max_override > 0)
-        ? p.guarda_max_override
-        : guarda_max_formula;
+    const guarda_max_override = p.guarda_max_override || 0;  // modificación manual sumada
+    const guarda_max = guarda_max_formula + guarda_max_override;
 
+    // ── VEX ──────────────────────────────────────────────────────
     const vex_max = esJugador
         ? evalExpr(formulas.vex_max.expr, ctx)
         : (p.vex_max || 0);
@@ -103,7 +107,17 @@ export function calcularStats(p) {
     const dano_rojo = evalExpr(formulas.dano_rojo.expr, ctx) + bonoDR;
     const dano_azul = evalExpr(formulas.dano_azul.expr, ctx) + bonoDA;
 
-    return { vida_roja_max, vida_azul_max, vida_azul_actual, guarda_max, vex_max, dano_rojo, dano_azul, ctx };
+    return {
+        vida_roja_max,
+        vida_azul_base,   // valor calculado por fórmula (label: "base")
+        vida_azul_mod,    // modificación acumulada guardada en DB
+        vida_azul_total,  // = base + mod, el número que se muestra
+        guarda_max,       // = fórmula + override (suma)
+        guarda_max_formula,
+        guarda_max_override,
+        vex_max,
+        dano_rojo, dano_azul, ctx
+    };
 }
 
 // ─────────────────────────────────────────────────────────────
