@@ -241,10 +241,17 @@ function _css() {
 .hxc-item-evento { border-radius: 7px; border: 1px solid rgba(140,90,220,0.35); background: rgba(140,90,220,0.07); margin-bottom: 6px; overflow: hidden; }
 .hxc-item-evento-row { display: flex; align-items: center; gap: 7px; padding: 8px 10px; cursor: pointer; }
 .hxc-item-evento-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(140,90,220,0.7); flex-shrink: 0; }
-.hxc-item-evento-tipo { font-size: 0.55em; color: #b080e0; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+.hxc-item-evento-estado { font-size: 0.5em; padding: 1px 6px; border-radius: 3px; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap; }
+.hxc-item-evento-estado.aplicado { background: rgba(62,207,110,0.12); color: #3ecf6e; border: 1px solid rgba(62,207,110,0.3); }
+.hxc-item-evento-estado.pendiente { background: rgba(140,90,220,0.1); color: #b080e0; border: 1px solid rgba(140,90,220,0.25); }
 .hxc-item-evento-nombre { font-size: 0.76em; color: #ddd; flex: 1; font-weight: 500; }
-.hxc-item-evento-desc { font-size: 0.63em; color: #888; padding: 0 10px 9px; line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; }
+.hxc-item-evento-desc { font-size: 0.63em; color: #999; padding: 6px 10px 9px; line-height: 1.65; border-top: 1px solid rgba(255,255,255,0.06); white-space: pre-line; }
 .hxc-item-evento-pj { font-size: 0.6em; color: #9060d0; }
+/* botones de eventos en barra */
+.hxc-btn-aplicar-ev { background: rgba(62,207,110,0.07); border-color: rgba(62,207,110,0.35); color: #3ecf6e; }
+.hxc-btn-aplicar-ev:hover { background: rgba(62,207,110,0.18); }
+.hxc-btn-revertir-ev { background: rgba(232,160,48,0.07); border-color: rgba(232,160,48,0.35); color: #e8a030; }
+.hxc-btn-revertir-ev:hover { background: rgba(232,160,48,0.18); }
 `;
   document.head.appendChild(st);
 }
