@@ -34,6 +34,14 @@ export const hxState = {
   inventarioPJ: {},        // { nombre: [hechizos...] }
   busquedaHz: '',
 
+  // ── Panel lateral activo por slot ───────────────────────────
+  // { grupo, idx, tipo } donde tipo = 'hechizos' | 'estados' | 'evento'
+  panelSlot: null,
+
+  // ── Estados activos de cada PJ ───────────────────────────────
+  // { nombre: [{ id, hechizo_id, hechizo_nombre, afinidad, ... }] }
+  estadosPorPj: {},
+
   // ── Stack de hechizos del turno ─────────────────────────────
   stack: [],
 
