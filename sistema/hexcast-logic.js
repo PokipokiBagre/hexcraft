@@ -169,7 +169,7 @@ export function agregarHechizo(pjNombre, grupo, slotIdx, hechizo) {
   const ncNec = ncNecesario(costoBase, mult);
 
   const item = {
-    id: Date.now() + Math.random(),
+    id: 'local_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
     pjNombre, grupo, slotIdx, color,
     hechizo,
     infalible: false,
