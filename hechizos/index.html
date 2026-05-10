@@ -7,118 +7,248 @@
     <title>Mapa de Hechizos — HEX ROL</title>
     <link rel="icon" type="image/png" id="dynamic-favicon" href="../img/icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background: #05000a; font-family: 'Inter', system-ui, sans-serif; color: #ccc; }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            background: #05000a;
+            font-family: 'Inter', system-ui, sans-serif;
+            color: #ccc;
+        }
 
-        /* ── NAV ── */
+        /* ══════════════════════════════════════
+           NAV (top bar)
+        ══════════════════════════════════════ */
         #hm-nav {
             position: fixed; top: 0; left: 0; right: 0; height: 44px;
-            background: rgba(5,0,10,0.97); border-bottom: 1px solid rgba(212,175,55,0.18);
-            display: flex; align-items: center; gap: 0; z-index: 100; flex-shrink: 0;
+            background: rgba(5,0,10,0.98);
+            border-bottom: 1px solid rgba(212,175,55,0.18);
+            display: flex; align-items: center; gap: 0;
+            z-index: 200; flex-shrink: 0;
         }
-        #hm-nav-left { display: flex; align-items: center; gap: 8px; padding: 0 14px; border-right: 1px solid rgba(255,255,255,0.06); height: 100%; }
-        #hm-title { font-family: 'Cinzel', serif; font-size: 0.8em; color: #d4af37; letter-spacing: 2px; white-space: nowrap; }
-        #hm-back { font-size: 0.65em; color: #555; text-decoration: none; transition: color 0.15s; }
+        #hm-nav-left {
+            display: flex; align-items: center; gap: 8px;
+            padding: 0 14px;
+            border-right: 1px solid rgba(255,255,255,0.06);
+            height: 100%; flex-shrink: 0;
+        }
+        #hm-title {
+            font-family: 'Cinzel', serif; font-size: 0.8em;
+            color: #d4af37; letter-spacing: 2px; white-space: nowrap;
+        }
+        #hm-back {
+            font-size: 0.65em; color: #555;
+            text-decoration: none; transition: color 0.15s;
+        }
         #hm-back:hover { color: #aaa; }
 
-        /* ── TOOLBAR TABS ── */
+        /* ── Toolbar ── */
         #hm-toolbar {
-            display: flex; align-items: center; gap: 5px; padding: 0 12px; flex: 1; height: 100%; overflow-x: auto; scrollbar-width: none;
+            display: flex; align-items: center; gap: 5px;
+            padding: 0 10px; flex: 1; height: 100%;
+            overflow-x: auto; scrollbar-width: none;
         }
         #hm-toolbar::-webkit-scrollbar { display: none; }
-        .hm-tab-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.08); flex-shrink: 0; margin: 0 3px; }
-
-        /* Botones generales del toolbar */
+        .hm-tab-sep {
+            width: 1px; height: 20px;
+            background: rgba(255,255,255,0.08);
+            flex-shrink: 0; margin: 0 3px;
+        }
         .hm-btn {
             font-size: 0.62em; padding: 4px 10px; border-radius: 5px;
-            border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04);
-            color: #888; cursor: pointer; white-space: nowrap; transition: all 0.13s;
-            font-family: inherit; user-select: none; flex-shrink: 0;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.04);
+            color: #888; cursor: pointer; white-space: nowrap;
+            transition: all 0.13s; font-family: inherit;
+            user-select: none; flex-shrink: 0;
         }
-        .hm-btn:hover { background: rgba(255,255,255,0.09); color: #ccc; }
+        .hm-btn:hover  { background: rgba(255,255,255,0.09); color: #ccc; }
         .hm-btn.activo { background: rgba(0,210,255,0.12); border-color: rgba(0,210,255,0.45); color: #00d2ff; }
-        .hm-btn.gold { background: rgba(212,175,55,0.09); border-color: rgba(212,175,55,0.4); color: #d4af37; }
-        .hm-btn.gold:hover { background: rgba(212,175,55,0.18); }
+        .hm-btn.gold   { background: rgba(212,175,55,0.09); border-color: rgba(212,175,55,0.4); color: #d4af37; }
+        .hm-btn.gold:hover   { background: rgba(212,175,55,0.18); }
         .hm-btn.danger { background: rgba(220,60,60,0.09); border-color: rgba(220,60,60,0.35); color: #e06060; }
         .hm-btn.danger:hover { background: rgba(220,60,60,0.18); }
-        .hm-btn.verde { background: rgba(50,200,100,0.09); border-color: rgba(50,200,100,0.35); color: #32c864; }
-        .hm-btn.verde:hover { background: rgba(50,200,100,0.18); }
+        .hm-btn.verde  { background: rgba(50,200,100,0.09); border-color: rgba(50,200,100,0.35); color: #32c864; }
+        .hm-btn.verde:hover  { background: rgba(50,200,100,0.18); }
         .hm-btn:disabled { opacity: 0.35; cursor: default; }
 
-        /* Select PJ */
         #hm-pj-sel {
-            font-size: 0.65em; background: rgba(0,210,255,0.06); border: 1px solid rgba(0,210,255,0.25);
-            color: #00d2ff; padding: 4px 8px; border-radius: 5px; outline: none; cursor: pointer;
-            font-family: inherit; flex-shrink: 0;
+            font-size: 0.65em; background: rgba(0,210,255,0.06);
+            border: 1px solid rgba(0,210,255,0.25); color: #00d2ff;
+            padding: 4px 8px; border-radius: 5px; outline: none;
+            cursor: pointer; font-family: inherit; flex-shrink: 0;
         }
         #hm-pj-sel option { background: #0d0c1a; color: #ccc; }
 
-        /* Badge seleccionados */
         #hm-sel-badge {
-            font-size: 0.6em; color: #d4af37; background: rgba(212,175,55,0.1);
-            border: 1px solid rgba(212,175,55,0.3); border-radius: 10px;
-            padding: 2px 8px; display: none; flex-shrink: 0;
+            font-size: 0.6em; color: #d4af37;
+            background: rgba(212,175,55,0.1);
+            border: 1px solid rgba(212,175,55,0.3);
+            border-radius: 10px; padding: 2px 8px;
+            display: none; flex-shrink: 0;
         }
 
-        /* ── CANVAS CONTAINER ── */
+        /* ══════════════════════════════════════
+           CANVAS — ocupa todo bajo el nav y sobre la info bar
+        ══════════════════════════════════════ */
         #hm-canvas-wrap {
-            position: fixed; top: 44px; left: 0; right: 0; bottom: 32px;
+            position: fixed;
+            top: 44px; left: 0; right: 0; bottom: 32px;
             overflow: hidden; cursor: grab;
         }
         #hm-canvas-wrap:active { cursor: grabbing; }
-        #hm-canvas { display: block; }
+        #hm-canvas { display: block; width: 100%; height: 100%; }
 
-        /* ── INFO BAR INFERIOR ── */
+        /* ══════════════════════════════════════
+           INFO BAR (bottom strip — solo stats y zoom)
+        ══════════════════════════════════════ */
         #hm-info-bar {
             position: fixed; bottom: 0; left: 0; right: 0; height: 32px;
-            background: rgba(5,0,10,0.97); border-top: 1px solid rgba(255,255,255,0.06);
-            display: flex; align-items: center; gap: 10px; padding: 0 14px;
-            font-size: 0.62em; color: #555; z-index: 100; overflow: hidden;
+            background: rgba(5,0,10,0.98);
+            border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex; align-items: center; gap: 8px;
+            padding: 0 14px; font-size: 0.62em; color: #555;
+            z-index: 200; overflow: hidden;
         }
-        #hm-info-nodo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #hm-info-nodo {
+            flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
         #hm-info-stats { color: #333; flex-shrink: 0; }
         #hm-zoom-label { color: #333; flex-shrink: 0; min-width: 40px; text-align: right; }
 
-        /* ── MODAL GENÉRICO ── */
+        /* ══════════════════════════════════════
+           PANEL OP — flotante sobre info bar, aparece al seleccionar nodo
+        ══════════════════════════════════════ */
+        #hm-op-panel {
+            position: fixed; bottom: 32px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10,8,22,0.98);
+            border: 1px solid rgba(212,175,55,0.22);
+            border-bottom: none;
+            border-radius: 10px 10px 0 0;
+            padding: 10px 16px 8px;
+            display: none; flex-direction: row; align-items: center;
+            gap: 8px; flex-wrap: wrap;
+            z-index: 150;
+            box-shadow: 0 -4px 24px rgba(0,0,0,0.7);
+            max-width: min(760px, calc(100vw - 32px));
+            width: max-content;
+            transition: opacity 0.15s;
+        }
+        #hm-op-panel.visible { display: flex; }
+
+        .op-nombre {
+            font-family: 'Cinzel', serif; font-size: 0.82em; color: #d4af37;
+            font-weight: 600; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; max-width: 200px; flex-shrink: 0;
+        }
+        .op-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.08); flex-shrink: 0; }
+        .op-meta { font-size: 0.62em; color: #5a5a78; white-space: nowrap; flex-shrink: 0; }
+        .op-chip {
+            font-size: 0.6em; padding: 2px 7px; border-radius: 8px;
+            border: 1px solid; white-space: nowrap; flex-shrink: 0;
+        }
+        .op-chip-hex  { color: #c9953a; border-color: rgba(212,175,55,0.3); background: rgba(212,175,55,0.07); }
+        .op-chip-vex  { color: #b060e8; border-color: rgba(150,80,220,0.3); background: rgba(150,80,220,0.07); }
+        .op-chip-pos  { color: rgba(150,131,200,0.9); border-color: rgba(150,131,200,0.35); background: rgba(150,131,200,0.07); }
+        .op-chip-nota { color: #d4a830; border-color: rgba(212,160,30,0.25); background: rgba(212,160,30,0.06); }
+
+        .op-btn {
+            font-size: 0.63em; padding: 4px 11px; border-radius: 5px;
+            border: 1px solid; cursor: pointer; font-family: inherit;
+            transition: all 0.12s; white-space: nowrap; flex-shrink: 0;
+        }
+        .op-btn.conocido-on  { background: rgba(212,175,55,0.1); border-color: rgba(212,175,55,0.4); color: #d4af37; }
+        .op-btn.conocido-on:hover  { background: rgba(212,175,55,0.2); }
+        .op-btn.conocido-off { background: rgba(120,100,60,0.08); border-color: rgba(120,100,60,0.3); color: #7a6a40; }
+        .op-btn.conocido-off:hover { background: rgba(120,100,60,0.18); color: #d4af37; }
+        .op-btn.asignar { background: rgba(50,200,100,0.09); border-color: rgba(50,200,100,0.35); color: #32c864; }
+        .op-btn.asignar:hover { background: rgba(50,200,100,0.2); }
+        .op-btn.quitar  { background: rgba(220,60,60,0.09); border-color: rgba(220,60,60,0.35); color: #e06060; }
+        .op-btn.quitar:hover  { background: rgba(220,60,60,0.2); }
+        .op-btn.editar  { background: rgba(212,175,55,0.08); border-color: rgba(212,175,55,0.3); color: #c9953a; }
+        .op-btn.editar:hover  { background: rgba(212,175,55,0.18); }
+        .op-btn.descartar { background: rgba(200,50,50,0.08); border-color: rgba(200,50,50,0.3); color: #cc4444; }
+        .op-btn.descartar:hover { background: rgba(200,50,50,0.2); }
+        .op-btn.sellado { background: rgba(60,60,80,0.1); border-color: rgba(80,80,100,0.25); color: #3a3a58; cursor: default; }
+
+        /* ══════════════════════════════════════
+           MODAL GENÉRICO
+        ══════════════════════════════════════ */
         .hm-modal-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,0.75);
             z-index: 500; display: flex; align-items: center; justify-content: center;
         }
         .hm-modal {
             background: #0d0c1a; border: 1px solid rgba(212,175,55,0.25);
-            border-radius: 12px; padding: 22px 26px; width: 420px; max-width: 95vw;
-            max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+            border-radius: 12px; padding: 22px 26px;
+            width: 420px; max-width: 95vw; max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.8);
         }
-        .hm-modal-title { font-family: 'Cinzel', serif; font-size: 0.85em; color: #d4af37; margin-bottom: 14px; letter-spacing: 1px; }
-        .hm-modal label { font-size: 0.68em; color: #888; display: block; margin-bottom: 3px; margin-top: 11px; }
+        .hm-modal-title {
+            font-family: 'Cinzel', serif; font-size: 0.85em;
+            color: #d4af37; margin-bottom: 14px; letter-spacing: 1px;
+        }
+        .hm-modal label {
+            font-size: 0.68em; color: #888; display: block;
+            margin-bottom: 3px; margin-top: 11px;
+        }
         .hm-modal input, .hm-modal select, .hm-modal textarea {
-            width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14);
-            border-radius: 6px; color: #fff; font-size: 0.78em; padding: 7px 10px;
+            width: 100%; background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 6px; color: #fff;
+            font-size: 0.78em; padding: 7px 10px;
             font-family: inherit; outline: none; box-sizing: border-box;
         }
         .hm-modal input:focus, .hm-modal select:focus { border-color: rgba(212,175,55,0.45); }
         .hm-modal select option { background: #0d0c1a; }
-        .hm-modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-        .hm-btn-cancel { background: none; border: 1px solid rgba(255,255,255,0.12); color: #666; font-size: 0.68em; padding: 6px 13px; border-radius: 5px; cursor: pointer; font-family: inherit; }
+        .hm-modal-footer {
+            display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;
+        }
+        .hm-btn-cancel {
+            background: none; border: 1px solid rgba(255,255,255,0.12);
+            color: #666; font-size: 0.68em; padding: 6px 13px;
+            border-radius: 5px; cursor: pointer; font-family: inherit;
+        }
         .hm-btn-cancel:hover { color: #bbb; }
-        .hm-btn-ok { background: rgba(212,175,55,0.12); border: 1px solid rgba(212,175,55,0.4); color: #d4af37; font-size: 0.68em; padding: 6px 16px; border-radius: 5px; cursor: pointer; font-family: 'Cinzel', serif; }
+        .hm-btn-ok {
+            background: rgba(212,175,55,0.12); border: 1px solid rgba(212,175,55,0.4);
+            color: #d4af37; font-size: 0.68em; padding: 6px 16px;
+            border-radius: 5px; cursor: pointer; font-family: 'Cinzel', serif;
+        }
         .hm-btn-ok:hover { background: rgba(212,175,55,0.24); }
 
-        /* Checkbox list en modales */
-        .hm-check-list { max-height: 200px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px; margin-top: 4px; scrollbar-width: thin; }
-        .hm-check-item { display: flex; align-items: center; gap: 7px; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 0.72em; color: #bbb; }
+        .hm-check-list {
+            max-height: 200px; overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px; padding: 6px; margin-top: 4px;
+            scrollbar-width: thin;
+        }
+        .hm-check-item {
+            display: flex; align-items: center; gap: 7px;
+            padding: 4px 6px; border-radius: 4px; cursor: pointer;
+            font-size: 0.72em; color: #bbb;
+        }
         .hm-check-item:hover { background: rgba(255,255,255,0.05); }
-        .hm-check-item input[type=checkbox] { width: 14px; height: 14px; accent-color: #d4af37; flex-shrink: 0; cursor: pointer; }
+        .hm-check-item input[type=checkbox] {
+            width: 14px; height: 14px;
+            accent-color: #d4af37; flex-shrink: 0; cursor: pointer;
+        }
         .hm-check-item.sel { color: #d4af37; }
 
-        /* Toast */
+        /* ══════════════════════════════════════
+           TOAST
+        ══════════════════════════════════════ */
         #hm-toast {
-            position: fixed; bottom: 44px; left: 50%; transform: translateX(-50%);
-            background: rgba(15,12,28,0.98); border: 1px solid rgba(212,175,55,0.35);
-            color: #d4af37; font-size: 0.75em; padding: 8px 18px; border-radius: 8px;
-            z-index: 600; pointer-events: none; opacity: 0; transition: opacity 0.25s;
+            position: fixed; bottom: 44px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15,12,28,0.98);
+            border: 1px solid rgba(212,175,55,0.35);
+            color: #d4af37; font-size: 0.75em; padding: 8px 18px;
+            border-radius: 8px; z-index: 600;
+            pointer-events: none; opacity: 0; transition: opacity 0.25s;
             white-space: nowrap;
         }
         #hm-toast.show { opacity: 1; }
@@ -126,25 +256,30 @@
 </head>
 <body>
 
-<!-- ── NAV ── -->
+<!-- ══════════════ NAV ══════════════ -->
 <nav id="hm-nav">
     <div id="hm-nav-left">
         <a id="hm-back" href="../sistema/index.html">← Sistema</a>
         <span id="hm-title">✦ Hechizos</span>
     </div>
     <div id="hm-toolbar">
-        <!-- Se rellena por JS según rol -->
+        <!-- JS lo rellena -->
     </div>
 </nav>
 
-<!-- ── CANVAS ── -->
+<!-- ══════════════ CANVAS (full screen entre nav e info bar) ══════════════ -->
 <div id="hm-canvas-wrap">
     <canvas id="hm-canvas"></canvas>
 </div>
 
-<!-- ── INFO BAR ── -->
+<!-- ══════════════ PANEL OP ══════════════ -->
+<div id="hm-op-panel">
+    <!-- contenido renderizado por mapa-ui.js / renderInfoBar -->
+</div>
+
+<!-- ══════════════ INFO BAR ══════════════ -->
 <div id="hm-info-bar">
-    <span id="hm-info-nodo">Clic en un hechizo para ver detalles</span>
+    <span id="hm-info-nodo" style="color:#444;">Clic en un hechizo para ver detalles</span>
     <span id="hm-info-stats"></span>
     <span id="hm-zoom-label">100%</span>
 </div>
