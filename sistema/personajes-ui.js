@@ -72,110 +72,133 @@ export function renderCatalogo() {
     grid.innerHTML = lista.map(([nombre, p]) => {
         const s = calcularStats(p);
         const mayor = getMayorAfinidad(p);
+        const safe  = nombre.replace(/'/g, "\\'");
 
-        const pctVex    = s.vex_max > 0 ? Math.min(100, Math.round(p.vex_actual / s.vex_max * 100)) : 0;
+        const pctVex = s.vex_max > 0 ? Math.min(100, Math.round((p.vex_actual||0) / s.vex_max * 100)) : 0;
+        const hex    = p.hex || 0;
 
+        // ── Push indicators ──────────────────────────────────
+        const pushVexDisp    = calcularPushDisponibles(p, s, 'vex');
+        const pushGuardaDisp = calcularPushDisponibles(p, s, 'guarda');
+        const pushVexUsados  = p.push_vex_actual    || 0;
+        const pushGuardaUsados = p.push_guarda_actual || 0;
+
+        const pushHtml = (s.vex_max > 0 || s.guarda_max > 0) ? `
+            <div class="pjc-pushes">
+                ${s.vex_max > 0 ? `<span class="pjc-push pjc-push-vex" title="Push VEX">⚡ ${pushVexUsados}/${pushVexDisp}</span>` : ''}
+                ${s.guarda_max > 0 ? `<span class="pjc-push pjc-push-gua" title="Push Guarda">🛡 ${pushGuardaUsados}/${pushGuardaDisp}</span>` : ''}
+            </div>` : '';
+
+        // ── VEX bar ───────────────────────────────────────────
+        const vexHtml = s.vex_max > 0 ? `
+            <div class="pjc-vex-row">
+                <span class="pjc-vex-label">VEX</span>
+                <div class="pjc-vex-track"><div class="pjc-vex-fill" style="width:${pctVex}%"></div></div>
+                <span class="pjc-vex-val">${Math.floor(p.vex_actual||0)}<span class="pjc-sep">/</span>${s.vex_max}</span>
+            </div>` : '';
+
+        // ── HEX hexagon ───────────────────────────────────────
+        const hexK = hex >= 1000 ? (hex/1000).toFixed(hex%1000===0?0:1)+'k' : hex.toString();
+        const hexGlow = hex > 2000 ? 'pjc-hex-glow-hi' : hex > 500 ? 'pjc-hex-glow-mid' : 'pjc-hex-glow-lo';
+
+        // ── Collapsed detail section ──────────────────────────
         const maxAfin = Math.max(1, ...AFINIDADES.map(a =>
-            (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0)
+            (p.afinidadesBase?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0)
         ));
-
-        const barras = AFINIDADES.map(a => {
-            const base = p.afinidadesBase?.[a.key] || 0;
-            const bf   = p.afinidadesBf?.[a.key]   || 0;
-            const ef   = p.afinidadesEf?.[a.key]   || 0;
-            const hz   = p.afinidadesHz?.[a.key]   || 0;
-            const total = base + bf + ef + hz;
-            const esMayor = mayor && mayor.key === a.key;
-            const pBase = Math.round(base / maxAfin * 100);
-            const pBf   = Math.round(bf   / maxAfin * 100);
-            const pEf   = Math.round(ef   / maxAfin * 100);
-            const pHz   = Math.round(hz   / maxAfin * 100);
-            return `<div class="afin-bar-row">
-                <span class="afin-bar-label ${esMayor ? 'mayor' : ''}">${a.abr}</span>
-                <div class="afin-bar-track">
-                    <div class="afin-seg afin-seg-base" style="width:${pBase}%" title="Base: ${base}"></div>
-                    <div class="afin-seg afin-seg-bf"   style="width:${pBf}%"   title="Buff: ${bf}"></div>
-                    <div class="afin-seg afin-seg-ef"   style="width:${pEf}%"   title="Alt: ${ef}"></div>
-                    <div class="afin-seg afin-seg-hz"   style="width:${pHz}%"   title="Hz: ${hz}"></div>
+        const afinBars = AFINIDADES.map(a => {
+            const base  = p.afinidadesBase?.[a.key] || 0;
+            const bf    = p.afinidadesBf?.[a.key]   || 0;
+            const ef    = p.afinidadesEf?.[a.key]   || 0;
+            const total = base + bf + ef;
+            const esMayor = mayor?.key === a.key;
+            const pct = Math.round(total / maxAfin * 100);
+            return `<div class="pjc-afin-row">
+                <span class="pjc-afin-lbl ${esMayor?'pjc-afin-mayor':''}">${a.abr}</span>
+                <div class="pjc-afin-track">
+                    <div class="pjc-afin-fill ${esMayor?'pjc-fill-mayor':''}" style="width:${pct}%"></div>
                 </div>
-                <span class="afin-bar-val ${esMayor ? 'val-gold' : ''}">${total}</span>
+                <span class="pjc-afin-val ${esMayor?'pjc-afin-mayor':''}">${total}</span>
             </div>`;
         }).join('');
 
-        const esInactivo = !p.isActive;
-        const canDelete  = estadoUI.esAdmin;
+        const vidaRoja = _barraSegmentada(p.vida_roja_actual||0, s.vida_roja_max, 'vida', 24);
+        const detailHtml = `
+            <div class="pjc-detail" id="pjc-detail-${safe}">
+                <div class="pjc-vida-row">
+                    <span class="pjc-vida-lbl" style="color:#c8404a;">Vida</span>
+                    ${vidaRoja}
+                    <span class="pjc-vida-xy">${p.vida_roja_actual||0}<span class="pjc-sep">/</span>${s.vida_roja_max}</span>
+                </div>
+                ${s.vida_azul_total > 0 ? `<div class="pjc-vida-row">
+                    <span class="pjc-vida-lbl" style="color:#4ab3e8;">Azul</span>
+                    <div style="flex:1;"></div>
+                    <span class="pjc-vida-xy" style="color:#4ab3e8;">${s.vida_azul_total}</span>
+                </div>` : ''}
+                ${s.guarda_max > 0 ? `<div class="pjc-vida-row">
+                    <span class="pjc-vida-lbl" style="color:var(--gold-dim);">Guarda</span>
+                    ${_barraSegmentada(p.guarda_actual||0, s.guarda_max, 'guarda', 20)}
+                    <span class="pjc-vida-xy">${p.guarda_actual||0}<span class="pjc-sep">/</span>${s.guarda_max}</span>
+                </div>` : ''}
+                <div class="pjc-afin-section">${afinBars}</div>
+            </div>`;
 
-        // Mini push indicador
-        const pushVexDisp    = calcularPushDisponibles(p, s, 'vex');
-        const pushGuardaDisp = calcularPushDisponibles(p, s, 'guarda');
-        const pushVexUsados    = p.push_vex_actual    || 0;
-        const pushGuardaUsados = p.push_guarda_actual || 0;
+        const canDelete = estadoUI.esAdmin;
 
-        const pushIndicadores = (s.vex_max > 0 || s.guarda_max > 0) ? `
-            <div class="push-mini">
-                ${s.vex_max > 0 ? `<span class="push-mini-item push-mini-vex" title="Push VEX">⚡ ${pushVexUsados}/${pushVexDisp}</span>` : ''}
-                ${s.guarda_max > 0 ? `<span class="push-mini-item push-mini-guarda" title="Push Guarda">🛡 ${pushGuardaUsados}/${pushGuardaDisp}</span>` : ''}
-            </div>` : '';
+        return `<div class="pj-card pjc-new ${!p.isActive?'pj-inactivo':''}" onclick="window.abrirDetalle('${safe}')">
 
-        // Barras de recursos con celdas segmentadas
-        const barraVidaRoja = _barraSegmentada(p.vida_roja_actual, s.vida_roja_max, 'vida', 28);
-        // Vida azul: valor único sin techo, mostrar solo el total
-        const barraVidaAzul = s.vida_azul_total > 0 ? true : null;
-        const barraGuarda   = s.guarda_max > 0 ? _barraSegmentada(p.guarda_actual || 0, s.guarda_max, 'guarda', 20) : null;
-
-        return `<div class="pj-card ${esInactivo ? 'pj-inactivo' : ''}" onclick="window.abrirDetalle('${nombre.replace(/'/g,"\\'")}')">
-            <div class="pj-card-top">
-                <div class="pj-inicial">
+            <div class="pjc-header">
+                <div class="pjc-avatar">
                     <img src="${_imgIconUrl(p.iconoOverride || nombre)}"
                          onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
                          style="width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:top;display:block;">
-                    <span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--font-display);font-size:1em;color:var(--gold-dim);">${nombre[0]}</span>
+                    <span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;font-family:var(--font-display);font-size:1.1em;color:var(--gold-dim);">${nombre[0]}</span>
                 </div>
-                <div class="pj-info">
-                    <div class="pj-name">${nombre}</div>
-                    <div class="pj-tags">
+                <div class="pjc-info">
+                    <div class="pjc-name">${nombre}</div>
+                    <div class="pjc-tags">
                         <span class="tag ${p.isPlayer ? 'tag-jugador' : 'tag-npc'}">${p.isPlayer ? 'Jugador' : 'NPC'}</span>
-                        ${!p.isPlayer ? `<span class="tag tag-dim">${p.npc_tipo === 'jugador' ? 'T. Jugador' : 'Sistema'}</span>` : ''}
-                        <span class="tag ${p.isActive ? 'tag-activo' : 'tag-inactivo'}">${p.isActive ? 'Activo' : 'Inactivo'}</span>
+                        ${!p.isPlayer ? `<span class="tag tag-dim">${p.npc_tipo==='jugador'?'T.Jug':'Sis'}</span>` : ''}
                     </div>
                 </div>
-                <div class="pj-card-actions" onclick="event.stopPropagation()">
-                    ${(estadoUI.esAdmin || !p.isPlayer) ? `<button class="icon-btn icon-btn-img" title="Subir imagen" onclick="window.abrirSubirImagen('${nombre.replace(/'/g,"\\'")}')">🖼</button>` : ''}
-                    ${canDelete ? `<button class="icon-btn icon-btn-danger" onclick="window.pedirDelete('${nombre.replace(/'/g,"\\'")}')">✕</button>` : ''}
+                <div class="pjc-actions" onclick="event.stopPropagation()">
+                    ${estadoUI.esAdmin||!p.isPlayer ? `<button class="icon-btn icon-btn-img" onclick="window.abrirSubirImagen('${safe}')">🖼</button>` : ''}
+                    ${canDelete ? `<button class="icon-btn icon-btn-danger" onclick="window.pedirDelete('${safe}')">✕</button>` : ''}
                 </div>
             </div>
 
-            <div class="recursos-section">
-                <div class="recurso-row">
-                    <span class="recurso-label">Vida</span>
-                    ${barraVidaRoja}
-                    <span class="recurso-xy">${p.vida_roja_actual}<span class="xy-sep">/</span>${s.vida_roja_max}</span>
-                </div>
-                ${barraVidaAzul ? `<div class="recurso-row">
-                    <span class="recurso-label">Azul</span>
-                    <div class="recurso-bar-track" style="flex:1;"></div>
-                    <span class="recurso-xy" style="color:#4ab3e8;">${s.vida_azul_total}</span>
-                </div>` : ''}
-                ${s.vex_max > 0 ? `<div class="recurso-row">
-                    <span class="recurso-label">VEX</span>
-                    <div class="recurso-bar-track">
-                        <div class="recurso-bar-fill fill-vex" style="width:${pctVex}%"></div>
-                    </div>
-                    <span class="recurso-xy">${Math.floor(p.vex_actual)}<span class="xy-sep">/</span>${s.vex_max}</span>
-                </div>` : ''}
-                ${barraGuarda ? `<div class="recurso-row">
-                    <span class="recurso-label">Guarda</span>
-                    ${barraGuarda}
-                    <span class="recurso-xy">${Math.floor(p.guarda_actual||0)}<span class="xy-sep">/</span>${s.guarda_max}</span>
-                </div>` : ''}
+            <div class="pjc-mid">
+                ${vexHtml}
+                ${pushHtml}
             </div>
 
-            ${pushIndicadores}
-            <div class="afin-section">${barras}</div>
-            <div class="pj-hex">HEX ${(p.hex||0).toLocaleString()}</div>
+            <div class="pjc-hex-row">
+                <div class="pjc-hexagon ${hexGlow}" title="HEX disponible">
+                    <svg viewBox="0 0 60 52" class="pjc-hex-svg">
+                        <polygon points="30,1 58,16 58,36 30,51 2,36 2,16" class="pjc-hex-poly"/>
+                        <polygon points="30,6 53,18.5 53,33.5 30,46 7,33.5 7,18.5" class="pjc-hex-inner"/>
+                    </svg>
+                    <div class="pjc-hex-val">${hexK}</div>
+                    <div class="pjc-hex-label">HEX</div>
+                </div>
+                <button class="pjc-expand-btn" onclick="event.stopPropagation();window._pjcToggle('${safe}')" title="Ver stats">
+                    <span id="pjc-arrow-${safe}" class="pjc-arrow">▾</span>
+                </button>
+            </div>
+
+            ${detailHtml}
+
         </div>`;
     }).join('');
 }
+
+// Toggle detail panel
+window._pjcToggle = (nombre) => {
+    const det = document.getElementById(`pjc-detail-${nombre}`);
+    const arrow = document.getElementById(`pjc-arrow-${nombre}`);
+    if (!det) return;
+    const open = det.classList.toggle('open');
+    if (arrow) arrow.textContent = open ? '▴' : '▾';
+};
 
 // ─────────────────────────────────────────────────────────────
 // PANEL LATERAL DE DETALLE

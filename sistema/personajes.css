@@ -150,100 +150,196 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 /* ── GRID DE PERSONAJES ──────────────────────────────────── */
 .pj-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
 }
 
+/* ── Nueva card compacta ───────────────────────────────────── */
 .pj-card {
     background: var(--bg2);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 14px;
+    padding: 14px 14px 10px;
     cursor: pointer;
-    transition: border-color 0.2s, transform 0.18s;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.18s;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 .pj-card:hover {
     border-color: var(--gold-border);
+    box-shadow: 0 0 18px rgba(212,175,55,0.07);
     transform: translateY(-2px);
 }
-.pj-inactivo { opacity: 0.45; }
+.pj-inactivo { opacity: 0.42; }
 
-.pj-card-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
-.pj-inicial {
-    width: 40px; height: 40px; flex-shrink: 0;
+/* Header */
+.pjc-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pjc-avatar {
+    width: 44px; height: 44px; flex-shrink: 0;
     border-radius: 50%;
     border: 1px solid var(--gold-border);
     background: var(--bg3);
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-display);
-    font-size: 1em;
-    color: var(--gold-dim);
     overflow: hidden;
-    position: relative;
 }
-.pj-info { flex: 1; min-width: 0; }
-.pj-name {
+.pjc-info { flex: 1; min-width: 0; }
+.pjc-name {
     font-family: var(--font-display);
-    font-size: 0.9em;
+    font-size: 0.88em;
     color: var(--gold);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
-.pj-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.pjc-tags { display: flex; gap: 3px; flex-wrap: wrap; }
+.pjc-actions { display: flex; gap: 3px; opacity: 0; transition: opacity 0.18s; flex-shrink: 0; }
+.pj-card:hover .pjc-actions { opacity: 1; }
 
-/* Tags — solo dorado y violeta */
-.tag {
-    padding: 2px 7px;
-    border-radius: 3px;
-    font-size: 0.7em;
-    font-weight: 500;
-    border: 1px solid;
+/* Mid: VEX + pushes */
+.pjc-mid { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; min-height: 14px; }
+
+.pjc-vex-row { display: flex; align-items: center; gap: 6px; }
+.pjc-vex-label { font-size: 0.64em; color: var(--violet); letter-spacing: 0.5px; width: 26px; text-align: right; }
+.pjc-vex-track { flex: 1; height: 3px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+.pjc-vex-fill  { height: 100%; background: var(--violet); border-radius: 2px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+.pjc-vex-val   { font-size: 0.67em; color: #9060c0; min-width: 60px; text-align: right; font-variant-numeric: tabular-nums; }
+.pjc-sep       { color: var(--dim); margin: 0 1px; }
+
+.pjc-pushes { display: flex; gap: 5px; }
+.pjc-push {
+    font-size: 0.62em; padding: 2px 7px; border-radius: 9px;
+    border: 1px solid; font-weight: 500; letter-spacing: 0.3px;
 }
+.pjc-push-vex   { background: rgba(124,77,170,0.1); border-color: rgba(124,77,170,0.35); color: #9060c0; }
+.pjc-push-gua   { background: rgba(212,175,55,0.08); border-color: rgba(212,175,55,0.25); color: var(--gold-dim); }
+
+/* HEX hexagon row */
+.pjc-hex-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0 2px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.pjc-hexagon {
+    position: relative;
+    width: 72px; height: 64px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    cursor: default;
+    transition: filter 0.3s;
+}
+.pjc-hexagon:hover { filter: brightness(1.2); }
+
+.pjc-hex-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+}
+.pjc-hex-poly {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 1.2;
+    opacity: 0.5;
+    transition: opacity 0.3s, stroke-width 0.3s;
+}
+.pjc-hexagon:hover .pjc-hex-poly { opacity: 0.9; stroke-width: 1.8; }
+.pjc-hex-inner {
+    fill: rgba(212,175,55,0.04);
+    stroke: rgba(212,175,55,0.15);
+    stroke-width: 0.8;
+    transition: fill 0.3s;
+}
+.pjc-hexagon:hover .pjc-hex-inner { fill: rgba(212,175,55,0.1); }
+
+/* Glow variants */
+.pjc-hex-glow-hi  .pjc-hex-poly { stroke: #f0cc40; opacity: 0.8; }
+.pjc-hex-glow-hi  .pjc-hex-inner { fill: rgba(240,204,64,0.1); }
+.pjc-hex-glow-mid .pjc-hex-poly { stroke: var(--gold); opacity: 0.6; }
+.pjc-hex-glow-lo  .pjc-hex-poly { stroke: var(--gold-dim); opacity: 0.35; }
+
+.pjc-hex-val {
+    position: relative;
+    font-family: var(--font-display);
+    font-size: 0.9em;
+    color: var(--gold);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    line-height: 1;
+    margin-bottom: 1px;
+}
+.pjc-hex-label {
+    position: relative;
+    font-size: 0.5em;
+    color: var(--gold-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+/* Expand button */
+.pjc-expand-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    width: 28px; height: 28px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--dim);
+    font-size: 0.8em;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+.pjc-expand-btn:hover { border-color: var(--gold-border); color: var(--gold); background: rgba(212,175,55,0.07); }
+.pjc-arrow { display: block; transition: transform 0.2s; }
+
+/* Collapsible detail */
+.pjc-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1), padding 0.3s;
+    padding: 0;
+    border-top: 1px solid transparent;
+}
+.pjc-detail.open {
+    max-height: 280px;
+    padding-top: 10px;
+    border-top-color: rgba(255,255,255,0.05);
+    margin-top: 6px;
+}
+
+.pjc-vida-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.pjc-vida-lbl { font-size: 0.64em; width: 36px; text-align: right; font-weight: 600; }
+.pjc-vida-xy  { font-size: 0.68em; min-width: 50px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.pjc-afin-section { margin-top: 8px; }
+.pjc-afin-row { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
+.pjc-afin-lbl { width: 26px; font-size: 0.64em; text-align: right; color: var(--dim); }
+.pjc-afin-mayor { color: var(--gold-dim) !important; }
+.pjc-afin-track { flex: 1; height: 2px; background: var(--bg4); border-radius: 1px; overflow: hidden; }
+.pjc-afin-fill { height: 100%; background: rgba(255,255,255,0.2); border-radius: 1px; }
+.pjc-fill-mayor { background: var(--gold); }
+.pjc-afin-val { width: 22px; font-size: 0.64em; text-align: right; color: var(--dim); }
+
+.empty-state { padding: 60px 20px; text-align: center; color: var(--dim); grid-column: 1/-1; }
+
+/* ── Tags (usados en cards y panel lateral) ─────────────────── */
+.tag { padding: 2px 7px; border-radius: 3px; font-size: 0.68em; font-weight: 500; border: 1px solid; }
 .tag-jugador { background: var(--violet-faint); border-color: var(--violet-border); color: #a07fd4; }
 .tag-npc     { background: var(--gold-faint);   border-color: var(--gold-border);   color: var(--gold-dim); }
 .tag-activo  { background: var(--gold-faint);   border-color: var(--gold-border);   color: var(--gold-dim); }
-.tag-inactivo{ background: transparent;          border-color: var(--border);         color: var(--dim); }
-.tag-dim     { background: transparent;          border-color: var(--border);         color: var(--dim); }
+.tag-inactivo{ background: transparent; border-color: var(--border); color: var(--dim); }
+.tag-dim     { background: transparent; border-color: var(--border); color: var(--dim); }
 
-/* Botones de card (OP) */
-.pj-card-actions {
-    display: flex; gap: 4px; align-items: flex-start;
-    opacity: 0; transition: opacity 0.2s;
-}
-.pj-card:hover .pj-card-actions { opacity: 1; }
-.icon-btn {
-    width: 26px; height: 26px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    background: var(--bg3);
-    color: var(--dim);
-    cursor: pointer;
-    font-size: 0.85em;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.18s;
-}
+/* ── Icon buttons (OP actions) ──────────────────────────────── */
+.icon-btn { width: 26px; height: 26px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg3); color: var(--dim); cursor: pointer; font-size: 0.85em; display: flex; align-items: center; justify-content: center; transition: all 0.18s; }
 .icon-btn:hover { border-color: var(--gold-border); color: var(--gold); }
 .icon-btn-danger:hover { border-color: rgba(180,60,60,0.5); color: #c46666; }
 
-/* Barras de recursos */
-.recursos-section { margin-bottom: 10px; }
-.recurso-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 5px;
-}
-.recurso-label { width: 44px; font-size: 0.72em; color: var(--dim); text-align: right; }
-.recurso-bar-track { flex: 1; height: 3px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
-.recurso-bar-fill  { height: 100%; border-radius: 2px; transition: width 0.4s; }
-.fill-vida   { background: var(--gold); }
-.fill-vex    { background: var(--violet); opacity: 0.8; }
-.fill-guarda { background: var(--gold); opacity: 0.5; }
-
-/* Barras segmentadas del catálogo (seg-cell) */
+/* ── Barras segmentadas (panel pj, hexcast inv) ─────────────── */
 .seg-bar-wrap { display: flex; gap: 2px; width: 100%; height: 5px; border-radius: 2px; overflow: hidden; }
 .seg-bar-wrap.seg-over .seg-cell { border: 1px solid rgba(255,100,100,0.5); }
 .seg-cell { flex: 1; height: 100%; border-radius: 1px; transition: background 0.3s; }
@@ -253,34 +349,25 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .seg-azul.seg-off   { background: rgba(74,179,232,0.1); }
 .seg-guarda.seg-on  { background: var(--gold); opacity: 0.85; }
 .seg-guarda.seg-off { background: rgba(212,175,55,0.1); }
-.recurso-xy {
-    min-width: 56px; text-align: right;
-    font-size: 0.75em; color: var(--text);
-    font-variant-numeric: tabular-nums;
-}
+.recurso-xy { min-width: 50px; text-align: right; font-size: 0.73em; color: var(--text); font-variant-numeric: tabular-nums; }
 .xy-sep { color: var(--dim); margin: 0 1px; }
 
-/* Barras de afinidad */
-.afin-section { margin-bottom: 8px; }
+/* ── Legacy (panel pj stats) ────────────────────────────────── */
 .afin-bar-row { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
 .afin-bar-label { width: 28px; font-size: 0.68em; text-align: right; color: var(--dim); }
 .afin-bar-label.mayor { color: var(--gold-dim); }
 .afin-bar-track { flex: 1; height: 2px; background: var(--bg4); border-radius: 1px; overflow: hidden; }
-.afin-bar-fill  { height: 100%; border-radius: 1px; }
-.fill-gold { background: var(--gold); }
-.fill-dim  { background: var(--violet); opacity: 0.5; }
+.afin-seg { height: 100%; float: left; }
+.afin-seg-base { background: var(--gold); opacity: 0.7; }
+.afin-seg-bf   { background: #3ecf6e; opacity: 0.7; }
+.afin-seg-ef   { background: #60a8e8; opacity: 0.7; }
+.afin-seg-hz   { background: #b080e0; opacity: 0.6; }
 .afin-bar-val { width: 20px; font-size: 0.68em; text-align: right; color: var(--dim); }
 .val-gold { color: var(--gold-dim); }
-
-.pj-hex {
-    font-size: 0.72em;
-    color: var(--dim);
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    margin-top: 6px;
-}
-
-.empty-state { padding: 60px 20px; text-align: center; color: var(--dim); grid-column: 1/-1; }
+.push-mini { display: flex; gap: 5px; margin: 4px 0; }
+.push-mini-item { font-size: 0.63em; padding: 2px 7px; border-radius: 9px; border: 1px solid; }
+.push-mini-vex   { background: rgba(124,77,170,0.1); border-color: rgba(124,77,170,0.35); color: #9060c0; }
+.push-mini-guarda{ background: rgba(212,175,55,0.08); border-color: rgba(212,175,55,0.25); color: var(--gold-dim); }
 
 /* ── PANEL LATERAL ───────────────────────────────────────── */
 .panel-lateral {
