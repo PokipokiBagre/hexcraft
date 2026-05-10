@@ -271,7 +271,6 @@ export function montarOverlay() {
 }
 
 // ── Drag helpers ──────────────────────────────────────────────
-// ── Drag helpers ──────────────────────────────────────────────
 function _elIdFromEvent(e) {
   const el = document.elementFromPoint(e.clientX, e.clientY);
   if (!el) return null;
@@ -391,32 +390,6 @@ export function fxMouseDownItem(e, itemIdx) {
 export function fxClickSlot(grupo, idx) { return false; }
 export function fxClickItem(itemIdx)     { return false; }
 
-// ── Obtener posición central ───────────────────────────────────
-function _posEl(el, lado) {
-  const svg = document.getElementById('hxfx-overlay');
-  if (!el || !svg) return null;
-  const bodyRect = svg.parentElement.getBoundingClientRect();
-  const r = el.getBoundingClientRect();
-  const cx = lado === 'left'  ? r.left  - bodyRect.left
-           : lado === 'right' ? r.right - bodyRect.left
-           : r.left + r.width/2 - bodyRect.left;
-  const cy = r.top + r.height/2 - bodyRect.top;
-  return { x: cx, y: cy, w: r.width, h: r.height, lado };
-}
-
-// ── Encontrar elemento DOM por su id ─────────────────────────
-function _findEl(id) {
-  if (id.startsWith('slot:')) {
-    const [, grupo, idx] = id.split(':');
-    return _slotEl(grupo, parseInt(idx));
-  }
-  if (id.startsWith('item:')) {
-    // Al dibujar, ignoramos el :L o :R para poder encontrar el elemento HTML
-    return _itemEl(id.split(':')[1]);
-  }
-  return null;
-}
-
 // ── Obtener posición central de un elemento relativa al SVG overlay ──
 // ── Posición en el BORDE del elemento (izq o der), no en el centro ──
 function _posEl(el, lado) {
@@ -438,6 +411,7 @@ function _findEl(id) {
     return _slotEl(grupo, parseInt(idx));
   }
   if (id.startsWith('item:')) {
+    // Al dibujar, ignoramos el :L o :R para poder encontrar el elemento HTML
     return _itemEl(id.split(':')[1]);
   }
   return null;
@@ -599,8 +573,6 @@ function _actualizarModoCursor() {
   if (fxState.modo === 'conectar') body.classList.add('modo-conectar-activo');
   if (fxState.modo === 'borrar')   body.classList.add('modo-borrar-activo');
 }
-
-// ── _seleccionar ya no se usa (reemplazado por drag) ──────────
 
 // ── Handlers de toolbar ────────────────────────────────────────
 
