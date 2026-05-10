@@ -164,12 +164,16 @@ function _css() {
 .hxc-btn-nueva-ses { background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.35); color: #d4af37; font-size: 0.7em; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-family: 'Cinzel', serif; transition: background 0.15s; }
 .hxc-btn-nueva-ses:hover { background: rgba(212,175,55,0.2); }
 .hxc-ses-list { flex: 1; overflow-y: auto; padding-bottom: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; align-content: start; }
-.hxc-ses-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; padding: 13px 15px; cursor: pointer; transition: background 0.13s, border-color 0.13s; display: flex; align-items: center; gap: 11px; }
+.hxc-ses-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; padding: 13px 15px; transition: background 0.13s, border-color 0.13s; display: flex; align-items: center; gap: 11px; }
 .hxc-ses-card:hover { background: rgba(212,175,55,0.05); border-color: rgba(212,175,55,0.28); }
 .hxc-ses-card-info { flex: 1; min-width: 0; }
 .hxc-ses-card-nombre { font-size: 0.82em; font-weight: 600; color: #fff; margin-bottom: 3px; }
 .hxc-ses-card-meta { font-size: 0.61em; color: #888; }
 .hxc-ses-card-chevron { color: #888; font-size: 1em; flex-shrink: 0; }
+.hxc-ses-card-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.hxc-ses-action-btn { background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #666; font-size: 0.75em; width: 26px; height: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.12s; padding: 0; }
+.hxc-ses-action-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; border-color: rgba(255,255,255,0.25); }
+.hxc-ses-action-del:hover { background: rgba(220,60,60,0.12); color: #e06060; border-color: rgba(220,60,60,0.3); }
 .hxc-ses-empty { text-align: center; color: #666; font-size: 0.73em; padding: 36px 16px; line-height: 1.9; grid-column: 1/-1; }
 .hxc-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 1300; display: flex; align-items: center; justify-content: center; }
 .hxc-modal { background: #0d0c1a; border: 1px solid rgba(212,175,55,0.25); border-radius: 12px; padding: 22px 26px; width: 370px; box-shadow: 0 8px 40px rgba(0,0,0,0.8); }
@@ -336,13 +340,24 @@ function _renderSesiones(drawer) {
   const cards = hxState.sesiones.length > 0
     ? hxState.sesiones.map(s => {
         const d = new Date(s.actualizada_en || s.creada_en);
+        const dC = new Date(s.creada_en);
         const fecha = d.toLocaleDateString('es', { day:'numeric', month:'short', year:'numeric' });
-        return `<div class="hxc-ses-card" onclick="window._hxcSelSesion(${s.id})">
-          <div class="hxc-ses-card-info">
+        const fechaCreada = dC.toLocaleDateString('es', { day:'numeric', month:'short', year:'numeric' });
+        const sesUrl = (() => { const u = new URL(window.location.href); u.searchParams.set('sesion', s.id); u.searchParams.delete('turno'); return u.toString(); })();
+        return `<div class="hxc-ses-card">
+          <div class="hxc-ses-card-info" onclick="window._hxcSelSesion(${s.id})" style="cursor:pointer;flex:1;min-width:0;">
             <div class="hxc-ses-card-nombre">${s.nombre || 'Sesión ' + s.id}</div>
-            <div class="hxc-ses-card-meta">${fecha}${s.descripcion ? ' · ' + s.descripcion : ''}</div>
+            <div class="hxc-ses-card-meta">
+              Modificada: ${fecha} · Creada: ${fechaCreada}
+              ${s.descripcion ? `<br><span style="color:#aaa;">${s.descripcion}</span>` : ''}
+            </div>
           </div>
-          <span class="hxc-ses-card-chevron">›</span>
+          <div class="hxc-ses-card-actions">
+            <button class="hxc-ses-action-btn" title="Copiar enlace" onclick="event.stopPropagation();navigator.clipboard.writeText('${sesUrl.replace(/'/g,"\\'")}');window._toast&&window._toast('Enlace copiado');window._hxcToastSes('Enlace copiado');">🔗</button>
+            <button class="hxc-ses-action-btn" title="Renombrar" onclick="event.stopPropagation();window._hxcModalEditarSesion(${s.id},'${(s.nombre||'').replace(/'/g,"\\'")}','${(s.descripcion||'').replace(/'/g,"\\'")}')">✎</button>
+            <button class="hxc-ses-action-btn hxc-ses-action-del" title="Eliminar sesión" onclick="event.stopPropagation();window._hxcEliminarSesion(${s.id},'${(s.nombre||'Sesión').replace(/'/g,"\\'")}')">🗑</button>
+            <span class="hxc-ses-card-chevron" onclick="window._hxcSelSesion(${s.id})" style="cursor:pointer;">›</span>
+          </div>
         </div>`;
       }).join('')
     : `<div class="hxc-ses-empty">Sin sesiones aún.<br>Crea una nueva para comenzar.</div>`;
@@ -359,6 +374,7 @@ function _renderSesiones(drawer) {
           <span class="hxc-ses-title">Sesiones</span>
           <button class="hxc-btn-nueva-ses" onclick="window._hxcModalNuevaSesion()">+ Nueva sesión</button>
         </div>
+        <div id="hxc-ses-toast" style="display:none;font-size:0.65em;color:#50c88c;padding:4px 0 8px;text-align:center;"></div>
         <div class="hxc-ses-list">${cards}</div>
       </div>
     </div>`;
@@ -613,6 +629,8 @@ function _renderCenter() {
       ${btnGuardarHistorico}
       ${botonesOp}
       <button class="hxc-btn-nuevo-turno" onclick="window._hxcToggleToolbar()" id="hxc-btn-flechas-toggle" title="Herramientas de flechas">▾ Flechas</button>
+      <button class="hxc-btn-nuevo-turno" title="Copiar enlace a este turno"
+        onclick="(()=>{const u=new URL(window.location.href);u.searchParams.set('sesion',${hxState.sesionActiva?.id||0});u.searchParams.set('turno',${hxState.turnoActivo?.numero||1});navigator.clipboard.writeText(u.toString()).then(()=>window._hxcToastSes&&_toast('🔗 Enlace copiado'))})()">🔗</button>
     </div>
     <div id="hxc-toolbar-wrap" style="display:${hxState._toolbarAbierto?'block':'none'};">${renderToolbarFlechas()}</div>
     <div class="hxc-stack" id="hxc-stack-list">${_renderStack(esHistorico)}</div>
@@ -918,6 +936,31 @@ export async function abrirHexCast() {
   await cargarSesiones();
   document.getElementById('hxc-overlay')?.classList.add('open');
   document.getElementById('hxc-drawer')?.classList.add('open');
+
+  // Deeplink: abrir sesión y turno desde la URL si vienen en los params
+  const params = new URLSearchParams(window.location.search);
+  const sesionIdUrl = params.get('sesion');
+  const turnoNUrl   = parseInt(params.get('turno') || '0');
+  if (sesionIdUrl) {
+    const sesId = parseInt(sesionIdUrl);
+    const ses = hxState.sesiones.find(s => s.id === sesId);
+    if (ses) {
+      try {
+        await seleccionarSesion(sesId);
+        if (hxState.turnoActivo && turnoNUrl > 0) {
+          const tIdx = hxState.turnos.findIndex(t => t.numero === turnoNUrl);
+          if (tIdx >= 0) await window._hxcIrTurno(tIdx);
+        }
+        await cargarHistorialSesion(sesId, hxState.turnoActivo?.numero || 1);
+        hxState.estadosPorPj = {};
+        await _cargarTodosEstadosTurno();
+        resetFlechas();
+        await cargarFlechasTurno(hxState.turnoActivo?.id, sesId);
+        hxState.vistaActiva = 'cast';
+      } catch(e) { console.warn('Deeplink sesion fallida:', e); }
+    }
+  }
+
   _render();
 }
 export function cerrarHexCast() {
@@ -928,10 +971,27 @@ export function cerrarHexCast() {
 // ── Globals ───────────────────────────────────────────────────
 window._hxcCerrar = cerrarHexCast;
 
+// Sincronizar URL con sesión y turno activos
+function _syncUrl() {
+  const url = new URL(window.location.href);
+  if (hxState.sesionActiva) {
+    url.searchParams.set('sesion', hxState.sesionActiva.id);
+    const turnoNum = hxState.turnoActivo?.numero;
+    if (turnoNum) url.searchParams.set('turno', turnoNum);
+    else url.searchParams.delete('turno');
+  } else {
+    url.searchParams.delete('sesion');
+    url.searchParams.delete('turno');
+  }
+  window.history.replaceState({}, '', url.toString());
+}
+
 window._hxcVolverSesiones = () => {
   hxState.vistaActiva = 'sesiones'; hxState.sesionActiva = null; hxState.turnoActivo = null;
   hxState.stack = []; hxState.turnos = []; hxState.grupoA = [null,null,null]; hxState.grupoB = [null,null,null];
-  hxState.pjSeleccionado = null; _render();
+  hxState.pjSeleccionado = null;
+  _syncUrl();
+  _render();
 };
 
 window._hxcSelSesion = async (id) => {
@@ -944,7 +1004,7 @@ window._hxcSelSesion = async (id) => {
     await _cargarTodosEstadosTurno();
     resetFlechas();
     await cargarFlechasTurno(hxState.turnoActivo?.id, id);
-    hxState.vistaActiva = 'cast'; _render();
+    hxState.vistaActiva = 'cast'; _syncUrl(); _render();
   }
   catch(e) { _toast('Error cargando sesión', true); }
 };
@@ -974,13 +1034,57 @@ window._hxcCrearSesion = async () => {
   catch(e) { _toast('Error al crear sesión', true); }
 };
 
+window._hxcToastSes = (msg) => {
+  const t = document.getElementById('hxc-ses-toast');
+  if (!t) return;
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2000);
+};
+
+window._hxcModalEditarSesion = (id, nombre, desc) => {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'hxc-modal-backdrop';
+  backdrop.innerHTML = `<div class="hxc-modal" onclick="event.stopPropagation()">
+    <div class="hxc-modal-title">Editar Sesión</div>
+    <label>Nombre</label><input id="hxc-es-nombre" value="${nombre.replace(/"/g,'&quot;')}">
+    <label>Descripción</label><textarea id="hxc-es-desc" rows="2">${desc}</textarea>
+    <div class="hxc-modal-footer">
+      <button class="hxc-btn-cancel-modal" onclick="this.closest('.hxc-modal-backdrop').remove()">Cancelar</button>
+      <button class="hxc-btn-ok-modal" onclick="window._hxcGuardarSesion(${id})">Guardar</button>
+    </div>
+  </div>`;
+  backdrop.onclick = () => backdrop.remove();
+  document.body.appendChild(backdrop);
+  setTimeout(() => document.getElementById('hxc-es-nombre')?.focus(), 50);
+};
+
+window._hxcGuardarSesion = async (id) => {
+  const nombre = document.getElementById('hxc-es-nombre')?.value.trim();
+  if (!nombre) { _toast('Nombre requerido', true); return; }
+  const desc = document.getElementById('hxc-es-desc')?.value.trim() || '';
+  const { error } = await supabase.from('sesiones_hexcast').update({ nombre, descripcion: desc }).eq('id', id);
+  if (error) { _toast('Error al guardar', true); return; }
+  const s = hxState.sesiones.find(s => s.id === id);
+  if (s) { s.nombre = nombre; s.descripcion = desc; }
+  document.querySelector('.hxc-modal-backdrop')?.remove();
+  _render(); _toast('Sesión actualizada');
+};
+
+window._hxcEliminarSesion = async (id, nombre) => {
+  if (!confirm(`¿Eliminar la sesión "${nombre}"?\nSe borrarán todos sus turnos, lanzamientos y flechas. Esta acción no se puede deshacer.`)) return;
+  const { error } = await supabase.from('sesiones_hexcast').delete().eq('id', id);
+  if (error) { _toast('Error al eliminar', true); return; }
+  hxState.sesiones = hxState.sesiones.filter(s => s.id !== id);
+  _render(); _toast('Sesión eliminada');
+};
+
 // Navegar a turno — reconstruye slots desde DB si es histórico
 window._hxcIrTurno = async (idxRaw) => {
   const idx = parseInt(idxRaw);
   const turno = hxState.turnos[idx];
   if (!turno) return;
   hxState.turnoActivo = turno;
-  const esUltimo = idx === hxState.turnos.length - 1;
+  _syncUrl();
 
   // Siempre recargar historial de sesión para el turno activo
   await cargarHistorialSesion(hxState.sesionActiva?.id, turno.numero);
