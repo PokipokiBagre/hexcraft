@@ -137,6 +137,14 @@ function _css() {
 .hxc-hz-field-label { font-size: 0.56em; letter-spacing: 1.2px; text-transform: uppercase; color: var(--slot-text); opacity: 0.75; margin-bottom: 2px; font-weight: 700; }
 .hxc-hz-field-val { font-size: 0.68em; color: #ddd; line-height: 1.55; }
 .hxc-gasto-row { font-size: 0.67em; color: #888; padding: 5px 9px; background: rgba(0,0,0,0.25); border-radius: 4px; margin-bottom: 7px; border-left: 2px solid rgba(255,255,255,0.08); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hxc-cd-edit-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; padding: 5px 9px; background: rgba(232,160,48,0.06); border-radius: 4px; border-left: 2px solid rgba(232,160,48,0.3); }
+.hxc-cd-edit-label { font-size: 0.6em; color: #e8a030; letter-spacing: 0.8px; text-transform: uppercase; white-space: nowrap; }
+.hxc-cd-edit-input { width: 54px; background: rgba(0,0,0,0.5); border: 1px solid rgba(232,160,48,0.4); border-radius: 4px; color: #e8a030; font-size: 0.75em; text-align: center; padding: 3px 4px; font-family: 'Cinzel', serif; outline: none; -moz-appearance: textfield; }
+.hxc-cd-edit-input::-webkit-inner-spin-button, .hxc-cd-edit-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.hxc-cd-edit-input:focus { border-color: rgba(232,160,48,0.75); background: rgba(0,0,0,0.7); }
+.hxc-cd-edit-btn { background: none; border: 1px solid rgba(232,160,48,0.3); border-radius: 3px; color: #e8a030; font-size: 0.72em; width: 20px; height: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: background 0.12s; line-height: 1; }
+.hxc-cd-edit-btn:hover { background: rgba(232,160,48,0.18); }
+.hxc-cd-edit-hint { font-size: 0.56em; color: #666; margin-left: 2px; }
 .hxc-gasto-row.hxc-gasto-none { color: #333; border-left-color: rgba(255,255,255,0.04); }
 .hxc-gasto-row.hxc-gasto-insuf { color: #e85050; border-left-color: rgba(232,80,80,0.4); background: rgba(232,80,80,0.05); }
 .hxc-gasto-vex { color: #9060c0; font-weight: 600; font-family: 'Cinzel', serif; }
@@ -673,7 +681,7 @@ function _renderStack(esHistorico) {
     const priCls  = item.esPrioridad ? 'prioridad' : '';
     const estadoCls = esEstado ? 'es-estado' : '';
     const resCls  = item.resultado ? `res-${item.resultado}` : '';
-    const multStr = item.mult > 1 ? `×${item.mult.toFixed(1)} CD` : '';
+    const multStr = item.mult > 1 ? `×${item.mult.toFixed(2)} CD` : '';
 
     // Meta badges: estado, prioridad
     const badgeEstado = esEstado
@@ -743,6 +751,21 @@ function _renderStack(esHistorico) {
           <button class="hxc-opt-btn ${item.esPrioridad?'on':''}" onclick="event.stopPropagation();window._hxcSetPrioridad(${i})">↑ Prioridad</button>
         </div>` : '';
 
+      // CD editor (solo OP) — permite ajustar el CD del PJ para esta afinidad en tiempo real
+      const afKeyItem = (item.hechizo?.afinidad || '').toLowerCase();
+      const cdActual = hxState.cdPorPj[item.pjNombre]?.[afKeyItem] ?? 0.5;
+      const cdEditorHtml = (puedeEditar && _esAdmin()) ? `<div class="hxc-cd-edit-row" onclick="event.stopPropagation()">
+        <span class="hxc-cd-edit-label">CD ${item.hechizo?.afinidad || ''}:</span>
+        <button class="hxc-cd-edit-btn" onclick="window._hxcCdStep(${i},-0.05)">▼</button>
+        <input class="hxc-cd-edit-input" type="number" step="0.05" min="0" max="5"
+          value="${cdActual.toFixed(2)}"
+          onchange="window._hxcCdSet(${i},parseFloat(this.value))"
+          oninput="window._hxcCdSet(${i},parseFloat(this.value))"
+          onclick="event.stopPropagation()">
+        <button class="hxc-cd-edit-btn" onclick="window._hxcCdStep(${i},0.05)">▲</button>
+        <span class="hxc-cd-edit-hint">Afecta todos los hechizos de esta afinidad</span>
+      </div>` : '';
+
       const objetivosStr = [
         hz.afecta_hechizos ? 'Hechizos' : '',
         hz.afecta_usuario  ? 'Usuario' : '',
@@ -751,6 +774,7 @@ function _renderStack(esHistorico) {
 
       detail = `<div class="hxc-item-detail">
         ${optBtns}
+        ${cdEditorHtml}
         <div class="hxc-detail-stats">
           <div>Afinidad: <span>${item.afinidadEfectiva}</span></div>
           <div>Costo HEX: <span>${item.costoBase}</span>${hz.valor_vex > 0 ? `<span style="color:#b060e8;margin-left:8px;">+ VEX: ${hz.valor_vex}</span>` : ''}</div>
@@ -1300,6 +1324,48 @@ window._hxcToggleFallo = (idx) => {
   _render();
 };
 window._hxcSetPrioridad = (idx) => { moverAPrioridad(hxState.stack[idx].id); _render(); };
+
+// ── CD editable por OP ────────────────────────────────────────
+// Ajusta el CD del PJ para la afinidad del item y recalcula el stack
+function _aplicarCdCambio(stackIdx, nuevoCd) {
+  const item = hxState.stack[stackIdx]; if (!item) return;
+  const afKey = (item.hechizo?.afinidad || '').toLowerCase();
+  if (!hxState.cdPorPj[item.pjNombre]) hxState.cdPorPj[item.pjNombre] = {};
+  const cdValido = Math.max(0, Math.round(nuevoCd * 1000) / 1000); // evitar float drift
+  hxState.cdPorPj[item.pjNombre][afKey] = cdValido;
+  // _recalcCooldowns está en hexcast-logic pero no es exportada; re-calculamos desde el módulo
+  // Recalculamos manualmente el mismo algoritmo que _recalcCooldowns de hexcast-logic.js
+  const vistoStack = {};
+  hxState.stack.forEach(it => {
+    const af = (it.hechizo?.afinidad || '').toLowerCase();
+    const k  = `${it.pjNombre}:${af}`;
+    const previosStack = vistoStack[k] || 0;
+    const lastMult = hxState.historialSesion[k] || 0;
+    const cd = hxState.cdPorPj[it.pjNombre]?.[af] ?? 0.5;
+    let mult;
+    if (lastMult === 0 && previosStack === 0) { mult = 1.0; }
+    else if (lastMult === 0) { mult = 1.0 + previosStack * cd; }
+    else { mult = lastMult + (1 + previosStack) * cd; }
+    it.mult = mult;
+    // ncNecesario = costoBase * mult redondeado
+    it.ncNecesario = Math.round(it.costoBase * mult);
+    vistoStack[k] = previosStack + 1;
+  });
+  _render();
+}
+
+window._hxcCdSet  = (stackIdx, val) => { if (!isNaN(val) && val >= 0) _aplicarCdCambio(stackIdx, val); };
+window._hxcCdStep = (stackIdx, delta) => {
+  const item = hxState.stack[stackIdx]; if (!item) return;
+  const afKey = (item.hechizo?.afinidad || '').toLowerCase();
+  const actual = hxState.cdPorPj[item.pjNombre]?.[afKey] ?? 0.5;
+  const nuevo  = Math.max(0, Math.round((actual + delta) * 1000) / 1000);
+  _aplicarCdCambio(stackIdx, nuevo);
+  // Actualizar el input visualmente sin esperar re-render completo
+  const el = document.querySelector(`[data-hxc-idx="${stackIdx}"] .hxc-cd-edit-input`);
+  if (el) el.value = nuevo.toFixed(2);
+};
+
 window._hxcRemover = async (idx) => {
   const item = hxState.stack[idx]; if (!item) return;
   // If historico item with real DB id, delete from DB
