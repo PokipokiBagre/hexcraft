@@ -760,16 +760,16 @@ const _CLARO_CSS = `
 .hxc-claro .hxc-turno-label strong { color:#000!important; }
 
 /* Botones barra superior — sólidos y distinguibles */
-.hxc-claro .hxc-btn-confirmar { background:#3a2e00!important; border:2px solid #7a6000!important; color:#f5d060!important; font-weight:700!important; }
-.hxc-claro .hxc-btn-guardar-hist { background:#0a3a20!important; border:2px solid #2a7a40!important; color:#50e880!important; font-weight:700!important; }
-.hxc-claro .hxc-btn-cobrar { background:#3a2e00!important; border:2px solid #7a6000!important; color:#f5d060!important; font-weight:700!important; }
-.hxc-claro .hxc-btn-devolver { background:#0a3030!important; border:2px solid #107070!important; color:#40d0c0!important; font-weight:700!important; }
-.hxc-claro .hxc-btn-turno { background:#3a0a0a!important; border:2px solid #882020!important; color:#f08080!important; font-weight:700!important; }
-.hxc-claro .hxc-btn-nuevo-turno { background:#303030!important; border:2px solid #666!important; color:#ddd!important; font-weight:600!important; }
-.hxc-claro .hxc-badge-hist { background:#7a3000!important; color:#ffa060!important; border:1px solid #a05020!important; font-weight:700!important; }
+.hxc-claro .hxc-btn-confirmar { background:rgba(180,140,0,0.15)!important; border:1.5px solid #a08020!important; color:#6a4800!important; font-weight:700!important; }
+.hxc-claro .hxc-btn-guardar-hist { background:rgba(0,120,60,0.13)!important; border:1.5px solid #287a40!important; color:#0a5020!important; font-weight:700!important; }
+.hxc-claro .hxc-btn-cobrar { background:rgba(180,140,0,0.15)!important; border:1.5px solid #a08020!important; color:#6a4800!important; font-weight:700!important; }
+.hxc-claro .hxc-btn-devolver { background:rgba(0,140,130,0.12)!important; border:1.5px solid #108070!important; color:#0a5048!important; font-weight:700!important; }
+.hxc-claro .hxc-btn-turno { background:rgba(180,40,40,0.1)!important; border:1.5px solid #882020!important; color:#701010!important; font-weight:700!important; }
+.hxc-claro .hxc-btn-nuevo-turno { background:rgba(0,0,0,0.08)!important; border:1.5px solid #888!important; color:#333!important; font-weight:600!important; }
+.hxc-claro .hxc-badge-hist { background:rgba(180,80,0,0.15)!important; color:#7a3000!important; border:1.5px solid #a05020!important; font-weight:700!important; }
 /* Botones turno nav */
-.hxc-claro .hxc-turno-nav-btn { background:#404040!important; border:1px solid #666!important; color:#eee!important; }
-.hxc-claro .hxc-turno-select { background:#404040!important; border:1px solid #666!important; color:#eee!important; }
+.hxc-claro .hxc-turno-nav-btn { background:rgba(0,0,0,0.08)!important; border:1px solid #999!important; color:#222!important; }
+.hxc-claro .hxc-turno-select { background:#fff!important; border:1px solid #999!important; color:#111!important; }
 
 /* Items hechizo — fondo blanco con borde visible */
 .hxc-claro .hxc-item { background:#fff!important; border:1px solid #bbb!important; box-shadow:0 1px 3px rgba(0,0,0,0.12)!important; }
@@ -790,7 +790,7 @@ const _CLARO_CSS = `
 /* Item detail expandido */
 .hxc-claro .hxc-item-detail { background:#f0ece0!important; border-top:2px solid #ccc!important; color:#111!important; }
 .hxc-claro .hxc-hz-field-label { color:#444!important; font-weight:800!important; letter-spacing:1px!important; }
-.hxc-claro .hxc-hz-field-val { color:#111!important; font-size:1em!important; }
+.hxc-claro .hxc-hz-field-val { color:#111!important; }
 .hxc-claro .hxc-gasto-row { background:#e4e0d4!important; color:#222!important; border-left:3px solid #999!important; }
 .hxc-claro .hxc-nc-calc { color:#222!important; font-weight:600!important; }
 /* CD editor dentro del detail */
@@ -803,9 +803,6 @@ const _CLARO_CSS = `
 .hxc-claro .hxc-detail-opts { border-bottom:1px solid #ccc!important; }
 .hxc-claro .hxc-opt-btn { background:#e4e0d4!important; border:1px solid #aaa!important; color:#222!important; font-weight:600!important; }
 .hxc-claro .hxc-opt-btn.on { background:#d4a030!important; border-color:#a07010!important; color:#fff!important; }
-/* Texto descriptivo dentro del detail */
-.hxc-claro .hxc-item-detail div { color:#111!important; }
-.hxc-claro .hxc-item-detail span { color:#333!important; }
 
 /* Items evento */
 .hxc-claro .hxc-item-evento { background:#f0ecf8!important; border:1px solid #9080c0!important; box-shadow:0 1px 3px rgba(0,0,0,0.1)!important; }
