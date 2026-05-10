@@ -428,31 +428,16 @@ function _svgFlecha(f) {
   const elD = _findEl(f.destinoId);
   if (!elO || !elD) return '';
 
-  // Determinar dinámicamente el lado correcto
-  const isColA = (id) => id.startsWith('slot:A');
-  const isColB = (id) => id.startsWith('slot:B');
-  const isCenter = (id) => id.startsWith('item:');
+  // Extraer el lado dinámicamente leyendo si tiene :L o :R
+  const getSide = (id) => {
+    if (id.startsWith('slot:A')) return 'right';
+    if (id.startsWith('slot:B')) return 'left';
+    if (id.startsWith('item:')) return id.endsWith(':L') ? 'left' : 'right';
+    return 'right'; // Predeterminado para flechas antiguas en DB
+  };
 
-  let ladoO = 'right';
-  let ladoD = 'left';
-
-  // Lógica de Origen
-  if (isColA(f.origenId)) ladoO = 'right';
-  else if (isColB(f.origenId)) ladoO = 'left';
-  else if (isCenter(f.origenId)) {
-    if (isColA(f.destinoId)) ladoO = 'left';
-    else if (isColB(f.destinoId)) ladoO = 'right';
-    else ladoO = 'right'; // De item a item por defecto a la derecha
-  }
-
-  // Lógica de Destino
-  if (isColA(f.destinoId)) ladoD = 'right';
-  else if (isColB(f.destinoId)) ladoD = 'left';
-  else if (isCenter(f.destinoId)) {
-    if (isColA(f.origenId)) ladoD = 'left';
-    else if (isColB(f.origenId)) ladoD = 'right';
-    else ladoD = 'right';
-  }
+  const ladoO = getSide(f.origenId);
+  const ladoD = getSide(f.destinoId);
 
   const po = _posEl(elO, ladoO);
   const pd = _posEl(elD, ladoD);
@@ -468,11 +453,11 @@ function _svgFlecha(f) {
 
   let cx, cy;
   if (ladoO === ladoD) {
-    // Arco en "C" para conectar elementos en la misma columna/lado
+    // Arco en "C" si conectan del mismo lado
     cx = ladoO === 'left' ? Math.min(po.x, pd.x) - arcAmt : Math.max(po.x, pd.x) + arcAmt;
     cy = my;
   } else {
-    // Comportamiento de curva en "S" para cruzar de columna
+    // Curva cruzada normal (en S)
     const arcDir = ladoO === 'right' ? 1 : -1;
     const nx = -dy / dist;
     const ny =  dx / dist;
@@ -488,10 +473,7 @@ function _svgFlecha(f) {
       ? `stroke-dasharray="${f.grosor*4} ${f.grosor*2}"`
       : '';
 
-  // Punta de flecha en el destino
   const al  = Math.max(8, f.grosor * 3.5);
-  const aw  = al * 0.45;
-  // Tangente al final del bezier: de cx,cy → pd.x,pd.y
   const tang = Math.atan2(pd.y - cy, pd.x - cx);
   const ax1 = pd.x - al*Math.cos(tang - 0.4);
   const ay1 = pd.y - al*Math.sin(tang - 0.4);
