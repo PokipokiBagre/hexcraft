@@ -40,7 +40,7 @@ function _css() {
 .hxc-header-sub:hover { color: #bbb; }
 .hxc-btn-close { background: none; border: none; color: #444; font-size: 1.4em; cursor: pointer; padding: 2px 6px; line-height: 1; transition: color 0.15s; }
 .hxc-btn-close:hover { color: #ccc; }
-.hxc-body { flex: 1; display: grid; grid-template-columns: 160px 56px 1fr 56px 160px; overflow: hidden; position: relative; }
+.hxc-body { flex: 1; display: grid; grid-template-columns: 160px 120px 1fr 120px 160px; overflow: hidden; position: relative; }
 .hxc-col { display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.05); overflow: hidden; }
 .hxc-col-b { border-right: none; border-left: 1px solid rgba(255,255,255,0.05); }
 .hxc-col-title { font-size: 0.52em; letter-spacing: 2.5px; text-transform: uppercase; color: #888; padding: 6px 10px 4px; flex-shrink: 0; font-weight: 700; }
@@ -537,10 +537,9 @@ function _renderCenter() {
       ${btnGuardarHistorico}
       ${botonesOp}
     </div>
+    ${renderToolbarFlechas()}
     <div class="hxc-stack" id="hxc-stack-list">${_renderStack(esHistorico)}</div>
   </div>`;
-  // Inject toolbar after center-top
-  return html.replace('</div>\n    <div class="hxc-stack"', `</div>\n    ${renderToolbarFlechas()}\n    <div class="hxc-stack"`);
 }
 
 function _calcGastoItem(item) {
