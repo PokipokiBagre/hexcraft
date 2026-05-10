@@ -724,44 +724,78 @@ window._hxfxLimpiar = async () => {
 
 // ── CSS modo claro (inline para no depender de fetch) ──────────
 const _CLARO_CSS = `
-.hxc-claro,.hxc-claro .hxc-col,.hxc-claro .hxc-col-title,.hxc-claro .hxc-center,.hxc-claro .hxc-center-top,.hxc-claro .hxc-slot{background:#ede9de!important;color:#111!important}
-.hxc-claro{background:#f5f2ea!important}
-.hxc-claro .hxc-col{border-right-color:rgba(0,0,0,0.12)!important}
-.hxc-claro .hxc-col-b{border-left-color:rgba(0,0,0,0.12)!important;border-right-color:transparent!important}
-.hxc-claro .hxc-col-title{color:#555!important;background:#dedad0!important;border-bottom:1px solid rgba(0,0,0,0.1)!important}
-.hxc-claro .hxc-slot{border-bottom-color:rgba(0,0,0,0.1)!important}
-.hxc-claro .hxc-slot-nombre{color:#111!important}
-.hxc-claro .hxc-slot-hex{color:#444!important}
-.hxc-claro .hxc-slot-vex{color:#5a2080!important}
-.hxc-claro .hxc-slot-plus,.hxc-claro .hxc-slot-label{color:rgba(0,0,0,0.35)!important}
-.hxc-claro .hxc-slot-avatar{border-color:rgba(0,0,0,0.2)!important;background:#ccc!important}
-.hxc-claro .hxc-slot-action-btn{background:rgba(0,0,0,0.07)!important;border-color:rgba(0,0,0,0.18)!important;color:#333!important}
-.hxc-claro .hxc-estado-block{background:rgba(20,130,70,0.09)!important;border-color:rgba(20,130,70,0.25)!important}
-.hxc-claro .hxc-estado-block-nombre{color:#145a30!important}
-.hxc-claro .hxc-estado-block-afin{color:#2a7a50!important}
-.hxc-claro .hxc-stack{background:#f5f2ea!important}
-.hxc-claro .hxc-item{background:#fff!important;border-color:rgba(0,0,0,0.13)!important;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
-.hxc-claro .hxc-item-pj{color:#666!important}
-.hxc-claro .hxc-item-hz{color:#111!important;font-weight:600}
-.hxc-claro .hxc-item-mult{color:#b86000!important;background:rgba(184,96,0,0.07)!important;border-color:rgba(184,96,0,0.2)!important}
-.hxc-claro .hxc-item.res-exito{background:rgba(20,160,70,0.07)!important;border-color:rgba(20,160,70,0.28)!important}
-.hxc-claro .hxc-item.res-fallo{background:rgba(200,40,40,0.05)!important;border-color:rgba(200,40,40,0.2)!important}
-.hxc-claro .hxc-hz-badge,.hxc-claro [class*="hxc-badge"]{color:#333!important;background:rgba(0,0,0,0.06)!important;border-color:rgba(0,0,0,0.16)!important}
-.hxc-claro .hxc-dado-input{background:rgba(0,0,0,0.05)!important;border-color:rgba(0,0,0,0.16)!important;color:#111!important}
-.hxc-claro .hxc-nc-calc{color:#333!important}
-.hxc-claro .hxc-item-evento{background:rgba(100,60,200,0.05)!important;border-color:rgba(100,60,200,0.18)!important}
-.hxc-claro .hxc-item-evento-tipo{color:#5030a0!important}
-.hxc-claro .hxc-item-evento-nombre{color:#111!important}
-.hxc-claro .hxc-item-evento-pj{color:#555!important}
-.hxc-claro .hxc-item-detail{background:rgba(0,0,0,0.03)!important;color:#333!important}
-.hxc-claro .hxc-hz-field-label{color:#888!important}
-.hxc-claro .hxc-hz-field-val{color:#222!important}
-.hxc-claro .hxc-balance-panel{background:#e8e4d8!important;border-top-color:rgba(0,0,0,0.1)!important}
-.hxc-claro .hxc-balance-title{color:#555!important}
-.hxc-claro .hxc-balance-row-nombre{color:#111!important}
-.hxc-claro .hxc-gasto-hex{color:#a04010!important}
-.hxc-claro .hxc-gasto-vex{color:#5a2080!important}
-.hxc-claro .hxfx-canal{background:#ede9de!important}
+/* Base */
+.hxc-claro { background:#eae6dc!important; color:#111!important; }
+
+/* Columnas A / B — fondo diferenciado del centro */
+.hxc-claro .hxc-col { background:#dedad0!important; border-right:2px solid #b8b4aa!important; }
+.hxc-claro .hxc-col-b { background:#dedad0!important; border-left:2px solid #b8b4aa!important; border-right:none!important; }
+.hxc-claro .hxc-col-title { color:#222!important; background:#ccc8be!important; border-bottom:1px solid #aaa!important; font-weight:800!important; }
+
+/* Slots */
+.hxc-claro .hxc-slot { background:#dedad0!important; border-bottom:1px solid #bbb8b0!important; }
+.hxc-claro .hxc-slot-nombre { color:#111!important; font-weight:700!important; }
+.hxc-claro .hxc-slot-hex { color:#333!important; }
+.hxc-claro .hxc-slot-vex { color:#5a2080!important; font-weight:600!important; }
+.hxc-claro .hxc-slot-plus { color:rgba(0,0,0,0.4)!important; }
+.hxc-claro .hxc-slot-label { color:#555!important; }
+.hxc-claro .hxc-slot-avatar { border:2px solid #888!important; background:#bbb!important; }
+.hxc-claro .hxc-slot.activo { box-shadow:inset 3px 0 0 var(--slot-border); background:#d4d0c6!important; }
+.hxc-claro .hxc-slot-action-btn { background:#c8c4ba!important; border:1px solid #999!important; color:#222!important; font-weight:600!important; }
+.hxc-claro .hxc-slot-action-btn.btn-evento { background:#c0b8d8!important; border-color:#8060b0!important; color:#3a1870!important; }
+
+/* Estados bajo slot */
+.hxc-claro .hxc-estado-block { background:#c8e8d4!important; border:1px solid #6aaa88!important; border-top:none!important; }
+.hxc-claro .hxc-estado-block-nombre { color:#0a4a28!important; font-weight:700!important; }
+.hxc-claro .hxc-estado-block-afin { color:#2a6a48!important; }
+
+/* Canales SVG laterales */
+.hxc-claro .hxfx-canal { background:#dedad0!important; }
+
+/* Centro / stack */
+.hxc-claro .hxc-stack { background:#eae6dc!important; }
+.hxc-claro .hxc-center { background:#eae6dc!important; }
+.hxc-claro .hxc-center-top { background:#d8d4ca!important; border-bottom:2px solid #aaa!important; }
+.hxc-claro .hxc-turno-label { color:#333!important; }
+.hxc-claro .hxc-turno-label strong { color:#000!important; }
+
+/* Items hechizo — fondo blanco con borde visible */
+.hxc-claro .hxc-item { background:#fff!important; border:1px solid #bbb!important; box-shadow:0 1px 3px rgba(0,0,0,0.12)!important; }
+.hxc-claro .hxc-item-pj { color:#555!important; font-weight:600!important; }
+.hxc-claro .hxc-item-hz { color:#111!important; font-weight:700!important; }
+.hxc-claro .hxc-item-mult { color:#a05000!important; background:#ffe8cc!important; border:1px solid #c87020!important; font-weight:700!important; }
+.hxc-claro .hxc-item.res-exito { background:#e8f8ee!important; border-color:#50a070!important; }
+.hxc-claro .hxc-item.res-fallo { background:#fceaea!important; border-color:#c05050!important; }
+.hxc-claro .hxc-item.es-estado { background:#eef8f2!important; border-color:#60a880!important; }
+
+/* Badges meta */
+.hxc-claro .hxc-item-row span[style] { color:#333!important; }
+.hxc-claro [class*="hxc-badge"] { background:#ddd!important; border:1px solid #999!important; color:#222!important; }
+
+/* Input dado */
+.hxc-claro .hxc-dado-input { background:#f0ece4!important; border:1px solid #999!important; color:#111!important; font-weight:700!important; }
+
+/* Item detail expandido */
+.hxc-claro .hxc-item-detail { background:#f8f4ec!important; border-top:1px solid #ccc!important; color:#222!important; }
+.hxc-claro .hxc-hz-field-label { color:#666!important; font-weight:700!important; }
+.hxc-claro .hxc-hz-field-val { color:#111!important; }
+.hxc-claro .hxc-gasto-row { background:#f0ece4!important; color:#444!important; border-left:2px solid #ccc!important; }
+.hxc-claro .hxc-nc-calc { color:#333!important; }
+
+/* Items evento */
+.hxc-claro .hxc-item-evento { background:#f0ecf8!important; border:1px solid #9080c0!important; box-shadow:0 1px 3px rgba(0,0,0,0.1)!important; }
+.hxc-claro .hxc-item-evento-tipo { color:#4020a0!important; font-weight:700!important; }
+.hxc-claro .hxc-item-evento-nombre { color:#111!important; font-weight:700!important; }
+.hxc-claro .hxc-item-evento-pj { color:#444!important; }
+.hxc-claro .hxc-item-evento-desc { color:#222!important; background:#e8e4f4!important; }
+
+/* Balance */
+.hxc-claro .hxc-balance-panel { background:#d8d4c8!important; border-top:2px solid #aaa!important; }
+.hxc-claro .hxc-balance-title { color:#333!important; font-weight:700!important; letter-spacing:2px!important; }
+.hxc-claro .hxc-balance-row { border-left:3px solid var(--slot-border)!important; }
+.hxc-claro .hxc-balance-row-nombre { color:#111!important; font-weight:700!important; }
+.hxc-claro .hxc-gasto-hex { color:#903010!important; font-weight:700!important; }
+.hxc-claro .hxc-gasto-vex { color:#5a2080!important; font-weight:700!important; }
 `;
 
 // ── Exportar imagen ────────────────────────────────────────────
