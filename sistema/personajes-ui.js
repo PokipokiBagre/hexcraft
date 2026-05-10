@@ -97,9 +97,9 @@ export function renderCatalogo() {
                 <span class="pjc-vex-val">${Math.floor(p.vex_actual||0)}<span class="pjc-sep">/</span>${s.vex_max}</span>
             </div>` : '';
 
-        // ── HEX hexagon ───────────────────────────────────────
+        // ── HEX display ───────────────────────────────────────
         const hexK = hex >= 1000 ? (hex/1000).toFixed(hex%1000===0?0:1)+'k' : hex.toString();
-        const hexGlow = hex > 2000 ? 'pjc-hex-glow-hi' : hex > 500 ? 'pjc-hex-glow-mid' : 'pjc-hex-glow-lo';
+        const hexGlow = hex > 2000 ? '#f0cc40' : hex > 500 ? '#d4af37' : '#a8881e';
 
         // ── Collapsed detail section ──────────────────────────
         const maxAfin = Math.max(1, ...AFINIDADES.map(a =>
@@ -121,7 +121,10 @@ export function renderCatalogo() {
             </div>`;
         }).join('');
 
-        const vidaRoja = _barraSegmentada(p.vida_roja_actual||0, s.vida_roja_max, 'vida', 24);
+        const vidaRoja   = _barraSegmentada(p.vida_roja_actual||0, s.vida_roja_max, 'vida', 24);
+        const vidaAzul   = s.vida_azul_total > 0 ? _barraSegmentada(Math.min(s.vida_azul_total, 60), 60, 'azul', 20) : null;
+        const guardaBarra = s.guarda_max > 0 ? _barraSegmentada(p.guarda_actual||0, s.guarda_max, 'guarda', 20) : null;
+
         const detailHtml = `
             <div class="pjc-detail" id="pjc-detail-${safe}">
                 <div class="pjc-vida-row">
@@ -129,14 +132,14 @@ export function renderCatalogo() {
                     ${vidaRoja}
                     <span class="pjc-vida-xy">${p.vida_roja_actual||0}<span class="pjc-sep">/</span>${s.vida_roja_max}</span>
                 </div>
-                ${s.vida_azul_total > 0 ? `<div class="pjc-vida-row">
+                ${vidaAzul ? `<div class="pjc-vida-row">
                     <span class="pjc-vida-lbl" style="color:#4ab3e8;">Azul</span>
-                    <div style="flex:1;"></div>
+                    ${vidaAzul}
                     <span class="pjc-vida-xy" style="color:#4ab3e8;">${s.vida_azul_total}</span>
                 </div>` : ''}
-                ${s.guarda_max > 0 ? `<div class="pjc-vida-row">
+                ${guardaBarra ? `<div class="pjc-vida-row">
                     <span class="pjc-vida-lbl" style="color:var(--gold-dim);">Guarda</span>
-                    ${_barraSegmentada(p.guarda_actual||0, s.guarda_max, 'guarda', 20)}
+                    ${guardaBarra}
                     <span class="pjc-vida-xy">${p.guarda_actual||0}<span class="pjc-sep">/</span>${s.guarda_max}</span>
                 </div>` : ''}
                 <div class="pjc-afin-section">${afinBars}</div>
@@ -166,20 +169,18 @@ export function renderCatalogo() {
                 </div>
             </div>
 
-            <div class="pjc-mid">
-                ${vexHtml}
-                ${pushHtml}
-            </div>
+            ${vexHtml}
+            ${pushHtml}
 
-            <div class="pjc-hex-row">
-                <div class="pjc-hexagon ${hexGlow}" title="HEX disponible">
-                    <svg viewBox="0 0 60 52" class="pjc-hex-svg">
-                        <polygon points="30,1 58,16 58,36 30,51 2,36 2,16" class="pjc-hex-poly"/>
-                        <polygon points="30,6 53,18.5 53,33.5 30,46 7,33.5 7,18.5" class="pjc-hex-inner"/>
-                    </svg>
-                    <div class="pjc-hex-val">${hexK}</div>
-                    <div class="pjc-hex-label">HEX</div>
-                </div>
+            <div class="pjc-hex-bar">
+                <svg class="pjc-hex-mini" viewBox="0 0 20 18" style="color:${hexGlow}">
+                    <polygon points="10,1 18.5,5.5 18.5,12.5 10,17 1.5,12.5 1.5,5.5"
+                        fill="rgba(212,175,55,0.06)" stroke="currentColor" stroke-width="1.2"/>
+                    <polygon points="10,4 15.5,7 15.5,11 10,14 4.5,11 4.5,7"
+                        fill="none" stroke="currentColor" stroke-width="0.6" opacity="0.4"/>
+                </svg>
+                <span class="pjc-hex-num" style="color:${hexGlow};">${hexK}</span>
+                <span class="pjc-hex-lbl">HEX</span>
                 <button class="pjc-expand-btn" onclick="event.stopPropagation();window._pjcToggle('${safe}')" title="Ver stats">
                     <span id="pjc-arrow-${safe}" class="pjc-arrow">▾</span>
                 </button>

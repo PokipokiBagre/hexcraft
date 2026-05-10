@@ -102,7 +102,10 @@ export function calcularStats(p) {
     const guarda_max = guarda_max_formula + guarda_max_override;
 
     // ── VEX ──────────────────────────────────────────────────────
-    const vex_max = esJugador
+    // Si la fórmula aplica a 'todos', evaluarla para cualquier PJ (jugador o NPC)
+    // Si aplica solo a 'jugador', los NPC sistema usan el campo fijo p.vex_max
+    const vexFormAplica = formulas.vex_max?.aplica || 'jugador';
+    const vex_max = (esJugador || vexFormAplica === 'todos')
         ? evalExpr(formulas.vex_max.expr, ctx)
         : (p.vex_max || 0);
 

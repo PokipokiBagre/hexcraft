@@ -742,7 +742,7 @@ function _renderStack(esHistorico) {
         ${optBtns}
         <div class="hxc-detail-stats">
           <div>Afinidad: <span>${item.afinidadEfectiva}</span></div>
-          <div>Costo HEX: <span>${item.costoBase}</span></div>
+          <div>Costo HEX: <span>${item.costoBase}</span>${hz.valor_vex > 0 ? `<span style="color:#b060e8;margin-left:8px;">+ VEX: ${hz.valor_vex}</span>` : ''}</div>
           ${item.mult>1?`<div>Con CD: <span style="color:#e8a030;">NC mín. ${item.ncNecesario}</span></div>`:''}
           <div>Afinidad Hz: <span>${hz.afinidad||'—'}</span></div>
           ${hz.clase?`<div>Clase: <span>${hz.clase}</span></div>`:''}
@@ -750,6 +750,7 @@ function _renderStack(esHistorico) {
           ${hz.backcast > 0 ? `<div>Backcast: <span style="color:#70a8e8;">←${hz.backcast}</span></div>` : ''}
           ${hz.nextcast > 0 ? `<div>Nextcast: <span style="color:#e87840;">${hz.nextcast}→</span></div>` : ''}
           ${hz.es_prioridad ? `<div>Prioridad: <span style="color:#d4af37;">↑ automática</span></div>` : ''}
+          ${hz.nota ? `<div>Nota: <span style="color:#d4a830;">📌 ${hz.nota}</span></div>` : ''}
         </div>
         ${nc!==null?`<div class="hxc-nc-calc">NC: <strong>${nc}</strong> / necesario: ${item.ncNecesario} — ${nc>=item.ncNecesario?'<span style="color:#3ecf6e;">ÉXITO</span>':'<span style="color:#e85050;">FALLO</span>'}</div>`:''}
         ${gastoHtml}
@@ -770,7 +771,6 @@ function _renderStack(esHistorico) {
         ${resHtml}
         ${delBtn}
       </div>
-      ${extraMeta}
       ${detail}
     </div>`;
   }).join('');

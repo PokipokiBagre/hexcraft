@@ -199,85 +199,48 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .pj-card:hover .pjc-actions { opacity: 1; }
 
 /* Mid: VEX + pushes */
-.pjc-mid { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; min-height: 14px; }
+.pjc-mid { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; min-height: 0; }
 
-.pjc-vex-row { display: flex; align-items: center; gap: 6px; }
+.pjc-vex-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
 .pjc-vex-label { font-size: 0.64em; color: var(--violet); letter-spacing: 0.5px; width: 26px; text-align: right; }
 .pjc-vex-track { flex: 1; height: 3px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
 .pjc-vex-fill  { height: 100%; background: var(--violet); border-radius: 2px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
 .pjc-vex-val   { font-size: 0.67em; color: #9060c0; min-width: 60px; text-align: right; font-variant-numeric: tabular-nums; }
 .pjc-sep       { color: var(--dim); margin: 0 1px; }
 
-.pjc-pushes { display: flex; gap: 5px; }
-.pjc-push {
-    font-size: 0.62em; padding: 2px 7px; border-radius: 9px;
-    border: 1px solid; font-weight: 500; letter-spacing: 0.3px;
-}
+.pjc-pushes { display: flex; gap: 5px; margin-bottom: 5px; }
+.pjc-push { font-size: 0.62em; padding: 2px 7px; border-radius: 9px; border: 1px solid; font-weight: 500; }
 .pjc-push-vex   { background: rgba(124,77,170,0.1); border-color: rgba(124,77,170,0.35); color: #9060c0; }
 .pjc-push-gua   { background: rgba(212,175,55,0.08); border-color: rgba(212,175,55,0.25); color: var(--gold-dim); }
 
-/* HEX hexagon row */
-.pjc-hex-row {
+/* HEX bar row */
+.pjc-hex-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 4px 0 2px;
+    gap: 7px;
+    padding: 6px 0 2px;
     border-top: 1px solid rgba(255,255,255,0.05);
+    margin-top: auto;
 }
-
-.pjc-hexagon {
-    position: relative;
-    width: 72px; height: 64px;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    cursor: default;
-    transition: filter 0.3s;
+.pjc-hex-mini {
+    width: 22px; height: 20px;
+    flex-shrink: 0;
+    transition: filter 0.2s;
 }
-.pjc-hexagon:hover { filter: brightness(1.2); }
-
-.pjc-hex-svg {
-    position: absolute;
-    inset: 0;
-    width: 100%; height: 100%;
-}
-.pjc-hex-poly {
-    fill: none;
-    stroke: var(--gold);
-    stroke-width: 1.2;
-    opacity: 0.5;
-    transition: opacity 0.3s, stroke-width 0.3s;
-}
-.pjc-hexagon:hover .pjc-hex-poly { opacity: 0.9; stroke-width: 1.8; }
-.pjc-hex-inner {
-    fill: rgba(212,175,55,0.04);
-    stroke: rgba(212,175,55,0.15);
-    stroke-width: 0.8;
-    transition: fill 0.3s;
-}
-.pjc-hexagon:hover .pjc-hex-inner { fill: rgba(212,175,55,0.1); }
-
-/* Glow variants */
-.pjc-hex-glow-hi  .pjc-hex-poly { stroke: #f0cc40; opacity: 0.8; }
-.pjc-hex-glow-hi  .pjc-hex-inner { fill: rgba(240,204,64,0.1); }
-.pjc-hex-glow-mid .pjc-hex-poly { stroke: var(--gold); opacity: 0.6; }
-.pjc-hex-glow-lo  .pjc-hex-poly { stroke: var(--gold-dim); opacity: 0.35; }
-
-.pjc-hex-val {
-    position: relative;
+.pjc-hex-bar:hover .pjc-hex-mini { filter: brightness(1.4); }
+.pjc-hex-num {
     font-family: var(--font-display);
-    font-size: 0.9em;
-    color: var(--gold);
-    font-weight: 600;
+    font-size: 1em;
+    font-weight: 700;
     letter-spacing: 0.5px;
     line-height: 1;
-    margin-bottom: 1px;
 }
-.pjc-hex-label {
-    position: relative;
-    font-size: 0.5em;
-    color: var(--gold-dim);
+.pjc-hex-lbl {
+    font-size: 0.52em;
+    color: var(--dim);
     letter-spacing: 2px;
     text-transform: uppercase;
+    flex: 1;
 }
 
 /* Expand button */
@@ -285,11 +248,11 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 50%;
-    width: 28px; height: 28px;
+    width: 26px; height: 26px;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     color: var(--dim);
-    font-size: 0.8em;
+    font-size: 0.75em;
     transition: all 0.15s;
     flex-shrink: 0;
 }
