@@ -1,0 +1,52 @@
+// ============================================================
+// mapa-main.js — Punto de entrada del mapa de hechizos
+// /hechizos/mapa-main.js
+// ============================================================
+
+import { supabase } from '../hex-auth.js';
+import { st } from './mapa-state.js';
+import { cargarDatos, cargarInventarioPJ, calcSetsGlobales } from './mapa-data.js';
+import { redimensionar, centrarCamara, iniciarLoop, renderInfoStats } from './mapa-render.js';
+import { iniciarEventos } from './mapa-eventos.js';
+import { renderToolbar } from './mapa-ui.js';
+
+async function init() {
+    // ── Canvas ───────────────────────────────────────────────
+    st.canvas = document.getElementById('hm-canvas');
+    st.ctx    = st.canvas.getContext('2d');
+
+    // ── Detectar rol (admin) ─────────────────────────────────
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: perfil } = await supabase
+                .from('perfiles_usuario')
+                .select('rol')
+                .eq('user_id', user.id)
+                .single();
+            st.esAdmin = perfil?.rol === 'master' || perfil?.rol === 'admin';
+        }
+    } catch(e) {
+        console.warn('[mapa-main] No se pudo detectar rol:', e?.message);
+    }
+
+    // ── Cargar datos desde Supabase ──────────────────────────
+    await cargarDatos();
+    calcSetsGlobales();
+    await cargarInventarioPJ(st.jugadorPanel);
+
+    // ── Montar UI ────────────────────────────────────────────
+    renderToolbar();
+    renderInfoStats();
+
+    // ── Iniciar canvas ───────────────────────────────────────
+    redimensionar();
+    centrarCamara();
+    iniciarEventos();
+    iniciarLoop();
+
+    // ── Resize listener ──────────────────────────────────────
+    window.addEventListener('resize', redimensionar);
+}
+
+init();
