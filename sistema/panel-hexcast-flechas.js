@@ -375,137 +375,138 @@ export function fxClickSlot(grupo, idx) { return false; }
 export function fxClickItem(itemIdx)     { return false; }
 
 // ── Obtener posición central de un elemento relativa al SVG overlay ──
-function _posEl(el) {
+// ── Posición en el BORDE del elemento (izq o der), no en el centro ──
+function _posEl(el, lado) {
   const svg = document.getElementById('hxfx-overlay');
   if (!el || !svg) return null;
   const bodyRect = svg.parentElement.getBoundingClientRect();
-  const elRect = el.getBoundingClientRect();
-  return {
-    x: elRect.left + elRect.width/2 - bodyRect.left,
-    y: elRect.top  + elRect.height/2 - bodyRect.top,
-    w: elRect.width,
-    h: elRect.height,
-  };
+  const r = el.getBoundingClientRect();
+  const cx = lado === 'left'  ? r.left  - bodyRect.left
+           : lado === 'right' ? r.right - bodyRect.left
+           : r.left + r.width/2 - bodyRect.left;
+  const cy = r.top + r.height/2 - bodyRect.top;
+  return { x: cx, y: cy, w: r.width, h: r.height, lado };
 }
 
 // ── Encontrar elemento DOM por su id ─────────────────────────
 function _findEl(id) {
   if (id.startsWith('slot:')) {
     const [, grupo, idx] = id.split(':');
-    return document.querySelector(`.hxc-col:${grupo==='B'?'last-child':'first-child'} .hxc-slot:nth-child(${parseInt(idx)+2})`);
+    return _slotEl(grupo, parseInt(idx));
   }
   if (id.startsWith('item:')) {
-    const idx = id.split(':')[1];
-    return document.querySelector(`[data-hxc-idx="${idx}"]`);
+    return _itemEl(id.split(':')[1]);
   }
   return null;
 }
 
-// Alias más fiable usando grupo/idx
 function _slotEl(grupo, idx) {
   const col = grupo === 'A'
     ? document.querySelector('.hxc-col:not(.hxc-col-b)')
     : document.querySelector('.hxc-col-b');
   if (!col) return null;
-  const slots = col.querySelectorAll('.hxc-slot');
-  return slots[idx] || null;
+  return col.querySelectorAll('.hxc-slot')[idx] || null;
 }
 
 function _itemEl(itemIdx) {
-  return document.querySelector(`[data-hxc-idx="${itemIdx}"] .hxc-item-row`) ||
-         document.querySelector(`[data-hxc-idx="${itemIdx}"]`);
+  return document.querySelector(`[data-hxc-idx="${itemIdx}"]`);
 }
 
-// ── Dibujar una flecha curva entre dos puntos ─────────────────
+// ── Dibujar una flecha entre dos elementos usando sus lados ────
 function _svgFlecha(f) {
-  const elO = f.origenId.startsWith('slot:')
-    ? _slotEl(...f.origenId.split(':').slice(1))
-    : _itemEl(f.origenId.split(':')[1]);
-  const elD = f.destinoId.startsWith('slot:')
-    ? _slotEl(...f.destinoId.split(':').slice(1))
-    : _itemEl(f.destinoId.split(':')[1]);
+  const elO = _findEl(f.origenId);
+  const elD = _findEl(f.destinoId);
+  if (!elO || !elD) return '';
 
-  const po = _posEl(elO);
-  const pd = _posEl(elD);
+  // Usar los lados guardados al crear la flecha
+  const po = _posEl(elO, f.ladoOrigen  || 'right');
+  const pd = _posEl(elD, f.ladoDestino || 'left');
   if (!po || !pd) return '';
 
-  // Punto de salida: borde derecho del origen si el destino está a la derecha, etc.
+  // Si ambos puntos son casi el mismo (item vs item mismo lado), arco lateral
   const dx = pd.x - po.x;
   const dy = pd.y - po.y;
   const dist = Math.sqrt(dx*dx + dy*dy) || 1;
 
-  // Punto de inicio/fin en el borde del elemento
-  const ox = po.x + (dx/dist)*(po.w/2);
-  const oy = po.y + (dy/dist)*(po.h/2);
-  const dx2 = pd.x - po.x; // recompute toward dest center
-  const dy2 = pd.y - po.y;
-  const d2 = Math.sqrt(dx2*dx2+dy2*dy2)||1;
-  const tx = pd.x - (dx2/d2)*(pd.w/2 + 8);
-  const ty = pd.y - (dy2/d2)*(pd.h/2 + 8);
+  // Control point: curva perpendicular al segmento
+  const arcDir = f.ladoOrigen === 'right' ? 1 : -1;
+  const arcAmt = Math.min(80, Math.max(30, dist * 0.35));
+  const mx = (po.x + pd.x) / 2;
+  const my = (po.y + pd.y) / 2;
+  // Perpendicular (rotar 90°)
+  const nx = -dy / dist;
+  const ny =  dx / dist;
+  const cx = mx + nx * arcAmt * arcDir;
+  const cy = my + ny * arcAmt * arcDir;
 
-  // Bezier con curva lateral para evitar solapamientos
-  const mid = { x: (ox+tx)/2, y: (oy+ty)/2 };
-  const perp = { x: -(ty-oy)/dist*60, y: (tx-ox)/dist*60 };
-  const cx = mid.x + perp.x;
-  const cy = mid.y + perp.y;
+  const path = `M ${po.x.toFixed(1)},${po.y.toFixed(1)} Q ${cx.toFixed(1)},${cy.toFixed(1)} ${pd.x.toFixed(1)},${pd.y.toFixed(1)}`;
 
-  const path = `M ${ox.toFixed(1)} ${oy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}`;
-
-  const dashArray = f.estilo === 'punteada'
-    ? `stroke-dasharray="${f.grosor*2} ${f.grosor*2}"`
+  const dash = f.estilo === 'punteada'
+    ? `stroke-dasharray="${f.grosor*1.5} ${f.grosor*2}"`
     : f.estilo === 'rayada'
-      ? `stroke-dasharray="${f.grosor*5} ${f.grosor*2}"`
+      ? `stroke-dasharray="${f.grosor*4} ${f.grosor*2}"`
       : '';
 
-  // Punta de flecha
-  const ang = Math.atan2(ty - cy, tx - cx);
-  const al = f.grosor * 4;
-  const aw = f.grosor * 2;
-  const ax1 = tx - al*Math.cos(ang-0.4);
-  const ay1 = ty - al*Math.sin(ang-0.4);
-  const ax2 = tx - al*Math.cos(ang+0.4);
-  const ay2 = ty - al*Math.sin(ang+0.4);
+  // Punta de flecha en el destino
+  const al  = Math.max(8, f.grosor * 3.5);
+  const aw  = al * 0.45;
+  // Tangente al final del bezier: de cx,cy → pd.x,pd.y
+  const tang = Math.atan2(pd.y - cy, pd.x - cx);
+  const ax1 = pd.x - al*Math.cos(tang - 0.4);
+  const ay1 = pd.y - al*Math.sin(tang - 0.4);
+  const ax2 = pd.x - al*Math.cos(tang + 0.4);
+  const ay2 = pd.y - al*Math.sin(tang + 0.4);
 
   return `<g class="hxfx-flecha-g" data-fx-id="${f.id}"
-      style="cursor:${fxState.modo==='borrar'?'pointer':'default'}"
-      onclick="window._hxfxClickFlecha(${f.id})">
-    <path d="${path}" fill="none" stroke="${f.color}"
-      stroke-width="${f.grosor}" stroke-linecap="round"
-      stroke-linejoin="round" opacity="0.85" ${dashArray}/>
-    <polygon points="${tx.toFixed(1)},${ty.toFixed(1)} ${ax1.toFixed(1)},${ay1.toFixed(1)} ${ax2.toFixed(1)},${ay2.toFixed(1)}"
-      fill="${f.color}" opacity="0.85"/>
-    <path d="${path}" fill="none" stroke="transparent" stroke-width="${Math.max(f.grosor,8)}"/>
+      onclick="window._hxfxClickFlecha(${f.id})" style="cursor:${fxState.modo==='borrar'?'pointer':'default'}">
+    <path d="${path}" fill="none" stroke="${f.color}" stroke-width="${f.grosor}"
+      stroke-linecap="round" stroke-linejoin="round" opacity="0.88" ${dash}/>
+    <polygon points="${pd.x.toFixed(1)},${pd.y.toFixed(1)} ${ax1.toFixed(1)},${ay1.toFixed(1)} ${ax2.toFixed(1)},${ay2.toFixed(1)}"
+      fill="${f.color}" opacity="0.88"/>
+    <path d="${path}" fill="none" stroke="transparent" stroke-width="${Math.max(f.grosor+4,10)}"/>
   </g>`;
 }
 
 function _redibujarTodo() {
   const svg = document.getElementById('hxfx-overlay');
   if (!svg) return;
-  // Preservar defs
+  // Actualizar tamaño del overlay al body
+  const body = svg.parentElement;
+  if (body) {
+    svg.setAttribute('width',  body.offsetWidth);
+    svg.setAttribute('height', body.offsetHeight);
+  }
+  // Limpiar y redibujar
   const defs = svg.querySelector('defs');
   svg.innerHTML = '';
   if (defs) svg.appendChild(defs);
   fxState.flechas.forEach(f => {
-    const tmp = document.createElementNS('http://www.w3.org/2000/svg','g');
-    tmp.innerHTML = _svgFlecha(f);
-    [...tmp.children].forEach(c => svg.appendChild(c));
+    const html = _svgFlecha(f);
+    if (!html) return;
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.innerHTML = html;
+    [...g.children].forEach(c => svg.appendChild(c));
   });
 }
 
-// Redibujar cuando cambia el layout (scroll, rerender)
+// RAF-throttled redraw para scroll — no dispara 60 veces por segundo
+let _rafPending = false;
 function _scheduleRedraw() {
-  clearTimeout(fxState._redrawTimer);
-  fxState._redrawTimer = setTimeout(_redibujarTodo, 50);
+  if (_rafPending) return;
+  _rafPending = true;
+  requestAnimationFrame(() => { _rafPending = false; _redibujarTodo(); });
 }
 
-// Observer para redibujar cuando el stack cambia
+// Observer solo para cambios de estructura del stack (no scroll, no attributes)
 let _observer = null;
 export function observarStack() {
   if (_observer) _observer.disconnect();
   const stack = document.getElementById('hxc-stack-list');
   if (!stack) return;
+  // Solo childList en el stack directo (no subtree) para evitar loops
   _observer = new MutationObserver(_scheduleRedraw);
-  _observer.observe(stack, { childList: true, subtree: true, attributes: true });
+  _observer.observe(stack, { childList: true });
+  // Scroll con RAF throttle
   stack.addEventListener('scroll', _scheduleRedraw, { passive: true });
 }
 
