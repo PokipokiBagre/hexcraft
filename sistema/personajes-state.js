@@ -33,7 +33,9 @@ export const VARS_FORMULA = [
     { key: 'Hz2', label: 'Hechizos Clase 2', fuente: 'hechizos' },
     { key: 'Hz3', label: 'Hechizos Clase 3', fuente: 'hechizos' },
     { key: 'Hz4', label: 'Hechizos Clase 4', fuente: 'hechizos' },
-    { key: 'Hz5', label: 'Hechizos Clase 5', fuente: 'hechizos' }
+    { key: 'Hz5', label: 'Hechizos Clase 5', fuente: 'hechizos' },
+    // Suma de valor_vex del inventario de hechizos
+    { key: 'VexHz', label: 'Vex total de hechizos', fuente: 'hechizos' }
 ];
 
 export const FORMULAS_DEFAULT = {

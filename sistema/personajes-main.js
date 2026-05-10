@@ -535,8 +535,8 @@ window.guardarFormulas = async function() {
         const el = document.getElementById(`finput-${key}`);
         if (el) formulas[key].expr = el.value;
     });
-    const ok = await guardarFormulasBD();
-    mostrarToast(ok ? 'Fórmulas guardadas' : 'Error al guardar', !ok);
+    const err = await guardarFormulasBD();
+    mostrarToast(err ? `Error: ${err}` : 'Fórmulas guardadas', !!err);
     renderCatalogo();
 };
 

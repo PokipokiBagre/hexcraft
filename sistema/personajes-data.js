@@ -138,9 +138,11 @@ export async function guardarFormulasBD() {
         expresion: f.expr,
         aplica_a:  f.aplica
     }));
+    console.log('[guardarFormulasBD] rows:', rows);
     const { error } = await supabase.from('config_formulas')
         .upsert(rows, { onConflict: 'clave' });
-    return !error;
+    if (error) console.error('[guardarFormulasBD] error:', error);
+    return error ? error.message : null;  // null = éxito
 }
 
 // ── Guardar fórmulas de push en DB ───────────────────────────

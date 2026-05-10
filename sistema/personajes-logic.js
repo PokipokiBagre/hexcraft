@@ -37,18 +37,20 @@ export function buildContext(p) {
         Hz2: p.hz_clase2 || 0,
         Hz3: p.hz_clase3 || 0,
         Hz4: p.hz_clase4 || 0,
-        Hz5: p.hz_clase5 || 0
+        Hz5: p.hz_clase5 || 0,
+        // Suma de valor_vex de todos los hechizos del inventario
+        VexHz: p.hz_vex_total || 0
     };
 }
 
 // Evalúa una expresión con el contexto de un personaje
 export function evalExpr(expr, ctx) {
     try {
-        const { Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB,Hz1,Hz2,Hz3,Hz4,Hz5 } = ctx;
+        const { Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB,Hz1,Hz2,Hz3,Hz4,Hz5,VexHz } = ctx;
         // eslint-disable-next-line no-new-func
-        const resultado = new Function('Fis','Ene','Esp','Man','Psi','Osc','FisB','EneB','EspB','ManB','PsiB','OscB','Hz1','Hz2','Hz3','Hz4','Hz5',
+        const resultado = new Function('Fis','Ene','Esp','Man','Psi','Osc','FisB','EneB','EspB','ManB','PsiB','OscB','Hz1','Hz2','Hz3','Hz4','Hz5','VexHz',
             `return Math.max(0, ${expr});`
-        )(Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB,Hz1,Hz2,Hz3,Hz4,Hz5);
+        )(Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB,Hz1,Hz2,Hz3,Hz4,Hz5,VexHz);
         return isFinite(resultado) ? Math.round(resultado) : 0;
     } catch { return 0; }
 }
@@ -268,6 +270,8 @@ export function mapPersonaje(row) {
         hz_clase1: row.hz_clase1 || 0, hz_clase2: row.hz_clase2 || 0,
         hz_clase3: row.hz_clase3 || 0, hz_clase4: row.hz_clase4 || 0,
         hz_clase5: row.hz_clase5 || 0,
+        // Suma de valor_vex de los hechizos del inventario (calculada por trigger)
+        hz_vex_total: row.hz_vex_total || 0,
         estados: row.estados || {}
     };
 }
