@@ -133,29 +133,45 @@ export async function cargarCatalogo() {
 }
 
 /**
- * Carga el historial de lanzamientos de todos los turnos con numero < turnoNumero
- * y construye el mapa { 'PJ:afinidad': count } en hxState.historialSesion.
- * Se llama siempre que cambia el turno activo.
+ * Carga el historial de lanzamientos de todos los turnos con numero < turnoNumero.
+ *
+ * En vez de guardar un conteo (que multiplicado por el CD actual da resultados
+ * incorrectos si el CD cambió entre sesiones), guardamos el ÚLTIMO multiplicador_cd
+ * registrado para cada PJ:afinidad. El próximo lanzamiento parte desde ese mult
+ * histórico y solo suma el CD vigente, respetando cambios de CD retroactivos.
+ *
+ * hxState.historialSesion = { 'PJ:afinidad': lastMult }
  */
 export async function cargarHistorialSesion(sesionId, turnoNumeroActivo) {
   hxState.historialSesion = {};
   if (!sesionId) return;
 
-  // Obtener IDs de turnos anteriores
   const turnosAnteriores = hxState.turnos.filter(t => t.numero < turnoNumeroActivo);
   if (!turnosAnteriores.length) return;
 
   const ids = turnosAnteriores.map(t => t.id);
   const { data } = await supabase
     .from('hexcast_lanzamientos')
-    .select('personaje_nombre, hechizo_afinidad')
+    .select('personaje_nombre, hechizo_afinidad, multiplicador_cd, orden, turno_id')
     .in('turno_id', ids);
 
-  const hist = {};
+  // Para cada PJ:afinidad, obtener el mult del lanzamiento MAS RECIENTE
+  // (turno mas alto; dentro del mismo turno, orden mas alto)
+  const turnoNumMap = {};
+  hxState.turnos.forEach(t => { turnoNumMap[t.id] = t.numero; });
+
+  const best = {};
   for (const row of (data || [])) {
     const k = `${row.personaje_nombre}:${(row.hechizo_afinidad || '').toLowerCase()}`;
-    hist[k] = (hist[k] || 0) + 1;
+    const tn = turnoNumMap[row.turno_id] ?? 0;
+    const prev = best[k];
+    if (!prev || tn > prev.tn || (tn === prev.tn && (row.orden ?? 0) > prev.orden)) {
+      best[k] = { lastMult: row.multiplicador_cd ?? 1, tn, orden: row.orden ?? 0 };
+    }
   }
+
+  const hist = {};
+  for (const [k, v] of Object.entries(best)) hist[k] = v.lastMult;
   hxState.historialSesion = hist;
 }
 
@@ -212,18 +228,26 @@ export function moverAPrioridad(itemId) {
 }
 
 function _recalcCooldowns() {
-  // Count within current stack
+  // Recalcula mult para todos los items del stack usando el nuevo modelo:
+  // parte del lastMult historico y suma cd por cada lanzamiento en el stack actual.
   const vistoStack = {};
   hxState.stack.forEach(item => {
     const afKey = (item.hechizo?.afinidad || '').toLowerCase();
     const k = `${item.pjNombre}:${afKey}`;
     const previosStack = vistoStack[k] || 0;
-    const previosSesion = hxState.historialSesion[k] || 0;
-    const totalPrevios = previosSesion + previosStack;
+    const lastMult = hxState.historialSesion[k] || 0;
     const cd = hxState.cdPorPj[item.pjNombre]?.[afKey] ?? 0.5;
-    item.mult = totalPrevios === 0 ? 1.0 : 1 + totalPrevios * cd;
-    item.ncNecesario = ncNecesario(item.costoBase, item.mult);
-    // costoBase (HEX cobrado) NO cambia con el CD
+
+    let mult;
+    if (lastMult === 0 && previosStack === 0) {
+      mult = 1.0;
+    } else if (lastMult === 0) {
+      mult = 1.0 + previosStack * cd;
+    } else {
+      mult = lastMult + (1 + previosStack) * cd;
+    }
+    item.mult = mult;
+    item.ncNecesario = ncNecesario(item.costoBase, mult);
     vistoStack[k] = previosStack + 1;
   });
 }

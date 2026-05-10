@@ -65,23 +65,30 @@ export const hxState = {
 /**
  * Calcula el multiplicador de cooldown para un PJ+afinidad.
  *
- * El CD es acumulativo a lo largo de TODA la sesión:
- *   previosSesion  = lanzamientos de esa afinidad en turnos anteriores al turno activo
- *   previosStack   = lanzamientos ya en el stack del turno actual (antes de este item)
- *   totalPrevios   = previosSesion + previosStack
+ * NUEVO MODELO (desde refactor anti-drift):
  *
- * mult = 1 + totalPrevios * cd_afinidad
- * Si totalPrevios === 0 → mult = 1.0 (sin CD)
+ * historialSesion guarda el ULTIMO mult registrado en DB para cada PJ:afinidad
+ * en los turnos anteriores al activo (lastMult). Esto evita que cambios de CD
+ * posteriores distorsionen el historial (antes se guardaba un conteo y se
+ * multiplicaba por el CD actual, dando resultados erróneos si el CD cambió).
  *
- * El mult NO modifica el costo HEX. Solo eleva el NC necesario para el éxito:
- *   NC_necesario = costoBase * mult
+ * El mult del siguiente lanzamiento es:
+ *   - Si no hay historial ni stack previo → 1.0 (sin CD)
+ *   - Si hay historial pero nada en el stack → lastMult + cd_actual
+ *     (el próximo lanzamiento cuesta un paso más que el último histórico)
+ *   - Por cada lanzamiento adicional en el stack del turno actual → +cd_actual
+ *
+ * Formula: mult = lastMult + previosStack * cd_actual
+ *   donde lastMult = 0 si no hay historial (primer lanzamiento = 1.0 sin CD)
+ *
+ * El mult NO modifica el costo HEX. Solo eleva el NC necesario para el éxito.
  */
 export function calcularMultCooldown(pjNombre, afinidad, stackPrevio) {
   const afKey = (afinidad || '').toLowerCase();
   const k = `${pjNombre}:${afKey}`;
 
-  // Lanzamientos en turnos anteriores de la sesión
-  const previosSesion = hxState.historialSesion[k] || 0;
+  // lastMult: mult del ultimo lanzamiento en turnos anteriores (0 si nunca lanzó)
+  const lastMult = hxState.historialSesion[k] || 0;
 
   // Lanzamientos ya en el stack del turno actual antes de este item
   const previosStack = stackPrevio.filter(item =>
@@ -89,11 +96,21 @@ export function calcularMultCooldown(pjNombre, afinidad, stackPrevio) {
     (item.hechizo?.afinidad || '').toLowerCase() === afKey
   ).length;
 
-  const totalPrevios = previosSesion + previosStack;
-  if (totalPrevios === 0) return 1.0;
+  // Si no hay historial ni stack → primer lanzamiento, sin CD
+  if (lastMult === 0 && previosStack === 0) return 1.0;
 
   const cd = hxState.cdPorPj[pjNombre]?.[afKey] ?? 0.5;
-  return 1 + totalPrevios * cd;
+
+  // Primer lanzamiento de este turno: el historial ya implica un paso anterior,
+  // así que el siguiente es lastMult + cd.
+  // Si lastMult === 0 pero hay stack (lanzamientos en este turno sin historial):
+  // el primero ya se tomó como 1.0, los siguientes suman cd cada uno.
+  if (lastMult === 0) {
+    // Sin historial: 1er lanzamiento del turno ya fue 1.0, este es el 2do+
+    return 1.0 + previosStack * cd;
+  }
+
+  return lastMult + (1 + previosStack) * cd;
 }
 
 /**
