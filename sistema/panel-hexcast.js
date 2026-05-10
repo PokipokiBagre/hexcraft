@@ -551,8 +551,9 @@ function _renderCenter() {
       ${!esHistorico ? `<button class="hxc-btn-confirmar" onclick="window._hxcConfirmar()">Confirmar ›</button>` : ''}
       ${btnGuardarHistorico}
       ${botonesOp}
+      <button class="hxc-btn-nuevo-turno" onclick="window._hxcToggleToolbar()" id="hxc-btn-flechas-toggle" title="Herramientas de flechas">▾ Flechas</button>
     </div>
-    ${renderToolbarFlechas()}
+    <div id="hxc-toolbar-wrap" style="display:${hxState._toolbarAbierto?'block':'none'};">${renderToolbarFlechas()}</div>
     <div class="hxc-stack" id="hxc-stack-list">${_renderStack(esHistorico)}</div>
   </div>`;
 }
@@ -662,18 +663,12 @@ function _renderStack(esHistorico) {
         : '';
       const tipoLabel = { evento:'Evento', casteo:'Casteo GM', stat:'Stat', hechizo_add:'+ Hechizo', hechizo_rem:'− Hechizo', objeto:'Objeto' }[item.eventoTipo] || 'Evento';
 
-      // Botones aplicar/revertir solo para OP
+      // Botones aplicar/revertir en la fila colapsada, solo para OP
       const aplicarBtns = (esAdmin && puedeEditar && item._payload?.length > 0)
-        ? `<div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;">
-            <button class="hxc-opt-btn ${item._aplicado?'':'on'}" style="font-size:0.6em;padding:3px 9px;${item._aplicado?'':'background:rgba(62,207,110,0.12);border-color:rgba(62,207,110,0.4);color:#3ecf6e;'}"
-              onclick="event.stopPropagation();window._hxcAplicarEvento(${i})">
-              ▶ Aplicar
-            </button>
-            <button class="hxc-opt-btn" style="font-size:0.6em;padding:3px 9px;background:rgba(220,80,80,0.08);border-color:rgba(220,80,80,0.3);color:#e06060;"
-              onclick="event.stopPropagation();window._hxcRevertirEvento(${i})">
-              ↩ Revertir
-            </button>
-          </div>`
+        ? `<button class="hxc-opt-btn" style="font-size:0.58em;padding:2px 8px;background:rgba(62,207,110,0.1);border-color:rgba(62,207,110,0.35);color:#3ecf6e;"
+            onclick="event.stopPropagation();window._hxcAplicarEvento(${i})">▶ Aplicar</button>
+           <button class="hxc-opt-btn" style="font-size:0.58em;padding:2px 8px;background:rgba(220,80,80,0.07);border-color:rgba(220,80,80,0.3);color:#e06060;"
+            onclick="event.stopPropagation();window._hxcRevertirEvento(${i})">↩ Revertir</button>`
         : '';
 
       return `<div class="hxc-item-evento" data-hxc-idx="${i}">
@@ -683,10 +678,11 @@ function _renderStack(esHistorico) {
           <span class="hxc-item-evento-nombre">${item.eventoNombre || '—'}</span>
           <span class="hxc-item-evento-pj">${item.pjNombre}</span>
           ${item._aplicado ? `<span style="font-size:0.52em;color:#3ecf6e;padding:1px 5px;border-radius:3px;background:rgba(62,207,110,0.1);border:1px solid rgba(62,207,110,0.25);">aplicado</span>` : ''}
+          ${aplicarBtns}
           ${editBtn}
           ${delBtn}
         </div>
-        ${item.abierto ? `<div class="hxc-item-evento-desc">${item.eventoDesc || '—'}</div>${aplicarBtns}` : ''}
+        ${item.abierto && item.eventoDesc ? `<div class="hxc-item-evento-desc">${item.eventoDesc}</div>` : ''}
       </div>`;
     }
 
@@ -1472,6 +1468,14 @@ window._hxcRemover = async (idx) => {
   }
   removerHechizo(item.id);
   _render();
+};
+
+window._hxcToggleToolbar = () => {
+  hxState._toolbarAbierto = !hxState._toolbarAbierto;
+  const wrap = document.getElementById('hxc-toolbar-wrap');
+  const btn  = document.getElementById('hxc-btn-flechas-toggle');
+  if (wrap) wrap.style.display = hxState._toolbarAbierto ? 'block' : 'none';
+  if (btn)  btn.textContent = (hxState._toolbarAbierto ? '▴' : '▾') + ' Flechas';
 };
 
 // Save a single historico item back to DB (OP edit)
