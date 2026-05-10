@@ -315,6 +315,7 @@ export async function confirmarTurno() {
       nc:                 item.ncCalc,
       costo_efectivo:     item.ncNecesario,   // guardamos el NC umbral (no el HEX)
       multiplicador_cd:   item.mult,
+      cd_override:        item.cdOverride ?? null,
       resultado:          item.resultado,
       hex_gastado:        hexGastado,
       orden:              hxState.stack.indexOf(item)

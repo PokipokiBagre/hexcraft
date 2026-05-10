@@ -751,12 +751,16 @@ function _renderStack(esHistorico) {
           <button class="hxc-opt-btn ${item.esPrioridad?'on':''}" onclick="event.stopPropagation();window._hxcSetPrioridad(${i})">↑ Prioridad</button>
         </div>` : '';
 
-      // CD editor (solo OP) — permite ajustar el CD del PJ para esta afinidad en tiempo real
+      // CD editor (solo OP) — muestra y edita el cd de ESTE lanzamiento específico
+      // item.cdOverride: si está seteado, sobreescribe el cd del PJ para este item
       const afKeyItem = (item.hechizo?.afinidad || '').toLowerCase();
-      const cdActual = hxState.cdPorPj[item.pjNombre]?.[afKeyItem] ?? (personajes[item.pjNombre]?.['cd_' + afKeyItem] ?? 0.5);
-      const cdPct = Math.round(cdActual * 100);
+      const cdBasePj = hxState.cdPorPj[item.pjNombre]?.[afKeyItem]
+        ?? (personajes[item.pjNombre]?.['cd_' + afKeyItem] ?? 0.5);
+      // El cd efectivo de este item = override si existe, si no el del PJ
+      const cdEfectivo = item.cdOverride !== undefined ? item.cdOverride : cdBasePj;
+      const cdPct = Math.round(cdEfectivo * 100);
       const cdEditorHtml = (puedeEditar && _esAdmin()) ? `<div class="hxc-cd-edit-row" onclick="event.stopPropagation()">
-        <span class="hxc-cd-edit-label">CD ${item.hechizo?.afinidad || ''}:</span>
+        <span class="hxc-cd-edit-label">CD este lanzamiento:</span>
         <button class="hxc-cd-edit-btn" onclick="window._hxcCdStep(${i},-5)">▼</button>
         <input class="hxc-cd-edit-input" type="number" step="5" min="0" max="500"
           value="${cdPct}"
@@ -765,7 +769,7 @@ function _renderStack(esHistorico) {
           onclick="event.stopPropagation()">
         <span style="font-size:0.72em;color:#e8a030;margin-left:-4px;">%</span>
         <button class="hxc-cd-edit-btn" onclick="window._hxcCdStep(${i},5)">▲</button>
-        <span class="hxc-cd-edit-hint">Afecta todos los hechizos de esta afinidad</span>
+        ${item.cdOverride !== undefined ? `<span class="hxc-cd-edit-hint" style="color:#e8a030;">editado</span>` : `<span class="hxc-cd-edit-hint">base del PJ</span>`}
       </div>` : '';
 
       const objetivosStr = [
@@ -906,7 +910,7 @@ window._hxcIrTurno = async (idxRaw) => {
   await cargarHistorialSesion(hxState.sesionActiva?.id, turno.numero);
 
   if (!esUltimo) {
-    const { data } = await supabase.from('hexcast_lanzamientos').select('*').eq('turno_id', turno.id).order('orden');
+    const { data } = await supabase.from('hexcast_lanzamientos').select('*, cd_override').eq('turno_id', turno.id).order('orden');
     const rows = data || [];
 
     // Reconstruir slots desde lanzamientos
@@ -957,6 +961,7 @@ window._hxcIrTurno = async (idxRaw) => {
         forceFallo: false,
         dado: row.dado_d100??'', afinidadEfectiva: row.afinidad_efectiva,
         mult: row.multiplicador_cd,
+        cdOverride: row.cd_override ?? undefined,
         costoBase: row.hechizo_hex_cost,    // HEX real cobrado
         ncNecesario: row.costo_efectivo,    // NC umbral (guardado en costo_efectivo)
         abierto: false, resultado: row.resultado, ncCalc: row.nc, hexGastado: row.hex_gastado
@@ -1340,30 +1345,47 @@ window._hxcToggleFallo = (idx) => {
 window._hxcSetPrioridad = (idx) => { moverAPrioridad(hxState.stack[idx].id); _render(); };
 
 // ── CD editable por OP ────────────────────────────────────────
-// Ajusta el CD del PJ para la afinidad del item y recalcula el stack
-// nuevoCdPct: valor en porcentaje entero (ej. 40 = 0.40)
+// Guarda un cdOverride en el item específico y recalcula hacia adelante.
+// nuevoCdPct: valor en porcentaje entero (ej. 40 = 40%)
 function _aplicarCdCambio(stackIdx, nuevoCdPct) {
   const item = hxState.stack[stackIdx]; if (!item) return;
   const afKey = (item.hechizo?.afinidad || '').toLowerCase();
-  if (!hxState.cdPorPj[item.pjNombre]) hxState.cdPorPj[item.pjNombre] = {};
-  const cdValido = Math.max(0, Math.round(nuevoCdPct)) / 100; // pct → decimal, sin float drift
-  hxState.cdPorPj[item.pjNombre][afKey] = cdValido;
-  // Recalcular todos los mults del stack con el nuevo CD
-  const vistoStack = {};
-  hxState.stack.forEach(it => {
+  const pjNombre = item.pjNombre;
+
+  // Guardar el override en el item (no toca cdPorPj global del PJ)
+  item.cdOverride = Math.max(0, Math.round(nuevoCdPct)) / 100;
+
+  // Recalcular mult de este item y los siguientes de la misma afinidad/PJ
+  // Para cada item del stack, determinamos su mult usando:
+  //   - el cdOverride del item si existe, si no el cd del PJ
+  //   - el mult del item anterior de la misma afinidad/PJ como base
+  const multPrevio = {}; // { 'PJ:afin': lastMult hasta antes de este item }
+
+  hxState.stack.forEach((it, idx) => {
     const af = (it.hechizo?.afinidad || '').toLowerCase();
     const k  = `${it.pjNombre}:${af}`;
-    const previosStack = vistoStack[k] || 0;
-    const lastMult = hxState.historialSesion[k] || 0;
-    const cd = hxState.cdPorPj[it.pjNombre]?.[af] ?? 0.5;
+
+    // cd efectivo para este item
+    const cdItem = it.cdOverride !== undefined
+      ? it.cdOverride
+      : (hxState.cdPorPj[it.pjNombre]?.[af] ?? (personajes[it.pjNombre]?.['cd_' + af] ?? 0.5));
+
+    const lastMult = multPrevio[k] !== undefined ? multPrevio[k] : (hxState.historialSesion[k] || 0);
+
     let mult;
-    if (lastMult === 0 && previosStack === 0) { mult = 1.0; }
-    else if (lastMult === 0) { mult = 1.0 + previosStack * cd; }
-    else { mult = lastMult + (1 + previosStack) * cd; }
+    if (lastMult === 0) {
+      // Sin historial y sin previos en stack → primer lanzamiento sin CD
+      mult = (multPrevio[k] !== undefined) ? lastMult + cdItem : 1.0;
+    } else {
+      mult = lastMult + cdItem;
+    }
+
     it.mult = mult;
     it.ncNecesario = Math.round(it.costoBase * mult);
-    vistoStack[k] = previosStack + 1;
+    // Guardar este mult como base para el siguiente de la misma afinidad/PJ
+    multPrevio[k] = mult;
   });
+
   _render();
 }
 
@@ -1371,9 +1393,10 @@ window._hxcCdSet  = (stackIdx, pct) => { if (!isNaN(pct) && pct >= 0) _aplicarCd
 window._hxcCdStep = (stackIdx, deltaPct) => {
   const item = hxState.stack[stackIdx]; if (!item) return;
   const afKey = (item.hechizo?.afinidad || '').toLowerCase();
-  // Leer CD actual en porcentaje entero
-  const cdDec = hxState.cdPorPj[item.pjNombre]?.[afKey]
-    ?? (personajes[item.pjNombre]?.['cd_' + afKey] ?? 0.5);
+  // Leer cd actual de este item (override si existe, si no el del PJ)
+  const cdDec = item.cdOverride !== undefined
+    ? item.cdOverride
+    : (hxState.cdPorPj[item.pjNombre]?.[afKey] ?? (personajes[item.pjNombre]?.['cd_' + afKey] ?? 0.5));
   const actualPct = Math.round(cdDec * 100);
   const nuevoPct  = Math.max(0, actualPct + deltaPct);
   _aplicarCdCambio(stackIdx, nuevoPct);
@@ -1397,12 +1420,14 @@ window._hxcGuardarItemDB = async (item) => {
   if (!item.id || typeof item.id !== 'number') return;
   const dado = parseInt(item.dado) || null;
   await supabase.from('hexcast_lanzamientos').update({
-    dado_d100: dado,
-    infalible: item.infalible,
-    resultado: item.resultado,
-    nc: item.ncCalc,
-    costo_efectivo: item.ncNecesario,  // NC umbral guardado en costo_efectivo
-    hex_gastado: item.hexGastado || 0,
+    dado_d100:        dado,
+    infalible:        item.infalible,
+    resultado:        item.resultado,
+    nc:               item.ncCalc,
+    costo_efectivo:   item.ncNecesario,
+    multiplicador_cd: item.mult,
+    cd_override:      item.cdOverride ?? null,
+    hex_gastado:      item.hexGastado || 0,
   }).eq('id', item.id);
 };
 
@@ -1434,6 +1459,7 @@ window._hxcGuardarHistorico = async () => {
       nc:               item.ncCalc,
       costo_efectivo:   item.ncNecesario,
       multiplicador_cd: item.mult,
+      cd_override:      item.cdOverride ?? null,
       hex_gastado:      hexGastado,
       orden:            hxState.stack.indexOf(item)
     }).eq('id', item.id);
@@ -1464,6 +1490,7 @@ window._hxcGuardarHistorico = async () => {
         nc:                 item.ncCalc,
         costo_efectivo:     item.ncNecesario,
         multiplicador_cd:   item.mult,
+        cd_override:        item.cdOverride ?? null,
         resultado:          item.resultado,
         hex_gastado:        hexGastado,
         orden:              hxState.stack.indexOf(item)
