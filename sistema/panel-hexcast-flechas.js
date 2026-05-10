@@ -563,12 +563,20 @@ function _actualizarModoCursor() {
 // ── _seleccionar ya no se usa (reemplazado por drag) ──────────
 
 // ── Handlers de toolbar ────────────────────────────────────────
+
+function _refreshToolbar() {
+  const oldTb = document.querySelector('.hxfx-toolbar');
+  if (oldTb) {
+    oldTb.outerHTML = renderToolbarFlechas();
+  }
+}
+
 window._hxfxToggleConectar = () => {
   fxState.modo = fxState.modo === 'conectar' ? null : 'conectar';
   fxState.origen = null;
   document.querySelectorAll('.hxfx-origen').forEach(e => e.classList.remove('hxfx-origen'));
   _actualizarModoCursor();
-  if (typeof window._hxcRender === 'function') window._hxcRender();
+  _refreshToolbar();
 };
 
 window._hxfxToggleBorrar = () => {
@@ -576,18 +584,22 @@ window._hxfxToggleBorrar = () => {
   fxState.origen = null;
   document.querySelectorAll('.hxfx-origen').forEach(e => e.classList.remove('hxfx-origen'));
   _actualizarModoCursor();
-  if (typeof window._hxcRender === 'function') window._hxcRender();
+  _refreshToolbar();
 };
 
 window._hxfxSetColor = (c) => {
   fxState.colorActivo = c;
   if (fxState.modo !== 'conectar') fxState.modo = 'conectar';
   _actualizarModoCursor();
-  if (typeof window._hxcRender === 'function') window._hxcRender();
+  _refreshToolbar();
 };
 
 window._hxfxSetGrosor = (v) => { fxState.grosor = Math.max(1, Math.min(12, parseInt(v)||3)); };
-window._hxfxSetEstilo = (e) => { fxState.estilo = e; if (typeof window._hxcRender === 'function') window._hxcRender(); };
+
+window._hxfxSetEstilo = (e) => { 
+  fxState.estilo = e; 
+  _refreshToolbar(); 
+};
 
 window._hxfxClickFlecha = (id) => {
   if (fxState.modo !== 'borrar') return;
