@@ -364,6 +364,11 @@ function _renderSesiones(drawer) {
 }
 
 function _renderCast(drawer) {
+  // Guardar scroll de columnas y stack antes de destruir el DOM
+  const scrollA    = drawer.querySelector('.hxc-col:not(.hxc-col-b)')?.scrollTop ?? 0;
+  const scrollB    = drawer.querySelector('.hxc-col-b')?.scrollTop ?? 0;
+  const scrollStack = drawer.querySelector('.hxc-stack')?.scrollTop ?? 0;
+
   const sesNombre = hxState.sesionActiva?.nombre || 'Sesión';
   drawer.innerHTML = `
     <div class="hxc-handle"></div>
@@ -381,6 +386,15 @@ function _renderCast(drawer) {
       ${_renderColGrupo('B')}
       ${_renderLateralPanel()}
     </div>`;
+
+  // Restaurar posiciones de scroll
+  const colA  = drawer.querySelector('.hxc-col:not(.hxc-col-b)');
+  const colB  = drawer.querySelector('.hxc-col-b');
+  const stack = drawer.querySelector('.hxc-stack');
+  if (colA)  colA.scrollTop  = scrollA;
+  if (colB)  colB.scrollTop  = scrollB;
+  if (stack) stack.scrollTop = scrollStack;
+
   // Montar overlay SVG y observar cambios del stack
   requestAnimationFrame(() => { montarOverlay(); observarStack(); });
 }
@@ -453,6 +467,9 @@ function _renderSlot(pj, grupo, idx) {
   return slotEl + estadosBlocks;
 }
 
+// Mapa en memoria para datos de tooltip de hechizos (evita escape de JSON en atributos HTML)
+const _hzTooltipMap = {};
+
 function _renderLateralPanel() {
   const p = hxState.panelSlot;
   if (!p) return '';
@@ -478,14 +495,15 @@ function _renderLateralPanel() {
       ? filtrado.map(h => {
           const hzKey = _norm(h.hechizo_id || h.nombre);
           const esEstado = h.es_estado;
-          const hzData = JSON.stringify({
+          // Guardar en mapa para tooltip (evita problemas de escape en atributos HTML)
+          _hzTooltipMap[hzKey] = {
             nombre: h.nombre, afinidad: h.afinidad||'', hex_cost: h.hex_cost||0,
             clase: h.clase||'', efecto: h.efecto||'', overcast: h.overcast||'',
             undercast: h.undercast||'', especial: h.especial||''
-          }).replace(/"/g,'&quot;');
+          };
           return `<div class="hxc-lat-hz ${esEstado?'es-estado':''}"
             onclick="window._hxcAgregarHz('${p.grupo}',${p.idx},'${hzKey}')"
-            onmouseenter="window._hxcShowHzTooltip(event,'${hzData}','${latColor}')"
+            onmouseenter="window._hxcShowHzTooltip(event,'${hzKey}')"
             onmouseleave="window._hxcHideHzTooltip()">
             <div style="flex:1;min-width:0;">
               <div class="hxc-lat-hz-nombre">${h.nombre}${esEstado?`<span class="hxc-lat-hz-badge">estado</span>`:''}</div>
@@ -1254,27 +1272,24 @@ window._hxcCerrarInv = () => { hxState.panelSlot = null; _render(); };
 window._hxcBuscarHz  = (val) => { hxState.busquedaHz = val; _render(); };
 
 // ── Tooltip de hechizo en panel lateral ───────────────────────
-window._hxcShowHzTooltip = (e, hzDataStr, color) => {
+window._hxcShowHzTooltip = (e, key) => {
   window._hxcHideHzTooltip();
-  let hz;
-  try { hz = JSON.parse(hzDataStr.replace(/&quot;/g,'"')); } catch { return; }
+  const hz = _hzTooltipMap[key];
+  if (!hz) return;
   const campos = [
-    { label: 'Efecto',     val: hz.efecto },
-    { label: 'Overcast',   val: hz.overcast },
-    { label: 'Undercast',  val: hz.undercast },
-    { label: 'Especial',   val: hz.especial },
+    { label: 'Efecto',    val: hz.efecto },
+    { label: 'Overcast',  val: hz.overcast },
+    { label: 'Undercast', val: hz.undercast },
+    { label: 'Especial',  val: hz.especial },
   ].filter(c => c.val && c.val.trim() && c.val !== '0');
 
   const tt = document.createElement('div');
   tt.id = 'hxc-hz-tooltip';
   tt.className = 'hxc-hz-tooltip';
-  tt.style.setProperty('--lat-color', color || '#d4af37');
   tt.innerHTML = `
     <div class="hxc-hz-tooltip-nombre">${hz.nombre}</div>
     <div class="hxc-hz-tooltip-meta">
-      <span>${hz.afinidad||'—'}</span>·
-      <span>Cl.${hz.clase||'?'}</span>·
-      <span style="color:#d4af37;">${hz.hex_cost} HEX</span>
+      <span>${hz.afinidad||'—'}</span> · <span>Cl.${hz.clase||'?'}</span> · <span style="color:#d4af37;">${hz.hex_cost} HEX</span>
     </div>
     ${campos.map(c => `<div class="hxc-hz-tooltip-field">
       <div class="hxc-hz-tooltip-label">${c.label}</div>
@@ -1284,20 +1299,18 @@ window._hxcShowHzTooltip = (e, hzDataStr, color) => {
   `;
   document.body.appendChild(tt);
 
-  // Posicionar a la derecha del elemento hover, dentro de pantalla
   const rect = e.currentTarget.getBoundingClientRect();
-  const ttW = 220, ttH = tt.offsetHeight || 200;
+  const ttW = 220;
   let left = rect.right + 8;
   let top  = rect.top;
   if (left + ttW > window.innerWidth - 10) left = rect.left - ttW - 8;
-  if (top + ttH  > window.innerHeight - 10) top = window.innerHeight - ttH - 10;
+  const ttH = tt.getBoundingClientRect().height || 150;
+  if (top + ttH > window.innerHeight - 10) top = window.innerHeight - ttH - 10;
   tt.style.left = left + 'px';
   tt.style.top  = Math.max(8, top) + 'px';
 };
 
-window._hxcHideHzTooltip = () => {
-  document.getElementById('hxc-hz-tooltip')?.remove();
-};
+window._hxcHideHzTooltip = () => { document.getElementById('hxc-hz-tooltip')?.remove(); };
 
 window._hxcQuitarPJ = (grupo, idx) => {
   if (grupo === 'A') hxState.grupoA[idx] = null; else hxState.grupoB[idx] = null;
