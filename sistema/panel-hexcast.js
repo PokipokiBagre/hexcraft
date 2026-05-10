@@ -661,16 +661,32 @@ function _renderStack(esHistorico) {
         ? `<button class="hxc-item-del" onclick="event.stopPropagation();window._hxcEditarEvento(${i})" title="Editar evento" style="color:#9060c0;">✎</button>`
         : '';
       const tipoLabel = { evento:'Evento', casteo:'Casteo GM', stat:'Stat', hechizo_add:'+ Hechizo', hechizo_rem:'− Hechizo', objeto:'Objeto' }[item.eventoTipo] || 'Evento';
+
+      // Botones aplicar/revertir solo para OP
+      const aplicarBtns = (esAdmin && puedeEditar && item._payload?.length > 0)
+        ? `<div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;">
+            <button class="hxc-opt-btn ${item._aplicado?'':'on'}" style="font-size:0.6em;padding:3px 9px;${item._aplicado?'':'background:rgba(62,207,110,0.12);border-color:rgba(62,207,110,0.4);color:#3ecf6e;'}"
+              onclick="event.stopPropagation();window._hxcAplicarEvento(${i})">
+              ▶ Aplicar
+            </button>
+            <button class="hxc-opt-btn" style="font-size:0.6em;padding:3px 9px;background:rgba(220,80,80,0.08);border-color:rgba(220,80,80,0.3);color:#e06060;"
+              onclick="event.stopPropagation();window._hxcRevertirEvento(${i})">
+              ↩ Revertir
+            </button>
+          </div>`
+        : '';
+
       return `<div class="hxc-item-evento" data-hxc-idx="${i}">
         <div class="hxc-item-evento-row" onclick="window._hxcToggleItem(${i})">
           <div class="hxc-item-evento-dot"></div>
           <span class="hxc-item-evento-tipo">${tipoLabel}</span>
           <span class="hxc-item-evento-nombre">${item.eventoNombre || '—'}</span>
           <span class="hxc-item-evento-pj">${item.pjNombre}</span>
+          ${item._aplicado ? `<span style="font-size:0.52em;color:#3ecf6e;padding:1px 5px;border-radius:3px;background:rgba(62,207,110,0.1);border:1px solid rgba(62,207,110,0.25);">aplicado</span>` : ''}
           ${editBtn}
           ${delBtn}
         </div>
-        ${item.abierto && item.eventoDesc ? `<div class="hxc-item-evento-desc">${item.eventoDesc}</div>` : ''}
+        ${item.abierto ? `<div class="hxc-item-evento-desc">${item.eventoDesc || '—'}</div>${aplicarBtns}` : ''}
       </div>`;
     }
 
@@ -1129,6 +1145,36 @@ window._hxcEditarEvento = async (stackIdx) => {
     console.error('panel-hexcast-evento.js no disponible:', e);
     _toast('Módulo de eventos no disponible', true);
   }
+};
+
+// ── Aplicar / Revertir evento (solo OP) ──────────────────────
+window._hxcAplicarEvento = async (stackIdx) => {
+  if (!_esAdmin()) return;
+  const item = hxState.stack[stackIdx];
+  if (!item || item.tipoItem !== 'evento' || !item._payload?.length) return;
+  try {
+    const { aplicarPayload } = await import('./panel-hexcast-evento.js');
+    const errores = await aplicarPayload(item._payload, false);
+    item._aplicado = true;
+    if (errores.length) _toast('Errores: ' + errores.join(', '), true);
+    else _toast('✦ Evento aplicado');
+  } catch(e) { _toast('Error aplicando evento', true); }
+  _render();
+};
+
+window._hxcRevertirEvento = async (stackIdx) => {
+  if (!_esAdmin()) return;
+  const item = hxState.stack[stackIdx];
+  if (!item || item.tipoItem !== 'evento' || !item._payload?.length) return;
+  if (!confirm('¿Revertir los cambios de este evento?')) return;
+  try {
+    const { aplicarPayload } = await import('./panel-hexcast-evento.js');
+    const errores = await aplicarPayload(item._payload, true);
+    item._aplicado = false;
+    if (errores.length) _toast('Errores: ' + errores.join(', '), true);
+    else _toast('↩ Evento revertido');
+  } catch(e) { _toast('Error revirtiendo evento', true); }
+  _render();
 };
 
 window._hxcAbrirPanel = async (grupo, idx, tipo) => {

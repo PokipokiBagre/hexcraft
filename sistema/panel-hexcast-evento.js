@@ -198,9 +198,18 @@ function _previewInvObj() {
 }
 
 // ── Render ────────────────────────────────────────────────────
-function _render() {
+async function _render() {
   const root = document.getElementById('hxev-root');
   if (!root) return;
+
+  // Guardar posiciones de scroll antes de destruir el DOM
+  const scrollStats = root.querySelector('.hxev-stats-body')?.scrollTop ?? 0;
+  const scrollHz    = root.querySelector('.hxev-list-body:nth-of-type(1)')?.scrollTop ?? 0;
+  const scrollObj   = root.querySelector('.hxev-list-body:nth-of-type(2)')?.scrollTop ?? 0;
+  // Guardar el nombre escrito en el input
+  const inputNombreActual = document.getElementById('hxev-nombre-evento')?.value;
+  if (inputNombreActual !== undefined) evState._inputNombre = inputNombreActual;
+
   const pOrig = personajes[evState.pjNombre];
   const p = _previewStats(pOrig);
   const s = p ? calcularStats(p) : null;
@@ -216,7 +225,7 @@ function _render() {
       <button class="hxev-close" onclick="window._hxevCerrar()">×</button>
     </div>
     <div class="hxev-body">
-      ${_renderStats(p, s)}
+      ${await _renderStats(p, s)}
       ${_renderHechizos()}
       ${_renderObjetos()}
     </div>
@@ -236,6 +245,16 @@ function _render() {
         <button class="hxev-btn-guardar" onclick="window._hxevGuardar()">✦ Guardar evento</button>
       </div>
     </div>`;
+
+  // Restaurar posiciones de scroll
+  const panels = root.querySelectorAll('.hxev-stats-body, .hxev-list-body');
+  if (panels[0]) panels[0].scrollTop = scrollStats;
+  if (panels[1]) panels[1].scrollTop = scrollHz;
+  if (panels[2]) panels[2].scrollTop = scrollObj;
+
+  // Restaurar nombre si hay uno guardado en el input
+  const inp = document.getElementById('hxev-nombre-evento');
+  if (inp && evState._inputNombre) inp.value = evState._inputNombre;
 }
 
 function _cambioLabel(c) {
@@ -249,7 +268,7 @@ function _cambioLabel(c) {
 }
 
 // ── Panel Stats ───────────────────────────────────────────────
-function _renderStats(p, s) {
+async function _renderStats(p, s) {
   if (!p || !s) return `<div class="hxev-panel"><div class="hxev-panel-title">Stats</div>
     <div class="hxev-stats-body"><div class="hxev-list-empty">Sin personaje</div></div></div>`;
 
@@ -342,9 +361,32 @@ function _renderStats(p, s) {
     </div>`
   ).join('');
 
+  // ── Sección CD por afinidad ──────────────────────────────────
+  const { hxState: hxS } = await import('./hexcast-state.js').catch(() => ({ hxState: null }));
+  const cdPj = hxS?.cdPorPj?.[evState.pjNombre] || {};
+  const cdHtml = `<div style="margin-top:8px;">
+    <div class="hxev-stat-label" style="color:#e8a030;">Cooldown por afinidad</div>
+    ${AFINS.map(k => {
+      const cdDec = cdPj[k] ?? (pOrig?.['cd_' + k] ?? 0.5);
+      const cdPct = Math.round(cdDec * 100);
+      return `<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">
+        <span style="font-size:0.62em;color:#aaa;width:26px;">${AFIN_LABELS[k]}</span>
+        <span style="font-size:0.68em;color:#e8a030;min-width:32px;text-align:right;">${cdPct}%</span>
+        <button class="hxev-stat-btn neg" style="padding:1px 4px;border-color:rgba(232,160,48,0.3);color:#e8a030;background:rgba(232,160,48,0.06);"
+          onclick="window._hxevCdStep('${safe}','${k}',-5)">-5%</button>
+        <button class="hxev-stat-btn neg" style="padding:1px 4px;border-color:rgba(232,160,48,0.3);color:#e8a030;background:rgba(232,160,48,0.06);"
+          onclick="window._hxevCdStep('${safe}','${k}',-10)">-10%</button>
+        <button class="hxev-stat-btn pos" style="padding:1px 4px;border-color:rgba(232,160,48,0.3);color:#e8a030;background:rgba(232,160,48,0.06);"
+          onclick="window._hxevCdStep('${safe}','${k}',+5)">+5%</button>
+        <button class="hxev-stat-btn pos" style="padding:1px 4px;border-color:rgba(232,160,48,0.3);color:#e8a030;background:rgba(232,160,48,0.06);"
+          onclick="window._hxevCdStep('${safe}','${k}',+10)">+10%</button>
+      </div>`;
+    }).join('')}
+  </div>`;
+
   return `<div class="hxev-panel">
     <div class="hxev-panel-title">Stats</div>
-    <div class="hxev-stats-body">${statsHtml}<hr class="hxev-stat-divider">${afinsHtml}</div>
+    <div class="hxev-stats-body">${statsHtml}<hr class="hxev-stat-divider">${afinsHtml}<hr class="hxev-stat-divider">${cdHtml}</div>
   </div>`;
 }
 
@@ -524,6 +566,22 @@ window._hxevAddObjRem = (nombre, objNombre, slotId, cantidad) => {
   _render();
 };
 
+// ── CD por afinidad (solo OP) ─────────────────────────────────
+window._hxevCdStep = async (nombre, afKey, deltaPct) => {
+  const { hxState: hxS } = await import('./hexcast-state.js');
+  if (!hxS.cdPorPj[nombre]) {
+    const p = personajes[nombre];
+    hxS.cdPorPj[nombre] = {
+      fisica: p?.cd_fisica??0.5, energetica: p?.cd_energetica??0.5,
+      espiritual: p?.cd_espiritual??0.5, mando: p?.cd_mando??0.5,
+      psiquica: p?.cd_psiquica??0.5, oscura: p?.cd_oscura??0.5
+    };
+  }
+  const actual = Math.round((hxS.cdPorPj[nombre][afKey] ?? 0.5) * 100);
+  hxS.cdPorPj[nombre][afKey] = Math.max(0, actual + deltaPct) / 100;
+  _render();
+};
+
 // ── Guardar → bloque en el stack ─────────────────────────────
 window._hxevGuardar = () => {
   if (!evState.cambios.length) { _toast('No hay cambios seleccionados', true); return; }
@@ -624,10 +682,12 @@ export async function abrirEventoPanel(pjNombre, grupo, idx, editContext = null)
     evState.cambios   = editContext.cambios || [];
     evState._stackIdx = editContext.stackIdx ?? null;
     evState._editNombre = editContext.nombre || '';
+    evState._inputNombre = editContext.nombre || '';
   } else {
     evState.cambios   = [];
     evState._stackIdx = null;
     evState._editNombre = '';
+    evState._inputNombre = '';
   }
   await _cargarDatos(pjNombre);
   document.getElementById('hxev-overlay')?.classList.add('open');
@@ -644,6 +704,8 @@ export async function abrirEventoPanel(pjNombre, grupo, idx, editContext = null)
 export function cerrarEventoPanel() {
   document.getElementById('hxev-overlay')?.classList.remove('open');
   document.getElementById('hxev-root')?.classList.remove('open');
+  // Limpiar panelSlot para que no quede abierto un panel vacío
+  if (typeof window._hxcCerrarPanel === 'function') window._hxcCerrarPanel();
 }
 window._hxevCerrar = cerrarEventoPanel;
 
