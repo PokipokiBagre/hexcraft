@@ -2470,8 +2470,31 @@ window._ppjSetCd = async (nombre, afinKey, deltaP) => {
     // deltaP es ±5 (puntos porcentuales). Convertir a decimal y clampear 10%–200%
     const v = Math.round(Math.max(0.1, Math.min(2.0, actual + deltaP / 100)) * 100) / 100;
     p[`cd_${afinKey}`] = v;
-    // Persistir inmediatamente en DB (igual que modStat/modAfin)
-    await supabase.from('personajes').update({ [`cd_${afinKey}`]: v }).eq('nombre', nombre);
+
+    // Construir el objeto cd_afin completo con todos los valores actuales del PJ
+    const cdAfin = {
+        fisica:     p.cd_fisica     ?? 0.5,
+        energetica: p.cd_energetica ?? 0.5,
+        espiritual: p.cd_espiritual ?? 0.5,
+        mando:      p.cd_mando      ?? 0.5,
+        psiquica:   p.cd_psiquica   ?? 0.5,
+        oscura:     p.cd_oscura     ?? 0.5,
+        [afinKey]:  v,   // sobreescribir el que acaba de cambiar
+    };
+
+    // Intentar guardar como JSONB (cd_afin) — si la columna no existe, caerá
+    // silenciosamente. Intentar también columna individual como fallback.
+    const { error: e1 } = await supabase.from('personajes')
+        .update({ cd_afin: cdAfin, [`cd_${afinKey}`]: v })
+        .eq('nombre', nombre);
+    if (e1) {
+        // Si cd_afin no existe en el schema, intentar solo la columna individual
+        const { error: e2 } = await supabase.from('personajes')
+            .update({ [`cd_${afinKey}`]: v })
+            .eq('nombre', nombre);
+        if (e2) console.error('[_ppjSetCd] Error guardando CD:', e2.message);
+    }
+
     // Actualizar solo el span sin re-renderizar todo el panel
     const span = document.getElementById(`ppj-cd-${nombre}-${afinKey}`);
     if (span) span.textContent = `${(v * 100).toFixed(0)}%`;

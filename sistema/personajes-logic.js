@@ -263,13 +263,13 @@ export function mapPersonaje(row) {
         vida_roja_max_override: row.vida_roja_max_op || 0,
         vida_azul_max_override: row.vida_azul_max_op || 0,
         guarda_max_override:    row.guarda_max_op    || 0,
-        // Cooldowns por afinidad (schema nuevo)
-        cd_fisica:     row.cd_fisica     ?? 0.5,
-        cd_energetica: row.cd_energetica ?? 0.5,
-        cd_espiritual: row.cd_espiritual ?? 0.5,
-        cd_mando:      row.cd_mando      ?? 0.5,
-        cd_psiquica:   row.cd_psiquica   ?? 0.5,
-        cd_oscura:     row.cd_oscura     ?? 0.5,
+        // Cooldowns por afinidad — lee cd_afin (JSONB) con fallback a columnas individuales
+        cd_fisica:     (row.cd_afin?.fisica     ?? row.cd_fisica)     ?? 0.5,
+        cd_energetica: (row.cd_afin?.energetica ?? row.cd_energetica) ?? 0.5,
+        cd_espiritual: (row.cd_afin?.espiritual ?? row.cd_espiritual) ?? 0.5,
+        cd_mando:      (row.cd_afin?.mando      ?? row.cd_mando)      ?? 0.5,
+        cd_psiquica:   (row.cd_afin?.psiquica   ?? row.cd_psiquica)   ?? 0.5,
+        cd_oscura:     (row.cd_afin?.oscura     ?? row.cd_oscura)     ?? 0.5,
         // Hechizos por clase
         hz_clase1: row.hz_clase1 || 0, hz_clase2: row.hz_clase2 || 0,
         hz_clase3: row.hz_clase3 || 0, hz_clase4: row.hz_clase4 || 0,
@@ -319,7 +319,15 @@ export function serializarPersonaje(nombre, p) {
         vida_roja_max_op: p.vida_roja_max_override || 0,
         vida_azul_max_op: p.vida_azul_max_override || 0,
         guarda_max_op:    p.guarda_max_override    || 0,
-        // Cooldowns
+        // Cooldowns — escribe cd_afin (JSONB) y también columnas individuales por retrocompat
+        cd_afin: {
+            fisica:     p.cd_fisica     ?? 0.5,
+            energetica: p.cd_energetica ?? 0.5,
+            espiritual: p.cd_espiritual ?? 0.5,
+            mando:      p.cd_mando      ?? 0.5,
+            psiquica:   p.cd_psiquica   ?? 0.5,
+            oscura:     p.cd_oscura     ?? 0.5,
+        },
         cd_fisica:     p.cd_fisica     ?? 0.5,
         cd_energetica: p.cd_energetica ?? 0.5,
         cd_espiritual: p.cd_espiritual ?? 0.5,

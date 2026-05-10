@@ -27,6 +27,13 @@ export async function cargarDatos(barra) {
         (pjRes.data || []).forEach(row => {
             personajes[row.nombre] = mapPersonaje(row);
         });
+        // Debug: verificar qué columnas CD llegaron de DB
+        if (pjRes.data?.length > 0) {
+            const sample = pjRes.data[0];
+            const cdCols = Object.keys(sample).filter(k => k.startsWith('cd_'));
+            console.log('[cargarDatos] Columnas CD en DB:', cdCols.length ? cdCols : 'NINGUNA — columnas cd_* no existen en el schema');
+            if (sample.cd_afin !== undefined) console.log('[cargarDatos] cd_afin JSONB:', sample.cd_afin);
+        }
 
         // Poblar fórmulas de stats
         (fRes.data || []).forEach(row => {
