@@ -688,6 +688,13 @@ function _renderStack(esHistorico) {
     const metaHtml = (badgeEstado || badgePri || objHtml || castHtml)
       ? `<div class="hxc-hz-meta">${badgeEstado}${badgePri}${objHtml}${castHtml}</div>` : '';
 
+    const vexBadge = hz.valor_vex > 0
+      ? `<span class="hxc-hz-badge" style="background:rgba(150,80,220,0.12);color:#b060e8;border-color:rgba(150,80,220,0.35);">⬡ VEX ${hz.valor_vex}</span>` : '';
+    const notaBadge = hz.nota
+      ? `<span class="hxc-hz-badge" style="background:rgba(212,160,30,0.08);color:#d4a830;border-color:rgba(212,160,30,0.25);" title="${hz.nota}">📌 ${hz.nota}</span>` : '';
+    const extraMeta = (vexBadge || notaBadge)
+      ? `<div class="hxc-hz-meta" style="margin-top:2px;">${vexBadge}${notaBadge}</div>` : '';
+
     let resHtml;
     if      (item.resultado === 'exito')     resHtml = `<span class="hxc-item-resultado hxc-res-exito">¡Éxito!</span>`;
     else if (item.resultado === 'fallo')     resHtml = `<span class="hxc-item-resultado hxc-res-fallo">¡Fallo!</span>`;
@@ -763,6 +770,7 @@ function _renderStack(esHistorico) {
         ${resHtml}
         ${delBtn}
       </div>
+      ${extraMeta}
       ${detail}
     </div>`;
   }).join('');

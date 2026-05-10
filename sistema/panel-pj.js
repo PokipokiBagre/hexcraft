@@ -235,6 +235,8 @@ function _inyectarEstilos() {
 .ppj-hz-badge-prioridad{background:rgba(100,180,255,0.08);color:#6eb4ff;border-color:rgba(100,180,255,0.25);}
 .ppj-hz-badge-cast{background:rgba(100,180,255,0.07);color:#7ab8e8;border-color:rgba(100,180,255,0.2);}
 .ppj-hz-badge-afecta{background:rgba(140,100,220,0.07);color:#a07ad0;border-color:rgba(140,100,220,0.2);}
+.ppj-hz-badge-vex{background:rgba(150,80,220,0.1);color:#b060e8;border-color:rgba(150,80,220,0.3);}
+.ppj-hz-badge-nota{background:rgba(255,200,50,0.07);color:#d4a830;border-color:rgba(255,200,50,0.2);max-width:160px;overflow:hidden;text-overflow:ellipsis;}
 .ppj-hz-btn-danger{background:rgba(200,50,50,0.12);color:#ff5555;border:1px solid rgba(200,50,50,0.35);border-radius:6px;padding:10px 18px;font-size:0.8em;font-family:'Cinzel',serif;cursor:pointer;transition:background 0.15s;}
 .ppj-hz-btn-danger:hover{background:rgba(200,50,50,0.28);}
 `;
@@ -695,14 +697,14 @@ async function _tabHechizos(nombre, body) {
     let nodosMapInv = {};
     if (hNombres.length > 0) {
         const { data: nd } = await supabase.from('hechizos_nodos')
-            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id, backcast, nextcast, es_estado, es_prioridad, afecta_hechizos, afecta_usuario, afecta_objetivo')
+            .select('nombre, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, hechizo_id, backcast, nextcast, es_estado, es_prioridad, afecta_hechizos, afecta_usuario, afecta_objetivo, valor_vex, nota')
             .in('nombre', hNombres);
         (nd||[]).forEach(n => { nodosMapInv[n.nombre] = n; });
     }
 
     // ── Catálogo completo ────────────────────────────────────────
     const { data: catalogo } = await supabase.from('hechizos_nodos')
-        .select('id, nombre, hechizo_id, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, backcast, nextcast, es_estado, es_prioridad, afecta_hechizos, afecta_usuario, afecta_objetivo')
+        .select('id, nombre, hechizo_id, afinidad, clase, resumen, efecto, overcast, undercast, especial, hex_cost, es_conocido, backcast, nextcast, es_estado, es_prioridad, afecta_hechizos, afecta_usuario, afecta_objetivo, valor_vex, nota')
         .order('clase').order('nombre');
 
     // ── Strings (dependencias) ───────────────────────────────────
@@ -795,6 +797,8 @@ async function _tabHechizos(nombre, body) {
         const castBadge = castParts.length ? `<span class="ppj-hz-badge ppj-hz-badge-cast">⟳ ${castParts.join(' ')}</span>` : '';
         const afTargets = [nd.afecta_hechizos?'🌀':'', nd.afecta_usuario?'🧙':'', nd.afecta_objetivo?'🎯':''].filter(Boolean).join('');
         const afBadge  = afTargets ? `<span class="ppj-hz-badge ppj-hz-badge-afecta">${afTargets}</span>` : '';
+        const vexBadge = nd.valor_vex > 0 ? `<span class="ppj-hz-badge ppj-hz-badge-vex">⬡ VEX ${nd.valor_vex}</span>` : '';
+        const notaBadge = nd.nota ? `<span class="ppj-hz-badge ppj-hz-badge-nota" title="${nd.nota}">📌 ${nd.nota}</span>` : '';
         return `<div class="ppj-hz-card" data-hz-nombre="${(h.hechizo_nombre||'').toLowerCase()}"
             style="cursor:pointer;"
             onclick="if(window.centrarEnHechizo && '${safeHzId}') window.centrarEnHechizo('${safeHzId}')">
@@ -803,7 +807,7 @@ async function _tabHechizos(nombre, body) {
                 ${hexInv}${clsBadge}
                 ${editBtn}
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">${estadoBadge}${prioridadBadge}${castBadge}${afBadge}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">${estadoBadge}${prioridadBadge}${castBadge}${afBadge}${vexBadge}${notaBadge}</div>
             <div class="ppj-hz-fields">
                 ${_campo('Efecto',nd.efecto)}${_campo('Resumen',nd.resumen)}
                 ${_campo('Overcast',nd.overcast)}${_campo('Undercast',nd.undercast)}${_campo('Especial',nd.especial)}
@@ -931,6 +935,8 @@ async function _tabHechizos(nombre, body) {
             const castBadgeCat = castPartsCat.length ? `<span class="ppj-hz-badge ppj-hz-badge-cast">⟳ ${castPartsCat.join(' ')}</span>` : '';
             const afTargetsCat = showFull ? [n.afecta_hechizos?'🌀':'', n.afecta_usuario?'🧙':'', n.afecta_objetivo?'🎯':''].filter(Boolean).join('') : '';
             const afBadgeCat   = afTargetsCat ? `<span class="ppj-hz-badge ppj-hz-badge-afecta">${afTargetsCat}</span>` : '';
+            const vexBadgeCat  = n.valor_vex > 0 ? `<span class="ppj-hz-badge ppj-hz-badge-vex">⬡ VEX ${n.valor_vex}</span>` : '';
+            const notaBadgeCat = n.nota ? `<span class="ppj-hz-badge ppj-hz-badge-nota" title="${n.nota}">📌 ${n.nota}</span>` : '';
             html += `<div class="ppj-hz-card ppj-cat-card ${isAssigned?'ppj-cat-assigned':''}"
                          data-cat-nombre="${(n.nombre||'').toLowerCase()}"
                          data-cat-id="${n.hechizo_id||''}"
@@ -943,7 +949,7 @@ async function _tabHechizos(nombre, body) {
                     ${isAssigned?`<span class="ppj-cat-assigned-tag">✓ Aprendido</span>`:''}
                     <span style="margin-left:auto;display:flex;gap:4px;">${editBtn}${toggleKnown}</span>
                 </div>
-                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${estadoBadgeCat}${prioridadBadgeCat}${castBadgeCat}${afBadgeCat}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">${estadoBadgeCat}${prioridadBadgeCat}${castBadgeCat}${afBadgeCat}${vexBadgeCat}${notaBadgeCat}</div>
                 ${showFull ? ('<div class="ppj-hz-fields">' +
                     (n.efecto    ? '<div class="ppj-hz-field"><strong>Efecto:</strong> '    + n.efecto    + '</div>' : '') +
                     (n.resumen   ? '<div class="ppj-hz-field"><strong>Resumen:</strong> '   + n.resumen   + '</div>' : '') +
@@ -2825,6 +2831,32 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
             </div>
         </div>
 
+        <!-- ── VALOR VEX / NOTA ── -->
+        <div class="ppj-hz-modal-row" style="margin-top:14px;gap:12px;">
+            <div style="flex:0 0 160px;">
+                <label class="ppj-hz-inline-label">⬡ Valor VEX</label>
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <button class="ppj-ctrl-btn" style="padding:4px 8px;font-size:1em;" onclick="
+                        const i=document.getElementById('hze-valor-vex');
+                        i.value=Math.max(0,(parseInt(i.value)||0)-50);">−</button>
+                    <input class="ppj-hz-inline-input" id="hze-valor-vex" type="number" min="0" step="50"
+                        value="${nodo?.valor_vex??0}" style="text-align:center;flex:1;">
+                    <button class="ppj-ctrl-btn" style="padding:4px 8px;font-size:1em;" onclick="
+                        const i=document.getElementById('hze-valor-vex');
+                        i.value=(parseInt(i.value)||0)+50;">+</button>
+                </div>
+                <div style="font-size:0.62em;color:#3a3a5a;margin-top:3px;">Múltiplos de 50</div>
+            </div>
+            <div style="flex:1;">
+                <label class="ppj-hz-inline-label">📌 Nota pública</label>
+                <input class="ppj-hz-inline-input" id="hze-nota"
+                    value="${(nodo?.nota||'').replace(/"/g,'&quot;')}"
+                    placeholder="Ej: Ilegal · Solo Linda · Descontinuado…"
+                    maxlength="60">
+                <div style="font-size:0.62em;color:#3a3a5a;margin-top:3px;">Visible para todos · máx. 60 chars</div>
+            </div>
+        </div>
+
         <label class="ppj-hz-inline-label" style="margin-top:10px;">Precedentes — strings de entrada</label>
         <div class="ppj-hz-strings-wrap" id="ppj-hz-str-wrap-in"></div>
 
@@ -2934,6 +2966,8 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
     const afHechizos= document.getElementById('hze-afecta-hechizos')?.checked || false;
     const afUsuario = document.getElementById('hze-afecta-usuario')?.checked || false;
     const afObjetivo= document.getElementById('hze-afecta-objetivo')?.checked || false;
+    const valorVex  = parseInt(document.getElementById('hze-valor-vex')?.value) || 0;
+    const nota      = (document.getElementById('hze-nota')?.value || '').trim().substring(0, 60);
 
     // ── FIX: usar _ppjHzGetStrs() (antes _ppjHzStrsSel no estaba definida) ──
     const strs       = window._ppjHzGetStrs?.() || { entrada: [], salida: [] };
@@ -2954,6 +2988,8 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
         afecta_hechizos: afHechizos,
         afecta_usuario:  afUsuario,
         afecta_objetivo: afObjetivo,
+        valor_vex: valorVex,
+        nota,
         ...((!idOriginal && tempNodo) ? { pos_x: Math.round(tempNodo.x), pos_y: Math.round(tempNodo.y) } : {}),
     };
 
