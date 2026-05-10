@@ -271,15 +271,21 @@ export function montarOverlay() {
 }
 
 // ── Drag helpers ──────────────────────────────────────────────
+// ── Drag helpers ──────────────────────────────────────────────
 function _elIdFromEvent(e) {
-  // Encuentra el elemento hechizo o slot más cercano al punto del evento
   const el = document.elementFromPoint(e.clientX, e.clientY);
   if (!el) return null;
+  
   const item = el.closest('[data-hxc-idx]');
-  if (item) return { id: `item:${item.dataset.hxcIdx}`, el: item };
+  if (item) {
+    // Detectamos de qué lado se soltó el mouse para el Destino
+    const rect = item.getBoundingClientRect();
+    const isLeft = e.clientX < rect.left + rect.width / 2;
+    return { id: `item:${item.dataset.hxcIdx}:${isLeft ? 'L' : 'R'}`, el: item };
+  }
+  
   const slot = el.closest('.hxc-slot:not(.vacio)');
   if (slot) {
-    // Determinar grupo e índice del slot
     const col = slot.closest('.hxc-col');
     if (!col) return null;
     const grupo = col.classList.contains('hxc-col-b') ? 'B' : 'A';
@@ -301,7 +307,6 @@ function _onDragMove(e) {
   const mx = e.clientX - bodyRect.left;
   const my = e.clientY - bodyRect.top;
 
-  // Dibujar línea de preview
   if (!_previewLine) {
     _previewLine = document.createElementNS('http://www.w3.org/2000/svg','line');
     _previewLine.setAttribute('id','hxfx-preview-line');
@@ -310,13 +315,12 @@ function _onDragMove(e) {
     svg.appendChild(_previewLine);
   }
 
-  // Determinar el lado inteligente para la preview
+  // Leer el lado dinámico para la línea de previsualización
   let ladoO = 'right';
   if (fxState.drag.origenId.startsWith('slot:A')) ladoO = 'right';
   else if (fxState.drag.origenId.startsWith('slot:B')) ladoO = 'left';
-  else {
-    // Si sale de un hechizo del centro, sale a izquierda o derecha según la posición del mouse
-    ladoO = mx < bodyRect.width / 2 ? 'left' : 'right';
+  else if (fxState.drag.origenId.startsWith('item:')) {
+    ladoO = fxState.drag.origenId.endsWith(':L') ? 'left' : 'right';
   }
 
   const po = _posEl(fxState.drag.origenEl, ladoO);
@@ -333,11 +337,8 @@ function _onDragMove(e) {
 function _onDragEnd(e) {
   if (!fxState.drag || fxState.modo !== 'conectar') return;
 
-  // Quitar línea de preview
   _previewLine?.remove();
   _previewLine = null;
-
-  // Quitar highlight origen
   document.querySelectorAll('.hxfx-origen').forEach(x => x.classList.remove('hxfx-origen'));
 
   const destino = _elIdFromEvent(e);
@@ -373,11 +374,47 @@ export function fxMouseDownSlot(e, grupo, idx) {
 export function fxMouseDownItem(e, itemIdx) {
   if (fxState.modo !== 'conectar') return false;
   e.stopPropagation();
-  const id = `item:${itemIdx}`;
   const el = _itemEl(itemIdx);
-  el?.classList.add('hxfx-origen');
+  if (!el) return false;
+  
+  // Detectamos de qué lado se inició el drag para el Origen
+  const rect = el.getBoundingClientRect();
+  const isLeft = e.clientX < rect.left + rect.width / 2;
+  const id = `item:${itemIdx}:${isLeft ? 'L' : 'R'}`;
+  
+  el.classList.add('hxfx-origen');
   fxState.drag = { origenId: id, origenEl: el };
   return true;
+}
+
+// Mantener compatibilidad con los handlers de clic
+export function fxClickSlot(grupo, idx) { return false; }
+export function fxClickItem(itemIdx)     { return false; }
+
+// ── Obtener posición central ───────────────────────────────────
+function _posEl(el, lado) {
+  const svg = document.getElementById('hxfx-overlay');
+  if (!el || !svg) return null;
+  const bodyRect = svg.parentElement.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  const cx = lado === 'left'  ? r.left  - bodyRect.left
+           : lado === 'right' ? r.right - bodyRect.left
+           : r.left + r.width/2 - bodyRect.left;
+  const cy = r.top + r.height/2 - bodyRect.top;
+  return { x: cx, y: cy, w: r.width, h: r.height, lado };
+}
+
+// ── Encontrar elemento DOM por su id ─────────────────────────
+function _findEl(id) {
+  if (id.startsWith('slot:')) {
+    const [, grupo, idx] = id.split(':');
+    return _slotEl(grupo, parseInt(idx));
+  }
+  if (id.startsWith('item:')) {
+    // Al dibujar, ignoramos el :L o :R para poder encontrar el elemento HTML
+    return _itemEl(id.split(':')[1]);
+  }
+  return null;
 }
 
 // Mantener compatibilidad con los handlers de clic (ya no se usan para crear)
