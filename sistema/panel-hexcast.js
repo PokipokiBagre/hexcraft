@@ -12,7 +12,7 @@ import {
   agregarHechizo, removerHechizo, moverAPrioridad,
   evaluarItem, confirmarTurno, getAfinidadEfectiva
 } from './hexcast-logic.js';
-import { renderToolbarFlechas, renderCanalSVG, montarOverlay, observarStack, fxClickSlot, fxClickItem, cargarFlechasTurno, resetFlechas } from './panel-hexcast-flechas.js';
+import { renderToolbarFlechas, renderCanalSVG, montarOverlay, observarStack, fxClickSlot, fxClickItem, fxMouseDownSlot, fxMouseDownItem, cargarFlechasTurno, resetFlechas } from './panel-hexcast-flechas.js';
 
 // ── CSS ───────────────────────────────────────────────────────
 function _css() {
@@ -298,6 +298,9 @@ function _render() {
   else _renderCast(drawer);
 }
 window._hxcRender = _render;
+// Exponer funciones de drag para uso desde HTML inline
+window.fxMouseDownSlot = fxMouseDownSlot;
+window.fxMouseDownItem = fxMouseDownItem;
 window._hxcReplaceStackItem = (idx, nuevoItem) => {
   if (idx >= 0 && idx < hxState.stack.length) {
     // Preserve _aplicado state if it was already applied
@@ -406,7 +409,9 @@ function _renderSlot(pj, grupo, idx) {
 
   const actCls = esteActivo && pj ? 'activo' : (pj ? '' : 'vacio');
 
-  return `<div class="hxc-slot ${actCls}" style="${vars}" onclick="window._hxcClickSlot('${grupo}',${idx})">
+  return `<div class="hxc-slot ${actCls}" style="${vars}"
+    onmousedown="if(window.fxMouseDownSlot&&window.fxMouseDownSlot(event,'${grupo}',${idx}))event.preventDefault()"
+    onclick="window._hxcClickSlot('${grupo}',${idx})">
     ${quit}${inner}
   </div>`;
 }
@@ -766,7 +771,9 @@ function _renderStack(esHistorico) {
     }
 
     return `<div class="hxc-item ${priCls} ${estadoCls} ${resCls}" style="${vars}" data-hxc-idx="${i}">
-      <div class="hxc-item-row" onclick="window._hxcToggleItem(${i})">
+      <div class="hxc-item-row"
+        onmousedown="if(window.fxMouseDownItem&&window.fxMouseDownItem(event,${i}))event.preventDefault()"
+        onclick="window._hxcToggleItem(${i})">
         <div class="hxc-item-color-dot ${esEstado ? 'es-estado' : ''}"></div>
         <span class="hxc-item-pj">${item.pjNombre}</span>
         <span class="hxc-item-hz">${hz.nombre}</span>

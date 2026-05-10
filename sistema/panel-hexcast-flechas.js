@@ -257,16 +257,124 @@ export function montarOverlay() {
   svg.id = 'hxfx-overlay';
   svg.setAttribute('xmlns','http://www.w3.org/2000/svg');
   body.appendChild(svg);
-
-  // Defs para marcadores de punta de flecha (uno por color)
   const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
   svg.appendChild(defs);
+
+  // Eventos globales de drag para conectar elementos
+  document.addEventListener('mousemove', _onDragMove);
+  document.addEventListener('mouseup',   _onDragEnd);
+  document.addEventListener('touchmove', e => _onDragMove(e.touches[0]), { passive: true });
+  document.addEventListener('touchend',  e => _onDragEnd(e.changedTouches[0]), { passive: true });
 
   _actualizarModoCursor();
   _redibujarTodo();
 }
 
-// ── Obtener posición central de un elemento relativa al SVG overlay
+// ── Drag helpers ──────────────────────────────────────────────
+function _elIdFromEvent(e) {
+  // Encuentra el elemento hechizo o slot más cercano al punto del evento
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if (!el) return null;
+  const item = el.closest('[data-hxc-idx]');
+  if (item) return { id: `item:${item.dataset.hxcIdx}`, el: item };
+  const slot = el.closest('.hxc-slot:not(.vacio)');
+  if (slot) {
+    // Determinar grupo e índice del slot
+    const col = slot.closest('.hxc-col');
+    if (!col) return null;
+    const grupo = col.classList.contains('hxc-col-b') ? 'B' : 'A';
+    const slots = [...col.querySelectorAll('.hxc-slot')];
+    const idx = slots.indexOf(slot);
+    if (idx < 0) return null;
+    return { id: `slot:${grupo}:${idx}`, el: slot };
+  }
+  return null;
+}
+
+let _previewLine = null;
+
+function _onDragMove(e) {
+  if (!fxState.drag || fxState.modo !== 'conectar') return;
+  const svg = document.getElementById('hxfx-overlay');
+  if (!svg) return;
+  const bodyRect = svg.parentElement.getBoundingClientRect();
+  const mx = e.clientX - bodyRect.left;
+  const my = e.clientY - bodyRect.top;
+
+  // Dibujar línea de preview
+  if (!_previewLine) {
+    _previewLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+    _previewLine.setAttribute('id','hxfx-preview-line');
+    _previewLine.setAttribute('stroke-dasharray','6 4');
+    _previewLine.setAttribute('opacity','0.6');
+    svg.appendChild(_previewLine);
+  }
+  const po = _posEl(fxState.drag.origenEl);
+  if (po) {
+    _previewLine.setAttribute('x1', po.x);
+    _previewLine.setAttribute('y1', po.y);
+    _previewLine.setAttribute('x2', mx);
+    _previewLine.setAttribute('y2', my);
+    _previewLine.setAttribute('stroke', fxState.colorActivo);
+    _previewLine.setAttribute('stroke-width', fxState.grosor);
+  }
+}
+
+function _onDragEnd(e) {
+  if (!fxState.drag || fxState.modo !== 'conectar') return;
+
+  // Quitar línea de preview
+  _previewLine?.remove();
+  _previewLine = null;
+
+  // Quitar highlight origen
+  document.querySelectorAll('.hxfx-origen').forEach(x => x.classList.remove('hxfx-origen'));
+
+  const destino = _elIdFromEvent(e);
+  const origenId = fxState.drag.origenId;
+  fxState.drag = null;
+
+  if (destino && destino.id !== origenId) {
+    const nueva = {
+      id:        fxState.nextLocalId--,
+      origenId,
+      destinoId: destino.id,
+      color:     fxState.colorActivo,
+      grosor:    fxState.grosor,
+      estilo:    fxState.estilo,
+    };
+    fxState.flechas.push(nueva);
+    _redibujarTodo();
+    _guardarFlechaDB(nueva);
+  }
+}
+
+// ── API pública: inicio de drag desde slot o item ─────────────
+export function fxMouseDownSlot(e, grupo, idx) {
+  if (fxState.modo !== 'conectar') return false;
+  e.stopPropagation();
+  const id = `slot:${grupo}:${idx}`;
+  const el = _slotEl(grupo, idx);
+  el?.classList.add('hxfx-origen');
+  fxState.drag = { origenId: id, origenEl: el };
+  return true;
+}
+
+export function fxMouseDownItem(e, itemIdx) {
+  if (fxState.modo !== 'conectar') return false;
+  e.stopPropagation();
+  const id = `item:${itemIdx}`;
+  const el = _itemEl(itemIdx);
+  el?.classList.add('hxfx-origen');
+  fxState.drag = { origenId: id, origenEl: el };
+  return true;
+}
+
+// Mantener compatibilidad con los handlers de clic (ya no se usan para crear)
+export function fxClickSlot(grupo, idx) { return false; }
+export function fxClickItem(itemIdx)     { return false; }
+
+// ── Obtener posición central de un elemento relativa al SVG overlay ──
 function _posEl(el) {
   const svg = document.getElementById('hxfx-overlay');
   if (!el || !svg) return null;
@@ -410,47 +518,7 @@ function _actualizarModoCursor() {
   if (fxState.modo === 'borrar')   body.classList.add('modo-borrar-activo');
 }
 
-// ── Selección de origen/destino ────────────────────────────────
-// Llamado desde _hxcClickSlot y _hxcToggleItem en panel-hexcast.js
-export function fxClickSlot(grupo, idx) {
-  if (fxState.modo !== 'conectar') return false;
-  const id = `slot:${grupo}:${idx}`;
-  _seleccionar(id, _slotEl(grupo, idx));
-  return true; // interceptado
-}
-
-export function fxClickItem(itemIdx) {
-  if (fxState.modo !== 'conectar') return false;
-  const id = `item:${itemIdx}`;
-  _seleccionar(id, _itemEl(itemIdx));
-  return true;
-}
-
-function _seleccionar(id, el) {
-  document.querySelectorAll('.hxfx-origen').forEach(e => e.classList.remove('hxfx-origen'));
-
-  if (!fxState.origen) {
-    fxState.origen = { id, el };
-    el?.classList.add('hxfx-origen');
-    if (typeof window._hxcRender === 'function') window._hxcRender();
-  } else {
-    if (fxState.origen.id !== id) {
-      const nueva = {
-        id:        fxState.nextLocalId--,  // ID temporal negativo
-        origenId:  fxState.origen.id,
-        destinoId: id,
-        color:     fxState.colorActivo,
-        grosor:    fxState.grosor,
-        estilo:    fxState.estilo,
-      };
-      fxState.flechas.push(nueva);
-      _scheduleRedraw();
-      _guardarFlechaDB(nueva); // guardar en DB async
-    }
-    fxState.origen = null;
-    if (typeof window._hxcRender === 'function') window._hxcRender();
-  }
-}
+// ── _seleccionar ya no se usa (reemplazado por drag) ──────────
 
 // ── Handlers de toolbar ────────────────────────────────────────
 window._hxfxToggleConectar = () => {
