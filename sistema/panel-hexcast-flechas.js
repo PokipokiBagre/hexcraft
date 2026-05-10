@@ -309,7 +309,17 @@ function _onDragMove(e) {
     _previewLine.setAttribute('opacity','0.6');
     svg.appendChild(_previewLine);
   }
-  const po = _posEl(fxState.drag.origenEl);
+
+  // Determinar el lado inteligente para la preview
+  let ladoO = 'right';
+  if (fxState.drag.origenId.startsWith('slot:A')) ladoO = 'right';
+  else if (fxState.drag.origenId.startsWith('slot:B')) ladoO = 'left';
+  else {
+    // Si sale de un hechizo del centro, sale a izquierda o derecha según la posición del mouse
+    ladoO = mx < bodyRect.width / 2 ? 'left' : 'right';
+  }
+
+  const po = _posEl(fxState.drag.origenEl, ladoO);
   if (po) {
     _previewLine.setAttribute('x1', po.x);
     _previewLine.setAttribute('y1', po.y);
@@ -418,26 +428,57 @@ function _svgFlecha(f) {
   const elD = _findEl(f.destinoId);
   if (!elO || !elD) return '';
 
-  // Usar los lados guardados al crear la flecha
-  const po = _posEl(elO, f.ladoOrigen  || 'right');
-  const pd = _posEl(elD, f.ladoDestino || 'left');
+  // Determinar dinámicamente el lado correcto
+  const isColA = (id) => id.startsWith('slot:A');
+  const isColB = (id) => id.startsWith('slot:B');
+  const isCenter = (id) => id.startsWith('item:');
+
+  let ladoO = 'right';
+  let ladoD = 'left';
+
+  // Lógica de Origen
+  if (isColA(f.origenId)) ladoO = 'right';
+  else if (isColB(f.origenId)) ladoO = 'left';
+  else if (isCenter(f.origenId)) {
+    if (isColA(f.destinoId)) ladoO = 'left';
+    else if (isColB(f.destinoId)) ladoO = 'right';
+    else ladoO = 'right'; // De item a item por defecto a la derecha
+  }
+
+  // Lógica de Destino
+  if (isColA(f.destinoId)) ladoD = 'right';
+  else if (isColB(f.destinoId)) ladoD = 'left';
+  else if (isCenter(f.destinoId)) {
+    if (isColA(f.origenId)) ladoD = 'left';
+    else if (isColB(f.origenId)) ladoD = 'right';
+    else ladoD = 'right';
+  }
+
+  const po = _posEl(elO, ladoO);
+  const pd = _posEl(elD, ladoD);
   if (!po || !pd) return '';
 
-  // Si ambos puntos son casi el mismo (item vs item mismo lado), arco lateral
   const dx = pd.x - po.x;
   const dy = pd.y - po.y;
   const dist = Math.sqrt(dx*dx + dy*dy) || 1;
 
-  // Control point: curva perpendicular al segmento
-  const arcDir = f.ladoOrigen === 'right' ? 1 : -1;
   const arcAmt = Math.min(80, Math.max(30, dist * 0.35));
   const mx = (po.x + pd.x) / 2;
   const my = (po.y + pd.y) / 2;
-  // Perpendicular (rotar 90°)
-  const nx = -dy / dist;
-  const ny =  dx / dist;
-  const cx = mx + nx * arcAmt * arcDir;
-  const cy = my + ny * arcAmt * arcDir;
+
+  let cx, cy;
+  if (ladoO === ladoD) {
+    // Arco en "C" para conectar elementos en la misma columna/lado
+    cx = ladoO === 'left' ? Math.min(po.x, pd.x) - arcAmt : Math.max(po.x, pd.x) + arcAmt;
+    cy = my;
+  } else {
+    // Comportamiento de curva en "S" para cruzar de columna
+    const arcDir = ladoO === 'right' ? 1 : -1;
+    const nx = -dy / dist;
+    const ny =  dx / dist;
+    cx = mx + nx * arcAmt * arcDir;
+    cy = my + ny * arcAmt * arcDir;
+  }
 
   const path = `M ${po.x.toFixed(1)},${po.y.toFixed(1)} Q ${cx.toFixed(1)},${cy.toFixed(1)} ${pd.x.toFixed(1)},${pd.y.toFixed(1)}`;
 
