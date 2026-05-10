@@ -1229,6 +1229,14 @@ window._hxcDadoKeydown = (e, idx) => {
     e.preventDefault();
     const next = document.querySelector(`[data-hxc-item="${idx+1}"]`);
     if (next) { next.focus(); next.select?.(); }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const next = document.querySelector(`[data-hxc-item="${idx+1}"]`);
+    if (next) { next.focus(); next.select?.(); }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const prev = document.querySelector(`[data-hxc-item="${idx-1}"]`);
+    if (prev) { prev.focus(); prev.select?.(); }
   }
 };
 
