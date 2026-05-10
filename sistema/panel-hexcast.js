@@ -809,6 +809,7 @@ function _renderStack(esHistorico) {
         <span class="hxc-item-hz">${hz.nombre}</span>
         ${item.esPrioridad?`<span class="hxc-prioridad-flag">↑</span>`:''}
         ${metaHtml}
+        ${extraMeta}
         ${multStr?`<span class="hxc-item-mult">${multStr}</span>`:''}
         ${dadoInput}
         ${resHtml}
