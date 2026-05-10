@@ -428,21 +428,46 @@ function _svgFlecha(f) {
   const elD = _findEl(f.destinoId);
   if (!elO || !elD) return '';
 
-  // Extraer el lado dinámicamente leyendo si tiene :L o :R
-  const getSide = (id) => {
-    if (id.startsWith('slot:A')) return 'right';
-    if (id.startsWith('slot:B')) return 'left';
-    if (id.startsWith('item:')) return id.endsWith(':L') ? 'left' : 'right';
-    return 'right'; // Predeterminado para flechas antiguas en DB
+  const isColA = (id) => id.startsWith('slot:A');
+  const isColB = (id) => id.startsWith('slot:B');
+  const isCenter = (id) => id.startsWith('item:');
+
+  // 1. Extraer sufijo explícito si existe (:L o :R)
+  const getExplicit = (id) => {
+    if (id.endsWith(':L')) return 'left';
+    if (id.endsWith(':R')) return 'right';
+    return null; // Flechas antiguas de la DB no tienen sufijo
   };
 
-  const ladoO = getSide(f.origenId);
-  const ladoD = getSide(f.destinoId);
+  let ladoO = getExplicit(f.origenId);
+  let ladoD = getExplicit(f.destinoId);
+
+  // 2. Si no hay sufijo (flechas viejas de DB o slots), deducir lógicamente el lado
+  if (!ladoO) {
+    if (isColA(f.origenId)) ladoO = 'right'; // Grupo A expulsa por su derecha
+    else if (isColB(f.origenId)) ladoO = 'left';  // Grupo B expulsa por su izquierda
+    else if (isCenter(f.origenId)) {
+      if (isColA(f.destinoId)) ladoO = 'left'; // Va hacia A, sale por la izquierda
+      else if (isColB(f.destinoId)) ladoO = 'right'; // Va hacia B, sale por la derecha
+      else ladoO = 'right'; // Item a Item por defecto a la derecha
+    }
+  }
+
+  if (!ladoD) {
+    if (isColA(f.destinoId)) ladoD = 'right'; // Grupo A recibe por su derecha
+    else if (isColB(f.destinoId)) ladoD = 'left';  // Grupo B recibe por su izquierda
+    else if (isCenter(f.destinoId)) {
+      if (isColA(f.origenId)) ladoD = 'left'; // Viene de A, entra por la izquierda
+      else if (isColB(f.origenId)) ladoD = 'right'; // Viene de B, entra por la derecha
+      else ladoD = 'right'; // Item a Item por defecto a la derecha
+    }
+  }
 
   const po = _posEl(elO, ladoO);
   const pd = _posEl(elD, ladoD);
   if (!po || !pd) return '';
 
+  // 3. Matemáticas para curvar la línea
   const dx = pd.x - po.x;
   const dy = pd.y - po.y;
   const dist = Math.sqrt(dx*dx + dy*dy) || 1;
@@ -453,11 +478,11 @@ function _svgFlecha(f) {
 
   let cx, cy;
   if (ladoO === ladoD) {
-    // Arco en "C" si conectan del mismo lado
+    // Arco en "C" para conectar elementos en el mismo flanco
     cx = ladoO === 'left' ? Math.min(po.x, pd.x) - arcAmt : Math.max(po.x, pd.x) + arcAmt;
     cy = my;
   } else {
-    // Curva cruzada normal (en S)
+    // Comportamiento de curva en "S" para cruzar la pantalla limpio
     const arcDir = ladoO === 'right' ? 1 : -1;
     const nx = -dy / dist;
     const ny =  dx / dist;
