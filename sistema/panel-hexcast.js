@@ -12,7 +12,7 @@ import {
   agregarHechizo, removerHechizo, moverAPrioridad,
   evaluarItem, confirmarTurno, getAfinidadEfectiva
 } from './hexcast-logic.js';
-import { renderToolbarFlechas, renderCanalSVG } from './panel-hexcast-flechas.js';
+import { renderToolbarFlechas, renderCanalSVG, montarOverlay, observarStack, fxClickSlot, fxClickItem, cargarFlechasTurno, resetFlechas } from './panel-hexcast-flechas.js';
 
 // ── CSS ───────────────────────────────────────────────────────
 function _css() {
@@ -356,6 +356,8 @@ function _renderCast(drawer) {
       ${_renderColGrupo('B')}
       ${_renderLateralPanel()}
     </div>`;
+  // Montar overlay SVG y observar cambios del stack
+  requestAnimationFrame(() => { montarOverlay(); observarStack(); });
 }
 
 function _renderColGrupo(grupo) {
@@ -827,6 +829,8 @@ window._hxcSelSesion = async (id) => {
     }
     hxState.estadosPorPj = {};
     await _cargarTodosEstadosTurno();
+    resetFlechas();
+    await cargarFlechasTurno(hxState.turnoActivo?.id, id);
     hxState.vistaActiva = 'cast'; _render();
   }
   catch(e) { _toast('Error cargando sesión', true); }
@@ -920,6 +924,8 @@ window._hxcIrTurno = async (idxRaw) => {
   // Cargar estados del turno (chips en slots)
   hxState.estadosPorPj = {};
   await _cargarTodosEstadosTurno();
+  // Cargar flechas del turno
+  await cargarFlechasTurno(turno.id, hxState.sesionActiva?.id);
   _render();
 };
 
@@ -1025,10 +1031,10 @@ window._hxcDevolverHex = async () => {
 };
 
 window._hxcClickSlot = async (grupo, idx) => {
+  if (fxClickSlot(grupo, parseInt(idx))) return; // interceptado por modo flecha
   const slots = grupo === 'A' ? hxState.grupoA : hxState.grupoB;
   const pj = slots[idx];
   if (!pj) { _abrirSelectorPJ(grupo, idx); return; }
-  // Si ya está abierto el panel de ese slot, ciérralo
   const p = hxState.panelSlot;
   if (p?.grupo === grupo && p?.idx === idx) { hxState.panelSlot = null; }
   _render();
@@ -1215,7 +1221,11 @@ window._hxcConfirmarEvento = (grupo, idx) => {
   _toast(`✦ Evento: ${nombre}`);
 };
 
-window._hxcToggleItem = (idx) => { hxState.stack[idx].abierto = !hxState.stack[idx].abierto; _render(); };
+window._hxcToggleItem = (idx) => {
+  if (fxClickItem(parseInt(idx))) return; // interceptado por modo flecha
+  hxState.stack[idx].abierto = !hxState.stack[idx].abierto;
+  _render();
+};
 
 window._hxcSetDado = (idx, val) => {
   const item = hxState.stack[idx]; if (!item) return;

@@ -1,27 +1,24 @@
 // ============================================================
-// panel-hexcast-flechas.js — Sistema de flechas para HexCast
-// Permite dibujar flechas de colores entre hechizos y personajes
+// panel-hexcast-flechas.js — Sistema de flechas automáticas HexCast
 // ============================================================
 
+import { supabase } from '../hex-auth.js';
+import { hxState } from './hexcast-state.js';
+
 const fxState = {
-  modo: null,          // 'flecha' | 'borrar' | null
-  flechas: [],         // [{ id, puntos:[{x,y}], color, grosor, svgEl }]
-  dibujando: null,     // { id, puntos, color, grosor }
+  modo: null,
+  origen: null,
+  flechas: [],      // incluye { id (DB), origenId, destinoId, color, grosor, estilo }
+  nextLocalId: -1,  // IDs negativos = locales aún no guardados
+  turnoIdCargado: null,
   colores: [
-    '#e84040', // rojo
-    '#e87040', // naranja
-    '#e8c040', // amarillo
-    '#40c840', // verde
-    '#40d0c0', // teal
-    '#4090e8', // azul
-    '#a040e8', // violeta
-    '#e840b0', // rosa
-    '#e8e8e8', // blanco
-    '#888888', // gris
+    '#e84040','#e87040','#e8c040','#40c840',
+    '#40d0c0','#4090e8','#a040e8','#e840b0',
+    '#e8e8e8','#888888',
   ],
   colorActivo: '#40c840',
   grosor: 3,
-  nextId: 1,
+  estilo: 'solida',
 };
 
 // ── CSS ────────────────────────────────────────────────────────
@@ -30,37 +27,47 @@ function _css() {
   const st = document.createElement('style');
   st.id = 'hxfx-styles';
   st.textContent = `
-/* Canales de flechas */
-.hxfx-canal {
-  position: relative;
-  overflow: visible;
-  flex-shrink: 0;
-}
-.hxfx-svg {
+/* SVG overlay sobre todo el body del panel */
+#hxfx-overlay {
   position: absolute;
   inset: 0;
-  width: 100%; height: 100%;
-  overflow: visible;
-  z-index: 5;
   pointer-events: none;
+  z-index: 20;
+  overflow: visible;
 }
-.hxfx-svg.modo-flecha  { pointer-events: all; cursor: crosshair; }
-.hxfx-svg.modo-borrar  { pointer-events: all; cursor: not-allowed; }
+#hxfx-overlay.modo-conectar { pointer-events: none; }
 
-/* Toolbar de flechas */
+/* Elemento seleccionado como origen */
+.hxfx-origen {
+  outline: 2px dashed v !important;
+  outline-offset: 2px;
+}
+[data-hxc-idx].hxfx-origen { outline: 2px dashed #40c840 !important; outline-offset: 2px; }
+.hxc-slot.hxfx-origen { outline: 2px dashed #40c840 !important; }
+
+/* Hover en modo conectar */
+.modo-conectar-activo [data-hxc-idx]:hover,
+.modo-conectar-activo .hxc-slot:not(.vacio):hover {
+  outline: 2px dashed rgba(64,200,64,0.5) !important;
+  outline-offset: 2px;
+  cursor: crosshair !important;
+}
+.modo-borrar-activo .hxfx-flecha-g:hover { cursor: pointer; }
+
+/* Toolbar */
 .hxfx-toolbar {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 8px;
+  padding: 5px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   flex-shrink: 0;
   flex-wrap: wrap;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.18);
 }
 .hxfx-btn {
   font-size: 0.62em;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 4px;
   border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.05);
@@ -69,352 +76,453 @@ function _css() {
   transition: all 0.12s;
   white-space: nowrap;
   font-family: inherit;
+  user-select: none;
 }
-.hxfx-btn:hover { background: rgba(255,255,255,0.12); color: #ccc; }
-.hxfx-btn.activo { color: #fff; border-color: var(--activo-color, #40c840); background: rgba(64,200,64,0.12); box-shadow: 0 0 6px rgba(64,200,64,0.2); }
-.hxfx-btn-borrar.activo { border-color: #e84040; background: rgba(232,64,64,0.12); box-shadow: 0 0 6px rgba(232,64,64,0.2); }
-.hxfx-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.1); flex-shrink: 0; }
+.hxfx-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+.hxfx-btn.activo {
+  color: #fff;
+  border-color: var(--fx-ac, #40c840);
+  background: rgba(64,200,64,0.12);
+  box-shadow: 0 0 8px rgba(64,200,64,0.25);
+}
+.hxfx-btn-borrar.activo {
+  border-color: #e84040 !important;
+  background: rgba(232,64,64,0.12) !important;
+  box-shadow: 0 0 8px rgba(232,64,64,0.2) !important;
+}
+.hxfx-sep { width: 1px; height: 14px; background: rgba(255,255,255,0.1); flex-shrink: 0; }
 .hxfx-colores { display: flex; gap: 3px; align-items: center; }
-.hxfx-color-dot {
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: transform 0.12s, border-color 0.12s;
-  flex-shrink: 0;
+.hxfx-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  cursor: pointer; border: 2px solid transparent;
+  transition: transform 0.1s, border-color 0.1s; flex-shrink: 0;
 }
-.hxfx-color-dot:hover { transform: scale(1.25); }
-.hxfx-color-dot.sel { border-color: #fff; transform: scale(1.2); }
-.hxfx-grosor-wrap { display: flex; align-items: center; gap: 4px; }
-.hxfx-grosor-lbl { font-size: 0.58em; color: #666; }
+.hxfx-dot:hover { transform: scale(1.25); }
+.hxfx-dot.sel { border-color: #fff; transform: scale(1.2); }
 .hxfx-grosor-inp {
   width: 30px;
   background: rgba(255,255,255,0.07);
   border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 3px;
-  color: #ccc;
-  font-size: 0.68em;
-  padding: 2px 4px;
-  text-align: center;
-  outline: none;
-  font-family: inherit;
+  border-radius: 3px; color: #ccc;
+  font-size: 0.68em; padding: 2px 4px;
+  text-align: center; outline: none; font-family: inherit;
 }
+.hxfx-estilo-btn {
+  font-size: 0.6em; padding: 3px 7px;
+  border-radius: 4px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05); color: #777;
+  cursor: pointer; font-family: inherit; transition: all 0.12s;
+}
+.hxfx-estilo-btn.sel { border-color: rgba(255,255,255,0.3); color: #ccc; background: rgba(255,255,255,0.1); }
 .hxfx-btn-export {
-  font-size: 0.62em;
-  padding: 3px 9px;
-  border-radius: 4px;
+  font-size: 0.62em; padding: 3px 9px; border-radius: 4px;
   border: 1px solid rgba(212,175,55,0.35);
-  background: rgba(212,175,55,0.07);
-  color: #d4af37;
-  cursor: pointer;
-  transition: all 0.12s;
-  white-space: nowrap;
-  font-family: inherit;
-  margin-left: auto;
+  background: rgba(212,175,55,0.07); color: #d4af37;
+  cursor: pointer; font-family: inherit; transition: all 0.12s;
 }
 .hxfx-btn-export:hover { background: rgba(212,175,55,0.18); }
 .hxfx-btn-clear {
-  font-size: 0.62em;
-  padding: 3px 7px;
-  border-radius: 4px;
+  font-size: 0.62em; padding: 3px 8px; border-radius: 4px;
   border: 1px solid rgba(220,80,80,0.25);
-  background: rgba(220,80,80,0.05);
-  color: #e06060;
-  cursor: pointer;
-  transition: all 0.12s;
-  font-family: inherit;
+  background: rgba(220,80,80,0.05); color: #e06060;
+  cursor: pointer; font-family: inherit; transition: all 0.12s;
 }
 .hxfx-btn-clear:hover { background: rgba(220,80,80,0.15); }
+.hxfx-hint {
+  font-size: 0.57em; color: #444; font-style: italic; margin-left: 4px;
+}
 `;
   document.head.appendChild(st);
 }
 
-// ── Render toolbar ─────────────────────────────────────────────
+// ── DB: cargar flechas del turno activo ───────────────────────
+export async function cargarFlechasTurno(turnoId, sesionId) {
+  if (fxState.turnoIdCargado === turnoId) return;
+  fxState.turnoIdCargado = turnoId;
+  fxState.flechas = [];
+  fxState.origen  = null;
+
+  if (!turnoId) { _redibujarTodo(); return; }
+
+  const { data } = await supabase
+    .from('hexcast_flechas')
+    .select('*')
+    .eq('turno_id', turnoId)
+    .order('id');
+
+  fxState.flechas = (data || []).map(r => ({
+    id:        r.id,          // ID real de DB
+    origenId:  r.origen_id,
+    destinoId: r.destino_id,
+    color:     r.color,
+    grosor:    r.grosor,
+    estilo:    r.estilo,
+  }));
+  _scheduleRedraw();
+}
+
+async function _guardarFlechaDB(f) {
+  const turnoId  = hxState.turnoActivo?.id;
+  const sesionId = hxState.sesionActiva?.id;
+  if (!turnoId) return;
+
+  const { data, error } = await supabase
+    .from('hexcast_flechas')
+    .insert({
+      turno_id:   turnoId,
+      sesion_id:  sesionId,
+      origen_id:  f.origenId,
+      destino_id: f.destinoId,
+      color:      f.color,
+      grosor:     f.grosor,
+      estilo:     f.estilo,
+    })
+    .select()
+    .single();
+
+  if (!error && data) {
+    // Reemplazar id local por id real de DB
+    const local = fxState.flechas.find(x => x.id === f.id);
+    if (local) local.id = data.id;
+  }
+}
+
+async function _borrarFlechaDB(id) {
+  if (id < 0) return; // era local, nunca se guardó
+  await supabase.from('hexcast_flechas').delete().eq('id', id);
+}
+
+// ── Exportar función para limpiar al cambiar turno ─────────────
+export function resetFlechas() {
+  fxState.flechas = [];
+  fxState.origen  = null;
+  fxState.turnoIdCargado = null;
+  _redibujarTodo();
+}
+
+// ── Toolbar HTML ───────────────────────────────────────────────
 export function renderToolbarFlechas() {
   _css();
-  const modoFlecha = fxState.modo === 'flecha';
-  const modoBorrar = fxState.modo === 'borrar';
+  const mc = fxState.modo === 'conectar';
+  const mb = fxState.modo === 'borrar';
+  const ac = fxState.colorActivo;
 
-  const coloresDots = fxState.colores.map(c =>
-    `<div class="hxfx-color-dot ${c===fxState.colorActivo?'sel':''}"
-      style="background:${c};"
-      title="${c}"
-      onclick="window._hxfxSetColor('${c}')"></div>`
+  const dots = fxState.colores.map(c =>
+    `<div class="hxfx-dot ${c===ac?'sel':''}" style="background:${c}" onclick="window._hxfxSetColor('${c}')"></div>`
   ).join('');
 
+  const estilos = [
+    { id:'solida',   label:'━━' },
+    { id:'punteada', label:'•••' },
+    { id:'rayada',   label:'╌╌' },
+  ].map(e =>
+    `<button class="hxfx-estilo-btn ${fxState.estilo===e.id?'sel':''}" onclick="window._hxfxSetEstilo('${e.id}')" title="${e.id}">${e.label}</button>`
+  ).join('');
+
+  const hint = mc
+    ? `<span class="hxfx-hint">${fxState.origen ? '→ clic en destino' : 'clic en origen'}</span>`
+    : mb ? `<span class="hxfx-hint">clic sobre una flecha para borrarla</span>` : '';
+
   return `<div class="hxfx-toolbar">
-    <button class="hxfx-btn ${modoFlecha?'activo':''}"
-      style="${modoFlecha?'--activo-color:'+fxState.colorActivo:''}"
-      onclick="window._hxfxToggleFlecha()">✏ Flecha</button>
-    <button class="hxfx-btn hxfx-btn-borrar ${modoBorrar?'activo':''}"
-      onclick="window._hxfxToggleBorrar()">✕ Borrar</button>
+    <button class="hxfx-btn ${mc?'activo':''}" style="${mc?'--fx-ac:'+ac:''}" onclick="window._hxfxToggleConectar()">⟶ Flecha</button>
+    <button class="hxfx-btn hxfx-btn-borrar ${mb?'activo':''}" onclick="window._hxfxToggleBorrar()">✕ Borrar</button>
     <div class="hxfx-sep"></div>
-    <div class="hxfx-colores">${coloresDots}</div>
+    <div class="hxfx-colores">${dots}</div>
     <div class="hxfx-sep"></div>
-    <div class="hxfx-grosor-wrap">
-      <span class="hxfx-grosor-lbl">Grosor</span>
-      <input class="hxfx-grosor-inp" type="number" min="1" max="12" value="${fxState.grosor}"
-        oninput="window._hxfxSetGrosor(this.value)" onclick="event.stopPropagation()">
-    </div>
+    ${estilos}
     <div class="hxfx-sep"></div>
-    <button class="hxfx-btn-clear" onclick="window._hxfxLimpiar()">✕ Borrar todo</button>
-    <button class="hxfx-btn-export" onclick="window._hxfxExportar(false)">📷 Exportar claro</button>
-    <button class="hxfx-btn-export" style="border-color:rgba(255,255,255,0.15);color:#888;background:rgba(255,255,255,0.04);" onclick="window._hxfxExportar(true)">📷 Oscuro</button>
+    <span style="font-size:0.58em;color:#555;">Grosor</span>
+    <input class="hxfx-grosor-inp" type="number" min="1" max="12" value="${fxState.grosor}"
+      oninput="window._hxfxSetGrosor(this.value)" onclick="event.stopPropagation()">
+    <div class="hxfx-sep"></div>
+    <button class="hxfx-btn-clear" onclick="window._hxfxLimpiar()">✕ Todo</button>
+    <button class="hxfx-btn-export" onclick="window._hxfxExportar(false)">📷 Claro</button>
+    <button class="hxfx-btn-export" style="border-color:rgba(255,255,255,0.1);color:#777;background:rgba(255,255,255,0.03);" onclick="window._hxfxExportar(true)">📷 Oscuro</button>
+    ${hint}
   </div>`;
 }
 
-// ── Render canales SVG ─────────────────────────────────────────
+// ── Canal SVG (placeholder, las flechas van en overlay global) ─
 export function renderCanalSVG(lado) {
-  const modo = fxState.modo;
-  const cls = modo === 'flecha' ? 'modo-flecha' : modo === 'borrar' ? 'modo-borrar' : '';
-  return `<div class="hxfx-canal" id="hxfx-canal-${lado}">
-    <svg class="hxfx-svg ${cls}" id="hxfx-svg-${lado}"
-      onmousedown="window._hxfxMouseDown(event,'${lado}')"
-      onmousemove="window._hxfxMouseMove(event,'${lado}')"
-      onmouseup="window._hxfxMouseUp(event,'${lado}')"
-      ontouchstart="window._hxfxTouchStart(event,'${lado}')"
-      ontouchmove="window._hxfxTouchMove(event,'${lado}')"
-      ontouchend="window._hxfxTouchEnd(event,'${lado}')">
-      ${_renderFlechasSVG(lado)}
-    </svg>
-  </div>`;
+  return `<div class="hxfx-canal" id="hxfx-canal-${lado}" style="flex-shrink:0;position:relative;overflow:visible;"></div>`;
 }
 
-// ── Dibuja todas las flechas en SVG ────────────────────────────
-function _renderFlechasSVG(lado) {
-  return fxState.flechas
-    .filter(f => f.lado === lado)
-    .map(f => _pathFlecha(f))
-    .join('');
+// ── Inyectar SVG overlay sobre el hxc-body ────────────────────
+export function montarOverlay() {
+  _css();
+  const body = document.querySelector('.hxc-body');
+  if (!body || document.getElementById('hxfx-overlay')) return;
+  body.style.position = 'relative';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.id = 'hxfx-overlay';
+  svg.setAttribute('xmlns','http://www.w3.org/2000/svg');
+  body.appendChild(svg);
+
+  // Defs para marcadores de punta de flecha (uno por color)
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  svg.appendChild(defs);
+
+  _actualizarModoCursor();
+  _redibujarTodo();
 }
 
-function _pathFlecha(f) {
-  if (f.puntos.length < 2) return '';
-  const pts = f.puntos;
-  // Bezier suavizado
-  let d = `M ${pts[0].x} ${pts[0].y}`;
-  if (pts.length === 2) {
-    d += ` L ${pts[1].x} ${pts[1].y}`;
-  } else {
-    for (let i = 1; i < pts.length - 1; i++) {
-      const mx = (pts[i].x + pts[i+1].x) / 2;
-      const my = (pts[i].y + pts[i+1].y) / 2;
-      d += ` Q ${pts[i].x} ${pts[i].y} ${mx} ${my}`;
-    }
-    d += ` L ${pts[pts.length-1].x} ${pts[pts.length-1].y}`;
+// ── Obtener posición central de un elemento relativa al SVG overlay
+function _posEl(el) {
+  const svg = document.getElementById('hxfx-overlay');
+  if (!el || !svg) return null;
+  const bodyRect = svg.parentElement.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  return {
+    x: elRect.left + elRect.width/2 - bodyRect.left,
+    y: elRect.top  + elRect.height/2 - bodyRect.top,
+    w: elRect.width,
+    h: elRect.height,
+  };
+}
+
+// ── Encontrar elemento DOM por su id ─────────────────────────
+function _findEl(id) {
+  if (id.startsWith('slot:')) {
+    const [, grupo, idx] = id.split(':');
+    return document.querySelector(`.hxc-col:${grupo==='B'?'last-child':'first-child'} .hxc-slot:nth-child(${parseInt(idx)+2})`);
   }
+  if (id.startsWith('item:')) {
+    const idx = id.split(':')[1];
+    return document.querySelector(`[data-hxc-idx="${idx}"]`);
+  }
+  return null;
+}
+
+// Alias más fiable usando grupo/idx
+function _slotEl(grupo, idx) {
+  const col = grupo === 'A'
+    ? document.querySelector('.hxc-col:not(.hxc-col-b)')
+    : document.querySelector('.hxc-col-b');
+  if (!col) return null;
+  const slots = col.querySelectorAll('.hxc-slot');
+  return slots[idx] || null;
+}
+
+function _itemEl(itemIdx) {
+  return document.querySelector(`[data-hxc-idx="${itemIdx}"] .hxc-item-row`) ||
+         document.querySelector(`[data-hxc-idx="${itemIdx}"]`);
+}
+
+// ── Dibujar una flecha curva entre dos puntos ─────────────────
+function _svgFlecha(f) {
+  const elO = f.origenId.startsWith('slot:')
+    ? _slotEl(...f.origenId.split(':').slice(1))
+    : _itemEl(f.origenId.split(':')[1]);
+  const elD = f.destinoId.startsWith('slot:')
+    ? _slotEl(...f.destinoId.split(':').slice(1))
+    : _itemEl(f.destinoId.split(':')[1]);
+
+  const po = _posEl(elO);
+  const pd = _posEl(elD);
+  if (!po || !pd) return '';
+
+  // Punto de salida: borde derecho del origen si el destino está a la derecha, etc.
+  const dx = pd.x - po.x;
+  const dy = pd.y - po.y;
+  const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+
+  // Punto de inicio/fin en el borde del elemento
+  const ox = po.x + (dx/dist)*(po.w/2);
+  const oy = po.y + (dy/dist)*(po.h/2);
+  const dx2 = pd.x - po.x; // recompute toward dest center
+  const dy2 = pd.y - po.y;
+  const d2 = Math.sqrt(dx2*dx2+dy2*dy2)||1;
+  const tx = pd.x - (dx2/d2)*(pd.w/2 + 8);
+  const ty = pd.y - (dy2/d2)*(pd.h/2 + 8);
+
+  // Bezier con curva lateral para evitar solapamientos
+  const mid = { x: (ox+tx)/2, y: (oy+ty)/2 };
+  const perp = { x: -(ty-oy)/dist*60, y: (tx-ox)/dist*60 };
+  const cx = mid.x + perp.x;
+  const cy = mid.y + perp.y;
+
+  const path = `M ${ox.toFixed(1)} ${oy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}`;
+
+  const dashArray = f.estilo === 'punteada'
+    ? `stroke-dasharray="${f.grosor*2} ${f.grosor*2}"`
+    : f.estilo === 'rayada'
+      ? `stroke-dasharray="${f.grosor*5} ${f.grosor*2}"`
+      : '';
 
   // Punta de flecha
-  const n = pts.length;
-  const dx = pts[n-1].x - pts[n-2].x;
-  const dy = pts[n-1].y - pts[n-2].y;
-  const len = Math.sqrt(dx*dx + dy*dy) || 1;
-  const ux = dx/len, uy = dy/len;
-  const al = Math.max(10, f.grosor * 3.5);
-  const aw = al * 0.45;
-  const tip  = { x: pts[n-1].x, y: pts[n-1].y };
-  const base = { x: tip.x - ux*al, y: tip.y - uy*al };
-  const lp   = { x: base.x - uy*aw, y: base.y + ux*aw };
-  const rp   = { x: base.x + uy*aw, y: base.y - ux*aw };
+  const ang = Math.atan2(ty - cy, tx - cx);
+  const al = f.grosor * 4;
+  const aw = f.grosor * 2;
+  const ax1 = tx - al*Math.cos(ang-0.4);
+  const ay1 = ty - al*Math.sin(ang-0.4);
+  const ax2 = tx - al*Math.cos(ang+0.4);
+  const ay2 = ty - al*Math.sin(ang+0.4);
 
-  return `<g data-fx-id="${f.id}">
-    <path d="${d}" fill="none" stroke="${f.color}" stroke-width="${f.grosor}"
-      stroke-linecap="round" stroke-linejoin="round" opacity="0.88"/>
-    <polygon points="${tip.x},${tip.y} ${lp.x},${lp.y} ${rp.x},${rp.y}"
-      fill="${f.color}" opacity="0.88"/>
+  return `<g class="hxfx-flecha-g" data-fx-id="${f.id}"
+      style="cursor:${fxState.modo==='borrar'?'pointer':'default'}"
+      onclick="window._hxfxClickFlecha(${f.id})">
+    <path d="${path}" fill="none" stroke="${f.color}"
+      stroke-width="${f.grosor}" stroke-linecap="round"
+      stroke-linejoin="round" opacity="0.85" ${dashArray}/>
+    <polygon points="${tx.toFixed(1)},${ty.toFixed(1)} ${ax1.toFixed(1)},${ay1.toFixed(1)} ${ax2.toFixed(1)},${ay2.toFixed(1)}"
+      fill="${f.color}" opacity="0.85"/>
+    <path d="${path}" fill="none" stroke="transparent" stroke-width="${Math.max(f.grosor,8)}"/>
   </g>`;
 }
 
-// ── Coordenadas relativas al SVG ───────────────────────────────
-function _coord(e, lado) {
-  const svg = document.getElementById(`hxfx-svg-${lado}`);
-  if (!svg) return { x: 0, y: 0 };
-  const rect = svg.getBoundingClientRect();
-  const src = e.touches ? e.touches[0] : e;
-  return { x: src.clientX - rect.left, y: src.clientY - rect.top };
-}
-
-// ── Event handlers ─────────────────────────────────────────────
-window._hxfxMouseDown = (e, lado) => {
-  if (fxState.modo === 'flecha') {
-    e.preventDefault();
-    const pt = _coord(e, lado);
-    fxState.dibujando = { id: fxState.nextId++, puntos: [pt], color: fxState.colorActivo, grosor: fxState.grosor, lado };
-  } else if (fxState.modo === 'borrar') {
-    _borrarEnPunto(_coord(e, lado), lado);
-  }
-};
-
-window._hxfxMouseMove = (e, lado) => {
-  if (!fxState.dibujando || fxState.modo !== 'flecha') return;
-  e.preventDefault();
-  const pt = _coord(e, lado);
-  const pts = fxState.dibujando.puntos;
-  const last = pts[pts.length - 1];
-  // Solo agregar si se movió suficiente (evita puntos redundantes)
-  if (Math.hypot(pt.x - last.x, pt.y - last.y) > 4) {
-    fxState.dibujando.puntos.push(pt);
-    _updatePreview(lado);
-  }
-};
-
-window._hxfxMouseUp = (e, lado) => {
-  if (fxState.dibujando && fxState.dibujando.puntos.length >= 2) {
-    fxState.flechas.push({ ...fxState.dibujando });
-    _redrawSVG(lado);
-  }
-  fxState.dibujando = null;
-  _clearPreview(lado);
-};
-
-window._hxfxTouchStart = (e, lado) => { window._hxfxMouseDown(e, lado); };
-window._hxfxTouchMove  = (e, lado) => { window._hxfxMouseMove(e, lado); };
-window._hxfxTouchEnd   = (e, lado) => { window._hxfxMouseUp(e, lado); };
-
-function _borrarEnPunto(pt, lado) {
-  const RADIO = 20;
-  const antes = fxState.flechas.length;
-  fxState.flechas = fxState.flechas.filter(f => {
-    if (f.lado !== lado) return true;
-    return !f.puntos.some(p => Math.hypot(p.x - pt.x, p.y - pt.y) < RADIO);
-  });
-  if (fxState.flechas.length !== antes) _redrawSVG(lado);
-}
-
-function _updatePreview(lado) {
-  const svg = document.getElementById(`hxfx-svg-${lado}`);
-  if (!svg || !fxState.dibujando) return;
-  let prev = svg.querySelector('#hxfx-preview');
-  if (!prev) { prev = document.createElementNS('http://www.w3.org/2000/svg','g'); prev.id='hxfx-preview'; svg.appendChild(prev); }
-  const tmp = { ...fxState.dibujando, id: 'preview' };
-  prev.innerHTML = _pathFlecha(tmp);
-}
-
-function _clearPreview(lado) {
-  const svg = document.getElementById(`hxfx-svg-${lado}`);
-  svg?.querySelector('#hxfx-preview')?.remove();
-}
-
-function _redrawSVG(lado) {
-  const svg = document.getElementById(`hxfx-svg-${lado}`);
+function _redibujarTodo() {
+  const svg = document.getElementById('hxfx-overlay');
   if (!svg) return;
-  // Remove all non-preview children and re-render
-  [...svg.children].forEach(c => { if (c.id !== 'hxfx-preview') c.remove(); });
-  const html = _renderFlechasSVG(lado);
-  const tmp = document.createElementNS('http://www.w3.org/2000/svg','g');
-  tmp.innerHTML = html;
-  [...tmp.children].forEach(c => svg.insertBefore(c, svg.querySelector('#hxfx-preview')));
+  // Preservar defs
+  const defs = svg.querySelector('defs');
+  svg.innerHTML = '';
+  if (defs) svg.appendChild(defs);
+  fxState.flechas.forEach(f => {
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg','g');
+    tmp.innerHTML = _svgFlecha(f);
+    [...tmp.children].forEach(c => svg.appendChild(c));
+  });
 }
 
-// ── Toolbar handlers ───────────────────────────────────────────
-window._hxfxToggleFlecha = () => {
-  fxState.modo = fxState.modo === 'flecha' ? null : 'flecha';
-  _actualizarCursores();
+// Redibujar cuando cambia el layout (scroll, rerender)
+function _scheduleRedraw() {
+  clearTimeout(fxState._redrawTimer);
+  fxState._redrawTimer = setTimeout(_redibujarTodo, 50);
+}
+
+// Observer para redibujar cuando el stack cambia
+let _observer = null;
+export function observarStack() {
+  if (_observer) _observer.disconnect();
+  const stack = document.getElementById('hxc-stack-list');
+  if (!stack) return;
+  _observer = new MutationObserver(_scheduleRedraw);
+  _observer.observe(stack, { childList: true, subtree: true, attributes: true });
+  stack.addEventListener('scroll', _scheduleRedraw, { passive: true });
+}
+
+// ── Modo cursor en el body ─────────────────────────────────────
+function _actualizarModoCursor() {
+  const body = document.querySelector('.hxc-body');
+  if (!body) return;
+  body.classList.remove('modo-conectar-activo','modo-borrar-activo');
+  if (fxState.modo === 'conectar') body.classList.add('modo-conectar-activo');
+  if (fxState.modo === 'borrar')   body.classList.add('modo-borrar-activo');
+}
+
+// ── Selección de origen/destino ────────────────────────────────
+// Llamado desde _hxcClickSlot y _hxcToggleItem en panel-hexcast.js
+export function fxClickSlot(grupo, idx) {
+  if (fxState.modo !== 'conectar') return false;
+  const id = `slot:${grupo}:${idx}`;
+  _seleccionar(id, _slotEl(grupo, idx));
+  return true; // interceptado
+}
+
+export function fxClickItem(itemIdx) {
+  if (fxState.modo !== 'conectar') return false;
+  const id = `item:${itemIdx}`;
+  _seleccionar(id, _itemEl(itemIdx));
+  return true;
+}
+
+function _seleccionar(id, el) {
+  document.querySelectorAll('.hxfx-origen').forEach(e => e.classList.remove('hxfx-origen'));
+
+  if (!fxState.origen) {
+    fxState.origen = { id, el };
+    el?.classList.add('hxfx-origen');
+    if (typeof window._hxcRender === 'function') window._hxcRender();
+  } else {
+    if (fxState.origen.id !== id) {
+      const nueva = {
+        id:        fxState.nextLocalId--,  // ID temporal negativo
+        origenId:  fxState.origen.id,
+        destinoId: id,
+        color:     fxState.colorActivo,
+        grosor:    fxState.grosor,
+        estilo:    fxState.estilo,
+      };
+      fxState.flechas.push(nueva);
+      _scheduleRedraw();
+      _guardarFlechaDB(nueva); // guardar en DB async
+    }
+    fxState.origen = null;
+    if (typeof window._hxcRender === 'function') window._hxcRender();
+  }
+}
+
+// ── Handlers de toolbar ────────────────────────────────────────
+window._hxfxToggleConectar = () => {
+  fxState.modo = fxState.modo === 'conectar' ? null : 'conectar';
+  fxState.origen = null;
+  document.querySelectorAll('.hxfx-origen').forEach(e => e.classList.remove('hxfx-origen'));
+  _actualizarModoCursor();
   if (typeof window._hxcRender === 'function') window._hxcRender();
 };
 
 window._hxfxToggleBorrar = () => {
   fxState.modo = fxState.modo === 'borrar' ? null : 'borrar';
-  _actualizarCursores();
+  fxState.origen = null;
+  document.querySelectorAll('.hxfx-origen').forEach(e => e.classList.remove('hxfx-origen'));
+  _actualizarModoCursor();
   if (typeof window._hxcRender === 'function') window._hxcRender();
 };
 
 window._hxfxSetColor = (c) => {
   fxState.colorActivo = c;
-  if (fxState.modo !== 'flecha') fxState.modo = 'flecha';
-  _actualizarCursores();
+  if (fxState.modo !== 'conectar') fxState.modo = 'conectar';
+  _actualizarModoCursor();
   if (typeof window._hxcRender === 'function') window._hxcRender();
 };
 
 window._hxfxSetGrosor = (v) => { fxState.grosor = Math.max(1, Math.min(12, parseInt(v)||3)); };
+window._hxfxSetEstilo = (e) => { fxState.estilo = e; if (typeof window._hxcRender === 'function') window._hxcRender(); };
 
-window._hxfxLimpiar = () => {
-  fxState.flechas = [];
-  _redrawSVG('izq');
-  _redrawSVG('der');
+window._hxfxClickFlecha = (id) => {
+  if (fxState.modo !== 'borrar') return;
+  const f = fxState.flechas.find(x => x.id === id);
+  if (f) _borrarFlechaDB(f.id);
+  fxState.flechas = fxState.flechas.filter(f => f.id !== id);
+  _redibujarTodo();
 };
 
-function _actualizarCursores() {
-  ['izq','der'].forEach(lado => {
-    const svg = document.getElementById(`hxfx-svg-${lado}`);
-    if (!svg) return;
-    svg.classList.remove('modo-flecha','modo-borrar');
-    svg.style.pointerEvents = fxState.modo ? 'all' : 'none';
-    if (fxState.modo === 'flecha') svg.classList.add('modo-flecha');
-    if (fxState.modo === 'borrar') svg.classList.add('modo-borrar');
-  });
-}
+window._hxfxLimpiar = async () => {
+  // Borrar de DB todas las flechas del turno activo
+  const turnoId = hxState.turnoActivo?.id;
+  if (turnoId) {
+    await supabase.from('hexcast_flechas').delete().eq('turno_id', turnoId);
+  }
+  fxState.flechas = [];
+  _redibujarTodo();
+};
 
 // ── Exportar imagen ────────────────────────────────────────────
 window._hxfxExportar = async (oscuro = false) => {
-  const panel = document.getElementById('hxc-drawer');
-  if (!panel) return;
-
-  // Importamos html2canvas dinámicamente
-  let html2canvas;
-  try {
-    // Si está disponible globalmente
-    if (window.html2canvas) {
-      html2canvas = window.html2canvas;
-    } else {
-      // Cargamos desde CDN
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        s.onload = resolve; s.onerror = reject;
-        document.head.appendChild(s);
-      });
-      html2canvas = window.html2canvas;
-    }
-  } catch(e) {
-    _toast('No se pudo cargar html2canvas', true);
-    return;
+  if (!window.html2canvas) {
+    await new Promise((res,rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
   }
-
-  // Ocultar temporalmente elementos UI que no queremos en la captura
-  const ocultar = panel.querySelectorAll('.hxc-header,.hxfx-toolbar,.hxc-center-top,.hxc-col-title');
-  const estilosOriginales = [];
-  ocultar.forEach(el => {
-    estilosOriginales.push(el.style.display);
-    el.style.display = 'none';
+  const target = document.querySelector('.hxc-body') || document.getElementById('hxc-drawer');
+  if (!target) return;
+  const prev = target.style.background;
+  if (!oscuro) target.style.background = '#f4f0e8';
+  // Ocultar toolbar momentáneamente
+  const tb = target.querySelector('.hxfx-toolbar');
+  if (tb) tb.style.display = 'none';
+  const canvas = await window.html2canvas(target, {
+    backgroundColor: oscuro ? '#08080e' : '#f4f0e8',
+    scale: 2, useCORS: true, allowTaint: true, logging: false,
   });
-
-  const bgOriginal = panel.style.background;
-  if (!oscuro) panel.style.background = '#f5f0e8';
-
-  // Capturar solo el hxc-body
-  const body = panel.querySelector('.hxc-body');
-  const canvas = await html2canvas(body || panel, {
-    backgroundColor: oscuro ? '#08080e' : '#f5f0e8',
-    scale: 2,
-    useCORS: true,
-    allowTaint: true,
-    logging: false,
-  });
-
-  // Restaurar
-  ocultar.forEach((el, i) => el.style.display = estilosOriginales[i]);
-  panel.style.background = bgOriginal;
-
-  // Si es claro, invertir colores de texto con un filtro
-  const finalCanvas = canvas;
-
-  // Descargar
+  target.style.background = prev;
+  if (tb) tb.style.display = '';
   const link = document.createElement('a');
-  const turno = document.querySelector('.hxc-turno-label')?.textContent?.replace(/\s+/g,'_') || 'turno';
-  link.download = `hexcast_${turno}_${oscuro?'oscuro':'claro'}.png`;
-  link.href = finalCanvas.toDataURL('image/png');
+  const tn = document.querySelector('.hxc-turno-label strong')?.textContent || 'T';
+  link.download = `hexcast_T${tn}_${oscuro?'oscuro':'claro'}.png`;
+  link.href = canvas.toDataURL('image/png');
   link.click();
-
-  _toast('✦ Imagen exportada');
 };
-
-function _toast(msg, err = false) {
-  let el = document.getElementById('hxc-toast');
-  if (!el) { el = document.createElement('div'); el.id = 'hxc-toast'; el.className = 'hxc-toast'; document.body.appendChild(el); }
-  el.textContent = msg;
-  el.style.color = err ? '#e07070' : '#c8a0f0';
-  el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 2800);
-}
