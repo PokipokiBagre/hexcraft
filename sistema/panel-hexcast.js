@@ -545,9 +545,9 @@ function _renderCenter() {
       <div class="hxc-turno-nav">
         <button class="hxc-turno-nav-btn" ${turnoIdx<=0?'disabled':''} onclick="window._hxcIrTurno(${turnoIdx-1})">‹</button>
         <select class="hxc-turno-select" onchange="window._hxcIrTurno(this.value)">${turnoOptions}</select>
-        <button class="hxc-turno-nav-btn" ${turnoIdx>=turnos.length-1?'disabled':''} onclick="window._hxcIrTurno(${turnoIdx+1})">›</button>
+        <button class="hxc-turno-nav-btn" onclick="window._hxcNavSiguiente(${turnoIdx}, ${turnos.length})">›</button>
       </div>
-      <button class="hxc-btn-nuevo-turno" onclick="window._hxcNuevoTurno()">+ Turno</button>
+      <button class="hxc-btn-nuevo-turno" onclick="window._hxcCrearTurnoSolo()">+ Turno</button>
       ${!esHistorico ? `<button class="hxc-btn-confirmar" onclick="window._hxcConfirmar()">Confirmar ›</button>` : ''}
       ${btnGuardarHistorico}
       ${botonesOp}
@@ -923,13 +923,19 @@ window._hxcIrTurno = async (idxRaw) => {
   await cargarHistorialSesion(hxState.sesionActiva?.id, turno.numero);
 
   if (!esUltimo) {
-    const { data } = await supabase.from('hexcast_lanzamientos').select('*, cd_override').eq('turno_id', turno.id).order('orden');
+    const { data } = await supabase.from('hexcast_lanzamientos')
+      .select('*, cd_override, es_evento, evento_payload, evento_nombre, evento_desc, evento_aplicado')
+      .eq('turno_id', turno.id).order('orden');
     const rows = data || [];
 
-    // Reconstruir slots desde lanzamientos
+    // Separar eventos de hechizos
+    const hechizosRows = rows.filter(r => !r.es_evento);
+    const eventosRows  = rows.filter(r => r.es_evento);
+
+    // Reconstruir slots desde hechizos normales únicamente
     const grupoA = [null,null,null], grupoB = [null,null,null];
     const vistos = { A:[], B:[] };
-    rows.forEach(row => {
+    hechizosRows.forEach(row => {
       const g = row.grupo === 'B' ? 'B' : 'A';
       const arr = vistos[g];
       if (!arr.includes(row.personaje_nombre) && arr.length < 3) {
@@ -952,12 +958,12 @@ window._hxcIrTurno = async (idxRaw) => {
       }
     });
 
-    hxState.stack = rows.map(row => {
+    // Reconstruir stack de hechizos
+    const stackHechizos = hechizosRows.map(row => {
       const g   = row.grupo === 'B' ? 'B' : 'A';
       const arr = vistos[g];
       const si  = arr.indexOf(row.personaje_nombre);
       const color = SLOT_COLORS[g][Math.max(0, si)] || SLOT_COLORS.A[0];
-      // Enrich with catalog data if available
       const cat = hxState.catalogoDB.find(h =>
         _norm(h.hechizo_id) === _norm(row.hechizo_id) || _norm(h.nombre) === _norm(row.hechizo_nombre)
       );
@@ -987,11 +993,38 @@ window._hxcIrTurno = async (idxRaw) => {
         dado: row.dado_d100??'', afinidadEfectiva: row.afinidad_efectiva,
         mult: row.multiplicador_cd,
         cdOverride: row.cd_override ?? undefined,
-        costoBase: row.hechizo_hex_cost,    // HEX real cobrado
-        ncNecesario: row.costo_efectivo,    // NC umbral (guardado en costo_efectivo)
+        costoBase: row.hechizo_hex_cost,
+        ncNecesario: row.costo_efectivo,
         abierto: false, resultado: row.resultado, ncCalc: row.nc, hexGastado: row.hex_gastado
       };
     });
+
+    // Reconstruir stack de eventos
+    const stackEventos = eventosRows.map(row => {
+      const g = row.grupo === 'B' ? 'B' : 'A';
+      const si = vistos[g]?.indexOf(row.personaje_nombre) ?? 0;
+      const color = SLOT_COLORS[g][Math.max(0, si)] || SLOT_COLORS.A[0];
+      let payload = [];
+      try { payload = row.evento_payload ? JSON.parse(row.evento_payload) : []; } catch(e) {}
+      return {
+        id: row.id, tipoItem: 'evento',
+        pjNombre: row.personaje_nombre, grupo: g, slotIdx: si, color,
+        eventoTipo: 'evento',
+        eventoNombre: row.evento_nombre || 'Evento',
+        eventoDesc:   row.evento_desc   || '',
+        _payload:     payload,
+        _aplicado:    row.evento_aplicado || false,
+        abierto: false
+      };
+    });
+
+    // Merge ordenado por posición original (orden en DB)
+    const allRows = rows.map((row, i) => ({ row, i }));
+    hxState.stack = allRows.map(({ row }) => {
+      if (row.es_evento) return stackEventos.find(e => e.id === row.id);
+      return stackHechizos.find(h => h.id === row.id);
+    }).filter(Boolean);
+
   } else {
     hxState.stack = [];
   }
@@ -1152,6 +1185,10 @@ window._hxcAplicarEvento = async (stackIdx) => {
     const { aplicarPayload } = await import('./panel-hexcast-evento.js');
     const errores = await aplicarPayload(item._payload, false);
     item._aplicado = true;
+    // Persistir estado aplicado en DB si tiene ID real
+    if (item.id && typeof item.id === 'number') {
+      await supabase.from('hexcast_lanzamientos').update({ evento_aplicado: true }).eq('id', item.id);
+    }
     if (errores.length) _toast('Errores: ' + errores.join(', '), true);
     else _toast('✦ Evento aplicado');
   } catch(e) { _toast('Error aplicando evento', true); }
@@ -1167,6 +1204,9 @@ window._hxcRevertirEvento = async (stackIdx) => {
     const { aplicarPayload } = await import('./panel-hexcast-evento.js');
     const errores = await aplicarPayload(item._payload, true);
     item._aplicado = false;
+    if (item.id && typeof item.id === 'number') {
+      await supabase.from('hexcast_lanzamientos').update({ evento_aplicado: false }).eq('id', item.id);
+    }
     if (errores.length) _toast('Errores: ' + errores.join(', '), true);
     else _toast('↩ Evento revertido');
   } catch(e) { _toast('Error revirtiendo evento', true); }
@@ -1506,6 +1546,8 @@ window._hxcGuardarHistorico = async () => {
   // Separar items con ID de DB (existentes) de items nuevos (sin ID numérico)
   const existentes = hxState.stack.filter(i => i.id && typeof i.id === 'number' && i.tipoItem !== 'evento');
   const nuevos     = hxState.stack.filter(i => (!i.id || typeof i.id !== 'number') && i.tipoItem !== 'evento');
+  // Eventos nuevos sin ID de DB
+  const eventosNuevos = hxState.stack.filter(i => i.tipoItem === 'evento' && (!i.id || typeof i.id !== 'number'));
 
   // Actualizar los existentes
   for (const item of existentes) {
@@ -1568,6 +1610,12 @@ window._hxcGuardarHistorico = async () => {
     }
   }
 
+  // Persistir eventos nuevos
+  if (eventosNuevos.length > 0) {
+    const ids = await _persistirEventos(eventosNuevos, turno.id);
+    ids.forEach((id, i) => { eventosNuevos[i].id = id; });
+  }
+
   _toast('✦ Turno guardado');
   _render();
 };
@@ -1579,25 +1627,83 @@ window._hxcNuevoTurno = async () => {
   const nuevoTurno = await crearTurno(hxState.sesionActiva.id, hxState.turnos.length + 1);
   hxState.turnoActivo = nuevoTurno;
   hxState.stack = [];
-  // Carry-forward: copiar estados del turno anterior al nuevo
   await _carryForwardEstados(turnoAnteriorId, nuevoTurno.id, hxState.sesionActiva.id);
   await _cargarTodosEstadosTurno();
   _render();
 };
 
+// Solo crea el turno sin navegar a él
+window._hxcCrearTurnoSolo = async () => {
+  if (!hxState.sesionActiva) return;
+  await crearTurno(hxState.sesionActiva.id, hxState.turnos.length + 1);
+  _toast('✦ Turno ' + hxState.turnos.length + ' creado');
+  _render(); // actualiza el select y contador
+};
+
+// Siguiente: navega si existe, crea+navega si es el último
+window._hxcNavSiguiente = async (turnoIdx, totalTurnos) => {
+  if (turnoIdx < totalTurnos - 1) {
+    // Existe siguiente → navegar
+    await window._hxcIrTurno(turnoIdx + 1);
+  } else {
+    // Es el último → crear y navegar
+    if (!hxState.sesionActiva) return;
+    const turnoAnteriorId = hxState.turnoActivo?.id;
+    const nuevoTurno = await crearTurno(hxState.sesionActiva.id, hxState.turnos.length + 1);
+    hxState.turnoActivo = nuevoTurno;
+    hxState.stack = [];
+    await _carryForwardEstados(turnoAnteriorId, nuevoTurno.id, hxState.sesionActiva.id);
+    await _cargarTodosEstadosTurno();
+    _toast('✦ Turno ' + nuevoTurno.numero + ' creado');
+    _render();
+  }
+};
+
 window._hxcConfirmar = async () => {
-  const hechizos = hxState.stack.filter(i => i.tipoItem !== 'evento');
-  if (!hechizos.length) { _toast('Stack vacío (solo eventos, sin hechizos)', true); return; }
+  if (!hxState.stack.length) { _toast('Stack vacío', true); return; }
   const turnoAnteriorId = hxState.turnoActivo?.id;
+  // Capturar eventos ANTES de que confirmarTurno vacíe el stack
+  const eventosAnteriores = hxState.stack.filter(i => i.tipoItem === 'evento');
   const res = await confirmarTurno();
   if (!res.ok) { _toast('Error: ' + res.msg, true); return; }
-  // Carry-forward: copiar estados al nuevo turno creado por confirmarTurno
-  const nuevoTurno = hxState.turnoActivo; // confirmarTurno ya actualizó turnoActivo
+
+  // Persistir bloques evento con el turno anterior
+  if (eventosAnteriores.length > 0 && turnoAnteriorId) {
+    await _persistirEventos(eventosAnteriores, turnoAnteriorId);
+  }
+
+  const nuevoTurno = hxState.turnoActivo;
   await _carryForwardEstados(turnoAnteriorId, nuevoTurno.id, hxState.sesionActiva.id);
   await _cargarTodosEstadosTurno();
   _toast('✦ Turno ' + (nuevoTurno?.numero??'') + ' confirmado');
   _render();
 };
+
+// Persiste bloques evento en hexcast_lanzamientos. Devuelve array de IDs insertados.
+async function _persistirEventos(eventos, turnoId) {
+  if (!eventos.length || !turnoId) return [];
+  const sesionId = hxState.sesionActiva?.id;
+  const rows = eventos.map((item, i) => ({
+    turno_id:        turnoId,
+    sesion_id:       sesionId,
+    personaje_nombre: item.pjNombre,
+    grupo:           item.grupo || 'A',
+    hechizo_id:      '__evento__',
+    hechizo_nombre:  item.eventoNombre || 'Evento',
+    hechizo_afinidad: '',
+    hechizo_hex_cost: 0,
+    afinidad_efectiva: 0,
+    es_evento:       true,
+    evento_payload:  item._payload ? JSON.stringify(item._payload) : null,
+    evento_nombre:   item.eventoNombre || 'Evento',
+    evento_desc:     item.eventoDesc || '',
+    evento_aplicado: item._aplicado || false,
+    orden:           hxState.stack.indexOf(item),
+  }));
+  const { data, error } = await supabase.from('hexcast_lanzamientos').insert(rows).select('id');
+  if (error) { console.error('_persistirEventos:', error); return []; }
+  return (data || []).map(r => r.id);
+}
 
 // Copia los estados activos del turno anterior al turno nuevo (carry-forward)
 async function _carryForwardEstados(turnoAnteriorId, nuevoTurnoId, sesionId) {
