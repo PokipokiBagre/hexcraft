@@ -302,7 +302,7 @@ function _inyectarEstilos() {
 // ── CARGA DE DATOS ───────────────────────────────────────────
 async function _cargarDatos() {
     const [nodosRes, stringsRes, afinRes, jugadoresRes] = await Promise.all([
-        supabase.from('hechizos_nodos').select('hechizo_id, nombre, afinidad, clase, hex_cost, es_conocido, pos_x, pos_y, radio, color, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo'),
+        supabase.from('hechizos_nodos').select('hechizo_id, nombre, afinidad, clase, hex_cost, es_conocido, pos_x, pos_y, radio, color, backcast, nextcast, es_estado, afecta_hechizos, afecta_usuario, afecta_objetivo, valor_vex, nota'),
         supabase.from('hechizos_strings').select('source_id, target_id'),
         supabase.from('hechizos_afinidades').select('afinidad, color_t, color_b'),
         supabase.from('personajes').select('nombre').eq('is_player', true).eq('is_active', true).order('nombre'),
@@ -321,6 +321,8 @@ async function _cargarDatos() {
         afinidad:      n.afinidad || 'Desconocida',
         clase:         n.clase || '1',
         hex:           n.hex_cost || 0,
+            vex:           n.valor_vex || 0,
+            nota:          n.nota || '',
         esConocido:    n.es_conocido,
         x:             n.pos_x || 0,
         y:             n.pos_y || 0,
@@ -846,6 +848,56 @@ function _dibujar() {
                 ctx.lineWidth = 3/sf;
                 ctx.strokeText(hexTxt, nodo.x, pillY + 2/sf);
                 ctx.fillText(hexTxt, nodo.x, pillY + 2/sf);
+
+                // Medallita VEX debajo del HEX
+                if (nodo.vex > 0) {
+                    const vexTxt = `⬡${nodo.vex} VEX`;
+                    ctx.font = `${fsPill}px sans-serif`;
+                    const vexW = ctx.measureText(vexTxt).width + 8/sf;
+                    const vexH = fsPill + 4/sf;
+                    const vexX = nodo.x - vexW/2;
+                    const vexY = pillY + pillH + 3/sf;
+
+                    ctx.beginPath();
+                    ctx.roundRect?.(vexX, vexY, vexW, vexH, 4/sf) || ctx.rect(vexX, vexY, vexW, vexH);
+                    ctx.fillStyle = 'rgba(20,10,35,0.85)';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(150,80,220,0.4)';
+                    ctx.lineWidth = 1/sf;
+                    ctx.stroke();
+
+                    ctx.font = `bold ${fsPill}px sans-serif`;
+                    ctx.fillStyle = 'rgba(176,96,232,0.9)';
+                    ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+                    ctx.lineWidth = 3/sf;
+                    ctx.strokeText(vexTxt, nodo.x, vexY + 2/sf);
+                    ctx.fillText(vexTxt, nodo.x, vexY + 2/sf);
+                }
+            } else if (nodo.vex > 0 && camara.zoom > 0.25 && !esIrrelevante) {
+                // Solo VEX, sin HEX
+                const vexTxt = `⬡${nodo.vex} VEX`;
+                const fsPill = 17;
+                ctx.font = `${fsPill}px sans-serif`;
+                const vexW = ctx.measureText(vexTxt).width + 8/sf;
+                const vexH = fsPill + 4/sf;
+                const vexX = nodo.x - vexW/2;
+                const vexY = ty2 + fs + 6/sf;
+
+                ctx.beginPath();
+                ctx.roundRect?.(vexX, vexY, vexW, vexH, 4/sf) || ctx.rect(vexX, vexY, vexW, vexH);
+                ctx.fillStyle = 'rgba(20,10,35,0.85)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(150,80,220,0.4)';
+                ctx.lineWidth = 1/sf;
+                ctx.stroke();
+
+                ctx.font = `bold ${fsPill}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(176,96,232,0.9)';
+                ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+                ctx.lineWidth = 3/sf;
+                ctx.strokeText(vexTxt, nodo.x, vexY + 2/sf);
+                ctx.fillText(vexTxt, nodo.x, vexY + 2/sf);
             }
 
             ctx.globalAlpha = 1.0;
@@ -868,12 +920,18 @@ function _renderInfo(nodo) {
 
     const nombre = mostrarFull ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
 
-    // Fila superior: nombre + hex inline
+    // Fila superior: nombre + hex + vex inline
     const hexTag = mostrarFull && nodo.hex > 0
         ? `<span style="display:inline-flex;align-items:center;font-size:0.82em;color:#c9953a;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.25);border-radius:4px;padding:1px 6px;margin-left:6px;font-family:'Cinzel',serif;">⬡ ${nodo.hex}</span>`
         : '';
+    const vexTag = mostrarFull && nodo.vex > 0
+        ? `<span style="display:inline-flex;align-items:center;font-size:0.82em;color:#b060e8;background:rgba(150,80,220,0.1);border:1px solid rgba(150,80,220,0.3);border-radius:4px;padding:1px 6px;margin-left:5px;font-family:'Cinzel',serif;">⬡ ${nodo.vex} VEX</span>`
+        : '';
+    const notaTag = mostrarFull && nodo.nota
+        ? `<span style="display:inline-flex;align-items:center;font-size:0.75em;color:#d4a830;background:rgba(212,160,30,0.08);border:1px solid rgba(212,160,30,0.22);border-radius:4px;padding:1px 6px;margin-left:5px;">📌 ${nodo.nota}</span>`
+        : '';
 
-    let html = `<h4 style="color:${color};display:flex;align-items:center;gap:4px;margin:0 0 6px;">${nombre}${hexTag}</h4>`;
+    let html = `<h4 style="color:${color};display:flex;align-items:center;gap:4px;margin:0 0 6px;flex-wrap:wrap;">${nombre}${hexTag}${vexTag}${notaTag}</h4>`;
 
     if (mostrarFull) {
         html += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">`;
