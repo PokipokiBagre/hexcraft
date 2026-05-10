@@ -2794,6 +2794,18 @@ window._ppjAbrirEditorHz = async (hechizo_id, nombrePJ, modo) => {
         <label class="ppj-hz-inline-label" style="margin-top:10px;">Especial</label>
         <input class="ppj-hz-inline-input" id="hze-especial" value="${(nodo?.especial||'').replace(/"/g,'&quot;')}">
 
+        <div class="ppj-hz-modal-row" style="margin-top:10px;">
+            <div>
+                <label class="ppj-hz-inline-label">⬡ Valor VEX</label>
+                <input class="ppj-hz-inline-input" id="hze-valor-vex" type="number" min="0" step="1"
+                    value="${nodo?.valor_vex??0}" style="text-align:center;">
+            </div>
+            <div>
+                <label class="ppj-hz-inline-label">📌 Nota</label>
+                <input class="ppj-hz-inline-input" id="hze-nota" value="${(nodo?.nota||'').replace(/"/g,'&quot;')}" placeholder="Nota visible en el stack">
+            </div>
+        </div>
+
         <!-- ── BACKCAST / NEXTCAST ── -->
         <div class="ppj-hz-modal-row" style="margin-top:14px;">
             <div>
@@ -2972,6 +2984,8 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
     const afHechizos= document.getElementById('hze-afecta-hechizos')?.checked || false;
     const afUsuario = document.getElementById('hze-afecta-usuario')?.checked || false;
     const afObjetivo= document.getElementById('hze-afecta-objetivo')?.checked || false;
+    const valorVex  = parseInt(document.getElementById('hze-valor-vex')?.value) || 0;
+    const nota      = document.getElementById('hze-nota')?.value.trim() || '';
 
     // ── FIX: usar _ppjHzGetStrs() (antes _ppjHzStrsSel no estaba definida) ──
     const strs       = window._ppjHzGetStrs?.() || { entrada: [], salida: [] };
@@ -2992,6 +3006,8 @@ window._ppjGuardarHz = async (nombrePJ, asignarAlPJ) => {
         afecta_hechizos: afHechizos,
         afecta_usuario:  afUsuario,
         afecta_objetivo: afObjetivo,
+        valor_vex: valorVex,
+        nota,
         ...((!idOriginal && tempNodo) ? { pos_x: Math.round(tempNodo.x), pos_y: Math.round(tempNodo.y) } : {}),
     };
 
