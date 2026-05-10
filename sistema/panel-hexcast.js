@@ -681,7 +681,7 @@ function _renderStack(esHistorico) {
     const priCls  = item.esPrioridad ? 'prioridad' : '';
     const estadoCls = esEstado ? 'es-estado' : '';
     const resCls  = item.resultado ? `res-${item.resultado}` : '';
-    const multStr = item.mult > 1 ? `×${item.mult.toFixed(2)} CD` : '';
+    const multStr = item.mult > 1 ? `×${Math.round(item.mult * 100)}% CD` : '';
 
     // Meta badges: estado, prioridad
     const badgeEstado = esEstado
@@ -753,16 +753,18 @@ function _renderStack(esHistorico) {
 
       // CD editor (solo OP) — permite ajustar el CD del PJ para esta afinidad en tiempo real
       const afKeyItem = (item.hechizo?.afinidad || '').toLowerCase();
-      const cdActual = hxState.cdPorPj[item.pjNombre]?.[afKeyItem] ?? 0.5;
+      const cdActual = hxState.cdPorPj[item.pjNombre]?.[afKeyItem] ?? (personajes[item.pjNombre]?.['cd_' + afKeyItem] ?? 0.5);
+      const cdPct = Math.round(cdActual * 100);
       const cdEditorHtml = (puedeEditar && _esAdmin()) ? `<div class="hxc-cd-edit-row" onclick="event.stopPropagation()">
         <span class="hxc-cd-edit-label">CD ${item.hechizo?.afinidad || ''}:</span>
-        <button class="hxc-cd-edit-btn" onclick="window._hxcCdStep(${i},-0.05)">▼</button>
-        <input class="hxc-cd-edit-input" type="number" step="0.05" min="0" max="5"
-          value="${cdActual.toFixed(2)}"
+        <button class="hxc-cd-edit-btn" onclick="window._hxcCdStep(${i},-5)">▼</button>
+        <input class="hxc-cd-edit-input" type="number" step="5" min="0" max="500"
+          value="${cdPct}"
           onchange="window._hxcCdSet(${i},parseFloat(this.value))"
           oninput="window._hxcCdSet(${i},parseFloat(this.value))"
           onclick="event.stopPropagation()">
-        <button class="hxc-cd-edit-btn" onclick="window._hxcCdStep(${i},0.05)">▲</button>
+        <span style="font-size:0.72em;color:#e8a030;margin-left:-4px;">%</span>
+        <button class="hxc-cd-edit-btn" onclick="window._hxcCdStep(${i},5)">▲</button>
         <span class="hxc-cd-edit-hint">Afecta todos los hechizos de esta afinidad</span>
       </div>` : '';
 
@@ -920,6 +922,18 @@ window._hxcIrTurno = async (idxRaw) => {
       }
     });
     hxState.grupoA = grupoA; hxState.grupoB = grupoB;
+
+    // Inicializar cdPorPj desde los personajes reconstruidos
+    [...grupoA, ...grupoB].filter(Boolean).forEach(slot => {
+      const p = personajes[slot.nombre];
+      if (p && !hxState.cdPorPj[slot.nombre]) {
+        hxState.cdPorPj[slot.nombre] = {
+          fisica: p.cd_fisica ?? 0.5, energetica: p.cd_energetica ?? 0.5,
+          espiritual: p.cd_espiritual ?? 0.5, mando: p.cd_mando ?? 0.5,
+          psiquica: p.cd_psiquica ?? 0.5, oscura: p.cd_oscura ?? 0.5
+        };
+      }
+    });
 
     hxState.stack = rows.map(row => {
       const g   = row.grupo === 'B' ? 'B' : 'A';
@@ -1327,14 +1341,14 @@ window._hxcSetPrioridad = (idx) => { moverAPrioridad(hxState.stack[idx].id); _re
 
 // ── CD editable por OP ────────────────────────────────────────
 // Ajusta el CD del PJ para la afinidad del item y recalcula el stack
-function _aplicarCdCambio(stackIdx, nuevoCd) {
+// nuevoCdPct: valor en porcentaje entero (ej. 40 = 0.40)
+function _aplicarCdCambio(stackIdx, nuevoCdPct) {
   const item = hxState.stack[stackIdx]; if (!item) return;
   const afKey = (item.hechizo?.afinidad || '').toLowerCase();
   if (!hxState.cdPorPj[item.pjNombre]) hxState.cdPorPj[item.pjNombre] = {};
-  const cdValido = Math.max(0, Math.round(nuevoCd * 1000) / 1000); // evitar float drift
+  const cdValido = Math.max(0, Math.round(nuevoCdPct)) / 100; // pct → decimal, sin float drift
   hxState.cdPorPj[item.pjNombre][afKey] = cdValido;
-  // _recalcCooldowns está en hexcast-logic pero no es exportada; re-calculamos desde el módulo
-  // Recalculamos manualmente el mismo algoritmo que _recalcCooldowns de hexcast-logic.js
+  // Recalcular todos los mults del stack con el nuevo CD
   const vistoStack = {};
   hxState.stack.forEach(it => {
     const af = (it.hechizo?.afinidad || '').toLowerCase();
@@ -1347,23 +1361,25 @@ function _aplicarCdCambio(stackIdx, nuevoCd) {
     else if (lastMult === 0) { mult = 1.0 + previosStack * cd; }
     else { mult = lastMult + (1 + previosStack) * cd; }
     it.mult = mult;
-    // ncNecesario = costoBase * mult redondeado
     it.ncNecesario = Math.round(it.costoBase * mult);
     vistoStack[k] = previosStack + 1;
   });
   _render();
 }
 
-window._hxcCdSet  = (stackIdx, val) => { if (!isNaN(val) && val >= 0) _aplicarCdCambio(stackIdx, val); };
-window._hxcCdStep = (stackIdx, delta) => {
+window._hxcCdSet  = (stackIdx, pct) => { if (!isNaN(pct) && pct >= 0) _aplicarCdCambio(stackIdx, pct); };
+window._hxcCdStep = (stackIdx, deltaPct) => {
   const item = hxState.stack[stackIdx]; if (!item) return;
   const afKey = (item.hechizo?.afinidad || '').toLowerCase();
-  const actual = hxState.cdPorPj[item.pjNombre]?.[afKey] ?? 0.5;
-  const nuevo  = Math.max(0, Math.round((actual + delta) * 1000) / 1000);
-  _aplicarCdCambio(stackIdx, nuevo);
+  // Leer CD actual en porcentaje entero
+  const cdDec = hxState.cdPorPj[item.pjNombre]?.[afKey]
+    ?? (personajes[item.pjNombre]?.['cd_' + afKey] ?? 0.5);
+  const actualPct = Math.round(cdDec * 100);
+  const nuevoPct  = Math.max(0, actualPct + deltaPct);
+  _aplicarCdCambio(stackIdx, nuevoPct);
   // Actualizar el input visualmente sin esperar re-render completo
   const el = document.querySelector(`[data-hxc-idx="${stackIdx}"] .hxc-cd-edit-input`);
-  if (el) el.value = nuevo.toFixed(2);
+  if (el) el.value = nuevoPct;
 };
 
 window._hxcRemover = async (idx) => {
