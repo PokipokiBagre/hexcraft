@@ -772,7 +772,10 @@ const _CLARO_CSS = `
 .hxc-claro .hxc-badge-hist { background:#fff3e6!important; color:#8a3800!important; border:1.5px solid #e08030!important; font-weight:700!important; }
 /* Botones turno nav */
 .hxc-claro .hxc-turno-nav-btn { background:#f0f0f3!important; border:1px solid #d0d0d8!important; color:#1a1a1a!important; }
-.hxc-claro .hxc-turno-select { background:#fff!important; border:1px solid #d0d0d8!important; color:#0d0d0d!important; }
+.hxc-claro .hxc-turno-select { background:#fff!important; border:1px solid #d0d0d8!important; color:#0d0d0d!important; min-width:52px!important; width:auto!important; text-align:center!important; }
+.hxc-claro .hxc-center-top input[type="text"],
+.hxc-claro .hxc-center-top input[type="number"] { min-width:52px!important; width:auto!important; text-align:center!important; }
+.hxc-claro .hxc-turno-label { min-width:max-content!important; white-space:nowrap!important; }
 
 /* Items hechizo */
 .hxc-claro .hxc-item { background:#ffffff!important; border:1px solid #e0e0e8!important; box-shadow:0 1px 3px rgba(0,0,0,0.06)!important; }
