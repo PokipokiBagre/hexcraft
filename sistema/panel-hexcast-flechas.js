@@ -45,10 +45,12 @@ function _css() {
 }
 [data-hxc-idx].hxfx-origen { outline: 2px dashed #40c840 !important; outline-offset: 2px; }
 .hxc-slot.hxfx-origen { outline: 2px dashed #40c840 !important; }
+.hxc-estado-block.hxfx-origen { outline: 2px dashed #40c840 !important; outline-offset: 1px; }
 
 /* Hover en modo conectar */
 .modo-conectar-activo [data-hxc-idx]:hover,
-.modo-conectar-activo .hxc-slot:not(.vacio):hover {
+.modo-conectar-activo .hxc-slot:not(.vacio):hover,
+.modo-conectar-activo .hxc-estado-block[data-hxf-id]:hover {
   outline: 2px dashed rgba(64,200,64,0.5) !important;
   outline-offset: 2px;
   cursor: crosshair !important;
@@ -335,6 +337,10 @@ function _onDragMove(e) {
   let ladoO = 'right';
   if (fxState.drag.origenId.startsWith('slot:A')) ladoO = 'right';
   else if (fxState.drag.origenId.startsWith('slot:B')) ladoO = 'left';
+  else if (fxState.drag.origenId.startsWith('estado:')) {
+    const el = fxState.drag.origenEl;
+    ladoO = el?.closest('.hxc-col-b') ? 'left' : 'right';
+  }
   else if (fxState.drag.origenId.startsWith('item:')) {
     ladoO = fxState.drag.origenId.endsWith(':L') ? 'left' : 'right';
   }
@@ -408,6 +414,17 @@ export function fxMouseDownItem(e, itemIdx) {
 export function fxClickSlot(grupo, idx) { return false; }
 export function fxClickItem(itemIdx)     { return false; }
 
+// Drag desde bloque de estado
+export function fxMouseDownEstado(e, hxfId) {
+  if (fxState.modo !== 'conectar') return false;
+  e.stopPropagation();
+  const el = document.querySelector(`.hxc-estado-block[data-hxf-id="${hxfId}"]`);
+  if (!el) return false;
+  el.classList.add('hxfx-origen');
+  fxState.drag = { origenId: `estado:${hxfId}`, origenEl: el };
+  return true;
+}
+
 // ── Obtener posición central de un elemento relativa al SVG overlay ──
 // ── Posición en el BORDE del elemento (izq o der), no en el centro ──
 function _posEl(el, lado) {
@@ -456,38 +473,49 @@ function _svgFlecha(f) {
   const elD = _findEl(f.destinoId);
   if (!elO || !elD) return '';
 
-  const isColA = (id) => id.startsWith('slot:A');
-  const isColB = (id) => id.startsWith('slot:B');
+  const isColA   = (id) => id.startsWith('slot:A');
+  const isColB   = (id) => id.startsWith('slot:B');
   const isCenter = (id) => id.startsWith('item:');
+  const isEstado = (id) => id.startsWith('estado:');
+
+  // Para estados, detectar en qué columna está su elemento DOM
+  const ladoEstado = (id) => {
+    const el = _findEl(id);
+    if (!el) return 'right';
+    const col = el.closest('.hxc-col');
+    return col?.classList.contains('hxc-col-b') ? 'left' : 'right';
+  };
 
   // 1. Extraer sufijo explícito si existe (:L o :R)
   const getExplicit = (id) => {
     if (id.endsWith(':L')) return 'left';
     if (id.endsWith(':R')) return 'right';
-    return null; // Flechas antiguas de la DB no tienen sufijo
+    return null;
   };
 
   let ladoO = getExplicit(f.origenId);
   let ladoD = getExplicit(f.destinoId);
 
-  // 2. Si no hay sufijo (flechas viejas de DB o slots), deducir lógicamente el lado
+  // 2. Deducir lado si no hay sufijo explícito
   if (!ladoO) {
-    if (isColA(f.origenId)) ladoO = 'right'; // Grupo A expulsa por su derecha
-    else if (isColB(f.origenId)) ladoO = 'left';  // Grupo B expulsa por su izquierda
+    if (isColA(f.origenId))   ladoO = 'right';
+    else if (isColB(f.origenId))   ladoO = 'left';
+    else if (isEstado(f.origenId)) ladoO = ladoEstado(f.origenId);
     else if (isCenter(f.origenId)) {
-      if (isColA(f.destinoId)) ladoO = 'left'; // Va hacia A, sale por la izquierda
-      else if (isColB(f.destinoId)) ladoO = 'right'; // Va hacia B, sale por la derecha
-      else ladoO = 'right'; // Item a Item por defecto a la derecha
+      if (isColA(f.destinoId) || isEstado(f.destinoId) && ladoEstado(f.destinoId)==='right') ladoO = 'left';
+      else if (isColB(f.destinoId)) ladoO = 'right';
+      else ladoO = 'right';
     }
   }
 
   if (!ladoD) {
-    if (isColA(f.destinoId)) ladoD = 'right'; // Grupo A recibe por su derecha
-    else if (isColB(f.destinoId)) ladoD = 'left';  // Grupo B recibe por su izquierda
+    if (isColA(f.destinoId))   ladoD = 'right';
+    else if (isColB(f.destinoId))   ladoD = 'left';
+    else if (isEstado(f.destinoId)) ladoD = ladoEstado(f.destinoId);
     else if (isCenter(f.destinoId)) {
-      if (isColA(f.origenId)) ladoD = 'left'; // Viene de A, entra por la izquierda
-      else if (isColB(f.origenId)) ladoD = 'right'; // Viene de B, entra por la derecha
-      else ladoD = 'right'; // Item a Item por defecto a la derecha
+      if (isColA(f.origenId) || isEstado(f.origenId) && ladoEstado(f.origenId)==='right') ladoD = 'left';
+      else if (isColB(f.origenId)) ladoD = 'right';
+      else ladoD = 'right';
     }
   }
 

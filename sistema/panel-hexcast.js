@@ -12,7 +12,7 @@ import {
   agregarHechizo, removerHechizo, moverAPrioridad,
   evaluarItem, confirmarTurno, getAfinidadEfectiva
 } from './hexcast-logic.js';
-import { renderToolbarFlechas, renderCanalSVG, montarOverlay, observarStack, fxClickSlot, fxClickItem, fxMouseDownSlot, fxMouseDownItem, cargarFlechasTurno, resetFlechas } from './panel-hexcast-flechas.js';
+import { renderToolbarFlechas, renderCanalSVG, montarOverlay, observarStack, fxClickSlot, fxClickItem, fxMouseDownSlot, fxMouseDownItem, fxMouseDownEstado, cargarFlechasTurno, resetFlechas } from './panel-hexcast-flechas.js';
 
 // ── CSS ───────────────────────────────────────────────────────
 function _css() {
@@ -321,8 +321,9 @@ function _render() {
 }
 window._hxcRender = _render;
 // Exponer funciones de drag para uso desde HTML inline
-window.fxMouseDownSlot = fxMouseDownSlot;
-window.fxMouseDownItem = fxMouseDownItem;
+window.fxMouseDownSlot   = fxMouseDownSlot;
+window.fxMouseDownItem   = fxMouseDownItem;
+window.fxMouseDownEstado = fxMouseDownEstado;
 window._hxcReplaceStackItem = (idx, nuevoItem) => {
   if (idx >= 0 && idx < hxState.stack.length) {
     // Preserve _aplicado state if it was already applied
@@ -475,6 +476,7 @@ function _renderSlot(pj, grupo, idx) {
         const hxfId = `${pj.nombre.replace(/[^a-zA-Z0-9]/g,'_')}_${e.id}`;
         return `<div class="hxc-estado-block" style="${vars}"
           data-hxf-id="${hxfId}"
+          onmousedown="if(window.fxMouseDownEstado&&window.fxMouseDownEstado(event,'${hxfId}'))event.preventDefault()"
           onclick="event.stopPropagation();window._hxcShowHzTooltipXY(event,'${tipKey}')"
           onmouseleave="window._hxcHideHzTooltip()">
           <span class="hxc-estado-block-nombre">${e.hechizo_nombre}</span>
