@@ -961,6 +961,16 @@ window._hxcIrTurno = async (idxRaw) => {
   await cargarHistorialSesion(hxState.sesionActiva?.id, turno.numero);
 
   if (!esUltimo) {
+    // Leer slots_json del turno (guardado al confirmar/guardar)
+    const turnoConSlots = hxState.turnos.find(t => t.id === turno.id);
+    const slotsGuardados = turnoConSlots?.slots_json || null;
+    // Si no tiene slots_json, recargarlo desde DB
+    let slotsJson = slotsGuardados;
+    if (!slotsJson) {
+      const { data: td } = await supabase.from('hexcast_turnos').select('slots_json').eq('id', turno.id).single();
+      slotsJson = td?.slots_json || null;
+    }
+
     const { data } = await supabase.from('hexcast_lanzamientos')
       .select('*, cd_override, es_evento, evento_payload, evento_nombre, evento_desc, evento_aplicado')
       .eq('turno_id', turno.id).order('orden');
@@ -970,18 +980,37 @@ window._hxcIrTurno = async (idxRaw) => {
     const hechizosRows = rows.filter(r => !r.es_evento);
     const eventosRows  = rows.filter(r => r.es_evento);
 
-    // Reconstruir slots desde hechizos normales únicamente
+    // Reconstruir slots — primero desde slots_json guardado, si no desde lanzamientos
     const grupoA = [null,null,null], grupoB = [null,null,null];
     const vistos = { A:[], B:[] };
-    hechizosRows.forEach(row => {
-      const g = row.grupo === 'B' ? 'B' : 'A';
-      const arr = vistos[g];
-      if (!arr.includes(row.personaje_nombre) && arr.length < 3) {
-        const si = arr.length;
-        arr.push(row.personaje_nombre);
-        (g==='A'?grupoA:grupoB)[si] = { nombre: row.personaje_nombre, color: SLOT_COLORS[g][si] };
-      }
-    });
+
+    if (slotsJson) {
+      // Reconstruir desde slots_json (incluye PJs sin hechizos)
+      (slotsJson.grupoA || []).forEach((s, i) => {
+        if (s) {
+          grupoA[i] = { nombre: s.nombre, color: SLOT_COLORS.A[i] };
+          vistos.A[i] = s.nombre;
+        }
+      });
+      (slotsJson.grupoB || []).forEach((s, i) => {
+        if (s) {
+          grupoB[i] = { nombre: s.nombre, color: SLOT_COLORS.B[i] };
+          vistos.B[i] = s.nombre;
+        }
+      });
+    } else {
+      // Fallback: reconstruir desde lanzamientos (solo PJs con hechizos)
+      hechizosRows.forEach(row => {
+        const g = row.grupo === 'B' ? 'B' : 'A';
+        const arr = vistos[g];
+        const nombres = Object.values(vistos[g]).filter(Boolean);
+        if (!nombres.includes(row.personaje_nombre) && nombres.length < 3) {
+          const si = nombres.length;
+          vistos[g][si] = row.personaje_nombre;
+          (g==='A'?grupoA:grupoB)[si] = { nombre: row.personaje_nombre, color: SLOT_COLORS[g][si] };
+        }
+      });
+    }
     hxState.grupoA = grupoA; hxState.grupoB = grupoB;
 
     // Inicializar cdPorPj desde los personajes reconstruidos
@@ -998,9 +1027,10 @@ window._hxcIrTurno = async (idxRaw) => {
 
     // Reconstruir stack de hechizos
     const stackHechizos = hechizosRows.map(row => {
-      const g   = row.grupo === 'B' ? 'B' : 'A';
-      const arr = vistos[g];
-      const si  = arr.indexOf(row.personaje_nombre);
+      const g = row.grupo === 'B' ? 'B' : 'A';
+      // Buscar slot index desde grupoA/grupoB directamente
+      const grupoSlots = g === 'A' ? grupoA : grupoB;
+      const si = grupoSlots.findIndex(s => s?.nombre === row.personaje_nombre);
       const color = SLOT_COLORS[g][Math.max(0, si)] || SLOT_COLORS.A[0];
       const cat = hxState.catalogoDB.find(h =>
         _norm(h.hechizo_id) === _norm(row.hechizo_id) || _norm(h.nombre) === _norm(row.hechizo_nombre)
@@ -1040,7 +1070,8 @@ window._hxcIrTurno = async (idxRaw) => {
     // Reconstruir stack de eventos
     const stackEventos = eventosRows.map(row => {
       const g = row.grupo === 'B' ? 'B' : 'A';
-      const si = vistos[g]?.indexOf(row.personaje_nombre) ?? 0;
+      const grupoSlots = g === 'A' ? grupoA : grupoB;
+      const si = grupoSlots.findIndex(s => s?.nombre === row.personaje_nombre);
       const color = SLOT_COLORS[g][Math.max(0, si)] || SLOT_COLORS.A[0];
       let payload = [];
       try { payload = row.evento_payload ? JSON.parse(row.evento_payload) : []; } catch(e) {}
@@ -1299,7 +1330,9 @@ window._hxcShowHzTooltip = (e, key) => {
   `;
   document.body.appendChild(tt);
 
-  const rect = e.currentTarget.getBoundingClientRect();
+  // e.currentTarget es null en handlers inline — usar target.closest o coordenadas del mouse
+  const el = (e.target || e.srcElement)?.closest('.hxc-lat-hz') || e.target;
+  const rect = el ? el.getBoundingClientRect() : { right: e.clientX, left: e.clientX - 220, top: e.clientY };
   const ttW = 220;
   let left = rect.right + 8;
   let top  = rect.top;
@@ -1615,6 +1648,13 @@ window._hxcGuardarHistorico = async () => {
   if (!_esAdmin()) { _toast('Solo el OP puede guardar turnos históricos', true); return; }
   const turno = hxState.turnoActivo;
   if (!turno) return;
+
+  // Guardar configuración de slots para reconstruir PJs aunque no tengan hechizos
+  const slotsJson = {
+    grupoA: hxState.grupoA.map((pj, i) => pj ? { nombre: pj.nombre, slotIdx: i } : null),
+    grupoB: hxState.grupoB.map((pj, i) => pj ? { nombre: pj.nombre, slotIdx: i } : null),
+  };
+  await supabase.from('hexcast_turnos').update({ slots_json: slotsJson }).eq('id', turno.id);
 
   // Evaluar todos los items antes de guardar
   hxState.stack.forEach(item => evaluarItem(item));

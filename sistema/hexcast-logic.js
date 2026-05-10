@@ -327,6 +327,13 @@ export async function confirmarTurno() {
     if (error) return { ok: false, msg: error.message };
   }
 
+  // Guardar slots actuales en el turno confirmado para reconstrucción posterior
+  const slotsJson = {
+    grupoA: hxState.grupoA.map((pj, i) => pj ? { nombre: pj.nombre, slotIdx: i } : null),
+    grupoB: hxState.grupoB.map((pj, i) => pj ? { nombre: pj.nombre, slotIdx: i } : null),
+  };
+  await supabase.from('hexcast_turnos').update({ slots_json: slotsJson }).eq('id', hxState.turnoActivo.id);
+
   const nuevoNum = hxState.turnos.length + 1;
   const nuevoTurno = await crearTurno(hxState.sesionActiva.id, nuevoNum);
   hxState.turnoActivo = nuevoTurno;
