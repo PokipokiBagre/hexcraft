@@ -330,7 +330,7 @@ function _elIdFromEvent(e) {
 let _previewLine = null;
 
 function _onDragMove(e) {
-  if (!fxState.drag || fxState.modo !== 'conectar') return;
+  if (!fxState.drag || (fxState.modo !== 'conectar' && fxState.modo !== 'borrar')) return;
   const svg = document.getElementById('hxfx-overlay');
   if (!svg) return;
   const bodyRect = svg.parentElement.getBoundingClientRect();
