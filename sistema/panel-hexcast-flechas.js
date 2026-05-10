@@ -786,76 +786,166 @@ window._hxfxExportar = async (oscuro = false) => {
     document.head.appendChild(st);
   }
 
-  // Clonar el body completo en un wrapper fuera de pantalla sin restricciones de tamaño
+  // Medir el body real
+  const bodyRect  = body.getBoundingClientRect();
+  const bodyW     = Math.round(bodyRect.width);
+
+  // Wrapper fuera de pantalla con el mismo ancho y grid exacto
   const wrapper = document.createElement('div');
+  const bodyCS  = getComputedStyle(body);
   wrapper.style.cssText = `
-    position:fixed; left:-99999px; top:0;
-    width:${body.offsetWidth}px;
-    display:flex; flex-direction:row;
+    position:fixed;
+    left:-${bodyW + 100}px;
+    top:0;
+    width:${bodyW}px;
+    display:${bodyCS.display};
+    grid-template-columns:${bodyCS.gridTemplateColumns};
+    flex-direction:${bodyCS.flexDirection};
     background:${oscuro ? '#08070f' : '#f5f2ea'};
     font-family:'Inter',system-ui,sans-serif;
     overflow:visible;
+    box-sizing:border-box;
   `;
   if (!oscuro) wrapper.classList.add('hxc-claro');
   document.body.appendChild(wrapper);
 
-  // Clonar cada columna/sección expandida
-  const sections = [...body.children];
-  const clones = sections.map(sec => {
-    // Saltar el overlay SVG — lo rehacemos después
-    if (sec.id === 'hxfx-overlay') return null;
+  // Clonar cada sección del body (excepto el SVG overlay)
+  const clones = [];
+  [...body.children].forEach(sec => {
+    if (sec.id === 'hxfx-overlay') return;
     const cl = sec.cloneNode(true);
-    // Quitar restricciones de scroll en el clon
-    cl.style.overflow = 'visible';
+    // Quitar overflow en el clon y todos sus hijos scrolleables
+    cl.style.overflow  = 'visible';
     cl.style.maxHeight = 'none';
-    cl.style.height = 'auto';
-    cl.style.flexShrink = '0';
-    // Expandir scrollables internos
+    cl.style.height    = 'auto';
     cl.querySelectorAll('*').forEach(el => {
       const cs = getComputedStyle(el);
-      if (cs.overflow === 'auto' || cs.overflow === 'hidden' || cs.overflowY === 'auto' || cs.overflowY === 'hidden') {
-        el.style.overflow = 'visible';
+      if (cs.overflowY === 'auto' || cs.overflowY === 'hidden' ||
+          cs.overflow  === 'auto' || cs.overflow  === 'hidden') {
+        el.style.overflow  = 'visible';
         el.style.maxHeight = 'none';
-        el.style.height = 'auto';
+        el.style.height    = 'auto';
       }
     });
-    // Quitar botones de acción que no son del contenido
-    cl.querySelectorAll('.hxc-slot-quit,.hxc-item-del,.hxc-estado-block-del').forEach(b => b.style.display = 'none');
+    // Ocultar botones de UI no relevantes
+    cl.querySelectorAll('.hxc-slot-quit,.hxc-item-del,.hxc-estado-block-del,.hxfx-toolbar').forEach(b => b.style.display='none');
     wrapper.appendChild(cl);
-    return cl;
-  }).filter(Boolean);
+    clones.push(cl);
+  });
 
-  // Esperar render
+  // Esperar render para medir
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  // Medir tamaño real del clon
-  const totalW = wrapper.scrollWidth;
-  const totalH = Math.max(...clones.map(c => c.scrollHeight), wrapper.scrollHeight);
+  const totalH = wrapper.scrollHeight;
 
-  // Añadir SVG de flechas escalado al clon
-  const origSvg = document.getElementById('hxfx-overlay');
-  if (origSvg) {
-    const svgClone = origSvg.cloneNode(true);
-    svgClone.setAttribute('width',  totalW);
-    svgClone.setAttribute('height', totalH);
-    svgClone.style.cssText = `position:absolute;top:0;left:0;pointer-events:none;z-index:20;`;
-    wrapper.style.position = 'relative';
-    wrapper.appendChild(svgClone);
-  }
+  // Redibujar flechas con posiciones relativas al clon
+  // Mapear cada elemento original → elemento clonado por su data-hxc-idx o posición slot
+  const svgNS   = 'http://www.w3.org/2000/svg';
+  const svgClone = document.createElementNS(svgNS, 'svg');
+  svgClone.setAttribute('xmlns', svgNS);
+  svgClone.setAttribute('width',  bodyW);
+  svgClone.setAttribute('height', totalH);
+  svgClone.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:20;overflow:visible;';
+  wrapper.style.position = 'relative';
+
+  // Helper: encontrar el rect de un elemento relativo al wrapper
+  const relRect = (el) => {
+    const r  = el.getBoundingClientRect();
+    const wr = wrapper.getBoundingClientRect();
+    return { top: r.top - wr.top, left: r.left - wr.left, right: r.right - wr.left, bottom: r.bottom - wr.top, width: r.width, height: r.height };
+  };
+
+  // Helper: encontrar el elemento clonado equivalente al original
+  const findCloneEl = (origId) => {
+    if (origId.startsWith('slot:')) {
+      const [, grupo, idx] = origId.split(':');
+      const colCls = grupo === 'B' ? '.hxc-col-b' : '.hxc-col:not(.hxc-col-b)';
+      const col = wrapper.querySelector(colCls);
+      return col?.querySelectorAll('.hxc-slot')[parseInt(idx)] || null;
+    }
+    if (origId.startsWith('item:')) {
+      return wrapper.querySelector(`[data-hxc-idx="${origId.split(':')[1]}"]`);
+    }
+    if (origId.startsWith('estado:')) {
+      return wrapper.querySelector(`.hxc-estado-block[data-hxf-id="${origId.slice(7)}"]`);
+    }
+    return null;
+  };
+
+  const getLado = (id, otherEl, otherIsColA) => {
+    if (id.endsWith(':L')) return 'left';
+    if (id.endsWith(':R')) return 'right';
+    if (id.startsWith('slot:A') || id.startsWith('estado:')) {
+      const el = findCloneEl(id);
+      if (el) return el.closest('.hxc-col-b') ? 'left' : 'right';
+      return 'right';
+    }
+    if (id.startsWith('slot:B')) return 'left';
+    return 'right';
+  };
+
+  fxState.flechas.forEach(f => {
+    const elO = findCloneEl(f.origenId);
+    const elD = findCloneEl(f.destinoId);
+    if (!elO || !elD) return;
+
+    const ladoO = getLado(f.origenId, elD, false);
+    const ladoD = getLado(f.destinoId, elO, false);
+
+    const rO = relRect(elO);
+    const rD = relRect(elD);
+
+    const px = ladoO === 'left' ? rO.left : rO.right;
+    const py = rO.top + rO.height / 2;
+    const dx = ladoD === 'left' ? rD.left : rD.right;
+    const dy = rD.top + rD.height / 2;
+
+    const dist = Math.sqrt((dx-px)**2 + (dy-py)**2) || 1;
+    const arc  = Math.min(80, Math.max(30, dist * 0.35));
+    const mx   = (px + dx) / 2;
+    const my   = (py + dy) / 2;
+    let cx, cy;
+    if (ladoO === ladoD) {
+      cx = ladoO === 'left' ? Math.min(px,dx) - arc : Math.max(px,dx) + arc;
+      cy = my;
+    } else {
+      const ndx = -(dy-py)/dist, ndy = (dx-px)/dist;
+      const dir = ladoO === 'right' ? 1 : -1;
+      cx = mx + ndx * arc * dir;
+      cy = my + ndy * arc * dir;
+    }
+
+    const path = `M ${px.toFixed(1)},${py.toFixed(1)} Q ${cx.toFixed(1)},${cy.toFixed(1)} ${dx.toFixed(1)},${dy.toFixed(1)}`;
+    const op  = f.opacidad ?? 0.88;
+    const al  = Math.max(8, f.grosor * 3.5);
+    const tang = Math.atan2(dy - cy, dx - cx);
+    const ax1 = dx - al*Math.cos(tang - 0.4), ay1 = dy - al*Math.sin(tang - 0.4);
+    const ax2 = dx - al*Math.cos(tang + 0.4), ay2 = dy - al*Math.sin(tang + 0.4);
+    const dash = f.estilo === 'punteada' ? `stroke-dasharray="${f.grosor*1.5} ${f.grosor*2}"` :
+                 f.estilo === 'rayada'   ? `stroke-dasharray="${f.grosor*4} ${f.grosor*2}"` : '';
+
+    const g = document.createElementNS(svgNS, 'g');
+    g.innerHTML = `<path d="${path}" fill="none" stroke="${f.color}" stroke-width="${f.grosor}" stroke-linecap="round" opacity="${op}" ${dash}/>
+      <polygon points="${dx.toFixed(1)},${dy.toFixed(1)} ${ax1.toFixed(1)},${ay1.toFixed(1)} ${ax2.toFixed(1)},${ay2.toFixed(1)}" fill="${f.color}" opacity="${op}"/>`;
+    svgClone.appendChild(g);
+  });
+
+  wrapper.appendChild(svgClone);
+  await new Promise(r => requestAnimationFrame(r));
 
   let canvas;
   try {
     canvas = await window.html2canvas(wrapper, {
       backgroundColor: oscuro ? '#08070f' : '#f5f2ea',
       scale: 2, useCORS: true, allowTaint: true, logging: false,
-      width: totalW, height: totalH,
+      width: bodyW, height: totalH,
     });
   } finally {
     document.body.removeChild(wrapper);
   }
 
   if (!canvas) return;
-  const tn = document.querySelector('.hxc-turno-label strong')?.textContent || 'T';
+  const tn   = document.querySelector('.hxc-turno-label strong')?.textContent || 'T';
   const link = document.createElement('a');
   link.download = `hexcast_T${tn}_${oscuro ? 'oscuro' : 'claro'}.png`;
   link.href = canvas.toDataURL('image/png');
