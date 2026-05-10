@@ -455,12 +455,30 @@ function _renderSlot(pj, grupo, idx) {
   if (pj) {
     const estados = hxState.estadosPorPj[pj.nombre] || [];
     if (estados.length > 0) {
-      estadosBlocks = estados.map(e => `
-        <div class="hxc-estado-block" style="${vars}">
+      estadosBlocks = estados.map(e => {
+        // Guardar info del catálogo en el mapa para el tooltip
+        const cat = hxState.catalogoDB.find(h =>
+          _norm(h.hechizo_id) === _norm(e.hechizo_id) || _norm(h.nombre) === _norm(e.hechizo_nombre)
+        );
+        const tipKey = 'est_' + _norm(e.hechizo_id || e.hechizo_nombre);
+        _hzTooltipMap[tipKey] = {
+          nombre:   e.hechizo_nombre,
+          afinidad: e.afinidad || '',
+          hex_cost: cat?.hex_cost ?? 0,
+          clase:    cat?.clase   || '',
+          efecto:   cat?.efecto  || '',
+          overcast: cat?.overcast || '',
+          undercast:cat?.undercast || '',
+          especial: cat?.especial  || '',
+        };
+        return `<div class="hxc-estado-block" style="${vars}"
+          onclick="event.stopPropagation();window._hxcShowHzTooltipXY(event,'${tipKey}')"
+          onmouseleave="window._hxcHideHzTooltip()">
           <span class="hxc-estado-block-nombre">${e.hechizo_nombre}</span>
           <span class="hxc-estado-block-afin">${e.afinidad||''}</span>
-          <button class="hxc-estado-block-del" onclick="event.stopPropagation();window._hxcQuitarEstado('${pj.nombre.replace(/'/g,"\\'")}',${e.id})">×</button>
-        </div>`).join('');
+          <button class="hxc-estado-block-del" onclick="event.stopPropagation();window._hxcHideHzTooltip();window._hxcQuitarEstado('${pj.nombre.replace(/'/g,"\\'")}',${e.id})">×</button>
+        </div>`;
+      }).join('');
     }
   }
 
@@ -1344,6 +1362,44 @@ window._hxcShowHzTooltip = (e, key) => {
 };
 
 window._hxcHideHzTooltip = () => { document.getElementById('hxc-hz-tooltip')?.remove(); };
+
+// Versión por coordenadas del mouse (para bloques de estado en la columna)
+window._hxcShowHzTooltipXY = (e, key) => {
+  window._hxcHideHzTooltip();
+  const hz = _hzTooltipMap[key];
+  if (!hz) return;
+  const campos = [
+    { label: 'Efecto',    val: hz.efecto },
+    { label: 'Overcast',  val: hz.overcast },
+    { label: 'Undercast', val: hz.undercast },
+    { label: 'Especial',  val: hz.especial },
+  ].filter(c => c.val && c.val.trim() && c.val !== '0');
+
+  const tt = document.createElement('div');
+  tt.id = 'hxc-hz-tooltip';
+  tt.className = 'hxc-hz-tooltip';
+  tt.innerHTML = `
+    <div class="hxc-hz-tooltip-nombre">${hz.nombre}</div>
+    <div class="hxc-hz-tooltip-meta">
+      <span>${hz.afinidad||'—'}</span> · <span>Cl.${hz.clase||'?'}</span>${hz.hex_cost ? ` · <span style="color:#d4af37;">${hz.hex_cost} HEX</span>` : ''}
+    </div>
+    ${campos.map(c => `<div class="hxc-hz-tooltip-field">
+      <div class="hxc-hz-tooltip-label">${c.label}</div>
+      <div class="hxc-hz-tooltip-val">${c.val}</div>
+    </div>`).join('')}
+    ${!campos.length ? '<div style="font-size:0.6em;color:#444;font-style:italic;">Sin descripción.</div>' : ''}
+  `;
+  // Posición fija junto al cursor, dentro de pantalla
+  tt.style.left = '-9999px'; tt.style.top = '-9999px';
+  document.body.appendChild(tt);
+  const ttW = 220, ttH = tt.getBoundingClientRect().height || 150;
+  let left = e.clientX + 14;
+  let top  = e.clientY - 10;
+  if (left + ttW > window.innerWidth  - 8) left = e.clientX - ttW - 8;
+  if (top  + ttH > window.innerHeight - 8) top  = window.innerHeight - ttH - 8;
+  tt.style.left = left + 'px';
+  tt.style.top  = Math.max(8, top) + 'px';
+};
 
 window._hxcQuitarPJ = (grupo, idx) => {
   if (grupo === 'A') hxState.grupoA[idx] = null; else hxState.grupoB[idx] = null;
