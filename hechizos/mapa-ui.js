@@ -1,5 +1,5 @@
 // ============================================================
-// mapa-ui.js — Toolbar, panel OP, modales, toast y handlers globales
+// mapa-ui.js — Toolbar, drawer, grimorio, modales y handlers
 // /hechizos/mapa-ui.js
 // ============================================================
 
@@ -8,12 +8,11 @@ import {
     cargarInventarioPJ, calcSetsGlobales,
     guardarPosiciones, toggleConocido,
     aplicarPropiedades, asignarHechizosAPJ,
-    recargarDatos,
 } from './mapa-data.js';
-import { centrarCamara, renderInfoBar, renderInfoStats } from './mapa-render.js';
+import { centrarCamara, centrarEnNodo, renderInfoBar, renderInfoStats, renderOpPanel } from './mapa-render.js';
 
 // ── Toast ────────────────────────────────────────────────────
-export function toast(msg, dur = 2300) {
+export function toast(msg, dur=2300) {
     const t = document.getElementById('hm-toast');
     if (!t) return;
     t.textContent = msg;
@@ -22,7 +21,7 @@ export function toast(msg, dur = 2300) {
     t._tid = setTimeout(() => t.classList.remove('show'), dur);
 }
 
-// ── Actualizar badge de seleccionados ─────────────────────────
+// ── Badge multi-sel ──────────────────────────────────────────
 export function actualizarBadgeSel() {
     const b = document.getElementById('hm-sel-badge');
     if (!b) return;
@@ -31,53 +30,207 @@ export function actualizarBadgeSel() {
     b.textContent   = `${n} sel.`;
 }
 
-// ── Render toolbar completa ───────────────────────────────────
+// ── Selector de PJ ───────────────────────────────────────────
+export function actualizarSelector() {
+    const sel = document.getElementById('hm-pj-sel');
+    if (!sel) return;
+    const ops = ['Todos', ...st.jugadores];
+    sel.innerHTML = ops.map(j =>
+        `<option value="${j}" ${j===st.jugadorPanel?'selected':''}>${j}</option>`
+    ).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TOOLBAR — solo lo esencial (selector PJ + centrar)
+// ══════════════════════════════════════════════════════════════
 export function renderToolbar() {
     const tb = document.getElementById('hm-toolbar');
     if (!tb) return;
 
     const pjSel = `<select id="hm-pj-sel" onchange="window._hmCambiarPJ(this.value)">
-        ${['Todos', ...st.jugadores].map(j =>
-            `<option value="${j}" ${j === st.jugadorPanel ? 'selected' : ''}>${j}</option>`
+        ${['Todos',...st.jugadores].map(j =>
+            `<option value="${j}" ${j===st.jugadorPanel?'selected':''}>${j}</option>`
         ).join('')}
     </select>`;
-
-    let adminBtns = '';
-    if (st.esAdmin) {
-        adminBtns = `
-        <div class="hm-tab-sep"></div>
-        <button class="hm-btn gold"  id="hm-btn-nuevo"   onclick="window._hmNuevoNodo()">➕ Nodo</button>
-        <button class="hm-btn"       id="hm-btn-flecha"  onclick="window._hmToggleConexion()">↗ Flecha</button>
-        <button class="hm-btn gold"  id="hm-btn-guardar" onclick="window._hmGuardarPos()">💾 Guardar pos.</button>
-        <div class="hm-tab-sep"></div>
-        <button class="hm-btn"       id="hm-btn-multi"   onclick="window._hmToggleMulti()" title="Seleccionar múltiples nodos">☐ Multi-sel</button>
-        <span id="hm-sel-badge" style="display:none;font-size:0.6em;color:#d4af37;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:10px;padding:2px 8px;">0 sel.</span>
-        <button class="hm-btn"       onclick="window._hmModalPropiedades()" title="Editar propiedades de los hechizos seleccionados">⚙ Propiedades</button>
-        <button class="hm-btn verde" onclick="window._hmModalAsignarPJ()"   title="Asignar hechizos seleccionados a un personaje">👤 Asignar PJ</button>
-        <div class="hm-tab-sep"></div>
-        <button class="hm-btn"       onclick="window._hmAutoOrdenar()">🌀 Ordenar</button>`;
-    }
 
     tb.innerHTML = `
         ${pjSel}
         <div class="hm-tab-sep"></div>
-        <button class="hm-btn" onclick="window._hmCentrar()">⊙ Centrar</button>
-        ${adminBtns}
+        <button class="hm-btn" onclick="window._hmCentrar()" title="Centrar vista">⊙ Centrar</button>
+        <span id="hm-sel-badge" style="display:none;font-size:0.6em;color:#d4af37;
+            background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);
+            border-radius:10px;padding:2px 8px;">0 sel.</span>
     `;
 }
 
-// ── Handlers globales ─────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+//  DRAWER — grimorio + admin
+// ══════════════════════════════════════════════════════════════
+export function renderDrawer() {
+    // Mostrar/ocultar tab admin según rol
+    const dtAdmin = document.getElementById('dt-admin');
+    if (dtAdmin) dtAdmin.style.display = st.esAdmin ? '' : 'none';
+
+    // Renderizar grimorio inicial
+    renderGrimorio('');
+
+    // Si hay admin, montar el pane admin
+    if (st.esAdmin) _renderDrawerAdmin();
+}
+
+// ── Toggle drawer ─────────────────────────────────────────────
+window._hmToggleDrawer = () => {
+    const drawer = document.getElementById('hm-drawer');
+    const tab    = document.getElementById('hm-drawer-tab');
+    if (!drawer) return;
+    const abierto = drawer.classList.toggle('open');
+    tab?.classList.toggle('open', abierto);
+    document.body.classList.toggle('drawer-open', abierto);
+};
+
+// ── Cambiar pestaña interna del drawer ────────────────────────
+window._hmDrawerTab = (cual) => {
+    document.getElementById('hm-pane-grimorio')?.classList.toggle('oculto', cual !== 'grimorio');
+    document.getElementById('hm-pane-admin')?.classList.toggle('oculto',   cual !== 'admin');
+    document.querySelectorAll('.hm-dtab').forEach(b => b.classList.remove('activo'));
+    document.getElementById(`dt-${cual}`)?.classList.add('activo');
+};
+
+// ── Buscar en grimorio ────────────────────────────────────────
+window._hmBuscar = (query) => renderGrimorio(query);
+
+// ── Renderizar grimorio (acordeones por afinidad) ─────────────
+export function renderGrimorio(query = '') {
+    const lista = document.getElementById('hm-grimorio-list');
+    if (!lista) return;
+
+    const q = query.toLowerCase().trim();
+
+    // Agrupar nodos por afinidad
+    const grupos = {};
+    st.nodos.forEach(nodo => {
+        const af = nodo.afinidad || 'Desconocida';
+        if (!grupos[af]) grupos[af] = [];
+        // Filtrar por búsqueda (admin ve todos; jugador solo ve conocidos/poseídos)
+        const visible = nodo.esConocido || st.posesiones.has(nodo) || st.esAdmin;
+        const nombre  = nodo.esConocido || st.esAdmin ? nodo.nombre : `Hechizo ${nodo.id.match(/\d+/)?.[0] || '?'}`;
+        if (q && !nombre.toLowerCase().includes(q) && !af.toLowerCase().includes(q)) return;
+        grupos[af].push({ nodo, visible, nombre });
+    });
+
+    const afinidades = Object.keys(grupos).sort();
+    if (afinidades.length === 0) {
+        lista.innerHTML = '<div style="font-size:0.7em;color:#333;padding:12px 8px;">Sin resultados</div>';
+        return;
+    }
+
+    // Si hay búsqueda activa, abrir todos los grupos; si no, mantener estado previo
+    const abiertos = new Set(
+        q
+            ? afinidades
+            : [...lista.querySelectorAll('.gr-grupo.open')].map(el => el.dataset.af)
+    );
+
+    lista.innerHTML = afinidades.map(af => {
+        const hechizos = grupos[af];
+        const colorAf  = (st.colores[af] || {}).t || '#888';
+        const estaAbierto = abiertos.has(af) || q;
+
+        const filas = hechizos.map(({ nodo, visible, nombre }) => {
+            const esPosesion  = st.posesiones.has(nodo);
+            const esAprendible = st.aprendibles.has(nodo);
+
+            let badge = '';
+            if (esPosesion)         badge = '<span class="gr-hz-badge posesion">✓</span>';
+            else if (nodo.esConocido) badge = '<span class="gr-hz-badge conocido">Conocido</span>';
+            else if (esAprendible)   badge = '<span class="gr-hz-badge aprendible">Aprendible</span>';
+
+            const meta = [
+                nodo.clase ? `Cl.${nodo.clase}` : '',
+                nodo.hex > 0 ? `⬡${nodo.hex}` : '',
+                nodo.vex > 0 ? `⬡${nodo.vex}v` : '',
+            ].filter(Boolean).join(' ');
+
+            const safe = nodo.id.replace(/'/g, "\\'");
+            return `<div class="gr-hz-row" data-id="${nodo.id}" onclick="window._hmGrimorioSel('${safe}')">
+                <span class="gr-hz-dot" style="background:${colorAf};border-color:${colorAf}55;opacity:${visible?1:0.3}"></span>
+                <span class="gr-hz-nombre${visible ? '' : ' desconocido'}">${nombre}</span>
+                <span class="gr-hz-meta">${meta}</span>
+                ${badge}
+            </div>`;
+        }).join('');
+
+        return `<div class="gr-grupo${estaAbierto ? ' open' : ''}" data-af="${af}">
+            <div class="gr-grupo-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="gr-grupo-arrow">▶</span>
+                <span class="gr-grupo-nombre" style="color:${colorAf}">${af}</span>
+                <span class="gr-grupo-count">${hechizos.length}</span>
+            </div>
+            <div class="gr-grupo-hechizos">${filas}</div>
+        </div>`;
+    }).join('');
+}
+
+// ── Seleccionar nodo desde grimorio ──────────────────────────
+window._hmGrimorioSel = (id) => {
+    const nodo = st.nodos.find(n => n.id === id);
+    if (!nodo) return;
+
+    // Resaltar en lista
+    document.querySelectorAll('.gr-hz-row').forEach(r => r.classList.remove('sel'));
+    document.querySelector(`.gr-hz-row[data-id="${id}"]`)?.classList.add('sel');
+
+    // Seleccionar y centrar en canvas
+    st.nodoSel = nodo;
+    renderInfoBar(nodo);
+    centrarEnNodo(nodo);
+};
+
+// ── Pane admin (dentro del drawer) ───────────────────────────
+function _renderDrawerAdmin() {
+    const pane = document.getElementById('hm-pane-admin');
+    if (!pane || !st.esAdmin) return;
+
+    pane.innerHTML = `
+        <div class="adm-seccion">
+            <div class="adm-titulo">Nodos y conexiones</div>
+            <div class="adm-fila">
+                <button class="hm-btn gold" onclick="window._hmNuevoNodo()">➕ Nuevo nodo</button>
+                <button class="hm-btn" id="hm-btn-flecha" onclick="window._hmToggleConexion()">↗ Modo flecha</button>
+                <button class="hm-btn gold" onclick="window._hmGuardarPos()">💾 Guardar posiciones</button>
+                <button class="hm-btn" onclick="window._hmAutoOrdenar()">🌀 Auto-ordenar</button>
+            </div>
+        </div>
+        <div class="adm-seccion">
+            <div class="adm-titulo">Selección múltiple</div>
+            <div class="adm-fila">
+                <button class="hm-btn" id="hm-btn-multi" onclick="window._hmToggleMulti()">☐ Multi-sel</button>
+                <button class="hm-btn" onclick="window._hmModalPropiedades()">⚙ Propiedades batch</button>
+                <button class="hm-btn verde" onclick="window._hmModalAsignarPJ()">👤 Asignar a PJ</button>
+            </div>
+        </div>
+    `;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HANDLERS GLOBALES
+// ══════════════════════════════════════════════════════════════
 
 window._hmCambiarPJ = async (nombre) => {
     st.jugadorPanel = nombre;
     await cargarInventarioPJ(nombre);
     calcSetsGlobales();
     renderInfoStats();
-    // refrescar panel OP si hay nodo sel
-    if (st.nodoSel) renderInfoBar(st.nodoSel);
+    renderGrimorio(document.getElementById('hm-search')?.value || '');
 };
 
 window._hmCentrar = centrarCamara;
+
+window._hmCerrarOpPanel = () => {
+    st.nodoSel = null;
+    renderOpPanel(null);
+    document.getElementById('hm-info-nodo').innerHTML = '<span style="color:#444;">Clic en un hechizo para ver detalles</span>';
+};
 
 window._hmToggleConexion = () => {
     st.modoConexion = !st.modoConexion;
@@ -85,7 +238,7 @@ window._hmToggleConexion = () => {
     const btn = document.getElementById('hm-btn-flecha');
     if (btn) {
         btn.classList.toggle('activo', st.modoConexion);
-        btn.textContent = st.modoConexion ? '↗ Cancelar' : '↗ Flecha';
+        btn.textContent = st.modoConexion ? '↗ Cancelar flecha' : '↗ Modo flecha';
     }
     const wrap = document.getElementById('hm-canvas-wrap');
     if (wrap) wrap.style.cursor = st.modoConexion ? 'crosshair' : 'grab';
@@ -99,115 +252,57 @@ window._hmToggleMulti = () => {
         btn.classList.toggle('activo', st.modoSelMulti);
         btn.textContent = st.modoSelMulti ? '☑ Multi-sel' : '☐ Multi-sel';
     }
+    // También actualizar badge en toolbar si existe
+    actualizarBadgeSel();
 };
 
 window._hmNuevoNodo = () => {
     if (!st.esAdmin) return;
     const wrap = document.getElementById('hm-canvas-wrap');
     if (!wrap) return;
-    const cx = (wrap.clientWidth  / 2 - st.camara.x) / st.camara.zoom;
-    const cy = (wrap.clientHeight / 2 - st.camara.y) / st.camara.zoom;
+    const cx = (wrap.clientWidth /2 - st.camara.x) / st.camara.zoom;
+    const cy = (wrap.clientHeight/2 - st.camara.y) / st.camara.zoom;
     const id = `hechizo_nuevo_${Date.now()}`;
     const nodo = {
-        id, nombre: 'Nuevo Hechizo', afinidad: 'Desconocida', clase: '1',
-        hex: 0, vex: 0, nota: '', esConocido: false, esNuevo: true,
-        esEstado: false, esPrioridad: false, backcast: 0, nextcast: 0,
-        afectaHechizos: false, afectaUsuario: false, afectaObjetivo: false,
-        x: cx, y: cy, radio: 28, color: '#888', incomingSources: [], _dirty: true,
+        id, nombre: 'Nuevo Hechizo', afinidad:'Desconocida', clase:'1',
+        hex:0, vex:0, nota:'', esConocido:false, esNuevo:true,
+        esEstado:false, esPrioridad:false, backcast:0, nextcast:0,
+        afectaHechizos:false, afectaUsuario:false, afectaObjetivo:false,
+        x:cx, y:cy, radio:28, color:'#888', incomingSources:[], _dirty:true,
     };
     st.nodos.push(nodo);
     st.nodoSel = nodo;
     renderInfoBar(nodo);
-    toast('Nodo temporal creado. Usa Propiedades para guardarlo en DB.');
+    renderGrimorio(document.getElementById('hm-search')?.value || '');
+    toast('Nodo temporal creado. Abre Propiedades para guardarlo en DB.');
 };
 
 window._hmGuardarPos = async () => {
     if (!st.esAdmin) return;
     const { ok, err, total } = await guardarPosiciones();
     if (total === 0) { toast('Sin posiciones que guardar'); return; }
-    toast(`✓ ${ok} posición${ok !== 1 ? 'es' : ''} guardada${ok !== 1 ? 's' : ''}${err ? ` · ${err} error${err !== 1 ? 'es' : ''}` : ''}`);
+    toast(`✓ ${ok} posición${ok!==1?'es':''} guardada${ok!==1?'s':''}${err?` · ${err} error${err!==1?'es':''}`:''}`);
 };
 
 window._hmToggleConocido = async (id, nuevoValor) => {
     const ok = await toggleConocido(id, nuevoValor);
     if (!ok) { toast('Error al actualizar'); return; }
-    const nodo = st.nodos.find(n => n.id === id);
-    if (nodo) renderInfoBar(nodo);
+    const nodo = st.nodos.find(n => n.id===id);
+    if (nodo) {
+        renderInfoBar(nodo);
+        renderGrimorio(document.getElementById('hm-search')?.value || '');
+    }
     toast(nuevoValor ? '👁 Publicado' : '🔒 Ocultado');
 };
 
 window._hmEliminarNuevo = (id) => {
     st.nodos   = st.nodos.filter(n => n.id !== id);
-    st.enlaces = st.enlaces.filter(e => e.source.id !== id && e.target.id !== id);
-    st.seleccionados.forEach(n => { if (n.id === id) st.seleccionados.delete(n); });
-    if (st.nodoSel?.id === id) {
-        st.nodoSel = null;
-        renderInfoBar(null);
-    }
+    st.enlaces = st.enlaces.filter(e => e.source.id!==id && e.target.id!==id);
+    st.seleccionados.forEach(n => { if(n.id===id) st.seleccionados.delete(n); });
+    if (st.nodoSel?.id === id) { st.nodoSel=null; renderInfoBar(null); }
     actualizarBadgeSel();
+    renderGrimorio(document.getElementById('hm-search')?.value || '');
     toast('Nodo descartado');
-};
-
-// ── Asignar nodo seleccionado al PJ del panel ─────────────────
-window._hmAsignarNodoAPJ = async (id) => {
-    if (!st.esAdmin) return;
-    const nodo = st.nodos.find(n => n.id === id);
-    if (!nodo) return;
-    if (!st.jugadorPanel || st.jugadorPanel === 'Todos') {
-        toast('Selecciona un PJ en el selector primero');
-        return;
-    }
-    const { ok, total, err } = await asignarHechizosAPJ([nodo.nombre], st.jugadorPanel);
-    if (err) { toast('Error: ' + err); return; }
-    if (ok === 0) { toast(`Ya estaba en inventario de ${st.jugadorPanel}`); return; }
-    toast(`✓ ${nodo.nombre} → ${st.jugadorPanel}`);
-    renderInfoBar(nodo);
-    renderInfoStats();
-};
-
-// ── Quitar nodo seleccionado del PJ del panel ─────────────────
-window._hmQuitarNodoDePJ = async (id) => {
-    if (!st.esAdmin) return;
-    const nodo = st.nodos.find(n => n.id === id);
-    if (!nodo || !st.jugadorPanel || st.jugadorPanel === 'Todos') return;
-
-    // importar supabase dinámicamente desde hex-auth
-    const { supabase } = await import('../hex-auth.js');
-    const { error } = await supabase
-        .from('hechizos_inventario')
-        .delete()
-        .eq('personaje_nombre', st.jugadorPanel)
-        .eq('hechizo_nombre', nodo.nombre);
-
-    if (error) { toast('Error al quitar: ' + error.message); return; }
-
-    // Actualizar sets locales
-    st.posesiones.delete(nodo);
-    st.rastreo = new Set();
-    const rastrear = (n) => {
-        st.enlaces.forEach(e => {
-            if (e.target === n && !st.rastreo.has(e.source) && !st.posesiones.has(e.source)) {
-                st.rastreo.add(e.source);
-                rastrear(e.source);
-            }
-        });
-    };
-    st.posesiones.forEach(n => rastrear(n));
-
-    toast(`✓ ${nodo.nombre} quitado de ${st.jugadorPanel}`);
-    renderInfoBar(nodo);
-    renderInfoStats();
-};
-
-// ── Abrir editor de hechizo (delega a panel-pj si está abierto, si no hace recargar) ──
-window._hmAbrirEditorHz = async (id) => {
-    if (!st.esAdmin) return;
-    // Si el panel-pj tiene el editor disponible, usarlo
-    if (typeof window._ppjAbrirEditorHz === 'function' && st.jugadorPanel !== 'Todos') {
-        window._ppjAbrirEditorHz(id, st.jugadorPanel, 'cat');
-    } else {
-        toast('Abre el panel de un personaje para editar hechizos');
-    }
 };
 
 // ── Modal: Propiedades batch ──────────────────────────────────
@@ -217,9 +312,9 @@ window._hmModalPropiedades = () => {
 
     const afinOps = Object.keys(st.colores).map(a => `<option value="${a}">${a}</option>`).join('');
 
-    _modal(`⚙ Propiedades — ${nodos.length} hechizo${nodos.length > 1 ? 's' : ''}`, `
+    _modal(`⚙ Propiedades — ${nodos.length} hechizo${nodos.length>1?'s':''}`,`
         <p style="font-size:0.68em;color:#666;margin-bottom:10px;">
-            ${nodos.map(n => n.nombre).slice(0, 5).join(', ')}${nodos.length > 5 ? ` + ${nodos.length - 5} más` : ''}
+            ${nodos.map(n=>n.nombre).slice(0,5).join(', ')}${nodos.length>5?` + ${nodos.length-5} más`:''}
         </p>
         <p style="font-size:0.62em;color:#444;margin-bottom:12px;">Deja en blanco los campos que no quieres modificar.</p>
 
@@ -232,7 +327,7 @@ window._hmModalPropiedades = () => {
         <label>Clase</label>
         <select id="hmp-clase">
             <option value="">sin cambio</option>
-            ${['1','2','3','4','5'].map(c => `<option value="${c}">Clase ${c}</option>`).join('')}
+            ${['1','2','3','4','5'].map(c=>`<option value="${c}">Clase ${c}</option>`).join('')}
         </select>
 
         <label>Afinidad</label>
@@ -255,7 +350,7 @@ window._hmModalPropiedades = () => {
                 <input type="checkbox" id="hmp-ocultar"> Ocultar (esConocido = false)
             </label>
         </div>
-    `, `window._hmAplicarProps(${JSON.stringify(nodos.map(n => n.id))})`);
+    `, `window._hmAplicarProps(${JSON.stringify(nodos.map(n=>n.id))})`);
 };
 
 window._hmAplicarProps = async (ids) => {
@@ -269,8 +364,8 @@ window._hmAplicarProps = async (ids) => {
     const ocultar = document.getElementById('hmp-ocultar')?.checked;
 
     const payload = {};
-    if (vex   !== '') payload.valor_vex    = parseInt(vex) || 0;
-    if (hex   !== '') payload.hex_cost     = parseInt(hex) || 0;
+    if (vex   !== '') payload.valor_vex    = parseInt(vex)||0;
+    if (hex   !== '') payload.hex_cost     = parseInt(hex)||0;
     if (clase)        payload.clase        = clase;
     if (afin)         payload.afinidad     = afin;
     if (estado)       payload.es_estado    = true;
@@ -282,9 +377,9 @@ window._hmAplicarProps = async (ids) => {
 
     const { ok, err } = await aplicarPropiedades(ids, payload);
     _cerrarModal();
-    toast(`✓ ${ok} hechizo${ok !== 1 ? 's' : ''} actualizado${ok !== 1 ? 's' : ''}${err ? ` · ${err} error${err !== 1 ? 'es' : ''}` : ''}`);
+    toast(`✓ ${ok} hechizo${ok!==1?'s':''} actualizado${ok!==1?'s':''}${err?` · ${err} error${err!==1?'es':''}`:''}`);
     if (st.nodoSel) renderInfoBar(st.nodoSel);
-    calcSetsGlobales();
+    renderGrimorio(document.getElementById('hm-search')?.value || '');
 };
 
 // ── Modal: Asignar PJ ─────────────────────────────────────────
@@ -292,69 +387,69 @@ window._hmModalAsignarPJ = () => {
     const nodos = _nodosOperacion();
     if (!nodos) return;
 
-    _modal(`👤 Asignar a personaje — ${nodos.length} hechizo${nodos.length > 1 ? 's' : ''}`, `
+    _modal(`👤 Asignar a personaje — ${nodos.length} hechizo${nodos.length>1?'s':''}`, `
         <p style="font-size:0.68em;color:#666;margin-bottom:10px;">
-            ${nodos.map(n => n.nombre).slice(0, 5).join(', ')}${nodos.length > 5 ? ` + ${nodos.length - 5} más` : ''}
+            ${nodos.map(n=>n.nombre).slice(0,5).join(', ')}${nodos.length>5?` + ${nodos.length-5} más`:''}
         </p>
         <label>Personaje</label>
         <select id="hmap-pj">
-            ${st.personajes.map(p => `<option value="${p}">${p}</option>`).join('')}
+            ${st.personajes.map(p=>`<option value="${p}">${p}</option>`).join('')}
         </select>
-    `, `window._hmAplicarAsignar(${JSON.stringify(nodos.map(n => n.nombre))})`);
+    `, `window._hmAplicarAsignar(${JSON.stringify(nodos.map(n=>n.nombre))})`);
 };
 
 window._hmAplicarAsignar = async (nombresHz) => {
     const pj = document.getElementById('hmap-pj')?.value;
     if (!pj) { toast('Selecciona un personaje'); return; }
-    const { ok, total, err } = await asignarHechizosAPJ(nombresHz, pj);
+    const { ok, total, yaEstan, err } = await asignarHechizosAPJ(nombresHz, pj);
     _cerrarModal();
     if (err)    { toast('Error: ' + err); return; }
-    if (ok === 0) { toast(`Todos ya estaban en inventario de ${pj}`); return; }
-    toast(`✓ ${ok} de ${total} hechizo${total !== 1 ? 's' : ''} asignado${ok !== 1 ? 's' : ''} a ${pj}`);
-    if (st.nodoSel) renderInfoBar(st.nodoSel);
+    if (ok===0) { toast(`Todos ya estaban en inventario de ${pj}`); return; }
+    toast(`✓ ${ok} de ${total} hechizo${total!==1?'s':''} asignado${ok!==1?'s':''} a ${pj}`);
+    renderGrimorio(document.getElementById('hm-search')?.value || '');
 };
 
 // ── Auto-ordenar (Fruchterman-Reingold) ───────────────────────
 window._hmAutoOrdenar = () => {
     if (!st.esAdmin) return;
     const nodos = st.nodos, enlaces = st.enlaces;
-    const K = 500; let temp = 300, iter = 120;
-    nodos.forEach(n => { n._dirty = true; });
+    const K=500; let temp=300, iter=120;
+    nodos.forEach(n => { n._dirty=true; });
 
     const paso = () => {
         if (iter <= 0) { toast('Ordenado. Guarda posiciones cuando quieras.'); return; }
-        const disp = new Map(nodos.map(n => [n.id, { x: 0, y: 0 }]));
+        const disp = new Map(nodos.map(n => [n.id, {x:0, y:0}]));
 
-        for (let i = 0; i < nodos.length; i++) {
-            for (let j = i + 1; j < nodos.length; j++) {
-                const u = nodos[i], v = nodos[j];
-                let dx = u.x - v.x, dy = u.y - v.y;
-                const d = Math.hypot(dx, dy) || 1, f = (K * K) / d;
-                disp.get(u.id).x += dx / d * f; disp.get(u.id).y += dy / d * f;
-                disp.get(v.id).x -= dx / d * f; disp.get(v.id).y -= dy / d * f;
+        for (let i=0; i<nodos.length; i++) {
+            for (let j=i+1; j<nodos.length; j++) {
+                const u=nodos[i], v=nodos[j];
+                let dx=u.x-v.x, dy=u.y-v.y;
+                const d=Math.hypot(dx,dy)||1, f=(K*K)/d;
+                disp.get(u.id).x+=dx/d*f; disp.get(u.id).y+=dy/d*f;
+                disp.get(v.id).x-=dx/d*f; disp.get(v.id).y-=dy/d*f;
             }
         }
-        enlaces.forEach(({ source: u, target: v }) => {
-            let dx = u.x - v.x, dy = u.y - v.y;
-            const d = Math.hypot(dx, dy) || 1, f = d * d / K;
-            disp.get(u.id).x -= dx / d * f; disp.get(u.id).y -= dy / d * f;
-            disp.get(v.id).x += dx / d * f; disp.get(v.id).y += dy / d * f;
+        enlaces.forEach(({source:u, target:v}) => {
+            let dx=u.x-v.x, dy=u.y-v.y;
+            const d=Math.hypot(dx,dy)||1, f=d*d/K;
+            disp.get(u.id).x-=dx/d*f; disp.get(u.id).y-=dy/d*f;
+            disp.get(v.id).x+=dx/d*f; disp.get(v.id).y+=dy/d*f;
         });
         nodos.forEach(u => {
-            const d = Math.hypot(u.x, u.y) || 1, f = d * d / (K * 2);
-            disp.get(u.id).x -= u.x / d * f; disp.get(u.id).y -= u.y / d * f;
+            const d=Math.hypot(u.x,u.y)||1, f=d*d/(K*2);
+            disp.get(u.id).x-=u.x/d*f; disp.get(u.id).y-=u.y/d*f;
         });
         nodos.forEach(u => {
-            const d2 = disp.get(u.id), len = Math.hypot(d2.x, d2.y) || 1, lim = Math.min(len, temp);
-            u.x += d2.x / len * lim; u.y += d2.y / len * lim;
+            const d2=disp.get(u.id), len=Math.hypot(d2.x,d2.y)||1, lim=Math.min(len,temp);
+            u.x+=d2.x/len*lim; u.y+=d2.y/len*lim;
         });
-        temp *= 0.95; iter--;
+        temp*=0.95; iter--;
         requestAnimationFrame(paso);
     };
     paso();
 };
 
-// ── Helpers de modal ─────────────────────────────────────────
+// ── Helpers modal ─────────────────────────────────────────────
 function _nodosOperacion() {
     const nodos = st.modoSelMulti && st.seleccionados.size > 0
         ? [...st.seleccionados]
@@ -366,8 +461,7 @@ function _nodosOperacion() {
 function _modal(titulo, cuerpo, onOk) {
     _cerrarModal();
     const backdrop = document.createElement('div');
-    backdrop.id = 'hm-modal-bd';
-    backdrop.className = 'hm-modal-backdrop';
+    backdrop.id='hm-modal-bd'; backdrop.className='hm-modal-backdrop';
     backdrop.innerHTML = `<div class="hm-modal" onclick="event.stopPropagation()">
         <div class="hm-modal-title">${titulo}</div>
         ${cuerpo}

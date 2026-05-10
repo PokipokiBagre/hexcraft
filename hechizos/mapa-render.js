@@ -1,5 +1,5 @@
 // ============================================================
-// mapa-render.js — Render canvas y UI reactiva
+// mapa-render.js — Render canvas, info bar y panel OP
 // /hechizos/mapa-render.js
 // ============================================================
 
@@ -21,21 +21,35 @@ export function centrarCamara() {
     const wrap = document.getElementById('hm-canvas-wrap');
     if (!wrap || st.nodos.length === 0) return;
     const W = wrap.clientWidth, H = wrap.clientHeight;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
     st.nodos.forEach(n => {
-        minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x);
-        minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y);
+        minX=Math.min(minX,n.x); maxX=Math.max(maxX,n.x);
+        minY=Math.min(minY,n.y); maxY=Math.max(maxY,n.y);
     });
-    const w = (maxX - minX) || 800, h = (maxY - minY) || 800;
-    const zoom = Math.min(W / (w * 1.15), H / (h * 1.15), 1.5);
+    const w = (maxX-minX)||800, h = (maxY-minY)||800;
+    const zoom = Math.min(W/(w*1.15), H/(h*1.15), 1.5);
     st.camara.zoom = zoom;
-    st.camara.x = W / 2 - (minX + w / 2) * zoom;
-    st.camara.y = H / 2 - (minY + h / 2) * zoom;
+    st.camara.x = W/2 - (minX + w/2)*zoom;
+    st.camara.y = H/2 - (minY + h/2)*zoom;
+}
+
+// ── Centrar cámara en un nodo específico ─────────────────────
+export function centrarEnNodo(nodo) {
+    const wrap = document.getElementById('hm-canvas-wrap');
+    if (!wrap || !nodo) return;
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    const z = Math.max(st.camara.zoom, 0.5); // no alejar demasiado
+    st.camara.zoom = z;
+    st.camara.x = W/2 - nodo.x * z;
+    st.camara.y = H/2 - nodo.y * z;
 }
 
 // ── Loop de render ───────────────────────────────────────────
 export function iniciarLoop() {
-    const tick = () => { dibujar(); st.raf = requestAnimationFrame(tick); };
+    const tick = () => {
+        dibujar();
+        st.raf = requestAnimationFrame(tick);
+    };
     tick();
 }
 
@@ -52,10 +66,11 @@ export function dibujar() {
 
     const wrap = document.getElementById('hm-canvas-wrap');
     if (!wrap) return;
+    const W   = wrap.clientWidth;
     const dpr = window.devicePixelRatio || 1;
     const sf  = Math.max(camara.zoom, 0.05);
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = C.FONDO;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -83,77 +98,74 @@ export function dibujar() {
     }
     const hayEnfoque = enfocado !== null;
 
-    // ── ENLACES ──────────────────────────────────────────────
-    _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones,
-        enfocado, enfoqPrev, enfoqNext, hayEnfoque, sf);
+    // ── ENLACES ──
+    _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, enfocado, enfoqPrev, enfoqNext, hayEnfoque, sf);
 
     // Flecha temporal (modo conexión)
     if (modoConexion && tempFlecha) {
-        const ang = Math.atan2(tempFlecha.endY - tempFlecha.source.y, tempFlecha.endX - tempFlecha.source.x);
-        const hl  = 16 / sf;
+        const ang = Math.atan2(tempFlecha.endY-tempFlecha.source.y, tempFlecha.endX-tempFlecha.source.x);
+        const hl  = 16/sf;
         ctx.beginPath();
         ctx.moveTo(tempFlecha.source.x, tempFlecha.source.y);
         ctx.lineTo(tempFlecha.endX, tempFlecha.endY);
-        ctx.strokeStyle = C.NUEVO; ctx.lineWidth = 3 / sf;
-        ctx.setLineDash([8 / sf, 6 / sf]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle=C.NUEVO; ctx.lineWidth=3/sf;
+        ctx.setLineDash([8/sf,6/sf]); ctx.stroke(); ctx.setLineDash([]);
         ctx.beginPath();
         ctx.moveTo(tempFlecha.endX, tempFlecha.endY);
-        ctx.lineTo(tempFlecha.endX - hl * Math.cos(ang - Math.PI / 7), tempFlecha.endY - hl * Math.sin(ang - Math.PI / 7));
-        ctx.lineTo(tempFlecha.endX - hl * Math.cos(ang + Math.PI / 7), tempFlecha.endY - hl * Math.sin(ang + Math.PI / 7));
-        ctx.closePath(); ctx.fillStyle = C.NUEVO; ctx.fill();
+        ctx.lineTo(tempFlecha.endX-hl*Math.cos(ang-Math.PI/7), tempFlecha.endY-hl*Math.sin(ang-Math.PI/7));
+        ctx.lineTo(tempFlecha.endX-hl*Math.cos(ang+Math.PI/7), tempFlecha.endY-hl*Math.sin(ang+Math.PI/7));
+        ctx.closePath(); ctx.fillStyle=C.NUEVO; ctx.fill();
     }
 
-    // ── NODOS ────────────────────────────────────────────────
+    // ── NODOS ──
     _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesiones,
         seleccionados, modoSelMulti, nodoSel, enfocado, enfoqPrev, enfoqNext, enfoqRel, hayEnfoque, camara, sf);
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(1,0,0,1,0,0);
 
     // Actualizar zoom label
     const zl = document.getElementById('hm-zoom-label');
-    if (zl) zl.textContent = Math.round(camara.zoom * 100) + '%';
+    if (zl) zl.textContent = Math.round(camara.zoom*100) + '%';
 }
 
 // ── Dibujar enlaces ──────────────────────────────────────────
-function _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones,
-    enfocado, enfoqPrev, enfoqNext, hayEnfoque, sf)
-{
+function _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, enfocado, enfoqPrev, enfoqNext, hayEnfoque, sf) {
     const esTodos = st.jugadorPanel === 'Todos';
     enlaces.forEach(e => {
-        const dx = e.target.x - e.source.x, dy = e.target.y - e.source.y;
+        const dx = e.target.x-e.source.x, dy = e.target.y-e.source.y;
         const ang = Math.atan2(dy, dx);
-        const tx = e.target.x - Math.cos(ang) * (e.target.radio + 4 / sf);
-        const ty = e.target.y - Math.sin(ang) * (e.target.radio + 4 / sf);
+        const tx = e.target.x - Math.cos(ang)*(e.target.radio+4/sf);
+        const ty = e.target.y - Math.sin(ang)*(e.target.radio+4/sf);
 
-        let color = C.L_OC, lw = 0.7 / sf, dash = [];
-        const sD = descubiertos.has(e.source), tD = descubiertos.has(e.target);
-        const tA = aprendibles.has(e.target);
-        const sP = posesiones.has(e.source), tP = posesiones.has(e.target);
+        let color = C.L_OC, lw = 0.7/sf, dash = [];
+        const sD=descubiertos.has(e.source), tD=descubiertos.has(e.target);
+        const tA=aprendibles.has(e.target);
+        const sP=posesiones.has(e.source), tP=posesiones.has(e.target);
 
         if (hayEnfoque) {
-            const sA = enfoqPrev.has(e.source), tA2 = enfoqPrev.has(e.target) || e.target === enfocado;
-            if (sA && tA2)                                          { color = C.PREV; lw = 2 / sf; }
-            else if (e.source === enfocado && enfoqNext.has(e.target)) { color = C.NEXT; lw = 2 / sf; }
-            else                                                    { color = 'rgba(160,155,175,0.18)'; lw = 0.5 / sf; }
-        } else if (sP && tP)  { color = C.L_PJ;  lw = 2 / sf; }
-        else if (sP || tP)    { color = 'rgba(0,200,240,0.3)'; lw = 1.2 / sf; }
-        else if (sD && tD)    { color = C.L_POS; lw = 1.4 / sf; }
-        else if (sD && tA)    { color = C.L_APR; lw = 1.1 / sf; }
-        else if (esTodos)     { color = 'rgba(120,110,160,0.45)'; lw = 1 / sf; }
-        else if (!e.target.esConocido && !tA) { dash = [6 / sf, 5 / sf]; }
+            const sA=enfoqPrev.has(e.source), tA2=enfoqPrev.has(e.target)||e.target===enfocado;
+            if (sA&&tA2)        { color=C.PREV; lw=2/sf; }
+            else if (e.source===enfocado&&enfoqNext.has(e.target)) { color=C.NEXT; lw=2/sf; }
+            else                { color='rgba(160,155,175,0.18)'; lw=0.5/sf; }
+        } else if (sP&&tP)      { color=C.L_PJ; lw=2/sf; }
+        else if (sP||tP)        { color='rgba(0,200,240,0.3)'; lw=1.2/sf; }
+        else if (sD&&tD)        { color=C.L_POS; lw=1.4/sf; }
+        else if (sD&&tA)        { color=C.L_APR; lw=1.1/sf; }
+        else if (esTodos)       { color='rgba(120,110,160,0.45)'; lw=1/sf; }
+        else if (!e.target.esConocido&&!tA) { dash=[6/sf,5/sf]; }
 
         ctx.beginPath();
         ctx.moveTo(e.source.x, e.source.y);
         ctx.lineTo(tx, ty);
-        ctx.strokeStyle = color; ctx.lineWidth = lw;
+        ctx.strokeStyle=color; ctx.lineWidth=lw;
         ctx.setLineDash(dash); ctx.stroke(); ctx.setLineDash([]);
 
-        const hl = lw * 3 + 8 / sf;
+        const hl = lw*3 + 8/sf;
         ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(tx - hl * Math.cos(ang - Math.PI / 7), ty - hl * Math.sin(ang - Math.PI / 7));
-        ctx.lineTo(tx - hl * Math.cos(ang + Math.PI / 7), ty - hl * Math.sin(ang + Math.PI / 7));
-        ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+        ctx.moveTo(tx,ty);
+        ctx.lineTo(tx-hl*Math.cos(ang-Math.PI/7), ty-hl*Math.sin(ang-Math.PI/7));
+        ctx.lineTo(tx-hl*Math.cos(ang+Math.PI/7), ty-hl*Math.sin(ang+Math.PI/7));
+        ctx.closePath(); ctx.fillStyle=color; ctx.fill();
     });
 }
 
@@ -164,99 +176,91 @@ function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesio
     const esTodos = st.jugadorPanel === 'Todos';
 
     nodos.forEach(nodo => {
-        const esDes  = descubiertos.has(nodo), esApr = aprendibles.has(nodo), esPar = parciales.has(nodo);
-        const esPos  = posesiones.has(nodo);
-        const esSel  = nodoSel === nodo || seleccionados.has(nodo);
-        const enSelMulti  = seleccionados.has(nodo);
-        const esNuevo     = nodo.esNuevo;
-        const esEnfocado  = hayEnfoque && nodoSel === nodo;
-        const esPrecedente= hayEnfoque && enfoqPrev.has(nodo);
-        const esSaliente  = hayEnfoque && enfoqNext.has(nodo);
-        const esIrrel     = hayEnfoque && !enfoqRel.has(nodo) && nodoSel !== nodo;
+        const esDes=descubiertos.has(nodo), esApr=aprendibles.has(nodo), esPar=parciales.has(nodo);
+        const esPos=posesiones.has(nodo);
+        const esSel=nodoSel===nodo || seleccionados.has(nodo);
+        const enSelMulti=seleccionados.has(nodo);
+        const esNuevo=nodo.esNuevo;
+        const esEnfocado=hayEnfoque&&nodoSel===nodo;
+        const esPrecedente=hayEnfoque&&enfoqPrev.has(nodo);
+        const esSaliente=hayEnfoque&&enfoqNext.has(nodo);
+        const esIrrel=hayEnfoque&&!enfoqRel.has(nodo)&&nodoSel!==nodo;
 
         let colorN, colorT;
         if (esNuevo) {
-            colorN = C.NUEVO; colorT = C.NUEVO;
+            colorN=C.NUEVO; colorT=C.NUEVO;
         } else if (hayEnfoque) {
-            if (esEnfocado)        { colorN = esDes ? C.POS : esApr ? C.APR : esPos ? C.PJ : 'rgba(200,195,220,0.95)'; colorT = colorN; }
-            else if (esPrecedente) { colorN = C.PREV; colorT = C.PREV; }
-            else if (esSaliente)   { colorN = C.NEXT; colorT = C.NEXT; }
-            else                   { colorN = 'rgba(90,85,110,0.5)'; colorT = 'rgba(120,115,140,0.55)'; }
-        } else if (esPos && !esTodos) {
-            colorN = C.PJ; colorT = C.PJ;
+            if (esEnfocado)       { colorN=esDes?C.POS:esApr?C.APR:esPos?C.PJ:'rgba(200,195,220,0.95)'; colorT=colorN; }
+            else if (esPrecedente){ colorN=C.PREV; colorT=C.PREV; }
+            else if (esSaliente)  { colorN=C.NEXT; colorT=C.NEXT; }
+            else                  { colorN='rgba(90,85,110,0.5)'; colorT='rgba(120,115,140,0.55)'; }
+        } else if (esPos&&!esTodos) {
+            colorN=C.PJ; colorT=C.PJ;
         } else if (esTodos) {
-            colorN = esDes ? C.POS : esApr ? C.APR : 'rgba(100,95,130,0.7)';
-            colorT = esDes ? C.POS : esApr ? C.APR : 'rgba(160,155,175,0.9)';
+            colorN=esDes?C.POS:esApr?C.APR:'rgba(100,95,130,0.7)';
+            colorT=esDes?C.POS:esApr?C.APR:'rgba(160,155,175,0.9)';
         } else {
-            colorN = esDes ? (esPar ? C.RASTR : C.POS) : esApr ? C.APR : 'rgba(80,75,105,0.75)';
-            colorT = esDes ? (esPar ? C.RASTR : C.POS) : esApr ? C.APR : 'rgba(160,155,175,0.9)';
+            colorN=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(80,75,105,0.75)';
+            colorT=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(160,155,175,0.9)';
         }
 
         ctx.globalAlpha = esIrrel ? 0.4 : 1.0;
 
-        const forma = (extraR = 0) => {
-            const R = nodo.radio + extraR;
-            if (nodo.esEstado) { const h = R * 0.88, r = R * 0.22; ctx.beginPath(); ctx.roundRect(nodo.x - h, nodo.y - h, h * 2, h * 2, r); }
-            else               { ctx.beginPath(); ctx.arc(nodo.x, nodo.y, R, 0, Math.PI * 2); }
+        const forma = (extraR=0) => {
+            const R=nodo.radio+extraR;
+            if (nodo.esEstado) { const h=R*0.88,r=R*0.22; ctx.beginPath(); ctx.roundRect(nodo.x-h,nodo.y-h,h*2,h*2,r); }
+            else               { ctx.beginPath(); ctx.arc(nodo.x,nodo.y,R,0,Math.PI*2); }
         };
         const formaR = (r) => {
-            if (nodo.esEstado) { const h = r * 0.88, rd = r * 0.22; ctx.beginPath(); ctx.roundRect(nodo.x - h, nodo.y - h, h * 2, h * 2, rd); }
-            else               { ctx.beginPath(); ctx.arc(nodo.x, nodo.y, r, 0, Math.PI * 2); }
+            if (nodo.esEstado) { const h=r*0.88,rd=r*0.22; ctx.beginPath(); ctx.roundRect(nodo.x-h,nodo.y-h,h*2,h*2,rd); }
+            else               { ctx.beginPath(); ctx.arc(nodo.x,nodo.y,r,0,Math.PI*2); }
         };
 
-        // Halo selección múltiple
         if (enSelMulti && modoSelMulti) {
-            forma(14 / sf);
-            ctx.strokeStyle = 'rgba(212,175,55,0.9)'; ctx.lineWidth = 2.5 / sf;
-            ctx.setLineDash([4 / sf, 3 / sf]); ctx.stroke(); ctx.setLineDash([]);
+            forma(14/sf);
+            ctx.strokeStyle='rgba(212,175,55,0.9)'; ctx.lineWidth=2.5/sf;
+            ctx.setLineDash([4/sf,3/sf]); ctx.stroke(); ctx.setLineDash([]);
         }
-        // Halo selección simple
         if (esSel && !enSelMulti) {
-            forma(12 / sf);
-            ctx.strokeStyle = 'rgba(236,213,154,0.9)'; ctx.lineWidth = 2.5 / sf;
-            ctx.setLineDash([6 / sf, 4 / sf]); ctx.stroke(); ctx.setLineDash([]);
+            forma(12/sf);
+            ctx.strokeStyle='rgba(236,213,154,0.9)'; ctx.lineWidth=2.5/sf;
+            ctx.setLineDash([6/sf,4/sf]); ctx.stroke(); ctx.setLineDash([]);
         }
-        // Halo nodo nuevo
         if (esNuevo) {
-            forma(14 / sf);
-            ctx.shadowBlur = 20; ctx.shadowColor = C.NUEVO;
-            ctx.strokeStyle = `rgba(0,255,255,${0.4 + 0.3 * Math.sin(Date.now() / 300)})`;
-            ctx.lineWidth = 3 / sf; ctx.stroke(); ctx.shadowBlur = 0;
+            forma(14/sf);
+            ctx.shadowBlur=20; ctx.shadowColor=C.NUEVO;
+            ctx.strokeStyle=`rgba(0,255,255,${0.4+0.3*Math.sin(Date.now()/300)})`;
+            ctx.lineWidth=3/sf; ctx.stroke(); ctx.shadowBlur=0;
         }
-        // Halo PJ
         if (esPos && !esTodos && !hayEnfoque) {
-            forma(8 / sf);
-            ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(0,210,255,0.6)';
-            ctx.strokeStyle = 'rgba(0,210,255,0.7)'; ctx.lineWidth = 2.5 / sf;
-            ctx.stroke(); ctx.shadowBlur = 0;
+            forma(8/sf);
+            ctx.shadowBlur=12; ctx.shadowColor='rgba(0,210,255,0.6)';
+            ctx.strokeStyle='rgba(0,210,255,0.7)'; ctx.lineWidth=2.5/sf;
+            ctx.stroke(); ctx.shadowBlur=0;
         }
-        // Halos de enfoque
         if (esPrecedente || esSaliente) {
             const hc = esPrecedente ? C.PREV : C.NEXT;
-            forma(8 / sf);
-            ctx.shadowBlur = 14; ctx.shadowColor = hc;
-            ctx.strokeStyle = hc; ctx.lineWidth = 2.5 / sf;
-            ctx.stroke(); ctx.shadowBlur = 0;
+            forma(8/sf);
+            ctx.shadowBlur=14; ctx.shadowColor=hc;
+            ctx.strokeStyle=hc; ctx.lineWidth=2.5/sf;
+            ctx.stroke(); ctx.shadowBlur=0;
         }
 
-        // Fondo negro
-        forma(0); ctx.fillStyle = '#0d0d1a'; ctx.fill();
+        forma(0); ctx.fillStyle='#0d0d1a'; ctx.fill();
 
-        // Núcleo coloreado
-        formaR(Math.max(1, nodo.radio - 7));
-        ctx.fillStyle = colorN;
+        formaR(Math.max(1, nodo.radio-7));
+        ctx.fillStyle=colorN;
         if (!esIrrel) {
-            ctx.shadowBlur  = esNuevo ? 14 : (esPos || esPrecedente || esSaliente || esEnfocado ? 10 : 5);
+            ctx.shadowBlur  = esNuevo?14:(esPos||esPrecedente||esSaliente||esEnfocado?10:5);
             ctx.shadowColor = colorN;
         }
-        ctx.fill(); ctx.shadowBlur = 0;
+        ctx.fill(); ctx.shadowBlur=0;
 
-        // Borde exterior
         forma(0);
-        ctx.strokeStyle = colorN; ctx.lineWidth = (esSel ? 3 : 1.5) / sf;
-        if (!nodo.esConocido && !esNuevo && !esTodos && esIrrel) ctx.setLineDash([5 / sf, 4 / sf]);
+        ctx.strokeStyle=colorN; ctx.lineWidth=(esSel?3:1.5)/sf;
+        if (!nodo.esConocido&&!esNuevo&&!esTodos&&esIrrel) ctx.setLineDash([5/sf,4/sf]);
         ctx.stroke(); ctx.setLineDash([]);
-        ctx.globalAlpha = 1.0;
+        ctx.globalAlpha=1.0;
 
         if (camara.zoom > 0.08 || esSel) {
             _dibujarTextoNodo(ctx, nodo, colorT, esDes, esIrrel, esSel, camara.zoom, sf);
@@ -264,24 +268,24 @@ function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesio
     });
 }
 
-// ── Texto + medallitas ───────────────────────────────────────
+// ── Texto + medallitas de un nodo ────────────────────────────
 function _dibujarTextoNodo(ctx, nodo, colorT, esDes, esIrrel, esSel, zoom, sf) {
     const fs = esDes ? 28 : 22;
-    ctx.font = `bold ${fs}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    const ty2 = nodo.y + nodo.radio + 10 / sf;
+    ctx.font=`bold ${fs}px sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    const ty2 = nodo.y + nodo.radio + 10/sf;
 
     const texto = (st.esAdmin || nodo.esConocido)
         ? nodo.nombre
         : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
 
     ctx.globalAlpha = esIrrel ? 0.4 : 1.0;
-    ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 5 / sf;
+    ctx.strokeStyle='rgba(0,0,0,0.95)'; ctx.lineWidth=5/sf;
     ctx.strokeText(texto, nodo.x, ty2);
-    ctx.fillStyle = colorT; ctx.fillText(texto, nodo.x, ty2);
+    ctx.fillStyle=colorT; ctx.fillText(texto, nodo.x, ty2);
 
     if (zoom > 0.25 && !esIrrel) {
-        let pillY = ty2 + fs + 6 / sf;
+        let pillY = ty2 + fs + 6/sf;
         if (nodo.hex > 0) {
             pillY = _medallita(ctx, `⬡${nodo.hex}`, nodo.x, pillY, 'rgba(212,175,55,0.85)', 'rgba(212,175,55,0.35)', sf);
         }
@@ -289,126 +293,113 @@ function _dibujarTextoNodo(ctx, nodo, colorT, esDes, esIrrel, esSel, zoom, sf) {
             _medallita(ctx, `⬡${nodo.vex} VEX`, nodo.x, pillY, 'rgba(176,96,232,0.9)', 'rgba(150,80,220,0.4)', sf);
         }
     }
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha=1.0;
 }
 
 function _medallita(ctx, txt, cx, y, colorTxt, colorBorder, sf) {
     const fsp = 17;
-    ctx.font = `${fsp}px sans-serif`;
-    const pW = ctx.measureText(txt).width + 8 / sf, pH = fsp + 4 / sf;
-    const pX = cx - pW / 2;
+    ctx.font=`${fsp}px sans-serif`;
+    const pW=ctx.measureText(txt).width+8/sf, pH=fsp+4/sf;
+    const pX=cx-pW/2;
     ctx.beginPath();
-    ctx.roundRect?.(pX, y, pW, pH, 4 / sf) || ctx.rect(pX, y, pW, pH);
-    ctx.fillStyle = 'rgba(10,5,25,0.88)'; ctx.fill();
-    ctx.strokeStyle = colorBorder; ctx.lineWidth = 1 / sf; ctx.stroke();
-    ctx.font = `bold ${fsp}px sans-serif`; ctx.textAlign = 'center';
-    ctx.fillStyle = colorTxt; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.lineWidth = 3 / sf;
-    ctx.strokeText(txt, cx, y + 2 / sf); ctx.fillText(txt, cx, y + 2 / sf);
-    return y + pH + 3 / sf;
+    ctx.roundRect?.(pX,y,pW,pH,4/sf) || ctx.rect(pX,y,pW,pH);
+    ctx.fillStyle='rgba(10,5,25,0.88)'; ctx.fill();
+    ctx.strokeStyle=colorBorder; ctx.lineWidth=1/sf; ctx.stroke();
+    ctx.font=`bold ${fsp}px sans-serif`; ctx.textAlign='center';
+    ctx.fillStyle=colorTxt; ctx.strokeStyle='rgba(0,0,0,0.9)'; ctx.lineWidth=3/sf;
+    ctx.strokeText(txt, cx, y+2/sf); ctx.fillText(txt, cx, y+2/sf);
+    return y + pH + 3/sf;
 }
 
-// ── Panel OP (nodo seleccionado) ─────────────────────────────
-// Este es el panel flotante que aparece sobre la info bar.
-// Contiene: nombre · afinidad · clase · HEX · VEX · nota ·
-//           chips de estado/posesión · botones de acción OP
+// ── Info bar inferior (strip) ─────────────────────────────────
 export function renderInfoBar(nodo) {
-    const panel = document.getElementById('hm-op-panel');
-    const infoNodo = document.getElementById('hm-info-nodo');
-
-    if (!panel) return;
+    const el = document.getElementById('hm-info-nodo');
+    if (!el) return;
 
     if (!nodo) {
-        panel.classList.remove('visible');
-        if (infoNodo) infoNodo.innerHTML = '<span style="color:#444;">Clic en un hechizo para ver detalles</span>';
+        el.innerHTML = '<span style="color:#444;">Clic en un hechizo para ver detalles</span>';
+        renderOpPanel(null);
         return;
     }
 
     const esPosesion = st.posesiones.has(nodo);
     const mostrar    = nodo.esConocido || esPosesion || st.esAdmin;
     const color      = (st.colores[nodo.afinidad] || {}).t || '#888';
-    const nombre     = mostrar
-        ? nodo.nombre
-        : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
-    const safe = nodo.id.replace(/'/g, "\\'");
+    const nombre     = mostrar ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
 
-    // ── Info básica en la barra inferior ──
-    if (infoNodo) {
-        const partsBar = [`<span style="color:${color};font-weight:700;">${nombre}</span>`];
-        if (mostrar) {
-            partsBar.push(`<span style="color:#444;">${nodo.afinidad}</span>`);
-            partsBar.push(`<span style="color:#333;">Cl.${nodo.clase}</span>`);
-            if (esPosesion) partsBar.push(`<span style="color:rgba(150,131,200,0.7);">✓</span>`);
-        }
-        infoNodo.innerHTML = partsBar.join('<span style="color:#1a1a2a;margin:0 5px;">·</span>');
+    // Strip inferior: solo nombre + meta básica
+    const parts = [`<span style="color:${color};font-weight:700;">${nombre}</span>`];
+    if (mostrar) {
+        parts.push(`<span style="color:#555;">${nodo.afinidad}</span>`);
+        parts.push(`<span style="color:#3a3a55;">Cl.${nodo.clase}</span>`);
+        if (nodo.hex > 0) parts.push(`<span style="color:#c9953a;">⬡${nodo.hex} HEX</span>`);
+        if (nodo.vex > 0) parts.push(`<span style="color:#b060e8;">⬡${nodo.vex} VEX</span>`);
+        if (esPosesion)   parts.push(`<span style="color:rgba(150,131,200,0.9);">✓</span>`);
+    } else {
+        parts.push('<span style="color:#2a2a3a;font-style:italic;">Sellado</span>');
+    }
+    el.innerHTML = parts.join('<span style="color:#1a1a2a;margin:0 5px;">·</span>');
+
+    // Panel OP flotante con acciones
+    renderOpPanel(nodo);
+}
+
+// ── Panel OP (flotante sobre info bar) ───────────────────────
+export function renderOpPanel(nodo) {
+    const panel = document.getElementById('hm-op-panel');
+    if (!panel) return;
+
+    if (!nodo) {
+        panel.classList.remove('visible');
+        panel.innerHTML = '';
+        return;
     }
 
-    // ── Construir contenido del panel OP ──
-    const parts = [];
+    const esPosesion = st.posesiones.has(nodo);
+    const mostrar    = nodo.esConocido || esPosesion || st.esAdmin;
+    const color      = (st.colores[nodo.afinidad] || {}).t || '#888';
+    const nombre     = mostrar ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
+    const safe       = nodo.id.replace(/'/g, "\\'");
 
-    // Nombre
-    parts.push(`<span class="op-nombre" style="color:${color};">${nombre}</span>`);
-    parts.push(`<span class="op-sep"></span>`);
+    let html = `<span class="op-nombre" style="color:${color}">${nombre}</span>`;
 
     if (mostrar) {
-        // Meta: afinidad, clase
-        parts.push(`<span class="op-meta">${nodo.afinidad} · Cl.${nodo.clase}</span>`);
+        html += `<span class="op-sep"></span>`;
+        html += `<span class="op-meta">${nodo.afinidad} · Cl.${nodo.clase}</span>`;
+        if (nodo.hex > 0) html += `<span class="op-chip op-chip-hex">⬡${nodo.hex} HEX</span>`;
+        if (nodo.vex > 0) html += `<span class="op-chip op-chip-vex">⬡${nodo.vex} VEX</span>`;
+        if (esPosesion)   html += `<span class="op-chip op-chip-pos">✓ Aprendido</span>`;
+        if (nodo.nota)    html += `<span class="op-chip op-chip-nota">📌 ${nodo.nota}</span>`;
 
-        // Chips
-        if (nodo.hex > 0) parts.push(`<span class="op-chip op-chip-hex">⬡ ${nodo.hex} HEX</span>`);
-        if (nodo.vex > 0) parts.push(`<span class="op-chip op-chip-vex">⬡ ${nodo.vex} VEX</span>`);
-        if (esPosesion)   parts.push(`<span class="op-chip op-chip-pos">✓ Aprendido</span>`);
-        if (nodo.nota)    parts.push(`<span class="op-chip op-chip-nota">📌 ${nodo.nota}</span>`);
-
-        parts.push(`<span class="op-sep"></span>`);
-
-        // Botones de acción según contexto
         if (st.esAdmin) {
-            // Toggle conocido
-            if (nodo.esConocido) {
-                parts.push(`<button class="op-btn conocido-on" onclick="window._hmToggleConocido('${safe}', false)">👁 Público</button>`);
-            } else {
-                parts.push(`<button class="op-btn conocido-off" onclick="window._hmToggleConocido('${safe}', true)">🔒 Oculto</button>`);
-            }
-
-            // Asignar / Quitar del PJ seleccionado en la toolbar
-            if (st.jugadorPanel && st.jugadorPanel !== 'Todos') {
-                if (esPosesion) {
-                    parts.push(`<button class="op-btn quitar" onclick="window._hmQuitarNodoDePJ('${safe}')">✕ Quitar de ${st.jugadorPanel}</button>`);
-                } else {
-                    parts.push(`<button class="op-btn asignar" onclick="window._hmAsignarNodoAPJ('${safe}')">+ Asignar a ${st.jugadorPanel}</button>`);
-                }
-            }
-
-            // Botón editar (abre modal propiedades para este nodo)
-            parts.push(`<button class="op-btn editar" onclick="window._hmSoloEsteNodo('${safe}');window._hmModalPropiedades()">⚙ Propiedades</button>`);
-
-            // Descartar si es nodo nuevo
-            if (nodo.esNuevo) {
-                parts.push(`<button class="op-btn descartar" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar</button>`);
-            }
+            html += `<span class="op-sep"></span>`;
+            html += `<button class="op-btn ${nodo.esConocido ? 'conocido-on' : 'conocido-off'}"
+                        onclick="window._hmToggleConocido('${safe}',${!nodo.esConocido})">
+                        ${nodo.esConocido ? '🔒 Ocultar' : '👁 Publicar'}
+                    </button>`;
+            html += `<button class="op-btn editar" onclick="window._hmModalPropiedades()">⚙ Propiedades</button>`;
+            html += `<button class="op-btn asignar" onclick="window._hmModalAsignarPJ()">👤 Asignar PJ</button>`;
+            if (nodo.esNuevo)
+                html += `<button class="op-btn descartar" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar</button>`;
         }
-
     } else {
-        // Sellado
-        parts.push(`<span class="op-btn sellado">🔒 Sellado</span>`);
+        html += `<span class="op-sep"></span>`;
+        html += `<span class="op-meta" style="color:#2a2a3a;font-style:italic;">Sellado — sin acceso</span>`;
     }
 
-    panel.innerHTML = parts.join('');
+    html += `<span class="op-sep"></span>`;
+    html += `<button class="op-btn cerrar" onclick="window._hmCerrarOpPanel()">✕</button>`;
+
+    panel.innerHTML = html;
     panel.classList.add('visible');
 }
 
-// Helper: poner el nodo actual como único seleccionado para el modal de propiedades
-window._hmSoloEsteNodo = (id) => {
-    const nodo = st.nodos.find(n => n.id === id);
-    if (nodo) { st.nodoSel = nodo; st.seleccionados.clear(); }
-};
-
-// ── Stats del info bar ─────────────────────────────────────────
+// ── Stats del info bar ────────────────────────────────────────
 export function renderInfoStats() {
     const el = document.getElementById('hm-info-stats');
     if (!el) return;
     const total    = st.nodos.length;
-    const conocidos= st.descubiertos.size;
+    const conocidos = st.descubiertos.size;
     const pjCount  = st.posesiones.size;
     let txt = `${total} nodos · ${conocidos} conocidos`;
     if (st.jugadorPanel !== 'Todos' && pjCount > 0)

@@ -8,7 +8,7 @@ import { st } from './mapa-state.js';
 import { cargarDatos, cargarInventarioPJ, calcSetsGlobales } from './mapa-data.js';
 import { redimensionar, centrarCamara, iniciarLoop, renderInfoStats } from './mapa-render.js';
 import { iniciarEventos } from './mapa-eventos.js';
-import { renderToolbar } from './mapa-ui.js';
+import { renderToolbar, renderDrawer } from './mapa-ui.js';
 
 async function init() {
     // ── Canvas ───────────────────────────────────────────────
@@ -37,6 +37,7 @@ async function init() {
 
     // ── Montar UI ────────────────────────────────────────────
     renderToolbar();
+    renderDrawer();       // Grimorio + admin (respeta st.esAdmin)
     renderInfoStats();
 
     // ── Iniciar canvas ───────────────────────────────────────
