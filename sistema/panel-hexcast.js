@@ -205,6 +205,12 @@ function _css() {
 /* ── Estado chips en slot ── */
 .hxc-slot-estados { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; margin-top: 3px; max-width: 100%; }
 .hxc-estado-chip { font-size: 0.44em; padding: 1px 5px; border-radius: 8px; background: rgba(80,200,140,0.15); border: 1px solid rgba(80,200,140,0.35); color: #50c88c; white-space: nowrap; max-width: 70px; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+/* Estado blocks debajo del slot */
+.hxc-estado-block { display: flex; align-items: center; gap: 5px; padding: 4px 8px 4px 10px; background: rgba(80,200,140,0.07); border: 1px solid rgba(80,200,140,0.22); border-top: none; margin: 0; flex-shrink: 0; }
+.hxc-estado-block-nombre { font-size: 0.58em; color: #50c88c; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hxc-estado-block-afin { font-size: 0.5em; color: #3a6a50; white-space: nowrap; }
+.hxc-estado-block-del { background: none; border: none; color: #2a4a38; font-size: 0.75em; cursor: pointer; padding: 0 3px; line-height: 1; transition: color 0.12s; flex-shrink: 0; }
+.hxc-estado-block-del:hover { color: #e05050; }
 /* ── Panel lateral flotante (inventario / estados / evento) ── */
 #hxc-lateral-panel { position: absolute; top: 0; bottom: 0; width: 280px; background: rgba(8,7,15,0.99); border: 1px solid rgba(255,255,255,0.1); z-index: 10; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 30px rgba(0,0,0,0.7); }
 #hxc-lateral-panel.lado-izq { left: 160px; border-left: none; border-radius: 0 8px 8px 0; }
@@ -410,18 +416,33 @@ function _renderSlot(pj, grupo, idx) {
       <span class="hxc-slot-nombre">${pj.nombre}</span>
       <span class="hxc-slot-hex">${(hex||0).toLocaleString()} HEX</span>
       ${vex > 0 ? `<span class="hxc-slot-vex">${vex.toLocaleString()} VEX</span>` : ''}
-      ${estadosHtml}
       <div class="hxc-slot-actions">${btnHz}${btnEst}${btnEv}</div>
     </div>`;
   }
 
   const actCls = esteActivo && pj ? 'activo' : (pj ? '' : 'vacio');
 
-  return `<div class="hxc-slot ${actCls}" style="${vars}"
+  const slotEl = `<div class="hxc-slot ${actCls}" style="${vars}"
     onmousedown="if(window.fxMouseDownSlot&&window.fxMouseDownSlot(event,'${grupo}',${idx}))event.preventDefault()"
     onclick="window._hxcClickSlot('${grupo}',${idx})">
     ${quit}${inner}
   </div>`;
+
+  // Estados como bloques apilados debajo del slot
+  let estadosBlocks = '';
+  if (pj) {
+    const estados = hxState.estadosPorPj[pj.nombre] || [];
+    if (estados.length > 0) {
+      estadosBlocks = estados.map(e => `
+        <div class="hxc-estado-block" style="${vars}">
+          <span class="hxc-estado-block-nombre">${e.hechizo_nombre}</span>
+          <span class="hxc-estado-block-afin">${e.afinidad||''}</span>
+          <button class="hxc-estado-block-del" onclick="event.stopPropagation();window._hxcQuitarEstado('${pj.nombre.replace(/'/g,"\\'")}',${e.id})">×</button>
+        </div>`).join('');
+    }
+  }
+
+  return slotEl + estadosBlocks;
 }
 
 function _renderLateralPanel() {
@@ -464,26 +485,14 @@ function _renderLateralPanel() {
       <div class="hxc-lat-body">${rows}</div>`;
 
   } else if (tipo === 'estados') {
-    const estados = hxState.estadosPorPj[pj.nombre] || [];
-    // Catálogo de hechizos estado para añadir
     const busq = hxState.busquedaHz.toLowerCase();
     const catalogoEstados = hxState.catalogoDB.filter(h => h.es_estado);
     const filtCatalogo = busq
       ? catalogoEstados.filter(h => (h.nombre||'').toLowerCase().includes(busq))
       : catalogoEstados;
 
-    const estadosActivos = estados.length > 0
-      ? estados.map(e => `<div class="hxc-estado-row">
-          <div style="flex:1;min-width:0;">
-            <div class="hxc-estado-row-nombre">${e.hechizo_nombre}</div>
-            <div class="hxc-estado-row-afin">${e.afinidad||'—'}</div>
-          </div>
-          <button class="hxc-estado-quitar" title="Quitar estado" onclick="window._hxcQuitarEstado('${pj.nombre}',${e.id})">×</button>
-        </div>`).join('')
-      : `<div class="hxc-lat-empty">Sin hechizos estado activos</div>`;
-
     const catalogoRows = filtCatalogo.length > 0
-      ? filtCatalogo.map(h => `<div class="hxc-lat-hz es-estado" onclick="window._hxcAgregarEstado('${pj.nombre}','${h.hechizo_id}','${h.nombre.replace(/'/g,"\\'")}','${h.afinidad||''}')">
+      ? filtCatalogo.map(h => `<div class="hxc-lat-hz es-estado" onclick="window._hxcAgregarEstado('${pj.nombre.replace(/'/g,"\\'")}','${h.hechizo_id}','${h.nombre.replace(/'/g,"\\'")}','${h.afinidad||''}')">
           <div style="flex:1;min-width:0;">
             <div class="hxc-lat-hz-nombre">${h.nombre}</div>
             <div class="hxc-lat-hz-afin">${h.afinidad||'—'}</div>
@@ -493,14 +502,9 @@ function _renderLateralPanel() {
       : `<div class="hxc-lat-empty">Sin hechizos estado en catálogo</div>`;
 
     body = `
-      <div class="hxc-lat-body" style="padding-bottom:0;">
-        <div style="font-size:0.55em;letter-spacing:1.5px;text-transform:uppercase;color:${latColor};padding:6px 4px 4px;font-weight:700;">Activos</div>
-        ${estadosActivos}
-        <div style="font-size:0.55em;letter-spacing:1.5px;text-transform:uppercase;color:#666;padding:10px 4px 4px;font-weight:700;border-top:1px solid rgba(255,255,255,0.06);margin-top:6px;">Agregar estado</div>
-        <input class="hxc-lat-search" style="margin:3px 0 4px;" placeholder="Buscar estado..." value="${hxState.busquedaHz}"
-          oninput="window._hxcBuscarHz(this.value)" onclick="event.stopPropagation()">
-        ${catalogoRows}
-      </div>`;
+      <input class="hxc-lat-search" style="margin:5px 8px 3px;width:calc(100% - 16px);box-sizing:border-box;" placeholder="Buscar estado..." value="${hxState.busquedaHz}"
+        oninput="window._hxcBuscarHz(this.value)" onclick="event.stopPropagation()">
+      <div class="hxc-lat-body">${catalogoRows}</div>`;
 
   } else if (tipo === 'evento') {
     body = '';
@@ -509,7 +513,7 @@ function _renderLateralPanel() {
   return `<div id="hxc-lateral-panel" class="${ladoCls}" style="--lat-color:${latColor};" onclick="event.stopPropagation()">
     <div class="hxc-lat-header">
       <span class="hxc-lat-titulo">${pj.nombre}</span>
-      <span class="hxc-lat-subtitulo">${tipo === 'hechizos' ? 'Inventario' : 'Estados'}</span>
+      <span class="hxc-lat-subtitulo">${tipo === 'hechizos' ? 'Inventario' : tipo === 'estados' ? 'Agregar estado' : ''}</span>
       <button class="hxc-lat-close" onclick="window._hxcCerrarPanel()">×</button>
     </div>
     ${body}
@@ -1321,9 +1325,6 @@ window._hxcAgregarEstado = async (nombre, hechizo_id, hechizo_nombre, afinidad) 
   const sesionId  = hxState.sesionActiva?.id;
   if (!turnoId) { _toast('Sin turno activo', true); return; }
   const actuales = hxState.estadosPorPj[nombre] || [];
-  if (actuales.find(e => e.hechizo_id === hechizo_id)) {
-    _toast('Este estado ya está activo en este turno', true); return;
-  }
   const { data, error } = await supabase.from('pj_estados')
     .insert({ turno_id: turnoId, sesion_id: sesionId, personaje_nombre: nombre, hechizo_id, hechizo_nombre, afinidad })
     .select().single();
