@@ -417,9 +417,6 @@ function _findEl(id) {
   return null;
 }
 
-// Mantener compatibilidad con los handlers de clic (ya no se usan para crear)
-export function fxClickItem(itemIdx)     { return false; }
-
 // ── Obtener posición central de un elemento relativa al SVG overlay ──
 // ── Posición en el BORDE del elemento (izq o der), no en el centro ──
 function _posEl(el, lado) {
