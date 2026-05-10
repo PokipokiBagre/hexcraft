@@ -579,20 +579,23 @@ function _svgFlecha(f) {
     cy = my + ny * arcAmt * arcDir;
   }
 
-  const path = `M ${po.x.toFixed(1)},${po.y.toFixed(1)} Q ${cx.toFixed(1)},${cy.toFixed(1)} ${pd.x.toFixed(1)},${pd.y.toFixed(1)}`;
+  const al   = Math.max(8, f.grosor * 3.5);
+  const tang = Math.atan2(pd.y - cy, pd.x - cx);
+  const ax1  = pd.x - al*Math.cos(tang - 0.4);
+  const ay1  = pd.y - al*Math.sin(tang - 0.4);
+  const ax2  = pd.x - al*Math.cos(tang + 0.4);
+  const ay2  = pd.y - al*Math.sin(tang + 0.4);
+
+  // Punto donde termina la línea (retrocede al por la tangente para no tapar la punta)
+  const lineEndX = pd.x - al * Math.cos(tang);
+  const lineEndY = pd.y - al * Math.sin(tang);
+  const path = `M ${po.x.toFixed(1)},${po.y.toFixed(1)} Q ${cx.toFixed(1)},${cy.toFixed(1)} ${lineEndX.toFixed(1)},${lineEndY.toFixed(1)}`;
 
   const dash = f.estilo === 'punteada'
     ? `stroke-dasharray="${f.grosor*1.5} ${f.grosor*2}"`
     : f.estilo === 'rayada'
       ? `stroke-dasharray="${f.grosor*4} ${f.grosor*2}"`
       : '';
-
-  const al  = Math.max(8, f.grosor * 3.5);
-  const tang = Math.atan2(pd.y - cy, pd.x - cx);
-  const ax1 = pd.x - al*Math.cos(tang - 0.4);
-  const ay1 = pd.y - al*Math.sin(tang - 0.4);
-  const ax2 = pd.x - al*Math.cos(tang + 0.4);
-  const ay2 = pd.y - al*Math.sin(tang + 0.4);
 
   const op = f.opacidad ?? 0.88;
   return `<g class="hxfx-flecha-g" data-fx-id="${f.id}" style="cursor:default;">
@@ -971,12 +974,13 @@ window._hxfxExportar = async (oscuro = false) => {
       cy = my + ndy * arc * dir;
     }
 
-    const path = `M ${px.toFixed(1)},${py.toFixed(1)} Q ${cx.toFixed(1)},${cy.toFixed(1)} ${dx.toFixed(1)},${dy.toFixed(1)}`;
-    const op  = f.opacidad ?? 0.88;
-    const al  = Math.max(8, f.grosor * 3.5);
+    const op   = f.opacidad ?? 0.88;
+    const al   = Math.max(8, f.grosor * 3.5);
     const tang = Math.atan2(dy - cy, dx - cx);
-    const ax1 = dx - al*Math.cos(tang - 0.4), ay1 = dy - al*Math.sin(tang - 0.4);
-    const ax2 = dx - al*Math.cos(tang + 0.4), ay2 = dy - al*Math.sin(tang + 0.4);
+    const ax1  = dx - al*Math.cos(tang - 0.4), ay1 = dy - al*Math.sin(tang - 0.4);
+    const ax2  = dx - al*Math.cos(tang + 0.4), ay2 = dy - al*Math.sin(tang + 0.4);
+    const leX  = dx - al*Math.cos(tang), leY = dy - al*Math.sin(tang);
+    const path = `M ${px.toFixed(1)},${py.toFixed(1)} Q ${cx.toFixed(1)},${cy.toFixed(1)} ${leX.toFixed(1)},${leY.toFixed(1)}`;
     const dash = f.estilo === 'punteada' ? `stroke-dasharray="${f.grosor*1.5} ${f.grosor*2}"` :
                  f.estilo === 'rayada'   ? `stroke-dasharray="${f.grosor*4} ${f.grosor*2}"` : '';
 
