@@ -418,7 +418,6 @@ function _findEl(id) {
 }
 
 // Mantener compatibilidad con los handlers de clic (ya no se usan para crear)
-export function fxClickSlot(grupo, idx) { return false; }
 export function fxClickItem(itemIdx)     { return false; }
 
 // ── Obtener posición central de un elemento relativa al SVG overlay ──
