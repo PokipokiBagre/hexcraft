@@ -175,7 +175,7 @@ export function agregarHechizo(pjNombre, grupo, slotIdx, hechizo) {
     infalible: false,
     forceFallo: false,
     cobrarHex: true,
-    esPrioridad: false,
+    esPrioridad: !!(hechizo.es_prioridad),  // auto-prioridad si el hechizo lo requiere
     dado: '',
     afinidadEfectiva,
     mult,
@@ -187,6 +187,13 @@ export function agregarHechizo(pjNombre, grupo, slotIdx, hechizo) {
     hexGastado: 0
   };
   hxState.stack.push(item);
+  // Si el hechizo es de prioridad y no es el primero, moverlo al frente
+  if (hechizo.es_prioridad && hxState.stack.length > 1) {
+    const idx = hxState.stack.length - 1;
+    const [added] = hxState.stack.splice(idx, 1);
+    hxState.stack.unshift(added);
+    _recalcCooldowns();
+  }
   return item;
 }
 

@@ -252,6 +252,26 @@ function _css() {
 .hxc-btn-aplicar-ev:hover { background: rgba(62,207,110,0.18); }
 .hxc-btn-revertir-ev { background: rgba(232,160,48,0.07); border-color: rgba(232,160,48,0.35); color: #e8a030; }
 .hxc-btn-revertir-ev:hover { background: rgba(232,160,48,0.18); }
+/* ── Hechizo-estado: bordes cuadrados ── */
+.hxc-item.es-estado { border-radius: 2px !important; }
+.hxc-item.es-estado .hxc-item-row { border-radius: 0; }
+.hxc-item-color-dot.es-estado { border-radius: 2px !important; }
+/* ── Badges de meta-info en la fila del hechizo ── */
+.hxc-hz-meta { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.hxc-hz-badge { font-size: 0.5em; padding: 2px 5px; border-radius: 3px; border: 1px solid; white-space: nowrap; font-weight: 700; letter-spacing: 0.3px; }
+.hxc-hz-badge-estado { background: rgba(80,200,140,0.12); color: #50c88c; border-color: rgba(80,200,140,0.35); }
+.hxc-hz-badge-pri { background: rgba(212,175,55,0.14); color: #d4af37; border-color: rgba(212,175,55,0.4); }
+/* Objetivos */
+.hxc-hz-obj { display: flex; gap: 2px; }
+.hxc-hz-obj-dot { width: 13px; height: 13px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.55em; font-weight: 700; border: 1px solid; flex-shrink: 0; }
+.hxc-hz-obj-dot.hz { background: rgba(60,130,230,0.15); color: #5090e8; border-color: rgba(60,130,230,0.4); }
+.hxc-hz-obj-dot.usr { background: rgba(140,90,220,0.15); color: #b080e0; border-color: rgba(140,90,220,0.4); }
+.hxc-hz-obj-dot.obj { background: rgba(232,100,60,0.15); color: #e87040; border-color: rgba(232,100,60,0.4); }
+/* Cast range chips */
+.hxc-hz-cast { display: flex; gap: 2px; }
+.hxc-hz-cast-chip { font-size: 0.58em; padding: 1px 5px; border-radius: 3px; font-weight: 800; font-family: 'Cinzel', serif; border: 1px solid; min-width: 18px; text-align: center; }
+.hxc-hz-cast-chip.back { background: rgba(100,160,230,0.12); color: #70a8e8; border-color: rgba(100,160,230,0.35); }
+.hxc-hz-cast-chip.next { background: rgba(230,100,60,0.12); color: #e87840; border-color: rgba(230,100,60,0.35); }
 `;
   document.head.appendChild(st);
 }
@@ -621,22 +641,13 @@ function _renderStack(esHistorico) {
       const editBtn = puedeEditar
         ? `<button class="hxc-item-del" onclick="event.stopPropagation();window._hxcEditarEvento(${i})" title="Editar evento" style="color:#9060c0;">✎</button>`
         : '';
-      const aplicadoLabel = item._aplicado
-        ? `<span class="hxc-item-evento-estado aplicado">✓ Aplicado</span>`
-        : `<span class="hxc-item-evento-estado pendiente">Pendiente</span>`;
-      const botonesAplicar = (esAdmin && puedeEditar) ? (item._aplicado
-        ? `<button class="hxc-item-del" style="color:#e8a030;font-size:0.65em;padding:2px 8px;border-radius:4px;border:1px solid rgba(232,160,48,0.35);background:rgba(232,160,48,0.07);" onclick="event.stopPropagation();window._hxcRevertirEvento(${i})">↩ Revertir</button>`
-        : `<button class="hxc-item-del" style="color:#3ecf6e;font-size:0.65em;padding:2px 8px;border-radius:4px;border:1px solid rgba(62,207,110,0.35);background:rgba(62,207,110,0.07);" onclick="event.stopPropagation();window._hxcAplicarEvento(${i})">✓ Aplicar</button>`)
-        : '';
       const tipoLabel = { evento:'Evento', casteo:'Casteo GM', stat:'Stat', hechizo_add:'+ Hechizo', hechizo_rem:'− Hechizo', objeto:'Objeto' }[item.eventoTipo] || 'Evento';
       return `<div class="hxc-item-evento" data-hxc-idx="${i}">
         <div class="hxc-item-evento-row" onclick="window._hxcToggleItem(${i})">
           <div class="hxc-item-evento-dot"></div>
           <span class="hxc-item-evento-tipo">${tipoLabel}</span>
           <span class="hxc-item-evento-nombre">${item.eventoNombre || '—'}</span>
-          ${aplicadoLabel}
           <span class="hxc-item-evento-pj">${item.pjNombre}</span>
-          ${botonesAplicar}
           ${editBtn}
           ${delBtn}
         </div>
@@ -646,9 +657,36 @@ function _renderStack(esHistorico) {
 
     // ── Item tipo HECHIZO (normal) ────────────────────────────
     const vars    = _colorVars(item.color);
+    const hz      = item.hechizo;
+    const esEstado = !!(hz.es_estado);
     const priCls  = item.esPrioridad ? 'prioridad' : '';
+    const estadoCls = esEstado ? 'es-estado' : '';
     const resCls  = item.resultado ? `res-${item.resultado}` : '';
     const multStr = item.mult > 1 ? `×${item.mult.toFixed(1)} CD` : '';
+
+    // Meta badges: estado, prioridad
+    const badgeEstado = esEstado
+      ? `<span class="hxc-hz-badge hxc-hz-badge-estado">Estado</span>` : '';
+    const badgePri = hz.es_prioridad
+      ? `<span class="hxc-hz-badge hxc-hz-badge-pri">↑ Pri</span>` : '';
+
+    // Objetivos
+    const objHtml = (hz.afecta_hechizos || hz.afecta_usuario || hz.afecta_objetivo)
+      ? `<div class="hxc-hz-obj">
+          ${hz.afecta_hechizos ? `<div class="hxc-hz-obj-dot hz" title="Afecta hechizos">Hz</div>` : ''}
+          ${hz.afecta_usuario  ? `<div class="hxc-hz-obj-dot usr" title="Afecta al usuario">U</div>` : ''}
+          ${hz.afecta_objetivo ? `<div class="hxc-hz-obj-dot obj" title="Afecta otros objetivos">O</div>` : ''}
+        </div>` : '';
+
+    // Backcast / Nextcast
+    const castHtml = (hz.backcast > 0 || hz.nextcast > 0)
+      ? `<div class="hxc-hz-cast">
+          ${hz.backcast > 0 ? `<span class="hxc-hz-cast-chip back" title="Backcast: afecta ${hz.backcast} hechizo(s) anteriores">←${hz.backcast}</span>` : ''}
+          ${hz.nextcast > 0 ? `<span class="hxc-hz-cast-chip next" title="Nextcast: afecta ${hz.nextcast} hechizo(s) siguientes">${hz.nextcast}→</span>` : ''}
+        </div>` : '';
+
+    const metaHtml = (badgeEstado || badgePri || objHtml || castHtml)
+      ? `<div class="hxc-hz-meta">${badgeEstado}${badgePri}${objHtml}${castHtml}</div>` : '';
 
     let resHtml;
     if      (item.resultado === 'exito')     resHtml = `<span class="hxc-item-resultado hxc-res-exito">¡Éxito!</span>`;
@@ -672,7 +710,6 @@ function _renderStack(esHistorico) {
     let detail = '';
     if (item.abierto) {
       const nc  = item.ncCalc;
-      const hz  = item.hechizo;
       const campos = [
         { label:'Resumen', val: hz.resumen },{ label:'Efecto', val: hz.efecto },
         { label:'Overcast', val: hz.overcast },{ label:'Undercast', val: hz.undercast },
@@ -688,6 +725,12 @@ function _renderStack(esHistorico) {
           <button class="hxc-opt-btn ${item.esPrioridad?'on':''}" onclick="event.stopPropagation();window._hxcSetPrioridad(${i})">↑ Prioridad</button>
         </div>` : '';
 
+      const objetivosStr = [
+        hz.afecta_hechizos ? 'Hechizos' : '',
+        hz.afecta_usuario  ? 'Usuario' : '',
+        hz.afecta_objetivo ? 'Objetivos' : '',
+      ].filter(Boolean).join(', ');
+
       detail = `<div class="hxc-item-detail">
         ${optBtns}
         <div class="hxc-detail-stats">
@@ -696,6 +739,10 @@ function _renderStack(esHistorico) {
           ${item.mult>1?`<div>Con CD: <span style="color:#e8a030;">NC mín. ${item.ncNecesario}</span></div>`:''}
           <div>Afinidad Hz: <span>${hz.afinidad||'—'}</span></div>
           ${hz.clase?`<div>Clase: <span>${hz.clase}</span></div>`:''}
+          ${objetivosStr ? `<div>Afecta: <span>${objetivosStr}</span></div>` : ''}
+          ${hz.backcast > 0 ? `<div>Backcast: <span style="color:#70a8e8;">←${hz.backcast}</span></div>` : ''}
+          ${hz.nextcast > 0 ? `<div>Nextcast: <span style="color:#e87840;">${hz.nextcast}→</span></div>` : ''}
+          ${hz.es_prioridad ? `<div>Prioridad: <span style="color:#d4af37;">↑ automática</span></div>` : ''}
         </div>
         ${nc!==null?`<div class="hxc-nc-calc">NC: <strong>${nc}</strong> / necesario: ${item.ncNecesario} — ${nc>=item.ncNecesario?'<span style="color:#3ecf6e;">ÉXITO</span>':'<span style="color:#e85050;">FALLO</span>'}</div>`:''}
         ${gastoHtml}
@@ -704,12 +751,13 @@ function _renderStack(esHistorico) {
       </div>`;
     }
 
-    return `<div class="hxc-item ${priCls} ${resCls}" style="${vars}" data-hxc-idx="${i}">
+    return `<div class="hxc-item ${priCls} ${estadoCls} ${resCls}" style="${vars}" data-hxc-idx="${i}">
       <div class="hxc-item-row" onclick="window._hxcToggleItem(${i})">
-        <div class="hxc-item-color-dot"></div>
+        <div class="hxc-item-color-dot ${esEstado ? 'es-estado' : ''}"></div>
         <span class="hxc-item-pj">${item.pjNombre}</span>
-        <span class="hxc-item-hz">${item.hechizo.nombre}</span>
+        <span class="hxc-item-hz">${hz.nombre}</span>
         ${item.esPrioridad?`<span class="hxc-prioridad-flag">↑</span>`:''}
+        ${metaHtml}
         ${multStr?`<span class="hxc-item-mult">${multStr}</span>`:''}
         ${dadoInput}
         ${resHtml}
@@ -1360,39 +1408,5 @@ async function _carryForwardEstados(turnoAnteriorId, nuevoTurnoId, sesionId) {
   }));
   await supabase.from('pj_estados').insert(rows);
 }
-
-// ── Aplicar / Revertir evento (solo OP) ──────────────────────
-window._hxcAplicarEvento = async (stackIdx) => {
-  if (!_esAdmin()) { _toast('Solo el OP puede aplicar eventos', true); return; }
-  const item = hxState.stack[stackIdx];
-  if (!item || item.tipoItem !== 'evento' || item._aplicado) return;
-  try {
-    const { aplicarPayload } = await import('./panel-hexcast-evento.js');
-    const errores = await aplicarPayload(item._payload, false);
-    if (errores && errores.length) { _toast('Errores: ' + errores.join(', '), true); return; }
-    item._aplicado = true;
-    _toast(`✦ Evento "${item.eventoNombre}" aplicado`);
-    _render();
-  } catch(e) {
-    _toast('Error al aplicar evento: ' + e.message, true);
-  }
-};
-
-window._hxcRevertirEvento = async (stackIdx) => {
-  if (!_esAdmin()) { _toast('Solo el OP puede revertir eventos', true); return; }
-  const item = hxState.stack[stackIdx];
-  if (!item || item.tipoItem !== 'evento' || !item._aplicado) return;
-  if (!confirm(`¿Revertir evento "${item.eventoNombre}"? Los cambios se desharán.`)) return;
-  try {
-    const { aplicarPayload } = await import('./panel-hexcast-evento.js');
-    const errores = await aplicarPayload(item._payload, true);
-    if (errores && errores.length) { _toast('Errores: ' + errores.join(', '), true); return; }
-    item._aplicado = false;
-    _toast(`↩ Evento "${item.eventoNombre}" revertido`);
-    _render();
-  } catch(e) {
-    _toast('Error al revertir evento: ' + e.message, true);
-  }
-};
 
 _montar();
