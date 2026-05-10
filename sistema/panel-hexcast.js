@@ -41,10 +41,10 @@ function _css() {
 .hxc-btn-close { background: none; border: none; color: #444; font-size: 1.4em; cursor: pointer; padding: 2px 6px; line-height: 1; transition: color 0.15s; }
 .hxc-btn-close:hover { color: #ccc; }
 .hxc-body { flex: 1; display: grid; grid-template-columns: 160px 120px 1fr 120px 160px; overflow: hidden; position: relative; }
-.hxc-col { display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.05); overflow: hidden; }
+.hxc-col { display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.05); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
 .hxc-col-b { border-right: none; border-left: 1px solid rgba(255,255,255,0.05); }
-.hxc-col-title { font-size: 0.52em; letter-spacing: 2.5px; text-transform: uppercase; color: #888; padding: 6px 10px 4px; flex-shrink: 0; font-weight: 700; }
-.hxc-slot { flex: 1; min-height: 0; display: flex; flex-direction: column; border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; position: relative; overflow: hidden; }
+.hxc-col-title { font-size: 0.52em; letter-spacing: 2.5px; text-transform: uppercase; color: #888; padding: 6px 10px 4px; flex-shrink: 0; font-weight: 700; position: sticky; top: 0; background: #08070f; z-index: 1; }
+.hxc-slot { flex-shrink: 0; min-height: 110px; display: flex; flex-direction: column; border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; position: relative; overflow: visible; }
 .hxc-slot:last-child { border-bottom: none; }
 .hxc-slot-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; height: 100%; padding: 8px 10px; transition: background 0.15s; }
 .hxc-slot:hover .hxc-slot-inner { background: rgba(255,255,255,0.025); }
@@ -211,6 +211,14 @@ function _css() {
 .hxc-estado-block-afin { font-size: 0.5em; color: #3a6a50; white-space: nowrap; }
 .hxc-estado-block-del { background: none; border: none; color: #2a4a38; font-size: 0.75em; cursor: pointer; padding: 0 3px; line-height: 1; transition: color 0.12s; flex-shrink: 0; }
 .hxc-estado-block-del:hover { color: #e05050; }
+/* Tooltip de hechizo */
+.hxc-hz-tooltip { position: fixed; width: 220px; background: #0d0c1a; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px 12px; z-index: 2000; pointer-events: none; box-shadow: 0 4px 24px rgba(0,0,0,0.7); font-family: 'Inter', system-ui, sans-serif; }
+.hxc-hz-tooltip-nombre { font-size: 0.72em; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.hxc-hz-tooltip-meta { font-size: 0.58em; color: #666; margin-bottom: 6px; display: flex; gap: 6px; }
+.hxc-hz-tooltip-meta span { color: #888; }
+.hxc-hz-tooltip-field { margin-bottom: 5px; }
+.hxc-hz-tooltip-label { font-size: 0.5em; letter-spacing: 1px; text-transform: uppercase; color: var(--lat-color, #d4af37); opacity: 0.8; margin-bottom: 1px; font-weight: 700; }
+.hxc-hz-tooltip-val { font-size: 0.63em; color: #ccc; line-height: 1.4; }
 /* ── Panel lateral flotante (inventario / estados / evento) ── */
 #hxc-lateral-panel { position: absolute; top: 0; bottom: 0; width: 280px; background: rgba(8,7,15,0.99); border: 1px solid rgba(255,255,255,0.1); z-index: 10; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 30px rgba(0,0,0,0.7); }
 #hxc-lateral-panel.lado-izq { left: 160px; border-left: none; border-radius: 0 8px 8px 0; }
@@ -470,7 +478,15 @@ function _renderLateralPanel() {
       ? filtrado.map(h => {
           const hzKey = _norm(h.hechizo_id || h.nombre);
           const esEstado = h.es_estado;
-          return `<div class="hxc-lat-hz ${esEstado?'es-estado':''}" onclick="window._hxcAgregarHz('${p.grupo}',${p.idx},'${hzKey}')">
+          const hzData = JSON.stringify({
+            nombre: h.nombre, afinidad: h.afinidad||'', hex_cost: h.hex_cost||0,
+            clase: h.clase||'', efecto: h.efecto||'', overcast: h.overcast||'',
+            undercast: h.undercast||'', especial: h.especial||''
+          }).replace(/"/g,'&quot;');
+          return `<div class="hxc-lat-hz ${esEstado?'es-estado':''}"
+            onclick="window._hxcAgregarHz('${p.grupo}',${p.idx},'${hzKey}')"
+            onmouseenter="window._hxcShowHzTooltip(event,'${hzData}','${latColor}')"
+            onmouseleave="window._hxcHideHzTooltip()">
             <div style="flex:1;min-width:0;">
               <div class="hxc-lat-hz-nombre">${h.nombre}${esEstado?`<span class="hxc-lat-hz-badge">estado</span>`:''}</div>
               <div class="hxc-lat-hz-afin">${h.afinidad||'—'}</div>
@@ -1236,6 +1252,52 @@ window._hxcAbrirPanel = async (grupo, idx, tipo) => {
 window._hxcCerrarPanel = () => { hxState.panelSlot = null; _render(); };
 window._hxcCerrarInv = () => { hxState.panelSlot = null; _render(); };
 window._hxcBuscarHz  = (val) => { hxState.busquedaHz = val; _render(); };
+
+// ── Tooltip de hechizo en panel lateral ───────────────────────
+window._hxcShowHzTooltip = (e, hzDataStr, color) => {
+  window._hxcHideHzTooltip();
+  let hz;
+  try { hz = JSON.parse(hzDataStr.replace(/&quot;/g,'"')); } catch { return; }
+  const campos = [
+    { label: 'Efecto',     val: hz.efecto },
+    { label: 'Overcast',   val: hz.overcast },
+    { label: 'Undercast',  val: hz.undercast },
+    { label: 'Especial',   val: hz.especial },
+  ].filter(c => c.val && c.val.trim() && c.val !== '0');
+
+  const tt = document.createElement('div');
+  tt.id = 'hxc-hz-tooltip';
+  tt.className = 'hxc-hz-tooltip';
+  tt.style.setProperty('--lat-color', color || '#d4af37');
+  tt.innerHTML = `
+    <div class="hxc-hz-tooltip-nombre">${hz.nombre}</div>
+    <div class="hxc-hz-tooltip-meta">
+      <span>${hz.afinidad||'—'}</span>·
+      <span>Cl.${hz.clase||'?'}</span>·
+      <span style="color:#d4af37;">${hz.hex_cost} HEX</span>
+    </div>
+    ${campos.map(c => `<div class="hxc-hz-tooltip-field">
+      <div class="hxc-hz-tooltip-label">${c.label}</div>
+      <div class="hxc-hz-tooltip-val">${c.val}</div>
+    </div>`).join('')}
+    ${!campos.length ? '<div style="font-size:0.6em;color:#444;font-style:italic;">Sin descripción.</div>' : ''}
+  `;
+  document.body.appendChild(tt);
+
+  // Posicionar a la derecha del elemento hover, dentro de pantalla
+  const rect = e.currentTarget.getBoundingClientRect();
+  const ttW = 220, ttH = tt.offsetHeight || 200;
+  let left = rect.right + 8;
+  let top  = rect.top;
+  if (left + ttW > window.innerWidth - 10) left = rect.left - ttW - 8;
+  if (top + ttH  > window.innerHeight - 10) top = window.innerHeight - ttH - 10;
+  tt.style.left = left + 'px';
+  tt.style.top  = Math.max(8, top) + 'px';
+};
+
+window._hxcHideHzTooltip = () => {
+  document.getElementById('hxc-hz-tooltip')?.remove();
+};
 
 window._hxcQuitarPJ = (grupo, idx) => {
   if (grupo === 'A') hxState.grupoA[idx] = null; else hxState.grupoB[idx] = null;
