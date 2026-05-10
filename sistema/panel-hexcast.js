@@ -733,7 +733,9 @@ function _renderStack(esHistorico) {
         : '';
 
       return `<div class="hxc-item-evento" data-hxc-idx="${i}">
-        <div class="hxc-item-evento-row" onclick="window._hxcToggleItem(${i})">
+        <div class="hxc-item-evento-row"
+          onmousedown="if(window.fxMouseDownItem&&window.fxMouseDownItem(event,${i}))event.preventDefault()"
+          onclick="window._hxcToggleItem(${i})">
           <div class="hxc-item-evento-dot"></div>
           <span class="hxc-item-evento-tipo">${tipoLabel}</span>
           <span class="hxc-item-evento-nombre">${item.eventoNombre || '—'}</span>

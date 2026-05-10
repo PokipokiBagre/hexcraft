@@ -55,7 +55,19 @@ function _css() {
   outline-offset: 2px;
   cursor: crosshair !important;
 }
-.modo-borrar-activo .hxfx-flecha-g:hover { cursor: pointer; }
+/* Hover en modo borrar - rojo */
+.modo-borrar-activo [data-hxc-idx]:hover,
+.modo-borrar-activo .hxc-slot:not(.vacio):hover,
+.modo-borrar-activo .hxc-estado-block[data-hxf-id]:hover {
+  outline: 2px dashed rgba(232,64,64,0.6) !important;
+  outline-offset: 2px;
+  cursor: crosshair !important;
+}
+.modo-borrar-activo [data-hxc-idx].hxfx-origen,
+.modo-borrar-activo .hxc-slot.hxfx-origen,
+.modo-borrar-activo .hxc-estado-block.hxfx-origen {
+  outline: 2px dashed #e84040 !important;
+}
 
 /* Toolbar */
 .hxfx-toolbar {
@@ -333,6 +345,8 @@ function _onDragMove(e) {
     svg.appendChild(_previewLine);
   }
 
+  const previewColor = fxState.modo === 'borrar' ? '#e84040' : fxState.colorActivo;
+
   // Leer el lado dinámico para la línea de previsualización
   let ladoO = 'right';
   if (fxState.drag.origenId.startsWith('slot:A')) ladoO = 'right';
@@ -351,13 +365,13 @@ function _onDragMove(e) {
     _previewLine.setAttribute('y1', po.y);
     _previewLine.setAttribute('x2', mx);
     _previewLine.setAttribute('y2', my);
-    _previewLine.setAttribute('stroke', fxState.colorActivo);
+    _previewLine.setAttribute('stroke', previewColor);
     _previewLine.setAttribute('stroke-width', fxState.grosor);
   }
 }
 
 function _onDragEnd(e) {
-  if (!fxState.drag || fxState.modo !== 'conectar') return;
+  if (!fxState.drag) return;
 
   _previewLine?.remove();
   _previewLine = null;
@@ -367,7 +381,29 @@ function _onDragEnd(e) {
   const origenId = fxState.drag.origenId;
   fxState.drag = null;
 
-  if (destino && destino.id !== origenId) {
+  if (!destino || destino.id === origenId) return;
+
+  if (fxState.modo === 'borrar') {
+    // Buscar flecha que conecte origen↔destino en cualquier dirección
+    // Comparación ignorando sufijos :L/:R para ser tolerante
+    const stripSuffix = (id) => id.replace(/:[LR]$/, '');
+    const oBase = stripSuffix(origenId);
+    const dBase = stripSuffix(destino.id);
+    const idx = fxState.flechas.findIndex(f => {
+      const fO = stripSuffix(f.origenId);
+      const fD = stripSuffix(f.destinoId);
+      return (fO === oBase && fD === dBase) || (fO === dBase && fD === oBase);
+    });
+    if (idx >= 0) {
+      const f = fxState.flechas[idx];
+      _borrarFlechaDB(f.id);
+      fxState.flechas.splice(idx, 1);
+      _redibujarTodo();
+    }
+    return;
+  }
+
+  if (fxState.modo === 'conectar') {
     const nueva = {
       id:        fxState.nextLocalId--,
       origenId,
@@ -385,7 +421,7 @@ function _onDragEnd(e) {
 
 // ── API pública: inicio de drag desde slot o item ─────────────
 export function fxMouseDownSlot(e, grupo, idx) {
-  if (fxState.modo !== 'conectar') return false;
+  if (fxState.modo !== 'conectar' && fxState.modo !== 'borrar') return false;
   e.stopPropagation();
   const id = `slot:${grupo}:${idx}`;
   const el = _slotEl(grupo, idx);
@@ -395,16 +431,13 @@ export function fxMouseDownSlot(e, grupo, idx) {
 }
 
 export function fxMouseDownItem(e, itemIdx) {
-  if (fxState.modo !== 'conectar') return false;
+  if (fxState.modo !== 'conectar' && fxState.modo !== 'borrar') return false;
   e.stopPropagation();
   const el = _itemEl(itemIdx);
   if (!el) return false;
-  
-  // Detectamos de qué lado se inició el drag para el Origen
   const rect = el.getBoundingClientRect();
   const isLeft = e.clientX < rect.left + rect.width / 2;
   const id = `item:${itemIdx}:${isLeft ? 'L' : 'R'}`;
-  
   el.classList.add('hxfx-origen');
   fxState.drag = { origenId: id, origenEl: el };
   return true;
@@ -416,7 +449,7 @@ export function fxClickItem(itemIdx)     { return false; }
 
 // Drag desde bloque de estado
 export function fxMouseDownEstado(e, hxfId) {
-  if (fxState.modo !== 'conectar') return false;
+  if (fxState.modo !== 'conectar' && fxState.modo !== 'borrar') return false;
   e.stopPropagation();
   const el = document.querySelector(`.hxc-estado-block[data-hxf-id="${hxfId}"]`);
   if (!el) return false;
@@ -562,8 +595,7 @@ function _svgFlecha(f) {
   const ay2 = pd.y - al*Math.sin(tang + 0.4);
 
   const op = f.opacidad ?? 0.88;
-  return `<g class="hxfx-flecha-g" data-fx-id="${f.id}"
-      onclick="window._hxfxClickFlecha(${f.id})" style="cursor:${fxState.modo==='borrar'?'pointer':'default'}">
+  return `<g class="hxfx-flecha-g" data-fx-id="${f.id}" style="cursor:default;">
     <path d="${path}" fill="none" stroke="${f.color}" stroke-width="${f.grosor}"
       stroke-linecap="round" stroke-linejoin="round" opacity="${op}" ${dash}/>
     <polygon points="${pd.x.toFixed(1)},${pd.y.toFixed(1)} ${ax1.toFixed(1)},${ay1.toFixed(1)} ${ax2.toFixed(1)},${ay2.toFixed(1)}"
