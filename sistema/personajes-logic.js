@@ -45,11 +45,12 @@ export function buildContext(p) {
 
 // Evalúa una expresión con el contexto de un personaje
 export function evalExpr(expr, ctx) {
+    if (!expr || !expr.trim()) return 0;
     try {
         const { Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB,Hz1,Hz2,Hz3,Hz4,Hz5,VexHz } = ctx;
         // eslint-disable-next-line no-new-func
         const resultado = new Function('Fis','Ene','Esp','Man','Psi','Osc','FisB','EneB','EspB','ManB','PsiB','OscB','Hz1','Hz2','Hz3','Hz4','Hz5','VexHz',
-            `return Math.max(0, ${expr});`
+            `"use strict"; return (${expr});`
         )(Fis,Ene,Esp,Man,Psi,Osc,FisB,EneB,EspB,ManB,PsiB,OscB,Hz1,Hz2,Hz3,Hz4,Hz5,VexHz);
         return isFinite(resultado) ? Math.round(resultado) : 0;
     } catch { return 0; }
