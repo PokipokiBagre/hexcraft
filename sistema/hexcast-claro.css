@@ -1,0 +1,113 @@
+/* ============================================================
+   hexcast-claro.css — Estilos para exportación en modo claro
+   Se aplica como clase .hxc-claro en el contenedor capturado.
+   ============================================================ */
+
+.hxc-claro {
+  background: #f5f2ea !important;
+  color: #1a1a1a !important;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* ── Columnas A / B ── */
+.hxc-claro .hxc-col {
+  background: #ede9de;
+  border-right-color: rgba(0,0,0,0.1) !important;
+}
+.hxc-claro .hxc-col-b {
+  border-left-color: rgba(0,0,0,0.1) !important;
+  border-right-color: transparent !important;
+}
+.hxc-claro .hxc-col-title {
+  color: #555 !important;
+  background: #ede9de !important;
+}
+
+/* ── Slots ── */
+.hxc-claro .hxc-slot {
+  border-bottom-color: rgba(0,0,0,0.08) !important;
+  background: #ede9de;
+}
+.hxc-claro .hxc-slot-nombre { color: #111 !important; }
+.hxc-claro .hxc-slot-hex    { color: #555 !important; }
+.hxc-claro .hxc-slot-vex    { color: #6a3090 !important; }
+.hxc-claro .hxc-slot-plus   { color: rgba(0,0,0,0.3) !important; }
+.hxc-claro .hxc-slot-label  { color: #666 !important; }
+.hxc-claro .hxc-slot-avatar { border-color: rgba(0,0,0,0.2) !important; background: #ccc !important; }
+.hxc-claro .hxc-slot.activo { box-shadow: inset 3px 0 0 var(--slot-border); }
+.hxc-claro .hxc-slot-action-btn {
+  background: rgba(0,0,0,0.06) !important;
+  border-color: rgba(0,0,0,0.16) !important;
+  color: #444 !important;
+}
+
+/* ── Estados bajo slot ── */
+.hxc-claro .hxc-estado-block {
+  background: rgba(40,160,100,0.1) !important;
+  border-color: rgba(40,160,100,0.3) !important;
+}
+.hxc-claro .hxc-estado-block-nombre { color: #1a6a40 !important; }
+.hxc-claro .hxc-estado-block-afin   { color: #4a8a60 !important; }
+
+/* ── Centro / stack ── */
+.hxc-claro .hxc-center { background: #f5f2ea; }
+.hxc-claro .hxc-center-top {
+  background: #ede9de;
+  border-bottom-color: rgba(0,0,0,0.1) !important;
+}
+.hxc-claro .hxc-turno-label        { color: #555 !important; }
+.hxc-claro .hxc-turno-label strong { color: #111 !important; }
+
+/* ── Items hechizo ── */
+.hxc-claro .hxc-item {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: rgba(0,0,0,0.14) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.hxc-claro .hxc-item-row { background: transparent !important; }
+.hxc-claro .hxc-item-pj  { color: var(--slot-text, #555) !important; }
+.hxc-claro .hxc-item-hz  { color: #111 !important; font-weight: 600; }
+.hxc-claro .hxc-item-mult { color: #c87010 !important; background: rgba(200,112,16,0.08) !important; border-color: rgba(200,112,16,0.2) !important; }
+
+/* Resultado badges */
+.hxc-claro .hxc-item.res-exito   { background: rgba(40,160,80,0.08) !important; border-color: rgba(40,160,80,0.3) !important; }
+.hxc-claro .hxc-item.res-fallo   { background: rgba(200,50,50,0.06) !important; border-color: rgba(200,50,50,0.22) !important; }
+.hxc-claro .hxc-item.res-infalible { background: rgba(212,175,55,0.07) !important; border-color: rgba(212,175,55,0.3) !important; }
+
+/* Badges de meta */
+.hxc-claro .hxc-hz-badge,
+.hxc-claro [class*="hxc-hz-badge"] { color: #333 !important; border-color: rgba(0,0,0,0.18) !important; background: rgba(0,0,0,0.05) !important; }
+
+/* Dado input */
+.hxc-claro .hxc-dado-input {
+  background: rgba(0,0,0,0.06) !important;
+  border-color: rgba(0,0,0,0.18) !important;
+  color: #111 !important;
+}
+
+/* ── Items evento ── */
+.hxc-claro .hxc-item-evento {
+  background: rgba(120,80,200,0.06) !important;
+  border-color: rgba(120,80,200,0.2) !important;
+}
+.hxc-claro .hxc-item-evento-tipo   { color: #7050b0 !important; }
+.hxc-claro .hxc-item-evento-nombre { color: #111 !important; }
+.hxc-claro .hxc-item-evento-pj     { color: #555 !important; }
+.hxc-claro .hxc-item-evento-desc   { color: #333 !important; background: rgba(0,0,0,0.04) !important; }
+
+/* ── Balance ── */
+.hxc-claro .hxc-balance-panel {
+  background: rgba(0,0,0,0.04) !important;
+  border-top-color: rgba(0,0,0,0.1) !important;
+}
+.hxc-claro .hxc-balance-title { color: #666 !important; }
+.hxc-claro .hxc-balance-row-nombre { color: #222 !important; }
+.hxc-claro .hxc-gasto-hex  { color: #b85010 !important; }
+.hxc-claro .hxc-gasto-vex  { color: #6a3090 !important; }
+
+/* ── Canales SVG laterales ── */
+.hxc-claro .hxfx-canal { background: #ede9de; }
+
+/* ── Scroll bars ── */
+.hxc-claro ::-webkit-scrollbar-track { background: #e0ddd4; }
+.hxc-claro ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 4px; }

@@ -725,29 +725,90 @@ window._hxfxLimpiar = async () => {
 // ── Exportar imagen ────────────────────────────────────────────
 window._hxfxExportar = async (oscuro = false) => {
   if (!window.html2canvas) {
-    await new Promise((res,rej) => {
+    await new Promise((res, rej) => {
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
       s.onload = res; s.onerror = rej;
       document.head.appendChild(s);
     });
   }
-  const target = document.querySelector('.hxc-body') || document.getElementById('hxc-drawer');
-  if (!target) return;
-  const prev = target.style.background;
-  if (!oscuro) target.style.background = '#f4f0e8';
-  // Ocultar toolbar momentáneamente
-  const tb = target.querySelector('.hxfx-toolbar');
-  if (tb) tb.style.display = 'none';
-  const canvas = await window.html2canvas(target, {
-    backgroundColor: oscuro ? '#08080e' : '#f4f0e8',
-    scale: 2, useCORS: true, allowTaint: true, logging: false,
+
+  const body = document.querySelector('.hxc-body');
+  const drawer = document.getElementById('hxc-drawer');
+  if (!body || !drawer) return;
+
+  // Ocultar toolbar y controles antes de capturar
+  const toolbar  = body.querySelector('.hxfx-toolbar') || drawer.querySelector('.hxfx-toolbar');
+  const topBar   = drawer.querySelector('.hxc-center-top');
+  const handle   = drawer.querySelector('.hxc-handle');
+  const header   = drawer.querySelector('.hxc-header');
+  const hideable = [toolbar, topBar, handle, header].filter(Boolean);
+  hideable.forEach(el => { el.dataset._prevDisplay = el.style.display; el.style.display = 'none'; });
+
+  // Para captura completa: expandir temporalmente todos los scrollables
+  const scrollEls = body.querySelectorAll('.hxc-col, .hxc-stack');
+  const prevStyles = [];
+  scrollEls.forEach(el => {
+    prevStyles.push({ el, overflow: el.style.overflow, maxH: el.style.maxHeight, height: el.style.height });
+    el.style.overflow  = 'visible';
+    el.style.maxHeight = 'none';
+    el.style.height    = 'auto';
   });
-  target.style.background = prev;
-  if (tb) tb.style.display = '';
-  const link = document.createElement('a');
+
+  // Aplicar clase claro si es necesario
+  if (!oscuro) body.classList.add('hxc-claro');
+
+  // Cargar hexcast-claro.css si no está ya inyectado
+  if (!oscuro && !document.getElementById('hxc-claro-styles')) {
+    try {
+      const cssResp = await fetch('./hexcast-claro.css');
+      if (cssResp.ok) {
+        const cssText = await cssResp.text();
+        const st = document.createElement('style');
+        st.id = 'hxc-claro-styles';
+        st.textContent = cssText;
+        document.head.appendChild(st);
+      }
+    } catch(e) { /* sin CSS externo, usa lo que haya */ }
+  }
+
+  // Redibujar flechas con el tamaño real expandido
+  const svg = document.getElementById('hxfx-overlay');
+  if (svg) {
+    svg.setAttribute('width',  body.scrollWidth);
+    svg.setAttribute('height', body.scrollHeight);
+  }
+  _redibujarTodo();
+
+  await new Promise(r => setTimeout(r, 80)); // esperar repaint
+
+  const canvas = await window.html2canvas(body, {
+    backgroundColor: oscuro ? '#08070f' : '#f5f2ea',
+    scale: 2, useCORS: true, allowTaint: true, logging: false,
+    width:  body.scrollWidth,
+    height: body.scrollHeight,
+    windowWidth:  body.scrollWidth,
+    windowHeight: body.scrollHeight,
+    scrollX: 0, scrollY: 0,
+  });
+
+  // Restaurar todo
+  if (!oscuro) body.classList.remove('hxc-claro');
+  hideable.forEach(el => { el.style.display = el.dataset._prevDisplay || ''; });
+  scrollEls.forEach(({ el, overflow, maxH, height }) => {
+    el.style.overflow  = overflow;
+    el.style.maxHeight = maxH;
+    el.style.height    = height;
+  });
+  if (svg) {
+    svg.setAttribute('width',  body.offsetWidth);
+    svg.setAttribute('height', body.offsetHeight);
+  }
+  _redibujarTodo();
+
   const tn = document.querySelector('.hxc-turno-label strong')?.textContent || 'T';
-  link.download = `hexcast_T${tn}_${oscuro?'oscuro':'claro'}.png`;
+  const link = document.createElement('a');
+  link.download = `hexcast_T${tn}_${oscuro ? 'oscuro' : 'claro'}.png`;
   link.href = canvas.toDataURL('image/png');
   link.click();
 };
