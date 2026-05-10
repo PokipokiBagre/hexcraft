@@ -722,6 +722,48 @@ window._hxfxLimpiar = async () => {
   _redibujarTodo();
 };
 
+// ── CSS modo claro (inline para no depender de fetch) ──────────
+const _CLARO_CSS = `
+.hxc-claro,.hxc-claro .hxc-col,.hxc-claro .hxc-col-title,.hxc-claro .hxc-center,.hxc-claro .hxc-center-top,.hxc-claro .hxc-slot{background:#ede9de!important;color:#111!important}
+.hxc-claro{background:#f5f2ea!important}
+.hxc-claro .hxc-col{border-right-color:rgba(0,0,0,0.12)!important}
+.hxc-claro .hxc-col-b{border-left-color:rgba(0,0,0,0.12)!important;border-right-color:transparent!important}
+.hxc-claro .hxc-col-title{color:#555!important;background:#dedad0!important;border-bottom:1px solid rgba(0,0,0,0.1)!important}
+.hxc-claro .hxc-slot{border-bottom-color:rgba(0,0,0,0.1)!important}
+.hxc-claro .hxc-slot-nombre{color:#111!important}
+.hxc-claro .hxc-slot-hex{color:#444!important}
+.hxc-claro .hxc-slot-vex{color:#5a2080!important}
+.hxc-claro .hxc-slot-plus,.hxc-claro .hxc-slot-label{color:rgba(0,0,0,0.35)!important}
+.hxc-claro .hxc-slot-avatar{border-color:rgba(0,0,0,0.2)!important;background:#ccc!important}
+.hxc-claro .hxc-slot-action-btn{background:rgba(0,0,0,0.07)!important;border-color:rgba(0,0,0,0.18)!important;color:#333!important}
+.hxc-claro .hxc-estado-block{background:rgba(20,130,70,0.09)!important;border-color:rgba(20,130,70,0.25)!important}
+.hxc-claro .hxc-estado-block-nombre{color:#145a30!important}
+.hxc-claro .hxc-estado-block-afin{color:#2a7a50!important}
+.hxc-claro .hxc-stack{background:#f5f2ea!important}
+.hxc-claro .hxc-item{background:#fff!important;border-color:rgba(0,0,0,0.13)!important;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
+.hxc-claro .hxc-item-pj{color:#666!important}
+.hxc-claro .hxc-item-hz{color:#111!important;font-weight:600}
+.hxc-claro .hxc-item-mult{color:#b86000!important;background:rgba(184,96,0,0.07)!important;border-color:rgba(184,96,0,0.2)!important}
+.hxc-claro .hxc-item.res-exito{background:rgba(20,160,70,0.07)!important;border-color:rgba(20,160,70,0.28)!important}
+.hxc-claro .hxc-item.res-fallo{background:rgba(200,40,40,0.05)!important;border-color:rgba(200,40,40,0.2)!important}
+.hxc-claro .hxc-hz-badge,.hxc-claro [class*="hxc-badge"]{color:#333!important;background:rgba(0,0,0,0.06)!important;border-color:rgba(0,0,0,0.16)!important}
+.hxc-claro .hxc-dado-input{background:rgba(0,0,0,0.05)!important;border-color:rgba(0,0,0,0.16)!important;color:#111!important}
+.hxc-claro .hxc-nc-calc{color:#333!important}
+.hxc-claro .hxc-item-evento{background:rgba(100,60,200,0.05)!important;border-color:rgba(100,60,200,0.18)!important}
+.hxc-claro .hxc-item-evento-tipo{color:#5030a0!important}
+.hxc-claro .hxc-item-evento-nombre{color:#111!important}
+.hxc-claro .hxc-item-evento-pj{color:#555!important}
+.hxc-claro .hxc-item-detail{background:rgba(0,0,0,0.03)!important;color:#333!important}
+.hxc-claro .hxc-hz-field-label{color:#888!important}
+.hxc-claro .hxc-hz-field-val{color:#222!important}
+.hxc-claro .hxc-balance-panel{background:#e8e4d8!important;border-top-color:rgba(0,0,0,0.1)!important}
+.hxc-claro .hxc-balance-title{color:#555!important}
+.hxc-claro .hxc-balance-row-nombre{color:#111!important}
+.hxc-claro .hxc-gasto-hex{color:#a04010!important}
+.hxc-claro .hxc-gasto-vex{color:#5a2080!important}
+.hxc-claro .hxfx-canal{background:#ede9de!important}
+`;
+
 // ── Exportar imagen ────────────────────────────────────────────
 window._hxfxExportar = async (oscuro = false) => {
   if (!window.html2canvas) {
@@ -734,78 +776,69 @@ window._hxfxExportar = async (oscuro = false) => {
   }
 
   const body = document.querySelector('.hxc-body');
-  const drawer = document.getElementById('hxc-drawer');
-  if (!body || !drawer) return;
+  if (!body) return;
 
-  // Ocultar toolbar y controles antes de capturar
-  const toolbar  = body.querySelector('.hxfx-toolbar') || drawer.querySelector('.hxfx-toolbar');
-  const topBar   = drawer.querySelector('.hxc-center-top');
-  const handle   = drawer.querySelector('.hxc-handle');
-  const header   = drawer.querySelector('.hxc-header');
-  const hideable = [toolbar, topBar, handle, header].filter(Boolean);
-  hideable.forEach(el => { el.dataset._prevDisplay = el.style.display; el.style.display = 'none'; });
+  // Inyectar CSS claro inline si no existe
+  if (!oscuro && !document.getElementById('hxc-claro-styles')) {
+    const st = document.createElement('style');
+    st.id = 'hxc-claro-styles';
+    st.textContent = _CLARO_CSS;
+    document.head.appendChild(st);
+  }
 
-  // Para captura completa: expandir temporalmente todos los scrollables
-  const scrollEls = body.querySelectorAll('.hxc-col, .hxc-stack');
-  const prevStyles = [];
+  // Ocultar la toolbar de flechas (está fuera del body, en el wrapper)
+  const toolbar = document.querySelector('.hxfx-toolbar');
+  if (toolbar) toolbar.style.display = 'none';
+
+  // Expandir todos los elementos scrolleables para capturar todo el contenido
+  const scrollEls = [...body.querySelectorAll('.hxc-col, .hxc-stack')];
+  const saved = scrollEls.map(el => ({
+    el,
+    overflow:  el.style.overflow,
+    maxHeight: el.style.maxHeight,
+    height:    el.style.height,
+  }));
   scrollEls.forEach(el => {
-    prevStyles.push({ el, overflow: el.style.overflow, maxH: el.style.maxHeight, height: el.style.height });
     el.style.overflow  = 'visible';
     el.style.maxHeight = 'none';
     el.style.height    = 'auto';
   });
 
-  // Aplicar clase claro si es necesario
+  // Aplicar modo claro
   if (!oscuro) body.classList.add('hxc-claro');
 
-  // Cargar hexcast-claro.css si no está ya inyectado
-  if (!oscuro && !document.getElementById('hxc-claro-styles')) {
-    try {
-      const cssResp = await fetch('./hexcast-claro.css');
-      if (cssResp.ok) {
-        const cssText = await cssResp.text();
-        const st = document.createElement('style');
-        st.id = 'hxc-claro-styles';
-        st.textContent = cssText;
-        document.head.appendChild(st);
-      }
-    } catch(e) { /* sin CSS externo, usa lo que haya */ }
-  }
-
-  // Redibujar flechas con el tamaño real expandido
+  // Redibujar SVG al tamaño real expandido
   const svg = document.getElementById('hxfx-overlay');
-  if (svg) {
-    svg.setAttribute('width',  body.scrollWidth);
-    svg.setAttribute('height', body.scrollHeight);
-  }
+  const fullW = body.scrollWidth;
+  const fullH = body.scrollHeight;
+  if (svg) { svg.setAttribute('width', fullW); svg.setAttribute('height', fullH); }
   _redibujarTodo();
 
-  await new Promise(r => setTimeout(r, 80)); // esperar repaint
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  const canvas = await window.html2canvas(body, {
-    backgroundColor: oscuro ? '#08070f' : '#f5f2ea',
-    scale: 2, useCORS: true, allowTaint: true, logging: false,
-    width:  body.scrollWidth,
-    height: body.scrollHeight,
-    windowWidth:  body.scrollWidth,
-    windowHeight: body.scrollHeight,
-    scrollX: 0, scrollY: 0,
-  });
-
-  // Restaurar todo
-  if (!oscuro) body.classList.remove('hxc-claro');
-  hideable.forEach(el => { el.style.display = el.dataset._prevDisplay || ''; });
-  scrollEls.forEach(({ el, overflow, maxH, height }) => {
-    el.style.overflow  = overflow;
-    el.style.maxHeight = maxH;
-    el.style.height    = height;
-  });
-  if (svg) {
-    svg.setAttribute('width',  body.offsetWidth);
-    svg.setAttribute('height', body.offsetHeight);
+  let canvas;
+  try {
+    canvas = await window.html2canvas(body, {
+      backgroundColor: oscuro ? '#08070f' : '#f5f2ea',
+      scale: 2, useCORS: true, allowTaint: true, logging: false,
+      width: fullW, height: fullH,
+      scrollX: -body.getBoundingClientRect().left,
+      scrollY: -body.getBoundingClientRect().top,
+    });
+  } finally {
+    // Restaurar siempre, aunque falle
+    if (!oscuro) body.classList.remove('hxc-claro');
+    if (toolbar) toolbar.style.display = '';
+    saved.forEach(({ el, overflow, maxHeight, height }) => {
+      el.style.overflow  = overflow;
+      el.style.maxHeight = maxHeight;
+      el.style.height    = height;
+    });
+    if (svg) { svg.setAttribute('width', body.offsetWidth); svg.setAttribute('height', body.offsetHeight); }
+    _redibujarTodo();
   }
-  _redibujarTodo();
 
+  if (!canvas) return;
   const tn = document.querySelector('.hxc-turno-label strong')?.textContent || 'T';
   const link = document.createElement('a');
   link.download = `hexcast_T${tn}_${oscuro ? 'oscuro' : 'claro'}.png`;
