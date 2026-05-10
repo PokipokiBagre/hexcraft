@@ -786,56 +786,72 @@ window._hxfxExportar = async (oscuro = false) => {
     document.head.appendChild(st);
   }
 
-  // Ocultar la toolbar de flechas (está fuera del body, en el wrapper)
-  const toolbar = document.querySelector('.hxfx-toolbar');
-  if (toolbar) toolbar.style.display = 'none';
+  // Clonar el body completo en un wrapper fuera de pantalla sin restricciones de tamaño
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = `
+    position:fixed; left:-99999px; top:0;
+    width:${body.offsetWidth}px;
+    display:flex; flex-direction:row;
+    background:${oscuro ? '#08070f' : '#f5f2ea'};
+    font-family:'Inter',system-ui,sans-serif;
+    overflow:visible;
+  `;
+  if (!oscuro) wrapper.classList.add('hxc-claro');
+  document.body.appendChild(wrapper);
 
-  // Expandir todos los elementos scrolleables para capturar todo el contenido
-  const scrollEls = [...body.querySelectorAll('.hxc-col, .hxc-stack')];
-  const saved = scrollEls.map(el => ({
-    el,
-    overflow:  el.style.overflow,
-    maxHeight: el.style.maxHeight,
-    height:    el.style.height,
-  }));
-  scrollEls.forEach(el => {
-    el.style.overflow  = 'visible';
-    el.style.maxHeight = 'none';
-    el.style.height    = 'auto';
-  });
+  // Clonar cada columna/sección expandida
+  const sections = [...body.children];
+  const clones = sections.map(sec => {
+    // Saltar el overlay SVG — lo rehacemos después
+    if (sec.id === 'hxfx-overlay') return null;
+    const cl = sec.cloneNode(true);
+    // Quitar restricciones de scroll en el clon
+    cl.style.overflow = 'visible';
+    cl.style.maxHeight = 'none';
+    cl.style.height = 'auto';
+    cl.style.flexShrink = '0';
+    // Expandir scrollables internos
+    cl.querySelectorAll('*').forEach(el => {
+      const cs = getComputedStyle(el);
+      if (cs.overflow === 'auto' || cs.overflow === 'hidden' || cs.overflowY === 'auto' || cs.overflowY === 'hidden') {
+        el.style.overflow = 'visible';
+        el.style.maxHeight = 'none';
+        el.style.height = 'auto';
+      }
+    });
+    // Quitar botones de acción que no son del contenido
+    cl.querySelectorAll('.hxc-slot-quit,.hxc-item-del,.hxc-estado-block-del').forEach(b => b.style.display = 'none');
+    wrapper.appendChild(cl);
+    return cl;
+  }).filter(Boolean);
 
-  // Aplicar modo claro
-  if (!oscuro) body.classList.add('hxc-claro');
-
-  // Redibujar SVG al tamaño real expandido
-  const svg = document.getElementById('hxfx-overlay');
-  const fullW = body.scrollWidth;
-  const fullH = body.scrollHeight;
-  if (svg) { svg.setAttribute('width', fullW); svg.setAttribute('height', fullH); }
-  _redibujarTodo();
-
+  // Esperar render
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // Medir tamaño real del clon
+  const totalW = wrapper.scrollWidth;
+  const totalH = Math.max(...clones.map(c => c.scrollHeight), wrapper.scrollHeight);
+
+  // Añadir SVG de flechas escalado al clon
+  const origSvg = document.getElementById('hxfx-overlay');
+  if (origSvg) {
+    const svgClone = origSvg.cloneNode(true);
+    svgClone.setAttribute('width',  totalW);
+    svgClone.setAttribute('height', totalH);
+    svgClone.style.cssText = `position:absolute;top:0;left:0;pointer-events:none;z-index:20;`;
+    wrapper.style.position = 'relative';
+    wrapper.appendChild(svgClone);
+  }
 
   let canvas;
   try {
-    canvas = await window.html2canvas(body, {
+    canvas = await window.html2canvas(wrapper, {
       backgroundColor: oscuro ? '#08070f' : '#f5f2ea',
       scale: 2, useCORS: true, allowTaint: true, logging: false,
-      width: fullW, height: fullH,
-      scrollX: -body.getBoundingClientRect().left,
-      scrollY: -body.getBoundingClientRect().top,
+      width: totalW, height: totalH,
     });
   } finally {
-    // Restaurar siempre, aunque falle
-    if (!oscuro) body.classList.remove('hxc-claro');
-    if (toolbar) toolbar.style.display = '';
-    saved.forEach(({ el, overflow, maxHeight, height }) => {
-      el.style.overflow  = overflow;
-      el.style.maxHeight = maxHeight;
-      el.style.height    = height;
-    });
-    if (svg) { svg.setAttribute('width', body.offsetWidth); svg.setAttribute('height', body.offsetHeight); }
-    _redibujarTodo();
+    document.body.removeChild(wrapper);
   }
 
   if (!canvas) return;
