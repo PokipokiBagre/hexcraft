@@ -8,7 +8,7 @@ import { hxState } from './hexcast-state.js';
 const fxState = {
   modo: null,
   origen: null,
-  flechas: [],      // incluye { id (DB), origenId, destinoId, color, grosor, estilo }
+  flechas: [],      // incluye { id (DB), origenId, destinoId, color, grosor, estilo, opacidad }
   nextLocalId: -1,  // IDs negativos = locales aún no guardados
   turnoIdCargado: null,
   colores: [
@@ -19,6 +19,7 @@ const fxState = {
   colorActivo: '#40c840',
   grosor: 3,
   estilo: 'solida',
+  opacidad: 0.88,
 };
 
 // ── CSS ────────────────────────────────────────────────────────
@@ -131,6 +132,9 @@ function _css() {
 .hxfx-hint {
   font-size: 0.57em; color: #444; font-style: italic; margin-left: 4px;
 }
+.hxfx-opacidad-wrap { display: flex; align-items: center; gap: 4px; }
+.hxfx-opacidad-lbl { font-size: 0.56em; color: #555; white-space: nowrap; }
+.hxfx-opacidad-inp { width: 60px; accent-color: #40c840; cursor: pointer; }
 `;
   document.head.appendChild(st);
 }
@@ -151,12 +155,13 @@ export async function cargarFlechasTurno(turnoId, sesionId) {
     .order('id');
 
   fxState.flechas = (data || []).map(r => ({
-    id:        r.id,          // ID real de DB
+    id:        r.id,
     origenId:  r.origen_id,
     destinoId: r.destino_id,
     color:     r.color,
     grosor:    r.grosor,
     estilo:    r.estilo,
+    opacidad:  r.opacidad ?? 0.88,
   }));
   _scheduleRedraw();
 }
@@ -176,6 +181,7 @@ async function _guardarFlechaDB(f) {
       color:      f.color,
       grosor:     f.grosor,
       estilo:     f.estilo,
+      opacidad:   f.opacidad ?? 0.88,
     })
     .select()
     .single();
@@ -235,6 +241,12 @@ export function renderToolbarFlechas() {
     <input class="hxfx-grosor-inp" type="number" min="1" max="12" value="${fxState.grosor}"
       oninput="window._hxfxSetGrosor(this.value)" onclick="event.stopPropagation()">
     <div class="hxfx-sep"></div>
+    <div class="hxfx-opacidad-wrap">
+      <span class="hxfx-opacidad-lbl">Opac. ${Math.round(fxState.opacidad*100)}%</span>
+      <input class="hxfx-opacidad-inp" type="range" min="0" max="100" value="${Math.round(fxState.opacidad*100)}"
+        oninput="window._hxfxSetOpacidad(this.value)" onclick="event.stopPropagation()">
+    </div>
+    <div class="hxfx-sep"></div>
     <button class="hxfx-btn-clear" onclick="window._hxfxLimpiar()">✕ Todo</button>
     <button class="hxfx-btn-export" onclick="window._hxfxExportar(false)">📷 Claro</button>
     <button class="hxfx-btn-export" style="border-color:rgba(255,255,255,0.1);color:#777;background:rgba(255,255,255,0.03);" onclick="window._hxfxExportar(true)">📷 Oscuro</button>
@@ -277,10 +289,15 @@ function _elIdFromEvent(e) {
   
   const item = el.closest('[data-hxc-idx]');
   if (item) {
-    // Detectamos de qué lado se soltó el mouse para el Destino
     const rect = item.getBoundingClientRect();
     const isLeft = e.clientX < rect.left + rect.width / 2;
     return { id: `item:${item.dataset.hxcIdx}:${isLeft ? 'L' : 'R'}`, el: item };
+  }
+
+  // Bloques de estado (debajo de los slots)
+  const estadoBlock = el.closest('.hxc-estado-block[data-hxf-id]');
+  if (estadoBlock) {
+    return { id: `estado:${estadoBlock.dataset.hxfId}`, el: estadoBlock };
   }
   
   const slot = el.closest('.hxc-slot:not(.vacio)');
@@ -352,6 +369,7 @@ function _onDragEnd(e) {
       color:     fxState.colorActivo,
       grosor:    fxState.grosor,
       estilo:    fxState.estilo,
+      opacidad:  fxState.opacidad,
     };
     fxState.flechas.push(nueva);
     _redibujarTodo();
@@ -411,8 +429,11 @@ function _findEl(id) {
     return _slotEl(grupo, parseInt(idx));
   }
   if (id.startsWith('item:')) {
-    // Al dibujar, ignoramos el :L o :R para poder encontrar el elemento HTML
     return _itemEl(id.split(':')[1]);
+  }
+  if (id.startsWith('estado:')) {
+    const hxfId = id.slice(7);
+    return document.querySelector(`.hxc-estado-block[data-hxf-id="${hxfId}"]`);
   }
   return null;
 }
@@ -512,12 +533,13 @@ function _svgFlecha(f) {
   const ax2 = pd.x - al*Math.cos(tang + 0.4);
   const ay2 = pd.y - al*Math.sin(tang + 0.4);
 
+  const op = f.opacidad ?? 0.88;
   return `<g class="hxfx-flecha-g" data-fx-id="${f.id}"
       onclick="window._hxfxClickFlecha(${f.id})" style="cursor:${fxState.modo==='borrar'?'pointer':'default'}">
     <path d="${path}" fill="none" stroke="${f.color}" stroke-width="${f.grosor}"
-      stroke-linecap="round" stroke-linejoin="round" opacity="0.88" ${dash}/>
+      stroke-linecap="round" stroke-linejoin="round" opacity="${op}" ${dash}/>
     <polygon points="${pd.x.toFixed(1)},${pd.y.toFixed(1)} ${ax1.toFixed(1)},${ay1.toFixed(1)} ${ax2.toFixed(1)},${ay2.toFixed(1)}"
-      fill="${f.color}" opacity="0.88"/>
+      fill="${f.color}" opacity="${op}"/>
     <path d="${path}" fill="none" stroke="transparent" stroke-width="${Math.max(f.grosor+4,10)}"/>
   </g>`;
 }
@@ -558,11 +580,15 @@ export function observarStack() {
   if (_observer) _observer.disconnect();
   const stack = document.getElementById('hxc-stack-list');
   if (!stack) return;
-  // Solo childList en el stack directo (no subtree) para evitar loops
   _observer = new MutationObserver(_scheduleRedraw);
   _observer.observe(stack, { childList: true });
-  // Scroll con RAF throttle
   stack.addEventListener('scroll', _scheduleRedraw, { passive: true });
+
+  // También recalcular cuando se scrollea en las columnas de grupo A y B
+  const colA = document.querySelector('.hxc-col:not(.hxc-col-b)');
+  const colB = document.querySelector('.hxc-col-b');
+  if (colA) colA.addEventListener('scroll', _scheduleRedraw, { passive: true });
+  if (colB) colB.addEventListener('scroll', _scheduleRedraw, { passive: true });
 }
 
 // ── Modo cursor en el body ─────────────────────────────────────
@@ -607,6 +633,11 @@ window._hxfxSetColor = (c) => {
 };
 
 window._hxfxSetGrosor = (v) => { fxState.grosor = Math.max(1, Math.min(12, parseInt(v)||3)); };
+
+window._hxfxSetOpacidad = (v) => {
+  fxState.opacidad = Math.max(0, Math.min(1, parseInt(v) / 100));
+  _refreshToolbar();
+};
 
 window._hxfxSetEstilo = (e) => { 
   fxState.estilo = e; 

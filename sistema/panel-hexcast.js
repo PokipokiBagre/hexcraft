@@ -471,7 +471,10 @@ function _renderSlot(pj, grupo, idx) {
           undercast:cat?.undercast || '',
           especial: cat?.especial  || '',
         };
+        // data-hxf-id permite a panel-hexcast-flechas.js identificar este bloque como objetivo
+        const hxfId = `${pj.nombre.replace(/[^a-zA-Z0-9]/g,'_')}_${e.id}`;
         return `<div class="hxc-estado-block" style="${vars}"
+          data-hxf-id="${hxfId}"
           onclick="event.stopPropagation();window._hxcShowHzTooltipXY(event,'${tipKey}')"
           onmouseleave="window._hxcHideHzTooltip()">
           <span class="hxc-estado-block-nombre">${e.hechizo_nombre}</span>
