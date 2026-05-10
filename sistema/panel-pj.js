@@ -357,7 +357,7 @@ function _renderTab(nombre, tab) {
 
     switch(tab) {
         case 'hex':      _tabHex(nombre, body);               break;
-        case 'stats':    body.innerHTML = _tabStats(nombre);  break;
+        case 'stats':    { const _sy = body.scrollTop; body.innerHTML = _tabStats(nombre); if (_sy > 0) body.scrollTop = _sy; break; }
         case 'hechizos': _tabHechizosConMapa(nombre, body);   break;
         case 'objetos':  _tabObjetos(nombre, body);            break;
         case 'misiones': renderTabMisiones(nombre, body);       break;
@@ -2463,18 +2463,24 @@ window._ppjDeasignarHz = async (nombrePJ, hechizo_id) => {
 };
 
 
-window._ppjSetCd = (nombre, afinKey, deltaP) => {
+window._ppjSetCd = async (nombre, afinKey, deltaP) => {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
     const actual = p[`cd_${afinKey}`] ?? 0.5;
     // deltaP es ±5 (puntos porcentuales). Convertir a decimal y clampear 10%–200%
     const v = Math.round(Math.max(0.1, Math.min(2.0, actual + deltaP / 100)) * 100) / 100;
     p[`cd_${afinKey}`] = v;
-    encolarCambio(nombre, `cd_${afinKey}`, v);
+    // Persistir inmediatamente en DB (igual que modStat/modAfin)
+    await supabase.from('personajes').update({ [`cd_${afinKey}`]: v }).eq('nombre', nombre);
     // Actualizar solo el span sin re-renderizar todo el panel
     const span = document.getElementById(`ppj-cd-${nombre}-${afinKey}`);
     if (span) span.textContent = `${(v * 100).toFixed(0)}%`;
-    window.actualizarBtnSync?.();
+    // Sincronizar con HexCast si el PJ está en un slot activo
+    try {
+        if (window.hxState?.cdPorPj?.[nombre]) {
+            window.hxState.cdPorPj[nombre][afinKey] = v;
+        }
+    } catch(e) { /* ignorar si hxState no disponible */ }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -2486,7 +2492,10 @@ export function refreshPanelPJ() {
     _renderHeader(nombre);
     const tab = _tabActivo[nombre] || 'hex';
     if (tab === 'stats') {
-        document.getElementById('ppj-body').innerHTML = _tabStats(nombre);
+        const body = document.getElementById('ppj-body');
+        const scrollY = body ? body.scrollTop : 0;
+        body.innerHTML = _tabStats(nombre);
+        if (body && scrollY > 0) body.scrollTop = scrollY;
     }
 }
 
