@@ -158,12 +158,16 @@ function _css() {
 .hxc-opt-fallo.on { background: rgba(232,80,80,0.15); border-color: rgba(232,80,80,0.5); color: #e85050; }
 .hxc-item-dado-hist { display: inline-block; width: 52px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 5px; color: #888; font-size: 0.78em; text-align: center; padding: 4px 3px; font-family: 'Cinzel', serif; }
 #hxc-view-sesiones { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.hxc-ses-wrap { max-width: 720px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; height: 100%; padding: 0 16px; box-sizing: border-box; }
-.hxc-ses-top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 12px; flex-shrink: 0; }
-.hxc-ses-title { font-family: 'Cinzel', serif; font-size: 0.88em; color: #d4af37; letter-spacing: 2px; text-transform: uppercase; }
-.hxc-btn-nueva-ses { background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.35); color: #d4af37; font-size: 0.7em; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-family: 'Cinzel', serif; transition: background 0.15s; }
+.hxc-ses-wrap { width: 100%; display: flex; flex-direction: column; height: 100%; padding: 0 40px; box-sizing: border-box; }
+.hxc-ses-top { display: flex; align-items: center; padding: 18px 0 10px; flex-shrink: 0; gap: 14px; }
+.hxc-ses-title { font-family: 'Cinzel', serif; font-size: 0.88em; color: #d4af37; letter-spacing: 2px; text-transform: uppercase; flex-shrink: 0; }
+.hxc-btn-nueva-ses { background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.35); color: #d4af37; font-size: 0.7em; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-family: 'Cinzel', serif; transition: background 0.15s; flex-shrink: 0; margin-left: auto; }
 .hxc-btn-nueva-ses:hover { background: rgba(212,175,55,0.2); }
-.hxc-ses-list { flex: 1; overflow-y: auto; padding-bottom: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 9px; align-content: start; }
+.hxc-ses-search { flex: 1; max-width: 380px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #ccc; font-size: 0.72em; padding: 6px 12px; outline: none; font-family: inherit; transition: border-color 0.15s; }
+.hxc-ses-search::placeholder { color: #444; }
+.hxc-ses-search:focus { border-color: rgba(212,175,55,0.35); }
+.hxc-ses-count { font-size: 0.6em; color: #555; flex-shrink: 0; }
+.hxc-ses-list { flex: 1; overflow-y: auto; padding-bottom: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-content: start; scrollbar-width: thin; }
 .hxc-ses-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; padding: 13px 15px; transition: background 0.13s, border-color 0.13s; display: flex; align-items: center; gap: 11px; }
 .hxc-ses-card:hover { background: rgba(212,175,55,0.05); border-color: rgba(212,175,55,0.28); }
 .hxc-ses-card-info { flex: 1; min-width: 0; cursor: pointer; }
@@ -337,14 +341,21 @@ window._hxcReplaceStackItem = (idx, nuevoItem) => {
 };
 
 function _renderSesiones(drawer) {
-  const cards = hxState.sesiones.length > 0
-    ? hxState.sesiones.map(s => {
+  const busq = (hxState._sesBusqueda || '').toLowerCase();
+  const sesiones = busq
+    ? hxState.sesiones.filter(s =>
+        (s.nombre||'').toLowerCase().includes(busq) ||
+        (s.descripcion||'').toLowerCase().includes(busq))
+    : hxState.sesiones;
+
+  const cards = sesiones.length > 0
+    ? sesiones.map(s => {
         const d  = new Date(s.actualizada_en || s.creada_en);
         const dC = new Date(s.creada_en);
         const fecha  = d.toLocaleDateString('es',  { day:'numeric', month:'short', year:'numeric' });
         const fechaC = dC.toLocaleDateString('es', { day:'numeric', month:'short', year:'numeric' });
         const sesUrl = (() => { try { const u = new URL(window.location.href); u.searchParams.set('sesion', s.id); u.searchParams.delete('turno'); return u.toString(); } catch(e) { return ''; } })();
-        const nomEsc = (s.nombre||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        const nomEsc  = (s.nombre||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
         const descEsc = (s.descripcion||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
         return `<div class="hxc-ses-card">
           <div class="hxc-ses-card-info" onclick="window._hxcSelSesion(${s.id})">
@@ -357,12 +368,12 @@ function _renderSesiones(drawer) {
           <div class="hxc-ses-card-actions">
             <button class="hxc-ses-action-btn" title="Copiar enlace" onclick="event.stopPropagation();navigator.clipboard.writeText('${sesUrl.replace(/'/g,"\\'")}');window._hxcToastSes('🔗 Enlace copiado')">🔗</button>
             <button class="hxc-ses-action-btn" title="Renombrar" onclick="event.stopPropagation();window._hxcModalEditarSesion(${s.id},'${nomEsc}','${descEsc}')">✎</button>
-            <button class="hxc-ses-action-btn hxc-ses-action-del" title="Eliminar" onclick="event.stopPropagation();window._hxcEliminarSesion(${s.id},'${nomEsc}')">🗑</button>
+            ${_esAdmin() ? `<button class="hxc-ses-action-btn hxc-ses-action-del" title="Eliminar" onclick="event.stopPropagation();window._hxcEliminarSesion(${s.id},'${nomEsc}')">🗑</button>` : ''}
             <span class="hxc-ses-card-chevron" onclick="window._hxcSelSesion(${s.id})">›</span>
           </div>
         </div>`;
       }).join('')
-    : `<div class="hxc-ses-empty">Sin sesiones aún.<br>Crea una nueva para comenzar.</div>`;
+    : `<div class="hxc-ses-empty">${busq ? 'Sin resultados para "' + busq + '"' : 'Sin sesiones aún.<br>Crea una nueva para comenzar.'}</div>`;
 
   drawer.innerHTML = `
     <div class="hxc-handle"></div>
@@ -374,6 +385,9 @@ function _renderSesiones(drawer) {
       <div class="hxc-ses-wrap">
         <div class="hxc-ses-top">
           <span class="hxc-ses-title">Sesiones</span>
+          <input class="hxc-ses-search" id="hxc-ses-search-inp" placeholder="🔍 Buscar sesión..." value="${busq}"
+            oninput="hxState._sesBusqueda=this.value;window._hxcRenderSes()" onclick="event.stopPropagation()">
+          ${busq ? `<span class="hxc-ses-count">${sesiones.length} resultado${sesiones.length!==1?'s':''}</span>` : `<span class="hxc-ses-count">${hxState.sesiones.length} sesión${hxState.sesiones.length!==1?'es':''}</span>`}
           <button class="hxc-btn-nueva-ses" onclick="window._hxcModalNuevaSesion()">+ Nueva sesión</button>
         </div>
         <div id="hxc-ses-toast-wrap" style="min-height:20px;padding:2px 0 6px;text-align:center;"></div>
@@ -1048,6 +1062,17 @@ window._hxcToastSes = (msg) => {
   if (!t) { _toast(msg); return; }
   t.innerHTML = `<span style="font-size:0.65em;color:#50c88c;">${msg}</span>`;
   setTimeout(() => { if (t) t.innerHTML = ''; }, 2500);
+};
+
+// Re-render solo la lista de sesiones (para búsqueda sin full render)
+window._hxcRenderSes = () => {
+  const drawer = document.getElementById('hxc-drawer');
+  if (!drawer || hxState.vistaActiva !== 'sesiones') return;
+  const selStart = document.getElementById('hxc-ses-search-inp')?.selectionStart;
+  _renderSesiones(drawer);
+  // Restaurar foco en el buscador
+  const inp = document.getElementById('hxc-ses-search-inp');
+  if (inp) { inp.focus(); if (selStart !== undefined) { try { inp.setSelectionRange(selStart, selStart); } catch(e){} } }
 };
 
 window._hxcModalEditarSesion = (id, nombre, desc) => {
