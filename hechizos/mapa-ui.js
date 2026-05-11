@@ -138,6 +138,9 @@ function _renderOpLeft() {
             <button class="op-l-btn op-l-gold" onclick="window._hmGuardarPos()">💾 Guardar posiciones</button>
             <button class="op-l-btn" onclick="window._hmAutoOrdenar()">🌀 Auto-ordenar</button>
         </div>
+        <button class="op-l-btn-tablas" onclick="window._hmAbrirTablas()">
+            🗄 Tablas DB &nbsp;<span style="opacity:0.5;font-size:0.9em;">nodos · strings</span>
+        </button>
 
         <div class="op-l-sep"></div>
 
@@ -1252,3 +1255,633 @@ window._hmModalPropiedades = () => {
 window._hmModalAsignarPJ = () => {
     if (st.esAdmin) window._hmModalAsignarPJLeft();
 };
+
+// ══════════════════════════════════════════════════════════════
+//  PANEL TABLAS DB — hechizos_nodos (75%) + hechizos_strings (25%)
+// ══════════════════════════════════════════════════════════════
+
+(function() {
+    // ── Estado interno del panel ─────────────────────────────
+    const TS = {
+        // Nodos
+        nRows:      [],   // filas cargadas desde DB
+        nFilt:      [],   // filas filtradas
+        nPage:      0,
+        nPageSize:  50,
+        nSearch:    '',
+        nSortCol:   'id',
+        nSortDir:   1,    // 1=asc -1=desc
+        nEditing:   null, // id de fila en edición
+        nBuf:       {},   // buffer de edición
+
+        // Strings
+        sRows:      [],
+        sFilt:      [],
+        sPage:      0,
+        sPageSize:  100,
+        sSearch:    '',
+        sSortCol:   'source_id',
+        sSortDir:   1,
+        sEditing:   null,
+        sBuf:       {},
+
+        open:       false,
+        afinidades: [],
+    };
+
+    // Columnas de nodos visibles en la tabla
+    const NCOLS = [
+        { key:'id',             label:'ID',         w:'5%',  type:'ro' },
+        { key:'hechizo_id',     label:'HECHIZO ID', w:'8%',  type:'text' },
+        { key:'nombre',         label:'Nombre',     w:'10%', type:'text' },
+        { key:'afinidad',       label:'Afinidad',   w:'7%',  type:'afin' },
+        { key:'clase',          label:'Clase',      w:'4%',  type:'clase' },
+        { key:'hex_cost',       label:'HEX',        w:'4%',  type:'num' },
+        { key:'valor_vex',      label:'VEX',        w:'4%',  type:'num' },
+        { key:'es_conocido',    label:'Conocido',   w:'4%',  type:'bool' },
+        { key:'es_estado',      label:'Estado',     w:'4%',  type:'bool' },
+        { key:'es_prioridad',   label:'Prioridad',  w:'4%',  type:'bool' },
+        { key:'backcast',       label:'Bk',         w:'3%',  type:'num' },
+        { key:'nextcast',       label:'Nx',         w:'3%',  type:'num' },
+        { key:'resumen',        label:'Resumen',    w:'10%', type:'text' },
+        { key:'efecto',         label:'Efecto',     w:'10%', type:'text' },
+        { key:'overcast',       label:'Overcast',   w:'7%',  type:'text' },
+        { key:'undercast',      label:'Undercast',  w:'7%',  type:'text' },
+        { key:'especial',       label:'Especial',   w:'5%',  type:'text' },
+        { key:'nota',           label:'Nota',       w:'5%',  type:'text' },
+        { key:'_acc',           label:'',           w:'5%',  type:'actions' },
+    ];
+
+    // ── Montar DOM ───────────────────────────────────────────
+    function _mount() {
+        if (document.getElementById('hz-tablas-overlay')) return;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'hz-tablas-overlay';
+        overlay.onclick = (e) => { if (e.target === overlay) _close(); };
+        document.body.appendChild(overlay);
+
+        const wrap = document.createElement('div');
+        wrap.id = 'hz-tablas-wrap';
+        wrap.innerHTML = `
+            <!-- Panel nodos (75%) -->
+            <div id="hz-panel-nodos">
+                <div class="hz-tab-header">
+                    <div style="display:flex;align-items:center;gap:0;">
+                        <span class="hz-tab-header-title">🗄 hechizos_nodos</span>
+                        <span class="hz-tab-header-sub" id="hz-nodos-count"></span>
+                    </div>
+                    <div class="hz-tab-header-actions">
+                        <button class="hz-btn blue" onclick="window._hmTablasExportNodos()">⬇ CSV</button>
+                        <label class="hz-btn blue" style="cursor:pointer;" title="Importar CSV">⬆ CSV <input type="file" accept=".csv" style="display:none;" onchange="window._hmTablasImportNodos(this)"></label>
+                        <button class="hz-btn green" onclick="window._hmTablasNuevoNodo()">➕ Fila</button>
+                        <button class="hz-btn gold" onclick="window._hmTablasRecargar()">↺ Recargar</button>
+                        <button class="hz-tab-close" onclick="window._hmCerrarTablas()">×</button>
+                    </div>
+                </div>
+                <div class="hz-tab-toolbar">
+                    <input type="text" id="hz-n-search" placeholder="Buscar en nodos…" oninput="window._hmTablasNSearch(this.value)">
+                    <span id="hz-n-sel-info" style="font-size:0.6em;color:#555;"></span>
+                </div>
+                <div class="hz-tab-body" id="hz-n-body">
+                    <div class="hz-loading"><div class="hz-spinner"></div>Cargando nodos…</div>
+                </div>
+                <div class="hz-tab-pager" id="hz-n-pager"></div>
+            </div>
+
+            <!-- Panel strings (25%) -->
+            <div id="hz-panel-strings">
+                <div class="hz-tab-header">
+                    <div style="display:flex;align-items:center;">
+                        <span class="hz-tab-header-title">🔗 hechizos_strings</span>
+                        <span class="hz-tab-header-sub" id="hz-strings-count"></span>
+                    </div>
+                    <div class="hz-tab-header-actions">
+                        <button class="hz-btn blue" onclick="window._hmTablasExportStrings()">⬇ CSV</button>
+                        <label class="hz-btn blue" style="cursor:pointer;">⬆ CSV <input type="file" accept=".csv" style="display:none;" onchange="window._hmTablasImportStrings(this)"></label>
+                        <button class="hz-btn green" onclick="window._hmTablasNuevoString()">➕</button>
+                    </div>
+                </div>
+                <div class="hz-tab-toolbar">
+                    <input type="text" id="hz-s-search" placeholder="Buscar…" oninput="window._hmTablasSSearch(this.value)">
+                </div>
+                <div class="hz-tab-body" id="hz-s-body">
+                    <div class="hz-loading"><div class="hz-spinner"></div>Cargando…</div>
+                </div>
+                <div class="hz-tab-pager" id="hz-s-pager"></div>
+            </div>
+        `;
+        document.body.appendChild(wrap);
+    }
+
+    // ── Abrir / cerrar ───────────────────────────────────────
+    async function _open() {
+        _mount();
+        TS.open = true;
+        document.getElementById('hz-tablas-overlay').classList.add('visible');
+        document.getElementById('hz-tablas-wrap').classList.add('visible');
+        // Cargar afinidades desde state
+        TS.afinidades = Object.keys(st.colores);
+        await Promise.all([_loadNodos(), _loadStrings()]);
+    }
+
+    function _close() {
+        TS.open = false;
+        const ov = document.getElementById('hz-tablas-overlay');
+        const wr = document.getElementById('hz-tablas-wrap');
+        if (ov) ov.classList.remove('visible');
+        if (wr) wr.classList.remove('visible');
+    }
+
+    // ── Cargar datos ─────────────────────────────────────────
+    async function _loadNodos() {
+        const body = document.getElementById('hz-n-body');
+        if (!body) return;
+        body.innerHTML = '<div class="hz-loading"><div class="hz-spinner"></div>Cargando nodos…</div>';
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const { data, error } = await supabase
+                .from('hechizos_nodos')
+                .select('*')
+                .order('id', { ascending: true });
+            if (error) throw error;
+            TS.nRows = data || [];
+            _nFilter();
+        } catch(e) {
+            body.innerHTML = `<div class="hz-tab-empty">Error: ${e.message}</div>`;
+        }
+    }
+
+    async function _loadStrings() {
+        const body = document.getElementById('hz-s-body');
+        if (!body) return;
+        body.innerHTML = '<div class="hz-loading"><div class="hz-spinner"></div>Cargando strings…</div>';
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const { data, error } = await supabase
+                .from('hechizos_strings')
+                .select('*')
+                .order('id', { ascending: true });
+            if (error) throw error;
+            TS.sRows = data || [];
+            _sFilter();
+        } catch(e) {
+            body.innerHTML = `<div class="hz-tab-empty">Error: ${e.message}</div>`;
+        }
+    }
+
+    // ── Filtro / sort / render NODOS ─────────────────────────
+    function _nFilter() {
+        const q = TS.nSearch.toLowerCase();
+        TS.nFilt = q
+            ? TS.nRows.filter(r =>
+                (r.nombre||'').toLowerCase().includes(q) ||
+                (r.hechizo_id||'').toLowerCase().includes(q) ||
+                (r.afinidad||'').toLowerCase().includes(q) ||
+                String(r.id).includes(q)
+              )
+            : [...TS.nRows];
+        _nSort();
+    }
+
+    function _nSort() {
+        const k = TS.nSortCol, d = TS.nSortDir;
+        TS.nFilt.sort((a,b) => {
+            let av = a[k], bv = b[k];
+            if (typeof av === 'boolean') av = av ? 1 : 0;
+            if (typeof bv === 'boolean') bv = bv ? 1 : 0;
+            if (av == null) av = '';
+            if (bv == null) bv = '';
+            return av < bv ? -d : av > bv ? d : 0;
+        });
+        TS.nPage = 0;
+        _nRender();
+    }
+
+    function _nRender() {
+        const body = document.getElementById('hz-n-body');
+        const pager = document.getElementById('hz-n-pager');
+        const count = document.getElementById('hz-nodos-count');
+        if (!body) return;
+
+        const total = TS.nFilt.length;
+        const pages = Math.max(1, Math.ceil(total / TS.nPageSize));
+        TS.nPage = Math.min(TS.nPage, pages - 1);
+        const slice = TS.nFilt.slice(TS.nPage * TS.nPageSize, (TS.nPage+1) * TS.nPageSize);
+
+        if (count) count.textContent = ` (${total}/${TS.nRows.length})`;
+
+        // Tabla
+        const thHtml = NCOLS.map(c => {
+            const cls = TS.nSortCol === c.key
+                ? (TS.nSortDir === 1 ? 'sort-asc' : 'sort-desc')
+                : '';
+            const onclick = c.type !== 'actions'
+                ? `onclick="window._hmTablasNSort('${c.key}')"` : '';
+            return `<th style="width:${c.w}" class="${cls}" ${onclick}>${c.label}</th>`;
+        }).join('');
+
+        const rowsHtml = slice.map(r => _nRowHtml(r)).join('');
+
+        body.innerHTML = `
+            <table class="hz-tabla">
+                <thead><tr>${thHtml}</tr></thead>
+                <tbody id="hz-n-tbody">${rowsHtml || '<tr><td colspan="${NCOLS.length}" class="hz-tab-empty">Sin resultados</td></tr>'}</tbody>
+            </table>`;
+
+        // Paginador
+        if (pager) pager.innerHTML = `
+            <span>${TS.nPage+1} / ${pages} &nbsp;·&nbsp; ${total} filas</span>
+            <button class="hz-pager-btn" ${TS.nPage<=0?'disabled':''} onclick="window._hmTablasNPage(${TS.nPage-1})">◀</button>
+            <button class="hz-pager-btn" ${TS.nPage>=pages-1?'disabled':''} onclick="window._hmTablasNPage(${TS.nPage+1})">▶</button>
+            <select style="font-size:1em;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:4px;color:#888;padding:1px 4px;" onchange="window._hmTablasNPageSize(this.value)">
+                ${[25,50,100,200].map(n=>`<option value="${n}" ${n===TS.nPageSize?'selected':''}>${n}/pág</option>`).join('')}
+            </select>`;
+    }
+
+    function _nRowHtml(r) {
+        const editing = TS.nEditing === r.id;
+        const buf = editing ? TS.nBuf : r;
+        const afinOpts = TS.afinidades.map(a =>
+            `<option value="${a}" ${(buf.afinidad||r.afinidad)===a?'selected':''}>${a}</option>`
+        ).join('');
+        const claseOpts = ['1','2','3','4','5'].map(c =>
+            `<option value="${c}" ${String(buf.clase||r.clase)===c?'selected':''}>${c}</option>`
+        ).join('');
+
+        return `<tr data-nid="${r.id}" class="${editing?'hz-row-sel':''}">
+            ${NCOLS.map(c => {
+                if (c.type === 'ro') return `<td class="hz-cell-id">${r[c.key]}</td>`;
+                if (c.type === 'actions') return `<td class="hz-cell-actions">
+                    ${editing
+                        ? `<button class="hz-row-btn save" onclick="window._hmTablasNSave(${r.id})">✓</button>
+                           <button class="hz-row-btn cancel" onclick="window._hmTablasNCancelEdit()">✕</button>`
+                        : `<button class="hz-row-btn" onclick="window._hmTablasNEdit(${r.id})">✏</button>
+                           <button class="hz-row-btn del" onclick="window._hmTablasNDel(${r.id},'${(r.nombre||'').replace(/'/g,"\\'")}')">🗑</button>`
+                    }</td>`;
+                if (c.type === 'bool') return `<td class="hz-cell-bool">
+                    <input type="checkbox" ${(editing?buf[c.key]:r[c.key])?'checked':''} ${editing?`onchange="window._hmTablasNBufBool('${c.key}',this.checked)"`:'disabled'}>
+                    </td>`;
+                if (c.type === 'num') return `<td class="hz-cell-num">
+                    ${editing
+                        ? `<input type="number" value="${buf[c.key]??r[c.key]??0}" min="0" style="width:52px;text-align:right;" oninput="window._hmTablasNBuf('${c.key}',this.value)">`
+                        : (r[c.key]??0)}</td>`;
+                if (c.type === 'afin') return `<td class="hz-cell-afin">
+                    ${editing
+                        ? `<select onchange="window._hmTablasNBuf('${c.key}',this.value)">${afinOpts}</select>`
+                        : (r[c.key]||'')}</td>`;
+                if (c.type === 'clase') return `<td>
+                    ${editing
+                        ? `<select onchange="window._hmTablasNBuf('${c.key}',this.value)">${claseOpts}</select>`
+                        : (r[c.key]||'')}</td>`;
+                // text
+                const val = editing ? (buf[c.key]??r[c.key]??'') : (r[c.key]||'');
+                const disp = String(val).length > 40 ? String(val).substring(0,40)+'…' : String(val);
+                return `<td title="${String(r[c.key]||'').replace(/"/g,'&quot;')}">
+                    ${editing
+                        ? `<input type="text" value="${String(buf[c.key]??r[c.key]??'').replace(/"/g,'&quot;')}" oninput="window._hmTablasNBuf('${c.key}',this.value)">`
+                        : `<span>${disp}</span>`}</td>`;
+            }).join('')}
+        </tr>`;
+    }
+
+    // ── Filtro / sort / render STRINGS ───────────────────────
+    function _sFilter() {
+        const q = TS.sSearch.toLowerCase();
+        TS.sFilt = q
+            ? TS.sRows.filter(r =>
+                (r.source_id||'').toLowerCase().includes(q) ||
+                (r.target_id||'').toLowerCase().includes(q) ||
+                String(r.id).includes(q)
+              )
+            : [...TS.sRows];
+        _sSort();
+    }
+
+    function _sSort() {
+        const k = TS.sSortCol, d = TS.sSortDir;
+        TS.sFilt.sort((a,b) => {
+            let av = a[k]??'', bv = b[k]??'';
+            return av < bv ? -d : av > bv ? d : 0;
+        });
+        TS.sPage = 0;
+        _sRender();
+    }
+
+    function _sRender() {
+        const body = document.getElementById('hz-s-body');
+        const pager = document.getElementById('hz-s-pager');
+        const count = document.getElementById('hz-strings-count');
+        if (!body) return;
+
+        const total = TS.sFilt.length;
+        const pages = Math.max(1, Math.ceil(total / TS.sPageSize));
+        TS.sPage = Math.min(TS.sPage, pages - 1);
+        const slice = TS.sFilt.slice(TS.sPage * TS.sPageSize, (TS.sPage+1) * TS.sPageSize);
+
+        if (count) count.textContent = ` (${total}/${TS.sRows.length})`;
+
+        const rowsHtml = slice.map(r => {
+            const editing = TS.sEditing === r.id;
+            const buf = editing ? TS.sBuf : r;
+            return `<tr data-sid="${r.id}" class="${editing?'hz-row-sel':''}">
+                <td class="hz-cell-id" style="width:8%">${r.id}</td>
+                <td class="hz-str-src" style="width:37%">${editing
+                    ? `<input type="text" value="${buf.source_id||''}" oninput="window._hmTablasSBuf('source_id',this.value)">`
+                    : (r.source_id||'')}</td>
+                <td style="width:4%;text-align:center;color:#555;">→</td>
+                <td class="hz-str-tgt" style="width:37%">${editing
+                    ? `<input type="text" value="${buf.target_id||''}" oninput="window._hmTablasSBuf('target_id',this.value)">`
+                    : (r.target_id||'')}</td>
+                <td style="width:14%;text-align:right;white-space:nowrap;">
+                    ${editing
+                        ? `<button class="hz-row-btn save" onclick="window._hmTablasSave(${r.id})">✓</button>
+                           <button class="hz-row-btn cancel" onclick="window._hmTablasSCancelEdit()">✕</button>`
+                        : `<button class="hz-row-btn" onclick="window._hmTablasSEdit(${r.id})">✏</button>
+                           <button class="hz-row-btn del" onclick="window._hmTablasSDelStr(${r.id})">🗑</button>`
+                    }
+                </td>
+            </tr>`;
+        }).join('');
+
+        body.innerHTML = `
+            <table class="hz-tabla">
+                <thead><tr>
+                    <th style="width:8%;" onclick="window._hmTablasSSort('id')">ID</th>
+                    <th style="width:37%;" onclick="window._hmTablasSSort('source_id')" class="${TS.sSortCol==='source_id'?(TS.sSortDir===1?'sort-asc':'sort-desc'):''}">SOURCE</th>
+                    <th style="width:4%;"></th>
+                    <th style="width:37%;" onclick="window._hmTablasSSort('target_id')" class="${TS.sSortCol==='target_id'?(TS.sSortDir===1?'sort-asc':'sort-desc'):''}">TARGET</th>
+                    <th style="width:14%;"></th>
+                </tr></thead>
+                <tbody>${rowsHtml || '<tr><td colspan="5" class="hz-tab-empty">Sin resultados</td></tr>'}</tbody>
+            </table>`;
+
+        if (pager) pager.innerHTML = `
+            <span>${TS.sPage+1} / ${pages} &nbsp;·&nbsp; ${total} filas</span>
+            <button class="hz-pager-btn" ${TS.sPage<=0?'disabled':''} onclick="window._hmTablasSPage(${TS.sPage-1})">◀</button>
+            <button class="hz-pager-btn" ${TS.sPage>=pages-1?'disabled':''} onclick="window._hmTablasSPage(${TS.sPage+1})">▶</button>`;
+    }
+
+    // ── CSV export ───────────────────────────────────────────
+    function _toCSV(rows) {
+        if (!rows.length) return '';
+        const keys = Object.keys(rows[0]);
+        const esc = v => `"${String(v??'').replace(/"/g,'""')}"`;
+        return [keys.join(','), ...rows.map(r => keys.map(k => esc(r[k])).join(','))].join('\n');
+    }
+    function _download(csv, fname) {
+        const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a'); a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    }
+
+    // ── CSV import ───────────────────────────────────────────
+    function _parseCSV(text) {
+        const lines = text.trim().split('\n');
+        const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
+        return lines.slice(1).map(line => {
+            const vals = []; let cur='', inQ=false;
+            for (const ch of line) {
+                if (ch==='"') inQ=!inQ;
+                else if (ch===',' && !inQ) { vals.push(cur.trim()); cur=''; }
+                else cur += ch;
+            }
+            vals.push(cur.trim());
+            const obj = {};
+            headers.forEach((h,i) => { obj[h] = vals[i]??''; });
+            return obj;
+        });
+    }
+
+    // ── Globals expuestos ────────────────────────────────────
+    window._hmAbrirTablas   = () => _open();
+    window._hmCerrarTablas  = () => _close();
+    window._hmTablasRecargar = async () => {
+        await Promise.all([_loadNodos(), _loadStrings()]);
+        toast('↺ Tablas recargadas');
+    };
+
+    // Nodos — búsqueda
+    window._hmTablasNSearch = (v) => { TS.nSearch=v; TS.nPage=0; _nFilter(); };
+    window._hmTablasNSort   = (k) => {
+        if (TS.nSortCol===k) TS.nSortDir *= -1; else { TS.nSortCol=k; TS.nSortDir=1; }
+        _nSort();
+    };
+    window._hmTablasNPage     = (p) => { TS.nPage=p; _nRender(); };
+    window._hmTablasNPageSize = (n) => { TS.nPageSize=parseInt(n); TS.nPage=0; _nRender(); };
+
+    // Nodos — edición
+    window._hmTablasNEdit = (id) => {
+        const r = TS.nRows.find(r=>r.id===id); if (!r) return;
+        TS.nEditing = id;
+        TS.nBuf = {...r};
+        _nRender();
+    };
+    window._hmTablasNCancelEdit = () => { TS.nEditing=null; TS.nBuf={}; _nRender(); };
+    window._hmTablasNBuf  = (k,v) => { TS.nBuf[k]=v; };
+    window._hmTablasNBufBool = (k,v) => { TS.nBuf[k]=v; };
+
+    window._hmTablasNSave = async (id) => {
+        const orig = TS.nRows.find(r=>r.id===id); if (!orig) return;
+        const buf = TS.nBuf;
+        const payload = {};
+        NCOLS.forEach(c => {
+            if (c.type==='ro' || c.type==='actions') return;
+            const k = c.key;
+            let v = buf[k]??orig[k];
+            if (c.type==='num') v = parseInt(v)||0;
+            if (c.type==='bool') v = !!v;
+            payload[k] = v;
+        });
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const { error } = await supabase.from('hechizos_nodos').update(payload).eq('id', id);
+            if (error) throw error;
+            Object.assign(orig, payload);
+            TS.nEditing = null; TS.nBuf = {};
+            _nFilter();
+            toast('✓ Nodo guardado');
+        } catch(e) { toast('Error: ' + e.message); }
+    };
+
+    window._hmTablasNDel = async (id, nombre) => {
+        if (!confirm(`¿Eliminar nodo "${nombre}" (id:${id})? Esta acción no se puede deshacer.`)) return;
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const { error } = await supabase.from('hechizos_nodos').delete().eq('id', id);
+            if (error) throw error;
+            TS.nRows = TS.nRows.filter(r=>r.id!==id);
+            _nFilter();
+            toast('🗑 Nodo eliminado');
+        } catch(e) { toast('Error: ' + e.message); }
+    };
+
+    window._hmTablasNuevoNodo = () => {
+        const nuevo = {
+            id: '__new__', hechizo_id:'', nombre:'', afinidad:'Desconocida',
+            clase:'1', hex_cost:0, valor_vex:0, es_conocido:false, es_estado:false,
+            es_prioridad:false, backcast:0, nextcast:0,
+            resumen:'', efecto:'', overcast:'', undercast:'', especial:'', nota:'',
+            _isNew: true,
+        };
+        TS.nRows.unshift(nuevo);
+        TS.nEditing = '__new__';
+        TS.nBuf = {...nuevo};
+        TS.nPage = 0;
+        _nFilter();
+    };
+
+    // Para filas nuevas guardamos con insert
+    window._hmTablasNSave = async (id) => {
+        const orig = TS.nRows.find(r=>r.id===id); if (!orig) return;
+        const buf = TS.nBuf;
+        const payload = {};
+        NCOLS.forEach(c => {
+            if (c.type==='ro' || c.type==='actions') return;
+            const k = c.key;
+            let v = buf[k]??orig[k];
+            if (c.type==='num') v = parseInt(v)||0;
+            if (c.type==='bool') v = !!v;
+            payload[k] = v;
+        });
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            if (orig._isNew) {
+                const { data, error } = await supabase.from('hechizos_nodos').insert(payload).select().single();
+                if (error) throw error;
+                // Reemplazar row temporal
+                const idx = TS.nRows.findIndex(r=>r.id==='__new__');
+                if (idx>=0) TS.nRows[idx] = data;
+            } else {
+                const { error } = await supabase.from('hechizos_nodos').update(payload).eq('id', id);
+                if (error) throw error;
+                Object.assign(orig, payload);
+            }
+            TS.nEditing = null; TS.nBuf = {};
+            _nFilter();
+            toast('✓ Guardado');
+        } catch(e) { toast('Error: ' + e.message); }
+    };
+
+    // Export/Import nodos
+    window._hmTablasExportNodos = () => _download(_toCSV(TS.nRows), 'hechizos_nodos.csv');
+    window._hmTablasImportNodos = async (input) => {
+        const file = input.files[0]; if (!file) return;
+        const text = await file.text();
+        const rows = _parseCSV(text);
+        if (!rows.length || !rows[0].hechizo_id) { toast('CSV inválido — necesita columna hechizo_id'); return; }
+        if (!confirm(`¿Importar ${rows.length} filas a hechizos_nodos? (upsert por hechizo_id)`)) { input.value=''; return; }
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const payload = rows.map(r => ({
+                hechizo_id: r.hechizo_id, nombre: r.nombre||r.hechizo_id,
+                afinidad: r.afinidad||'Desconocida', clase: r.clase||'1',
+                hex_cost: parseInt(r.hex_cost)||0, valor_vex: parseInt(r.valor_vex)||0,
+                es_conocido: r.es_conocido==='true'||r.es_conocido===true,
+                es_estado: r.es_estado==='true'||r.es_estado===true,
+                es_prioridad: r.es_prioridad==='true'||r.es_prioridad===true,
+                backcast: parseInt(r.backcast)||0, nextcast: parseInt(r.nextcast)||0,
+                resumen: r.resumen||'', efecto: r.efecto||'',
+                overcast: r.overcast||'', undercast: r.undercast||'',
+                especial: r.especial||'', nota: r.nota||'',
+            }));
+            const { error } = await supabase.from('hechizos_nodos')
+                .upsert(payload, { onConflict: 'hechizo_id' });
+            if (error) throw error;
+            toast(`✓ ${rows.length} filas importadas`);
+            await _loadNodos();
+        } catch(e) { toast('Error importando: ' + e.message); }
+        input.value = '';
+    };
+
+    // Strings — búsqueda
+    window._hmTablasSSearch = (v) => { TS.sSearch=v; TS.sPage=0; _sFilter(); };
+    window._hmTablasSSort   = (k) => {
+        if (TS.sSortCol===k) TS.sSortDir*=-1; else { TS.sSortCol=k; TS.sSortDir=1; }
+        _sSort();
+    };
+    window._hmTablasSPage   = (p) => { TS.sPage=p; _sRender(); };
+
+    // Strings — edición
+    window._hmTablasSEdit = (id) => {
+        const r = TS.sRows.find(r=>r.id===id); if (!r) return;
+        TS.sEditing=id; TS.sBuf={...r}; _sRender();
+    };
+    window._hmTablasSCancelEdit = () => { TS.sEditing=null; TS.sBuf={}; _sRender(); };
+    window._hmTablasSBuf = (k,v) => { TS.sBuf[k]=v; };
+
+    window._hmTablasSave = async (id) => {
+        const orig = TS.sRows.find(r=>r.id===id); if (!orig) return;
+        const payload = { source_id: TS.sBuf.source_id||orig.source_id, target_id: TS.sBuf.target_id||orig.target_id };
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const { error } = await supabase.from('hechizos_strings').update(payload).eq('id', id);
+            if (error) throw error;
+            Object.assign(orig, payload);
+            TS.sEditing=null; TS.sBuf={}; _sFilter();
+            toast('✓ String guardado');
+        } catch(e) { toast('Error: ' + e.message); }
+    };
+
+    window._hmTablasSDelStr = async (id) => {
+        if (!confirm(`¿Eliminar string id:${id}?`)) return;
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const { error } = await supabase.from('hechizos_strings').delete().eq('id', id);
+            if (error) throw error;
+            TS.sRows = TS.sRows.filter(r=>r.id!==id);
+            _sFilter();
+            toast('🗑 String eliminado');
+        } catch(e) { toast('Error: ' + e.message); }
+    };
+
+    window._hmTablasNuevoString = () => {
+        const nuevo = { id: '__snew__', source_id:'', target_id:'', _isNew:true };
+        TS.sRows.unshift(nuevo);
+        TS.sEditing='__snew__'; TS.sBuf={...nuevo};
+        TS.sPage=0; _sFilter();
+    };
+
+    window._hmTablasSave = async (id) => {
+        const orig = TS.sRows.find(r=>r.id===id); if (!orig) return;
+        const payload = { source_id: TS.sBuf.source_id||orig.source_id, target_id: TS.sBuf.target_id||orig.target_id };
+        if (!payload.source_id || !payload.target_id) { toast('source_id y target_id requeridos'); return; }
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            if (orig._isNew) {
+                const { data, error } = await supabase.from('hechizos_strings').insert(payload).select().single();
+                if (error) throw error;
+                const idx = TS.sRows.findIndex(r=>r.id==='__snew__');
+                if (idx>=0) TS.sRows[idx] = data;
+            } else {
+                const { error } = await supabase.from('hechizos_strings').update(payload).eq('id', id);
+                if (error) throw error;
+                Object.assign(orig, payload);
+            }
+            TS.sEditing=null; TS.sBuf={}; _sFilter();
+            toast('✓ String guardado');
+        } catch(e) { toast('Error: ' + e.message); }
+    };
+
+    // Export/Import strings
+    window._hmTablasExportStrings = () => _download(_toCSV(TS.sRows), 'hechizos_strings.csv');
+    window._hmTablasImportStrings = async (input) => {
+        const file = input.files[0]; if (!file) return;
+        const text = await file.text();
+        const rows = _parseCSV(text);
+        if (!rows.length || !rows[0].source_id) { toast('CSV inválido — necesita source_id, target_id'); return; }
+        if (!confirm(`¿Importar ${rows.length} strings? (upsert)`)) { input.value=''; return; }
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const payload = rows.map(r => ({ source_id: r.source_id, target_id: r.target_id }));
+            const { error } = await supabase.from('hechizos_strings')
+                .upsert(payload, { onConflict: 'source_id,target_id' });
+            if (error) throw error;
+            toast(`✓ ${rows.length} strings importados`);
+            await _loadStrings();
+        } catch(e) { toast('Error importando: ' + e.message); }
+        input.value = '';
+    };
+})();
