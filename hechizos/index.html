@@ -73,21 +73,80 @@
         .hm-btn.verde:hover  { background: rgba(50,200,100,0.18); }
         .hm-btn:disabled { opacity: 0.35; cursor: default; }
 
-        #hm-pj-sel {
-            font-size: 0.65em; background: rgba(0,210,255,0.06);
-            border: 1px solid rgba(0,210,255,0.25); color: #00d2ff;
-            padding: 4px 8px; border-radius: 5px; outline: none;
-            cursor: pointer; font-family: inherit; flex-shrink: 0;
+        /* ── Buscador central ── */
+        #hm-search-bar {
+            flex: 1; display: flex; justify-content: center; align-items: center;
+            padding: 0 12px;
         }
-        #hm-pj-sel option { background: #0d0c1a; color: #ccc; }
+        #hm-search-central {
+            width: 100%; max-width: 480px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 6px; color: #ccc;
+            font-size: 0.72em; padding: 6px 12px;
+            font-family: inherit; outline: none;
+            transition: border-color 0.15s;
+        }
+        #hm-search-central:focus { border-color: rgba(212,175,55,0.4); }
+        #hm-search-central::placeholder { color: #3a3a55; }
 
-        #hm-sel-badge {
-            font-size: 0.6em; color: #d4af37;
-            background: rgba(212,175,55,0.1);
-            border: 1px solid rgba(212,175,55,0.3);
-            border-radius: 10px; padding: 2px 8px;
-            display: none; flex-shrink: 0;
+        /* ── Pool de PJ (dropdown visual) ── */
+        .hm-pj-pool-wrap { position: relative; flex-shrink: 0; }
+        .hm-pj-pool-btn {
+            font-size: 0.63em; padding: 4px 10px; border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.04);
+            color: #888; cursor: pointer; white-space: nowrap;
+            transition: all 0.13s; font-family: inherit; display: flex;
+            align-items: center; gap: 6px;
         }
+        .hm-pj-pool-btn.activo { background: rgba(0,210,255,0.1); border-color: rgba(0,210,255,0.4); color: #00d2ff; }
+        .hm-pj-pool-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; }
+        .hm-pj-pool-dropdown {
+            display: none; position: absolute; top: calc(100% + 6px); left: 0;
+            min-width: 220px; background: rgba(8,6,20,0.99);
+            border: 1px solid rgba(212,175,55,0.22);
+            border-radius: 10px; z-index: 400;
+            padding: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+        }
+        .hm-pj-pool-dropdown.open { display: block; }
+        .hm-pool-title {
+            font-size: 0.56em; letter-spacing: 1.5px; text-transform: uppercase;
+            color: #3a3a55; font-weight: 700; margin-bottom: 7px; padding: 0 2px;
+        }
+        .hm-pool-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+            gap: 5px; margin-bottom: 8px;
+        }
+        .hm-pool-card {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            padding: 7px 4px; border-radius: 8px; cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.02);
+            transition: all 0.15s; text-decoration: none;
+        }
+        .hm-pool-card:hover { background: rgba(212,175,55,0.07); border-color: rgba(212,175,55,0.3); }
+        .hm-pool-card.activo { background: rgba(0,210,255,0.08); border-color: rgba(0,210,255,0.35); }
+        .hm-pool-avatar {
+            width: 38px; height: 38px; border-radius: 50%;
+            object-fit: cover; object-position: top;
+            background: #111; border: 2px solid rgba(255,255,255,0.08);
+            flex-shrink: 0;
+        }
+        .hm-pool-card.activo .hm-pool-avatar { border-color: rgba(0,210,255,0.5); }
+        .hm-pool-nombre {
+            font-size: 0.56em; color: #aaa; text-align: center;
+            line-height: 1.2; word-break: break-word;
+            overflow: hidden; max-width: 62px;
+        }
+        .hm-pool-card.activo .hm-pool-nombre { color: #00d2ff; }
+        .hm-pool-todos {
+            width: 100%; font-size: 0.62em; padding: 5px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 5px; color: #666; cursor: pointer; font-family: inherit;
+            transition: all 0.13s; margin-top: 4px;
+        }
+        .hm-pool-todos:hover { color: #ccc; background: rgba(255,255,255,0.07); }
 
         /* ══════════════════════════════════════
            CANVAS
@@ -276,8 +335,120 @@
         }
 
         /* ══════════════════════════════════════
-           PANEL OP — flotante sobre drawer/info bar
+           PANEL LATERAL DERECHO (OP)
         ══════════════════════════════════════ */
+        #hm-side-panel {
+            position: fixed; top: 44px; right: 0;
+            width: 300px; height: calc(100vh - 44px - 32px);
+            background: rgba(8,6,18,0.97);
+            border-left: 1px solid rgba(212,175,55,0.15);
+            display: flex; flex-direction: column;
+            z-index: 180;
+            transform: translateX(100%);
+            transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+            overflow: hidden;
+        }
+        #hm-side-panel.abierto { transform: translateX(0); }
+
+        /* Canvas y canvas-wrap se reducen cuando el panel está abierto */
+        body.side-panel-open #hm-canvas-wrap { right: 300px; }
+
+        #hm-side-panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 12px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            flex-shrink: 0;
+        }
+        .sp-titulo {
+            font-family: 'Cinzel', serif; font-size: 0.72em;
+            color: #d4af37; letter-spacing: 1px;
+        }
+        .sp-close {
+            background: none; border: none; color: #555; font-size: 1.1em;
+            cursor: pointer; padding: 2px 6px; border-radius: 4px;
+        }
+        .sp-close:hover { color: #ccc; }
+
+        #hm-side-panel-body {
+            flex: 1; overflow-y: auto; padding: 10px 12px;
+            scrollbar-width: thin; scrollbar-color: rgba(212,175,55,0.15) transparent;
+        }
+
+        .sp-nodo-nombre {
+            font-size: 0.92em; font-weight: 700; margin-bottom: 4px;
+        }
+        .sp-nodo-meta {
+            font-size: 0.64em; color: #5a5a78; margin-bottom: 12px;
+            display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+        }
+        .sp-chip {
+            font-size: 0.9em; padding: 2px 7px; border-radius: 6px; border: 1px solid;
+        }
+        .sp-chip-hex  { color: #c9953a; border-color: rgba(212,175,55,0.3); background: rgba(212,175,55,0.07); }
+        .sp-chip-vex  { color: #b060e8; border-color: rgba(150,80,220,0.3); background: rgba(150,80,220,0.07); }
+        .sp-chip-pos  { color: rgba(150,131,200,0.9); border-color: rgba(150,131,200,0.3); background: rgba(150,131,200,0.07); }
+        .sp-chip-est  { color: #4ab3e8; border-color: rgba(74,179,232,0.3); background: rgba(74,179,232,0.06); }
+        .sp-chip-pri  { color: #d4af37; border-color: rgba(212,175,55,0.3); background: rgba(212,175,55,0.07); }
+
+        .sp-section-title {
+            font-size: 0.56em; letter-spacing: 1.5px; text-transform: uppercase;
+            color: #3a3a55; font-weight: 700; margin: 12px 0 7px;
+            padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .sp-desc-field { margin-bottom: 7px; }
+        .sp-desc-label { font-size: 0.6em; font-weight: 700; color: #d4af37; letter-spacing: 0.8px; text-transform: uppercase; }
+        .sp-desc-val   { font-size: 0.7em; color: #8a8aaa; line-height: 1.5; margin-top: 2px; }
+
+        /* Botones de acción OP */
+        .sp-action-row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+        .sp-btn {
+            font-size: 0.62em; padding: 5px 11px; border-radius: 5px;
+            border: 1px solid; cursor: pointer; font-family: inherit;
+            transition: all 0.12s; white-space: nowrap;
+        }
+        .sp-btn-pub   { background: rgba(212,175,55,0.09); border-color: rgba(212,175,55,0.4); color: #d4af37; }
+        .sp-btn-pub:hover   { background: rgba(212,175,55,0.2); }
+        .sp-btn-ocultar { background: rgba(120,100,60,0.08); border-color: rgba(120,100,60,0.3); color: #7a6a40; }
+        .sp-btn-ocultar:hover { color: #d4af37; }
+        .sp-btn-asignar { background: rgba(50,200,100,0.09); border-color: rgba(50,200,100,0.35); color: #32c864; }
+        .sp-btn-asignar:hover { background: rgba(50,200,100,0.2); }
+        .sp-btn-quitar { background: rgba(220,60,60,0.09); border-color: rgba(220,60,60,0.35); color: #e06060; }
+        .sp-btn-quitar:hover { background: rgba(220,60,60,0.2); }
+        .sp-btn-props { background: rgba(212,175,55,0.08); border-color: rgba(212,175,55,0.3); color: #c9953a; }
+        .sp-btn-props:hover { background: rgba(212,175,55,0.18); }
+        .sp-btn-del   { background: rgba(200,50,50,0.08); border-color: rgba(200,50,50,0.3); color: #cc4444; }
+        .sp-btn-del:hover { background: rgba(200,50,50,0.2); }
+
+        /* Multi-sel badge */
+        #hm-sel-badge {
+            font-size: 0.6em; color: #d4af37;
+            background: rgba(212,175,55,0.1);
+            border: 1px solid rgba(212,175,55,0.3);
+            border-radius: 10px; padding: 2px 8px;
+            display: none; flex-shrink: 0;
+        }
+
+        /* Portapapeles / resumen de operación */
+        #hm-clipboard {
+            position: fixed; bottom: 36px; right: 308px;
+            max-width: 320px; width: max-content;
+            background: rgba(8,6,20,0.98);
+            border: 1px solid rgba(212,175,55,0.22);
+            border-radius: 10px; padding: 10px 14px;
+            font-size: 0.68em; color: #aaa;
+            z-index: 170; display: none;
+            line-height: 1.6;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+        }
+        #hm-clipboard.visible { display: block; }
+        .clip-title { font-family: 'Cinzel', serif; color: #d4af37; font-size: 1.05em; margin-bottom: 5px; }
+        .clip-pj    { color: #ffffff; font-weight: 700; }
+        .clip-hz    { color: #9090cc; }
+        .clip-hex   { color: #c9953a; }
+        .clip-desc  { color: rgba(150,131,200,0.9); }
+        .clip-close { float: right; cursor: pointer; color: #555; font-size: 1.1em; }
+        .clip-close:hover { color: #ccc; }
         #hm-op-panel {
             position: fixed; bottom: 32px; left: 50%;
             transform: translateX(-50%);
@@ -441,13 +612,65 @@
 <!-- ══════════════ NAV ══════════════ -->
 <nav id="hm-nav">
     <div id="hm-nav-left">
-        <a id="hm-back" href="../sistema/index.html">← Sistema</a>
+        <a id="hm-back" href="../index.html">← Inicio</a>
         <span id="hm-title">✦ Hechizos</span>
     </div>
+
+    <!-- Buscador central -->
+    <div id="hm-search-bar">
+        <input id="hm-search-central" type="text" autocomplete="off" spellcheck="false"
+            placeholder="Buscar hechizo… nombre, afinidad o número (ej: 7)"
+            oninput="window._hmBuscarCentral(this.value)">
+    </div>
+
     <div id="hm-toolbar">
-        <!-- JS lo rellena -->
+        <!-- Centrar -->
+        <button class="hm-btn" onclick="window._hmCentrar()" title="Centrar vista">⊙ Centrar</button>
+        <div class="hm-tab-sep"></div>
+
+        <!-- Pool jugadores -->
+        <div class="hm-pj-pool-wrap" id="pool-jugadores-wrap">
+            <button class="hm-pj-pool-btn" id="pool-jug-btn" onclick="window._hmTogglePool('jugadores')">
+                👤 Jugadores <span style="font-size:0.8em;opacity:0.5;">▾</span>
+            </button>
+            <div class="hm-pj-pool-dropdown" id="pool-jugadores-drop">
+                <div class="hm-pool-title">Jugadores</div>
+                <div class="hm-pool-grid" id="pool-jug-grid"><!-- JS --></div>
+                <button class="hm-pool-todos" onclick="window._hmCambiarPJ('Todos');window._hmCerrarPools()">Todos / limpiar filtro</button>
+            </div>
+        </div>
+
+        <!-- Pool NPCs -->
+        <div class="hm-pj-pool-wrap" id="pool-npcs-wrap">
+            <button class="hm-pj-pool-btn" id="pool-npc-btn" onclick="window._hmTogglePool('npcs')">
+                🤖 NPCs <span style="font-size:0.8em;opacity:0.5;">▾</span>
+            </button>
+            <div class="hm-pj-pool-dropdown" id="pool-npcs-drop">
+                <div class="hm-pool-title">NPCs</div>
+                <div class="hm-pool-grid" id="pool-npc-grid"><!-- JS --></div>
+            </div>
+        </div>
+
+        <span id="hm-sel-badge" style="display:none;">0 sel.</span>
     </div>
 </nav>
+
+<!-- ══════════════ PANEL LATERAL OP ══════════════ -->
+<div id="hm-side-panel">
+    <div id="hm-side-panel-header">
+        <span class="sp-titulo" id="sp-titulo-txt">Hechizo</span>
+        <button class="sp-close" onclick="window._hmCerrarSidePanel()">×</button>
+    </div>
+    <div id="hm-side-panel-body">
+        <!-- renderSidePanel() lo rellena -->
+    </div>
+</div>
+
+<!-- Portapapeles de operación -->
+<div id="hm-clipboard">
+    <span class="clip-close" onclick="document.getElementById('hm-clipboard').classList.remove('visible')">×</span>
+    <div id="hm-clipboard-content"><!-- JS --></div>
+</div>
 
 <!-- ══════════════ CANVAS ══════════════ -->
 <div id="hm-canvas-wrap">
@@ -479,11 +702,6 @@
             </div>
         </div>
     </div>
-</div>
-
-<!-- ══════════════ PANEL OP ══════════════ -->
-<div id="hm-op-panel">
-    <!-- renderOpPanel() lo rellena -->
 </div>
 
 <!-- ══════════════ INFO BAR ══════════════ -->
