@@ -827,3 +827,52 @@ body.drawer-open #hm-op-panel {
 }
 .op-clip-row { color: #999; line-height: 1.4; }
 .op-clip-lbl { color: #666; }
+
+/* ── Botones de edición rápida numérica (±50 / ±1) ── */
+.sp-num-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.sp-num-row .sp-inline-input.sp-num-input {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+}
+.sp-num-btn {
+    background: rgba(212,175,55,0.10);
+    border: 1px solid rgba(212,175,55,0.25);
+    color: #d4af37;
+    border-radius: 4px;
+    padding: 3px 7px;
+    font-size: 0.7em;
+    font-family: inherit;
+    cursor: pointer;
+    line-height: 1;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+}
+.sp-num-btn:hover {
+    background: rgba(212,175,55,0.22);
+    border-color: rgba(212,175,55,0.55);
+}
+.sp-num-btn:active {
+    background: rgba(212,175,55,0.35);
+}
+
+/* ── Navegación con flechas: resalte de checkbox enfocado ── */
+.sp-check-row {
+    border-radius: 4px;
+    padding: 2px 5px;
+    margin: 0 -5px;
+    transition: background 0.12s;
+}
+.sp-check-row.sp-check-focused {
+    background: rgba(212,175,55,0.12);
+    outline: 1px solid rgba(212,175,55,0.35);
+    color: #e8d080;
+}
+.sp-check-row:focus-within {
+    background: rgba(212,175,55,0.08);
+}

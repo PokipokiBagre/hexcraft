@@ -463,28 +463,44 @@ export function renderSidePanel(nodo) {
             </div>
             <div class="sp-desc-field">
                 <div class="sp-desc-label">HEX</div>
-                <input class="sp-inline-input" id="sp-ed-hex" type="number" value="${nodo.hex||0}" min="0">
+                <div class="sp-num-row">
+                    <button class="sp-num-btn" tabindex="-1" onclick="window._hmAjustarNum('sp-ed-hex',-50)">−50</button>
+                    <input class="sp-inline-input sp-num-input" id="sp-ed-hex" type="text" inputmode="numeric" value="${nodo.hex||0}">
+                    <button class="sp-num-btn" tabindex="-1" onclick="window._hmAjustarNum('sp-ed-hex',+50)">+50</button>
+                </div>
             </div>
             <div class="sp-desc-field">
                 <div class="sp-desc-label">VEX</div>
-                <input class="sp-inline-input" id="sp-ed-vex" type="number" value="${nodo.vex||0}" min="0">
+                <div class="sp-num-row">
+                    <button class="sp-num-btn" tabindex="-1" onclick="window._hmAjustarNum('sp-ed-vex',-50)">−50</button>
+                    <input class="sp-inline-input sp-num-input" id="sp-ed-vex" type="text" inputmode="numeric" value="${nodo.vex||0}">
+                    <button class="sp-num-btn" tabindex="-1" onclick="window._hmAjustarNum('sp-ed-vex',+50)">+50</button>
+                </div>
             </div>
             <div class="sp-desc-field">
                 <div class="sp-desc-label">Backcast</div>
-                <input class="sp-inline-input" id="sp-ed-backcast" type="number" value="${nodo.backcast||0}" min="0">
+                <div class="sp-num-row">
+                    <button class="sp-num-btn" tabindex="-1" onclick="window._hmAjustarNum('sp-ed-backcast',-1)">−1</button>
+                    <input class="sp-inline-input sp-num-input" id="sp-ed-backcast" type="text" inputmode="numeric" value="${nodo.backcast||0}">
+                    <button class="sp-num-btn" tabindex="-1" onclick="window._hmAjustarNum('sp-ed-backcast',+1)">+1</button>
+                </div>
             </div>
             <div class="sp-desc-field">
                 <div class="sp-desc-label">Nextcast</div>
-                <input class="sp-inline-input" id="sp-ed-nextcast" type="number" value="${nodo.nextcast||0}" min="0">
+                <div class="sp-num-row">
+                    <button class="sp-num-btn" tabindex="-1" onclick="window._hmAjustarNum('sp-ed-nextcast',-1)">−1</button>
+                    <input class="sp-inline-input sp-num-input" id="sp-ed-nextcast" type="text" inputmode="numeric" value="${nodo.nextcast||0}">
+                    <button class="sp-num-btn" tabindex="-1" onclick="window._hmAjustarNum('sp-ed-nextcast',+1)">+1</button>
+                </div>
             </div>
         </div>
-        <div class="op-l-checks" style="margin-top:6px;">
-            <label><input type="checkbox" id="sp-ed-conocido" ${nodo.esConocido?'checked':''}> Conocido (publicado)</label>
-            <label><input type="checkbox" id="sp-ed-estado"   ${nodo.esEstado?'checked':''}> Hechizo-Estado</label>
-            <label><input type="checkbox" id="sp-ed-prio"     ${nodo.esPrioridad?'checked':''}> Prioridad</label>
-            <label><input type="checkbox" id="sp-ed-afxusr"   ${nodo.afectaUsuario?'checked':''}> Afecta Usuario</label>
-            <label><input type="checkbox" id="sp-ed-afxobj"   ${nodo.afectaObjetivo?'checked':''}> Afecta Objetivo</label>
-            <label><input type="checkbox" id="sp-ed-afxhz"    ${nodo.afectaHechizos?'checked':''}> Afecta Hechizos</label>
+        <div class="op-l-checks sp-checks-nav" style="margin-top:6px;">
+            <label class="sp-check-row" data-check="sp-ed-conocido"><input type="checkbox" id="sp-ed-conocido" ${nodo.esConocido?'checked':''}> Conocido (publicado)</label>
+            <label class="sp-check-row" data-check="sp-ed-estado"  ><input type="checkbox" id="sp-ed-estado"   ${nodo.esEstado?'checked':''}> Hechizo-Estado</label>
+            <label class="sp-check-row" data-check="sp-ed-prio"    ><input type="checkbox" id="sp-ed-prio"     ${nodo.esPrioridad?'checked':''}> Prioridad</label>
+            <label class="sp-check-row" data-check="sp-ed-afxusr"  ><input type="checkbox" id="sp-ed-afxusr"   ${nodo.afectaUsuario?'checked':''}> Afecta Usuario</label>
+            <label class="sp-check-row" data-check="sp-ed-afxobj"  ><input type="checkbox" id="sp-ed-afxobj"   ${nodo.afectaObjetivo?'checked':''}> Afecta Objetivo</label>
+            <label class="sp-check-row" data-check="sp-ed-afxhz"   ><input type="checkbox" id="sp-ed-afxhz"    ${nodo.afectaHechizos?'checked':''}> Afecta Hechizos</label>
         </div>
         <div style="margin-top:10px;">
             <button class="sp-btn sp-btn-pub" style="width:100%;justify-content:center;"
@@ -511,10 +527,10 @@ window._hmGuardarHechizoDerecho = async () => {
         nombre:          document.getElementById('sp-ed-nombre')?.value?.trim() || nodo.nombre,
         clase:           document.getElementById('sp-ed-clase')?.value || nodo.clase,
         afinidad:        document.getElementById('sp-ed-afin')?.value || nodo.afinidad,
-        hex_cost:        parseInt(document.getElementById('sp-ed-hex')?.value)||0,
-        valor_vex:       parseInt(document.getElementById('sp-ed-vex')?.value)||0,
-        backcast:        parseInt(document.getElementById('sp-ed-backcast')?.value)||0,
-        nextcast:        parseInt(document.getElementById('sp-ed-nextcast')?.value)||0,
+        hex_cost:        Math.max(0, parseInt(document.getElementById('sp-ed-hex')?.value)||0),
+        valor_vex:       Math.max(0, parseInt(document.getElementById('sp-ed-vex')?.value)||0),
+        backcast:        Math.max(0, parseInt(document.getElementById('sp-ed-backcast')?.value)||0),
+        nextcast:        Math.max(0, parseInt(document.getElementById('sp-ed-nextcast')?.value)||0),
         resumen:         document.getElementById('sp-ed-resumen')?.value || '',
         efecto:          document.getElementById('sp-ed-efecto')?.value || '',
         overcast:        document.getElementById('sp-ed-overcast')?.value || '',
@@ -567,6 +583,118 @@ window._hmGuardarHechizoDerecho = async () => {
     if (st.esAdmin) _renderOpLeft();
     toast('✓ Hechizo guardado');
 };
+
+// ── Ajustar campo numérico con botones ±────────────────────────
+window._hmAjustarNum = (id, delta) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const val = Math.max(0, (parseInt(el.value) || 0) + delta);
+    el.value = val;
+    el.focus();
+};
+
+// ── Navegación rápida con flechas en el panel derecho ──────────
+// Orden de campos navegables (↓/↑ entre ellos, Shift+↓/↑ en checks)
+(function _initSidePanelKeyNav() {
+    // IDs de inputs/selects/textareas del panel (en orden visual)
+    const FIELD_IDS = [
+        'sp-ed-efecto', 'sp-ed-resumen', 'sp-ed-overcast',
+        'sp-ed-undercast', 'sp-ed-especial', 'sp-ed-nota',
+        'sp-ed-nombre',
+        'sp-ed-clase', 'sp-ed-afin',
+        'sp-ed-hex', 'sp-ed-vex', 'sp-ed-backcast', 'sp-ed-nextcast',
+    ];
+    // IDs de checkboxes (navegables también)
+    const CHECK_IDS = [
+        'sp-ed-conocido', 'sp-ed-estado', 'sp-ed-prio',
+        'sp-ed-afxusr', 'sp-ed-afxobj', 'sp-ed-afxhz',
+    ];
+    // Todos en orden: primero campos, luego checks
+    const ALL_IDS = [...FIELD_IDS, ...CHECK_IDS];
+
+    document.addEventListener('keydown', (e) => {
+        // Solo actuar si el foco está dentro del panel derecho
+        const panel = document.getElementById('hm-side-panel');
+        if (!panel || !panel.classList.contains('abierto')) return;
+        if (!panel.contains(document.activeElement)) return;
+
+        const focused = document.activeElement;
+        const focusedId = focused?.id;
+
+        // En textareas, flechas mueven cursor → no interferir (solo Tab navega)
+        if (focused?.tagName === 'TEXTAREA') return;
+
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+
+        // Encuentra posición actual
+        const idx = ALL_IDS.indexOf(focusedId);
+        const isCheck = CHECK_IDS.includes(focusedId);
+
+        // Si estamos en un input numérico (.sp-num-input), bloquear flechas del browser
+        // (ya son type=text, pero por si acaso)
+        if (focused?.classList.contains('sp-num-input')) {
+            e.preventDefault();
+        }
+
+        if (idx === -1) return; // campo no registrado, dejar comportamiento default
+        e.preventDefault();
+
+        const dir = e.key === 'ArrowDown' ? 1 : -1;
+        const nextIdx = idx + dir;
+        if (nextIdx < 0 || nextIdx >= ALL_IDS.length) return;
+
+        const nextId = ALL_IDS[nextIdx];
+        const nextEl = document.getElementById(nextId);
+        if (!nextEl) return;
+
+        const nextIsCheck = CHECK_IDS.includes(nextId);
+
+        if (nextIsCheck) {
+            // Enfocar el label contenedor para resalte visual
+            const label = nextEl.closest('label');
+            if (label) {
+                // Marcar visualmente con clase
+                document.querySelectorAll('.sp-check-row.sp-check-focused')
+                    .forEach(l => l.classList.remove('sp-check-focused'));
+                label.classList.add('sp-check-focused');
+            }
+            nextEl.focus();
+
+            // Shift + flecha → toggle check
+            if (e.shiftKey) {
+                nextEl.checked = !nextEl.checked;
+            }
+        } else {
+            document.querySelectorAll('.sp-check-row.sp-check-focused')
+                .forEach(l => l.classList.remove('sp-check-focused'));
+            nextEl.focus();
+            // Seleccionar texto si es input de texto
+            if (nextEl.tagName === 'INPUT' && nextEl.type !== 'checkbox') {
+                nextEl.select?.();
+            }
+        }
+    });
+
+    // Shift+Space para toggle cuando un checkbox está enfocado
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== ' ' && e.key !== 'Spacebar') return;
+        if (!e.shiftKey) return;
+        const focused = document.activeElement;
+        if (!focused || focused.type !== 'checkbox') return;
+        const panel = document.getElementById('hm-side-panel');
+        if (!panel?.contains(focused)) return;
+        e.preventDefault();
+        focused.checked = !focused.checked;
+    });
+
+    // Limpiar resalte al cambiar foco fuera de checks
+    document.addEventListener('focusin', (e) => {
+        if (!CHECK_IDS.includes(e.target?.id)) {
+            document.querySelectorAll('.sp-check-row.sp-check-focused')
+                .forEach(l => l.classList.remove('sp-check-focused'));
+        }
+    });
+})();
 
 // ── Renderizar pools de PJ ───────────────────────────────────
 export function renderPools() {
