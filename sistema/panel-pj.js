@@ -54,12 +54,43 @@ function _inyectarEstilos() {
     const st = document.createElement('style');
     st.id = 'panel-pj-styles';
     st.textContent = `
-#panel-pj-root{position:fixed;top:0;right:0;width:440px;height:100vh;background:#08080f;border-left:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;z-index:1200;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1),width 0.28s cubic-bezier(0.4,0,0.2,1);font-family:'Inter',system-ui,sans-serif;box-shadow:-8px 0 40px rgba(0,0,0,0.6);}
+#panel-pj-root{position:fixed;top:0;right:0;width:75vw;min-width:680px;height:100vh;background:transparent;border:none;display:flex;flex-direction:row;z-index:1200;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);font-family:'Inter',system-ui,sans-serif;}
 #panel-pj-root.open{transform:translateX(0);}
-#panel-pj-root.hz-mode{width:50vw;min-width:480px;}
-#panel-pj-root.obj-mode{width:50vw;min-width:480px;}
+#panel-pj-root.hz-mode{width:75vw;}
+#panel-pj-root.obj-mode{width:75vw;}
 #panel-pj-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1199;opacity:0;pointer-events:none;transition:opacity 0.28s;}
 #panel-pj-overlay.open{opacity:1;pointer-events:all;}
+
+/* ── Columna HEX (izquierda, 66.66% del panel = 50vw total) ── */
+#ppj-col-hex{flex:0 0 66.66%;width:66.66%;height:100vh;background:#08080f;border-left:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;overflow:hidden;box-shadow:-8px 0 40px rgba(0,0,0,0.6);}
+/* ── Columna STATS (derecha, 33.33% del panel = 25vw total) ── */
+#ppj-col-stats{flex:0 0 33.33%;width:33.33%;height:100vh;background:#070710;border-left:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;overflow:hidden;}
+
+/* Body de hex en col izquierda */
+#ppj-hex-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 70px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,0.2) transparent;}
+#ppj-hex-body::-webkit-scrollbar{width:4px;}#ppj-hex-body::-webkit-scrollbar-thumb{background:rgba(212,175,55,0.2);border-radius:2px;}
+
+/* Body de stats (recursos vitales + afinidades) en col derecha — parte superior */
+#ppj-stats-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 8px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,0.15) transparent;}
+#ppj-stats-body::-webkit-scrollbar{width:4px;}#ppj-stats-body::-webkit-scrollbar-thumb{background:rgba(212,175,55,0.15);border-radius:2px;}
+
+/* Body de tab (hechizos/objetos/misiones) en col derecha — con tabs y body propio */
+#ppj-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 70px;scrollbar-width:thin;scrollbar-color:rgba(212,175,55,0.15) transparent;}
+#ppj-body::-webkit-scrollbar{width:4px;}#ppj-body::-webkit-scrollbar-thumb{background:rgba(212,175,55,0.15);border-radius:2px;}
+
+/* La col-der: stats ocupa 50%, separator, tabs+body ocupan 50% */
+#ppj-col-stats{display:flex;flex-direction:column;}
+#ppj-stats-body{flex:1 1 0;min-height:0;}
+#ppj-col-stats .ppj-tabs{flex-shrink:0;border-top:1px solid rgba(212,175,55,0.12);border-bottom:1px solid rgba(255,255,255,0.06);background:#0a0a14;}
+#ppj-body{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+
+/* Sections en col-stats más compactas */
+#ppj-stats-body .ppj-section,#ppj-body .ppj-section{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.04);}
+#ppj-stats-body .ppj-section-title{font-size:0.6em;letter-spacing:1.5px;text-transform:uppercase;color:#3a3a58;font-weight:600;margin-bottom:8px;}
+
+/* Cabecera de col-stats */
+#ppj-stats-header{padding:10px 12px 8px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:#070710;}
+#ppj-stats-header-label{font-family:'Cinzel',serif;font-size:0.68em;color:#d4af37;letter-spacing:1px;}
 .ppj-header{display:flex;align-items:center;gap:12px;padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;min-height:68px;}
 .ppj-avatar{width:44px;height:44px;border-radius:8px;object-fit:cover;object-position:top;border:1px solid rgba(212,175,55,0.3);flex-shrink:0;cursor:pointer;background:#111;}
 .ppj-header-info{flex:1;min-width:0;}
@@ -253,7 +284,22 @@ function _crearEstructura() {
     document.body.appendChild(overlay);
     const root = document.createElement('div');
     root.id = 'panel-pj-root';
-    root.innerHTML = `<div class="ppj-header" id="ppj-header"></div><div class="ppj-tabs" id="ppj-tabs"></div><div class="ppj-body" id="ppj-body"></div><div class="ppj-footer" id="ppj-footer"></div>`;
+    root.innerHTML = `
+        <!-- Columna HEX (50% pantalla) -->
+        <div id="ppj-col-hex">
+            <div class="ppj-header" id="ppj-header"></div>
+            <div class="ppj-body" id="ppj-hex-body"></div>
+            <div class="ppj-footer" id="ppj-footer"></div>
+        </div>
+        <!-- Columna STATS (25% pantalla) -->
+        <div id="ppj-col-stats">
+            <div id="ppj-stats-header">
+                <span id="ppj-stats-header-label">Stats · Afinidades</span>
+            </div>
+            <div class="ppj-tabs" id="ppj-tabs"></div>
+            <div class="ppj-body" id="ppj-stats-body"><div class="ppj-loader">…</div></div>
+            <div class="ppj-body" id="ppj-body" style="display:none;"></div>
+        </div>`;
     document.body.appendChild(root);
 }
 
@@ -268,7 +314,14 @@ export function abrirPanelPJ(nombre) {
     document.getElementById('panel-pj-overlay').classList.add('open');
     _renderHeader(nombre);
     _renderTabs(nombre);
-    _renderTab(nombre, _tabActivo[nombre] || 'hex');
+    // Columna izquierda: HEX + VEX + pushes hex + historial + imagen
+    _tabHex(nombre, document.getElementById('ppj-hex-body'));
+    // Columna derecha superior: stats (recursos vitales + afinidades)
+    _renderStatsPanel(nombre);
+    // Columna derecha inferior: hechizos por defecto
+    const lastTab = _tabActivo[nombre];
+    const startTab = (lastTab && lastTab !== 'hex' && lastTab !== 'stats') ? lastTab : 'hechizos';
+    _renderTab(nombre, startTab);
 }
 
 export function cerrarPanelPJ() {
@@ -322,18 +375,23 @@ function _renderHeader(nombre) {
 // ─────────────────────────────────────────────────────────────
 function _renderTabs(nombre) {
     const p = personajes[nombre]; if (!p) return;
+    // La columna izquierda ya NO incluye hex ni stats (son el panel de hex y el panel de stats fijos)
     const tabs = [
-        { id:'hex', label:'HEX' }, { id:'stats', label:'Stats' },
         { id:'hechizos', label:'Hechizos' }, { id:'objetos', label:'Objetos' },
         ...( p.isPlayer ? [{ id:'misiones', label:'Misiones' }] : [] )
     ];
+    // Tab activa por defecto para la columna izq: hechizos
+    const activo = (_tabActivo[nombre] === 'hex' || _tabActivo[nombre] === 'stats' || !_tabActivo[nombre])
+        ? 'hechizos' : _tabActivo[nombre];
     document.getElementById('ppj-tabs').innerHTML = tabs.map(t =>
-        `<button class="ppj-tab ${(_tabActivo[nombre]||'hex')===t.id?'active':''}"
+        `<button class="ppj-tab ${activo===t.id?'active':''}"
                  onclick="window._ppjCambiarTab('${nombre.replace(/'/g,"\\'")}','${t.id}')">${t.label}</button>`
     ).join('');
 }
 
 function _renderTab(nombre, tab) {
+    // Redirigir hex/stats al panel correspondiente si llegaran por error
+    if (tab === 'hex' || tab === 'stats') tab = 'hechizos';
     _tabActivo[nombre] = tab;
     document.querySelectorAll('.ppj-tab').forEach(b =>
         b.classList.toggle('active', b.getAttribute('onclick')?.includes(`'${tab}'`))
@@ -341,7 +399,6 @@ function _renderTab(nombre, tab) {
     const body = document.getElementById('ppj-body');
     body.innerHTML = `<div class="ppj-loader">Cargando…</div>`;
 
-    // Cerrar minimapa si cambiamos a otro tab
     if (tab !== 'hechizos') {
         cerrarMinimapa();
         document.getElementById('panel-pj-root')?.classList.remove('hz-mode');
@@ -356,8 +413,6 @@ function _renderTab(nombre, tab) {
     }
 
     switch(tab) {
-        case 'hex':      _tabHex(nombre, body);               break;
-        case 'stats':    { const _sy = body.scrollTop; body.innerHTML = _tabStats(nombre); if (_sy > 0) body.scrollTop = _sy; break; }
         case 'hechizos': _tabHechizosConMapa(nombre, body);   break;
         case 'objetos':  _tabObjetos(nombre, body);            break;
         case 'misiones': renderTabMisiones(nombre, body);       break;
@@ -491,6 +546,7 @@ async function _tabHex(nombre, body) {
         <div class="ppj-hex-val">${(p.hex||0).toLocaleString()}</div>
         ${canEdit?`<div class="ppj-hex-grid">${btnsN}</div><div class="ppj-hex-grid" style="margin-top:5px;">${btnsP}</div>`:''}
     </div>
+    ${_vexPushesHtml(nombre)}
     ${estadoUI.esAdmin?`<div class="ppj-section">
         <div class="ppj-section-title">Pushes de HEX</div>
         <div class="ppj-hpush-grid">
@@ -512,6 +568,25 @@ async function _tabHex(nombre, body) {
         </div>
     </div>`;
 }
+
+// ─────────────────────────────────────────────────────────────
+// PANEL STATS (columna derecha — siempre visible)
+// ─────────────────────────────────────────────────────────────
+function _renderStatsPanel(nombre) {
+    const body = document.getElementById('ppj-stats-body');
+    if (!body) return;
+    const _sy = body.scrollTop;
+    const html = _tabStats(nombre);
+    body.innerHTML = html;
+    if (_sy > 0) body.scrollTop = _sy;
+}
+
+// Exponerlo para que modStat, modAfin, etc. puedan llamarlo tras cada cambio
+window._ppjRefreshStats = (nombre) => {
+    if (estadoUI.panelAbierto && estadoUI.pjSeleccionado === nombre) {
+        _renderStatsPanel(nombre);
+    }
+};
 
 // ─────────────────────────────────────────────────────────────
 // TAB: STATS
@@ -654,8 +729,53 @@ function _tabStats(nombre) {
         ${_maxOvAditivo('Guarda','guarda_max_override',s.guarda_max_override||0,s.guarda_max_formula,s.guarda_max)}
         <div class="ppj-formula">${formulas.guarda_max?.expr||''} ${s.guarda_max_override!==0?`<span style="color:#888;">+ ${s.guarda_max_override} manual</span>`:''}</div>
         ` : ''}
+    </div>
+    <div class="ppj-section"><div class="ppj-section-title">Afinidades</div>${afinRows}</div>`;
+}
 
-        ${s.vex_max>0?`<div class="ppj-vida-block">
+// Bloque VEX + Pushes para incluir en la columna HEX
+function _vexPushesHtml(nombre) {
+    const p = personajes[nombre]; if (!p) return '';
+    const s = calcularStats(p);
+    const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
+    const canEdit   = estadoUI.esAdmin || !p.isPlayer;
+    const safe = nombre.replace(/'/g, "\\'");
+    const pctVex = s.vex_max>0?Math.min(100,Math.round((p.vex_actual||0)/s.vex_max*100)):0;
+
+    const _push = (recurso, label, emoji) => {
+        const hasMax = recurso==='vex'?s.vex_max>0:s.guarda_max>0; if (!hasMax) return '';
+        const disp = calcularPushDisponibles(p, s, recurso);
+        const usados = recurso==='vex'?(p.push_vex_actual||0):(p.push_guarda_actual||0);
+        const rest = Math.max(0, disp-usados);
+        const val = calcularValorPush(p, recurso);
+        const cd = calcularCooldownPush(p, recurso);
+        const canPush = rest>0 && cd.disponible;
+        const dots = Array.from({length:Math.max(disp,1)},(_,i)=>
+            `<span class="ppj-dot ${i<usados?'used':'avail'}"></span>`).join('');
+        const cdTxt = !cd.disponible
+            ? `<div class="ppj-push-cd">⏳ ${Math.floor(cd.restaSeg/60)}m ${String(cd.restaSeg%60).padStart(2,'0')}s</div>` : '';
+        return `<div class="ppj-push-block">
+            <div class="ppj-push-header"><span class="ppj-push-label">${emoji} ${label}</span><div class="ppj-push-dots">${dots}</div><span style="font-size:0.68em;color:#4a4a68;">${usados}/${disp}</span></div>
+            ${cdTxt}
+            <div class="ppj-push-info"><span class="ppj-push-valor">+${val} por push</span>
+                <button class="btn-push-pj" ${canPush?'':'disabled'} onclick="window.ejecutarPush('${safe}','${recurso}')">
+                    ${!cd.disponible?'Cooldown':(rest>0?`Push ${label}`:'Sin pushes')}</button>
+            </div>
+            ${estadoUI.esAdmin?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+                <span style="font-size:0.62em;color:#3a3a58;">Extra OP</span>
+                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',-1)">−</button>
+                <span style="font-size:0.75em;color:#888;">${recurso==='vex'?(p.push_vex_limit||0):(p.push_guarda_limit||0)}</span>
+                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',1)">+</button>
+                <button class="ppj-ctrl-btn" onclick="window.resetPushes('${safe}','${recurso}')" style="margin-left:4px;">↺</button>
+            </div>`:''}
+        </div>`;
+    };
+
+    if (!s.vex_max) return '';
+    return `
+    <div class="ppj-section">
+        <div class="ppj-section-title">VEX</div>
+        <div class="ppj-vida-block">
             <div class="ppj-vida-header"><span class="ppj-vida-label" style="color:#9a50dc;">VEX</span>
                 <div class="ppj-vida-ctrl">
                     ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',-50)">−50</button>`:''}
@@ -663,13 +783,13 @@ function _tabStats(nombre) {
                     ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',50)">+50</button>`:''}
                 </div>
             </div><div class="ppj-vex-bar"><div class="ppj-vex-fill" style="width:${pctVex}%"></div></div>
-        </div><div class="ppj-formula">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>`:''}
+        </div>
+        <div class="ppj-formula" style="margin-top:4px;">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
     </div>
     <div class="ppj-section"><div class="ppj-section-title">Pushes</div>
         ${_push('vex','VEX','⚡')}${_push('guarda','Guarda','🛡')}
         ${!s.vex_max&&!s.guarda_max?'<div class="ppj-empty" style="padding:8px 0;">Sin pushes disponibles</div>':''}
-    </div>
-    <div class="ppj-section"><div class="ppj-section-title">Afinidades</div>${afinRows}</div>`;
+    </div>`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2513,13 +2633,11 @@ export function refreshPanelPJ() {
     const nombre = estadoUI.pjSeleccionado;
     if (!nombre || !estadoUI.panelAbierto) return;
     _renderHeader(nombre);
-    const tab = _tabActivo[nombre] || 'hex';
-    if (tab === 'stats') {
-        const body = document.getElementById('ppj-body');
-        const scrollY = body ? body.scrollTop : 0;
-        body.innerHTML = _tabStats(nombre);
-        if (body && scrollY > 0) body.scrollTop = scrollY;
-    }
+    // Refrescar columna hex (saldo + vex + pushes + historial)
+    const hexBody = document.getElementById('ppj-hex-body');
+    if (hexBody) _tabHex(nombre, hexBody);
+    // Refrescar columna stats (siempre visible)
+    _renderStatsPanel(nombre);
 }
 
 // ─────────────────────────────────────────────────────────────
