@@ -810,3 +810,20 @@ body.drawer-open #hm-op-panel {
 .op-l-checks input[type=checkbox] {
     accent-color: #d4af37; cursor: pointer;
 }
+
+/* ── Portapapeles en panel OP izquierdo ── */
+.op-l-clipboard {
+    background: rgba(30,25,55,0.7);
+    border: 1px solid rgba(150,131,200,0.25);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.68em;
+    display: flex; flex-direction: column; gap: 4px;
+}
+.op-clip-pj {
+    color: rgba(150,131,200,0.95);
+    font-weight: 700; font-size: 1.05em;
+    letter-spacing: 0.5px;
+}
+.op-clip-row { color: #999; line-height: 1.4; }
+.op-clip-lbl { color: #666; }
