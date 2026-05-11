@@ -147,23 +147,9 @@ html, body {
 .hm-pool-todos:hover { color: #ccc; background: rgba(255,255,255,0.07); }
 
 /* ══════════════════════════════════════
-   HERRAMIENTAS OP (NUEVA BARRA TOP)
+   HERRAMIENTAS OP (barra top — desactivada, contenido movido al panel izquierdo)
 ══════════════════════════════════════ */
-#hm-op-tools {
-    position: fixed; top: 44px; left: 0; right: 0; height: 42px;
-    background: rgba(12,8,24,0.98);
-    border-bottom: 1px solid rgba(212,175,55,0.25);
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    z-index: 190;
-    transform: translateY(-100%);
-    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
-}
-body.op-panel-open #hm-op-tools { transform: translateY(0); }
-
-.tool-group {
-    display: flex; gap: 5px; padding: 0 10px; border-right: 1px solid rgba(255,255,255,0.08);
-}
-.tool-group:last-child { border-right: none; }
+#hm-op-tools { display: none; }
 
 /* ══════════════════════════════════════
    CANVAS
@@ -172,13 +158,13 @@ body.op-panel-open #hm-op-tools { transform: translateY(0); }
     position: fixed;
     top: 44px; left: 0; right: 0; bottom: 32px;
     overflow: hidden; cursor: grab;
-    transition: left 0.25s cubic-bezier(0.4,0,0.2,1), right 0.25s cubic-bezier(0.4,0,0.2,1), top 0.25s cubic-bezier(0.4,0,0.2,1);
+    transition: left 0.25s cubic-bezier(0.4,0,0.2,1), right 0.25s cubic-bezier(0.4,0,0.2,1);
 }
 #hm-canvas-wrap:active { cursor: grabbing; }
 #hm-canvas { display: block; width: 100%; height: 100%; }
 
-/* Desplazamientos automáticos al abrir paneles */
-body.op-panel-open #hm-canvas-wrap { left: 300px; top: 86px; }
+/* Desplazamientos al abrir paneles — solo laterales, sin empujar top */
+body.op-panel-open #hm-canvas-wrap { left: 300px; }
 body.side-panel-open #hm-canvas-wrap { right: 300px; }
 
 /* ══════════════════════════════════════
@@ -220,6 +206,7 @@ body.side-panel-open #hm-canvas-wrap { right: 300px; }
 /* Ajuste del drawer si el panel izquierdo OP está abierto */
 body.op-panel-open #hm-drawer { left: 300px; }
 body.op-panel-open #hm-drawer-tab { left: calc(300px + 50%); transform: translateX(-50%); }
+/* El panel OP izquierdo ya no tiene barra top adicional — canvas siempre empieza en 44px */
 
 #hm-drawer-inner {
     display: flex; flex-direction: column;
@@ -432,18 +419,31 @@ body.side-panel-open #hm-canvas-wrap { right: 300px; }
     background: transparent; border: 1px solid transparent; border-radius: 4px;
     color: #e0d8f0; font-family: inherit; width: 100%;
     transition: background 0.15s, border-color 0.15s;
-    outline: none;
+    outline: none; box-sizing: border-box;
 }
-.sp-inline-input { font-size: 0.75em; padding: 3px 4px; margin-left: -4px; }
-.sp-inline-area { font-size: 0.7em; padding: 4px; margin-left: -4px; resize: vertical; line-height: 1.4; color: #8a8aaa; }
-
-.sp-inline-input:hover, .sp-inline-area:hover { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1); }
-.sp-inline-input:focus, .sp-inline-area:focus { background: rgba(15,10,30,0.9); border-color: rgba(212,175,55,0.5); color: #fff; }
-
+.sp-inline-input {
+    font-size: 0.75em; padding: 3px 6px; margin-left: -6px;
+    display: block;
+}
+.sp-inline-area {
+    font-size: 0.7em; padding: 4px 6px; margin-left: -6px;
+    resize: vertical; line-height: 1.4; color: #8a8aaa; min-height: 40px;
+    display: block;
+}
+.sp-inline-input:hover, .sp-inline-area:hover {
+    background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12);
+}
+.sp-inline-input:focus, .sp-inline-area:focus {
+    background: rgba(15,10,30,0.9); border-color: rgba(212,175,55,0.5); color: #fff;
+}
 .sp-inline-title {
-    font-size: 1.1em; font-weight: 700; color: #c0524a; margin-bottom: 4px; padding: 2px 4px;
+    font-size: 1.0em; font-weight: 700; color: #c0524a; padding: 2px 6px; margin-left: -6px;
 }
+select.sp-inline-input { cursor: pointer; }
 select.sp-inline-input option { background: #0d0c1a; color: #ccc; }
+input[type=number].sp-inline-input { -moz-appearance: textfield; }
+input[type=number].sp-inline-input::-webkit-outer-spin-button,
+input[type=number].sp-inline-input::-webkit-inner-spin-button { -webkit-appearance: none; }
 
 /* Botones de acción (ahora en la izquierda, pero si los necesitas aquí, se mantienen) */
 .sp-action-row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
@@ -653,7 +653,7 @@ body.drawer-open #hm-op-panel {
 #hm-toast.show { opacity: 1; }
 
 /* ══════════════════════════════════════
-   PANEL OP IZQUIERDO DESLIZABLE (AHORA MANUAL)
+   PANEL OP IZQUIERDO DESLIZABLE (manual, solo admins)
 ══════════════════════════════════════ */
 #hm-op-left {
     position: fixed; top: 44px; left: 0;
@@ -663,13 +663,10 @@ body.drawer-open #hm-op-panel {
     display: flex; flex-direction: column;
     z-index: 180;
     transform: translateX(-100%);
-    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), top 0.25s cubic-bezier(0.4,0,0.2,1), height 0.25s cubic-bezier(0.4,0,0.2,1);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
     overflow: hidden;
 }
 #hm-op-left.abierto { transform: translateX(0); }
-
-/* Cuando está abierto, baja para hacer espacio a la barra superior */
-body.op-panel-open #hm-op-left { top: 86px; height: calc(100vh - 86px - 32px); }
 
 #hm-op-left-header {
     display: flex; align-items: center; justify-content: space-between;

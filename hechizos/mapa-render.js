@@ -1,5 +1,5 @@
 // ============================================================
-// mapa-render.js — Render canvas, info bar
+// mapa-render.js — Render canvas, info bar y panel OP
 // /hechizos/mapa-render.js
 // ============================================================
 
@@ -38,7 +38,7 @@ export function centrarEnNodo(nodo) {
     const wrap = document.getElementById('hm-canvas-wrap');
     if (!wrap || !nodo) return;
     const W = wrap.clientWidth, H = wrap.clientHeight;
-    const z = Math.max(st.camara.zoom, 0.5); // no alejar demasiado
+    const z = Math.max(st.camara.zoom, 0.5);
     st.camara.zoom = z;
     st.camara.x = W/2 - nodo.x * z;
     st.camara.y = H/2 - nodo.y * z;
@@ -208,12 +208,10 @@ function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesio
         const esIrrel=hayEnfoque&&!enfoqRel.has(nodo)&&nodoSel!==nodo;
 
         let colorN, colorT;
-        // En modo multi-sel: nodos no seleccionados se muestran apagados con tinte
         const apagadoMulti = modoSelMulti && seleccionados.size > 0 && !enSelMulti && nodoSel !== nodo;
         if (esNuevo) {
             colorN=C.NUEVO; colorT=C.NUEVO;
         } else if (apagadoMulti) {
-            // Gris con tinte según si es conocido (violeta) o no (amarillo apagado)
             colorN = esDes ? 'rgba(100,90,130,0.45)' : 'rgba(100,95,70,0.38)';
             colorT = esDes ? 'rgba(130,120,160,0.5)' : 'rgba(120,115,85,0.45)';
         } else if (hayEnfoque) {
@@ -345,6 +343,8 @@ export function renderInfoBar(nodo) {
 
     if (!nodo) {
         el.innerHTML = '<span style="color:#444;">Clic en un hechizo para ver detalles</span>';
+        // Cerrar side panel derecho
+        import('./mapa-ui.js').then(m => m.renderSidePanel(null)).catch(()=>{});
         return;
     }
 
@@ -365,6 +365,16 @@ export function renderInfoBar(nodo) {
         parts.push('<span style="color:#2a2a3a;font-style:italic;">Sellado</span>');
     }
     el.innerHTML = parts.join('<span style="color:#1a1a2a;margin:0 5px;">·</span>');
+
+    // Abrir side panel DERECHO con info del nodo
+    import('./mapa-ui.js').then(m => {
+        m.renderSidePanel(nodo);
+    }).catch(()=>{});
+}
+
+// ── Panel OP (flotante legacy — mantenido para compatibilidad) ─
+export function renderOpPanel(nodo) {
+    // No-op: la UI se maneja desde el panel izquierdo y derecho
 }
 
 // ── Stats del info bar ────────────────────────────────────────
