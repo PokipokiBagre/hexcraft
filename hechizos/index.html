@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="hechizos.css">
+    <style>/* estilos inline adicionales */</style>
 </head>
 <body>
 
@@ -58,6 +59,14 @@
 <div id="hm-op-tools">
     </div>
 
+<div id="hm-side-panel">
+    <div id="hm-side-panel-header">
+        <span class="sp-titulo" id="sp-titulo-txt">Info Hechizo</span>
+        <button class="sp-close" onclick="window._hmCerrarSidePanel()">×</button>
+    </div>
+    <div id="hm-side-panel-body"></div>
+</div>
+
 <div id="hm-clipboard">
     <span class="clip-close" onclick="document.getElementById('hm-clipboard').classList.remove('visible')">×</span>
     <div id="hm-clipboard-content"></div>
@@ -65,18 +74,10 @@
 
 <div id="hm-op-left">
     <div id="hm-op-left-header">
-        <span id="hm-op-left-title">Panel OP</span>
+        <span id="hm-op-left-title">Opciones y Batch</span>
         <button id="hm-op-left-close" onclick="window._hmToggleOpLeft()">×</button>
     </div>
     <div id="hm-op-left-body"></div>
-</div>
-
-<div id="hm-side-panel">
-    <div id="hm-side-panel-header">
-        <span class="sp-titulo" id="sp-titulo-txt">Info Hechizo</span>
-        <button class="sp-close" onclick="window._hmCerrarSidePanel()">×</button>
-    </div>
-    <div id="hm-side-panel-body"></div>
 </div>
 
 <div id="hm-canvas-wrap">
@@ -91,6 +92,7 @@
     <div id="hm-drawer-inner">
         <div id="hm-drawer-nav">
             <button class="hm-dtab activo" id="dt-grimorio" onclick="window._hmDrawerTab('grimorio')">📖 Grimorio</button>
+            <button class="hm-dtab" id="dt-admin" style="display:none" onclick="window._hmDrawerTab('admin')">⚙ Admin</button>
         </div>
         <div id="hm-drawer-body">
             <div id="hm-pane-grimorio">
@@ -99,6 +101,8 @@
                 </div>
                 <div id="hm-grimorio-list"></div>
             </div>
+            <div id="hm-pane-admin" class="oculto">
+                </div>
         </div>
     </div>
 </div>
