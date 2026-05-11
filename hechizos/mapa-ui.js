@@ -250,24 +250,40 @@ window._hmConfirmarAsignar = async (id) => {
     const publicar = document.getElementById('op-asig-pub')?.checked;
     if (!pj) { toast('Selecciona un personaje'); return; }
 
+    // ── Calcular costo y validar HEX antes de asignar ────────
+    const { supabase } = await import('../hex-auth.js');
+    let hexGastado = 0;
+    let hexActual = null;
+    let hexRestante = null;
+
+    if (pct > 0 && nodo.hex > 0) {
+        hexGastado = Math.round(nodo.hex * pct / 100);
+        const { data: pjData } = await supabase.from('personajes').select('hex').eq('nombre', pj).single();
+        hexActual = pjData?.hex ?? 0;
+        if (hexGastado > 0 && hexActual < hexGastado) {
+            toast(`✘ ${pj} no tiene HEX suficiente (tiene ${hexActual}, necesita ${hexGastado})`);
+            return;
+        }
+    }
+
     const { ok, total, err } = await asignarHechizosAPJ([nodo.nombre], pj);
     if (err) { toast('Error: ' + err); return; }
 
-    let hexGastado = 0;
-    if (pct > 0 && ok > 0 && nodo.hex > 0) {
-        hexGastado = Math.round(nodo.hex * pct / 100);
-        const { supabase } = await import('../hex-auth.js');
-        const { data: pjData } = await supabase.from('personajes').select('hex').eq('nombre', pj).single();
-        if (pjData) await supabase.from('personajes').update({ hex: Math.max(0,(pjData.hex||0)-hexGastado) }).eq('nombre', pj);
+    if (hexGastado > 0 && ok > 0) {
+        hexRestante = hexActual - hexGastado;
+        await supabase.from('personajes').update({ hex: hexRestante }).eq('nombre', pj);
+    } else if (hexActual !== null) {
+        hexRestante = hexActual;
     }
+
     if (publicar) await toggleConocido(nodo.id, true);
 
-    // Guardar en portapapeles
-    st.clipboard = { pj, hechizos: [nodo.nombre], hexGastado, descubiertos: publicar ? [nodo.nombre] : [] };
+    const detalles = [{ nombre: nodo.nombre, hexBase: nodo.hex || 0, hexCobrado: hexGastado, pct }];
+    st.clipboard = { pj, hechizos: [nodo.nombre], hexGastado, descubiertos: publicar ? [nodo.nombre] : [], detalles, hexRestante, pct };
 
     const sec = document.getElementById('op-l-asignar-sec');
     if (sec) sec.innerHTML = '';
-    toast(`✓ ${nodo.nombre} asignado a ${pj}`);
+    toast(`✓ ${nodo.nombre} asignado a ${pj}${hexGastado > 0 ? ` · −${hexGastado} HEX` : ''}`);
     _renderOpLeft();
     if (st.nodoSel) renderSidePanel(st.nodoSel);
 };

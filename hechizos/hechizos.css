@@ -20,6 +20,7 @@ html, body {
     border-bottom: 1px solid rgba(212,175,55,0.18);
     display: flex; align-items: center; gap: 0;
     z-index: 200; flex-shrink: 0;
+    overflow: visible;
 }
 #hm-nav-left {
     display: flex; align-items: center; gap: 8px;
@@ -41,7 +42,7 @@ html, body {
 #hm-toolbar {
     display: flex; align-items: center; gap: 5px;
     padding: 0 10px; flex: 1; height: 100%;
-    overflow-x: auto; scrollbar-width: none;
+    overflow: visible; scrollbar-width: none;
 }
 #hm-toolbar::-webkit-scrollbar { display: none; }
 .hm-tab-sep {
@@ -158,6 +159,7 @@ html, body {
     position: fixed;
     top: 44px; left: 0; right: 0; bottom: 32px;
     overflow: hidden; cursor: grab;
+    z-index: 1;
     transition: left 0.25s cubic-bezier(0.4,0,0.2,1), right 0.25s cubic-bezier(0.4,0,0.2,1);
 }
 #hm-canvas-wrap:active { cursor: grabbing; }
