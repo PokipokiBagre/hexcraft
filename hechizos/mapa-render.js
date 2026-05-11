@@ -172,8 +172,8 @@ function _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, en
         else if (sP||tP)        { color='rgba(0,200,240,0.3)'; lw=1.2/sf; }
         else if (sD&&tD)        { color=C.L_POS; lw=1.4/sf; }
         else if (sD&&tA)        { color=C.L_APR; lw=1.1/sf; }
-        else if (esTodos)       { color='rgba(120,110,160,0.45)'; lw=1/sf; }
-        else if (!e.target.esConocido&&!tA) { dash=[6/sf,5/sf]; }
+        else if (esTodos)       { color='rgba(170,155,100,0.35)'; lw=1/sf; }
+        else if (!e.target.esConocido&&!tA) { color='rgba(170,155,100,0.2)'; dash=[6/sf,5/sf]; }
 
         // ── Override en modo eliminar flecha ──
         if (modoEliminarFlecha) {
@@ -232,11 +232,11 @@ function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesio
         } else if (esPos&&!esTodos) {
             colorN=C.PJ; colorT=C.PJ;
         } else if (esTodos) {
-            colorN=esDes?C.POS:esApr?C.APR:'rgba(180,165,110,0.45)';
-            colorT=esDes?C.POS:esApr?C.APR:'rgba(190,175,120,0.55)';
+            colorN=esDes?C.POS:esApr?C.APR:'rgba(100,95,130,0.7)';
+            colorT=esDes?C.POS:esApr?C.APR:'rgba(160,155,175,0.9)';
         } else {
-            colorN=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(180,165,110,0.38)';
-            colorT=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(190,175,120,0.5)';
+            colorN=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(80,75,105,0.75)';
+            colorT=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(160,155,175,0.9)';
         }
 
         ctx.globalAlpha = (esIrrel || apagadoMulti) ? (apagadoMulti ? 0.55 : 0.4) : 1.0;
