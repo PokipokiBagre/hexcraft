@@ -9,19 +9,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="hechizos.css">
-    <style>/* estilos inline adicionales */
-    </style>
 </head>
 <body>
 
-<!-- ══════════════ NAV ══════════════ -->
 <nav id="hm-nav">
     <div id="hm-nav-left">
         <a id="hm-back" href="../index.html">← Inicio</a>
         <span id="hm-title">✦ Hechizos</span>
     </div>
 
-    <!-- Buscador central -->
     <div id="hm-search-bar">
         <input id="hm-search-central" type="text" autocomplete="off" spellcheck="false"
             placeholder="Buscar hechizo… nombre, afinidad o número (ej: 7)"
@@ -29,30 +25,29 @@
     </div>
 
     <div id="hm-toolbar">
-        <!-- Centrar -->
+        <button class="hm-btn gold" id="btn-toggle-op" style="display:none;" onclick="window._hmToggleOpLeft()">⚙ Panel OP</button>
+
         <button class="hm-btn" onclick="window._hmCentrar()" title="Centrar vista">⊙ Centrar</button>
         <div class="hm-tab-sep"></div>
 
-        <!-- Pool jugadores -->
         <div class="hm-pj-pool-wrap" id="pool-jugadores-wrap">
             <button class="hm-pj-pool-btn" id="pool-jug-btn" onclick="window._hmTogglePool('jugadores')">
                 👤 Jugadores <span style="font-size:0.8em;opacity:0.5;">▾</span>
             </button>
             <div class="hm-pj-pool-dropdown" id="pool-jugadores-drop">
                 <div class="hm-pool-title">Jugadores</div>
-                <div class="hm-pool-grid" id="pool-jug-grid"><!-- JS --></div>
+                <div class="hm-pool-grid" id="pool-jug-grid"></div>
                 <button class="hm-pool-todos" onclick="window._hmCambiarPJ('Todos');window._hmCerrarPools()">Todos / limpiar filtro</button>
             </div>
         </div>
 
-        <!-- Pool NPCs -->
         <div class="hm-pj-pool-wrap" id="pool-npcs-wrap">
             <button class="hm-pj-pool-btn" id="pool-npc-btn" onclick="window._hmTogglePool('npcs')">
                 🤖 NPCs <span style="font-size:0.8em;opacity:0.5;">▾</span>
             </button>
             <div class="hm-pj-pool-dropdown" id="pool-npcs-drop">
                 <div class="hm-pool-title">NPCs</div>
-                <div class="hm-pool-grid" id="pool-npc-grid"><!-- JS --></div>
+                <div class="hm-pool-grid" id="pool-npc-grid"></div>
             </div>
         </div>
 
@@ -60,29 +55,34 @@
     </div>
 </nav>
 
-<!-- Panel lateral derecho eliminado — reemplazado por panel OP izquierdo -->
+<div id="hm-op-tools">
+    </div>
 
-<!-- Portapapeles de operación -->
 <div id="hm-clipboard">
     <span class="clip-close" onclick="document.getElementById('hm-clipboard').classList.remove('visible')">×</span>
-    <div id="hm-clipboard-content"><!-- JS --></div>
+    <div id="hm-clipboard-content"></div>
 </div>
 
-<!-- ══════════════ PANEL OP IZQUIERDO ══════════════ -->
 <div id="hm-op-left">
     <div id="hm-op-left-header">
-        <span id="hm-op-left-title">Hechizo</span>
-        <button id="hm-op-left-close" onclick="window._hmCerrarOpLeft()">×</button>
+        <span id="hm-op-left-title">Panel OP</span>
+        <button id="hm-op-left-close" onclick="window._hmToggleOpLeft()">×</button>
     </div>
-    <div id="hm-op-left-body"><!-- JS --></div>
+    <div id="hm-op-left-body"></div>
 </div>
 
-<!-- ══════════════ CANVAS ══════════════ -->
+<div id="hm-side-panel">
+    <div id="hm-side-panel-header">
+        <span class="sp-titulo" id="sp-titulo-txt">Info Hechizo</span>
+        <button class="sp-close" onclick="window._hmCerrarSidePanel()">×</button>
+    </div>
+    <div id="hm-side-panel-body"></div>
+</div>
+
 <div id="hm-canvas-wrap">
     <canvas id="hm-canvas"></canvas>
 </div>
 
-<!-- ══════════════ DRAWER DESLIZABLE ══════════════ -->
 <button id="hm-drawer-tab" onclick="window._hmToggleDrawer()">
     ✦ Grimorio <span class="dt-arrow">▲</span>
 </button>
@@ -91,25 +91,18 @@
     <div id="hm-drawer-inner">
         <div id="hm-drawer-nav">
             <button class="hm-dtab activo" id="dt-grimorio" onclick="window._hmDrawerTab('grimorio')">📖 Grimorio</button>
-            <button class="hm-dtab" id="dt-admin" style="display:none" onclick="window._hmDrawerTab('admin')">⚙ Admin</button>
         </div>
         <div id="hm-drawer-body">
-            <!-- Pane Grimorio -->
             <div id="hm-pane-grimorio">
                 <div id="hm-search-wrap">
                     <input id="hm-search" type="text" placeholder="Buscar hechizo…" oninput="window._hmBuscar(this.value)" autocomplete="off" spellcheck="false">
                 </div>
                 <div id="hm-grimorio-list"></div>
             </div>
-            <!-- Pane Admin -->
-            <div id="hm-pane-admin" class="oculto">
-                <!-- renderDrawerAdmin() lo rellena -->
-            </div>
         </div>
     </div>
 </div>
 
-<!-- ══════════════ INFO BAR ══════════════ -->
 <div id="hm-info-bar">
     <span id="hm-info-nodo" style="color:#444;">Clic en un hechizo para ver detalles</span>
     <span id="hm-info-stats"></span>
