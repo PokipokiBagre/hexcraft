@@ -158,6 +158,7 @@ html, body {
     position: fixed;
     top: 44px; left: 0; right: 0; bottom: 32px;
     overflow: hidden; cursor: grab;
+    z-index: 1;
     transition: left 0.25s cubic-bezier(0.4,0,0.2,1), right 0.25s cubic-bezier(0.4,0,0.2,1);
 }
 #hm-canvas-wrap:active { cursor: grabbing; }
