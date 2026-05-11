@@ -3,7 +3,7 @@
 // /hechizos/mapa-main.js
 // ============================================================
 
-import { supabase } from '../hex-auth.js';
+import { supabase, currentConfig } from '../hex-auth.js';
 import { st } from './mapa-state.js';
 import { cargarDatos, cargarInventarioPJ, calcSetsGlobales } from './mapa-data.js';
 import { redimensionar, centrarCamara, iniciarLoop, renderInfoStats } from './mapa-render.js';
@@ -14,6 +14,9 @@ async function init() {
     // ── Canvas ───────────────────────────────────────────────
     st.canvas = document.getElementById('hm-canvas');
     st.ctx    = st.canvas.getContext('2d');
+
+    // ── Exponer currentConfig globalmente (para _sb() en mapa-ui.js) ──
+    window.currentConfig = currentConfig;
 
     // ── Detectar rol (admin) + favicon ───────────────────────
     try {
