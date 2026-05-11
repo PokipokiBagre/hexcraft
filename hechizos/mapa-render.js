@@ -1,5 +1,5 @@
 // ============================================================
-// mapa-render.js — Render canvas, info bar y panel OP
+// mapa-render.js — Render canvas, info bar
 // /hechizos/mapa-render.js
 // ============================================================
 
@@ -345,9 +345,6 @@ export function renderInfoBar(nodo) {
 
     if (!nodo) {
         el.innerHTML = '<span style="color:#444;">Clic en un hechizo para ver detalles</span>';
-        // Panel OP flotante desactivado — todo está en el panel izquierdo
-        // renderOpPanel(null);
-        import('./mapa-ui.js').then(m => m.cerrarOpPanel()).catch(()=>{});
         return;
     }
 
@@ -368,70 +365,6 @@ export function renderInfoBar(nodo) {
         parts.push('<span style="color:#2a2a3a;font-style:italic;">Sellado</span>');
     }
     el.innerHTML = parts.join('<span style="color:#1a1a2a;margin:0 5px;">·</span>');
-
-    // Abrir panel OP izquierdo con detalles
-    import('./mapa-ui.js').then(m => {
-        if (nodo) {
-            const title = document.getElementById('hm-op-left-title');
-            if (title) title.textContent = (nodo.esConocido||st.esAdmin) ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
-            m.abrirOpPanel(nodo);
-        } else {
-            m.cerrarOpPanel();
-        }
-    }).catch(()=>{});
-
-    // Panel OP flotante desactivado — todo está en el panel izquierdo
-    // renderOpPanel(nodo);
-}
-
-// ── Panel OP (flotante sobre info bar) ───────────────────────
-export function renderOpPanel(nodo) {
-    const panel = document.getElementById('hm-op-panel');
-    if (!panel) return;
-
-    if (!nodo) {
-        panel.classList.remove('visible');
-        panel.innerHTML = '';
-        return;
-    }
-
-    const esPosesion = st.posesiones.has(nodo);
-    const mostrar    = nodo.esConocido || esPosesion || st.esAdmin;
-    const color      = (st.colores[nodo.afinidad] || {}).t || '#888';
-    const nombre     = mostrar ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
-    const safe       = nodo.id.replace(/'/g, "\\'");
-
-    let html = `<span class="op-nombre" style="color:${color}">${nombre}</span>`;
-
-    if (mostrar) {
-        html += `<span class="op-sep"></span>`;
-        html += `<span class="op-meta">${nodo.afinidad} · Cl.${nodo.clase}</span>`;
-        if (nodo.hex > 0) html += `<span class="op-chip op-chip-hex">⬡${nodo.hex} HEX</span>`;
-        if (nodo.vex > 0) html += `<span class="op-chip op-chip-vex">⬡${nodo.vex} VEX</span>`;
-        if (esPosesion)   html += `<span class="op-chip op-chip-pos">✓ Aprendido</span>`;
-        if (nodo.nota)    html += `<span class="op-chip op-chip-nota">📌 ${nodo.nota}</span>`;
-
-        if (st.esAdmin) {
-            html += `<span class="op-sep"></span>`;
-            html += `<button class="op-btn ${nodo.esConocido ? 'conocido-on' : 'conocido-off'}"
-                        onclick="window._hmToggleConocido('${safe}',${!nodo.esConocido})">
-                        ${nodo.esConocido ? '🔒 Ocultar' : '👁 Publicar'}
-                    </button>`;
-            html += `<button class="op-btn editar" onclick="window._hmModalPropiedades()">⚙ Propiedades</button>`;
-            html += `<button class="op-btn asignar" onclick="window._hmModalAsignarPJ()">👤 Asignar PJ</button>`;
-            if (nodo.esNuevo)
-                html += `<button class="op-btn descartar" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar</button>`;
-        }
-    } else {
-        html += `<span class="op-sep"></span>`;
-        html += `<span class="op-meta" style="color:#2a2a3a;font-style:italic;">Sellado — sin acceso</span>`;
-    }
-
-    html += `<span class="op-sep"></span>`;
-    html += `<button class="op-btn cerrar" onclick="window._hmCerrarOpPanel()">✕</button>`;
-
-    panel.innerHTML = html;
-    panel.classList.add('visible');
 }
 
 // ── Stats del info bar ────────────────────────────────────────
