@@ -72,7 +72,7 @@ export async function abrirMinimapa(nombrePJ, esAdmin, onNodoClick) {
 
     await _cargarDatos();
     _calcularSetsGlobales();
-    await _calcularVista(_estado.jugadorPanel);
+    _calcularVista(_estado.jugadorPanel);
     _actualizarSelector();
 
     // Esperar un frame para que el flexbox haya calculado las dimensiones
@@ -136,13 +136,13 @@ function _inyectarPanel() {
     // Selector de jugador
     const sel = document.getElementById('pmh-pj-selector');
     if (sel) {
-        sel.addEventListener('change', async () => {
+        sel.addEventListener('change', () => {
             _estado.jugadorPanel = sel.value;
             if (_estado.jugadorPanel === 'Todos') {
                 _estado.posesiones = new Set();
                 _estado.rastreo    = new Set();
             } else {
-                await _calcularVista(_estado.jugadorPanel);
+                _calcularVista(_estado.jugadorPanel);
             }
             _centrarCamara();
         });
@@ -397,8 +397,8 @@ async function _cargarInventarioPJ(nombre) {
     _estado.posesiones.forEach(n => rastrear(n));
 }
 
-async function _calcularVista(nombre) {
-    await _cargarInventarioPJ(nombre);
+function _calcularVista(nombre) {
+    _cargarInventarioPJ(nombre); // async, actualiza sets en background
 }
 
 // Calcula sets basados en esConocido (global, independiente del PJ)
@@ -601,9 +601,9 @@ function _dibujar() {
         } else if (sD && tA) {
             color = COLOR_LINEA_APR; lw = 1.1 / sf;
         } else if (_estado.jugadorPanel === 'Todos') {
-            color = 'rgba(120,110,160,0.45)'; lw = 1.0 / sf;
+            color = 'rgba(170,155,100,0.35)'; lw = 1.0 / sf;
         } else if (!e.target.esConocido && !tA) {
-            dash = [6/sf, 5/sf]; color = COLOR_LINEA_OCULTA;
+            dash = [6/sf, 5/sf]; color = 'rgba(170,155,100,0.2)';
         }
 
         ctx.globalAlpha = alpha;
