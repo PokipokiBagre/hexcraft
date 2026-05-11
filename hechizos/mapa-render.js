@@ -232,11 +232,11 @@ function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesio
         } else if (esPos&&!esTodos) {
             colorN=C.PJ; colorT=C.PJ;
         } else if (esTodos) {
-            colorN=esDes?C.POS:esApr?C.APR:'rgba(100,95,130,0.7)';
-            colorT=esDes?C.POS:esApr?C.APR:'rgba(160,155,175,0.9)';
+            colorN=esDes?C.POS:esApr?C.APR:'rgba(180,165,110,0.45)';
+            colorT=esDes?C.POS:esApr?C.APR:'rgba(190,175,120,0.55)';
         } else {
-            colorN=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(80,75,105,0.75)';
-            colorT=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(160,155,175,0.9)';
+            colorN=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(180,165,110,0.38)';
+            colorT=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(190,175,120,0.5)';
         }
 
         ctx.globalAlpha = (esIrrel || apagadoMulti) ? (apagadoMulti ? 0.55 : 0.4) : 1.0;
