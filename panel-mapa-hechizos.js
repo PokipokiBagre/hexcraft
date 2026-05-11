@@ -72,7 +72,7 @@ export async function abrirMinimapa(nombrePJ, esAdmin, onNodoClick) {
 
     await _cargarDatos();
     _calcularSetsGlobales();
-    _calcularVista(_estado.jugadorPanel);
+    await _calcularVista(_estado.jugadorPanel);
     _actualizarSelector();
 
     // Esperar un frame para que el flexbox haya calculado las dimensiones
@@ -136,13 +136,13 @@ function _inyectarPanel() {
     // Selector de jugador
     const sel = document.getElementById('pmh-pj-selector');
     if (sel) {
-        sel.addEventListener('change', () => {
+        sel.addEventListener('change', async () => {
             _estado.jugadorPanel = sel.value;
             if (_estado.jugadorPanel === 'Todos') {
                 _estado.posesiones = new Set();
                 _estado.rastreo    = new Set();
             } else {
-                _calcularVista(_estado.jugadorPanel);
+                await _calcularVista(_estado.jugadorPanel);
             }
             _centrarCamara();
         });
@@ -397,8 +397,8 @@ async function _cargarInventarioPJ(nombre) {
     _estado.posesiones.forEach(n => rastrear(n));
 }
 
-function _calcularVista(nombre) {
-    _cargarInventarioPJ(nombre); // async, actualiza sets en background
+async function _calcularVista(nombre) {
+    await _cargarInventarioPJ(nombre);
 }
 
 // Calcula sets basados en esConocido (global, independiente del PJ)
