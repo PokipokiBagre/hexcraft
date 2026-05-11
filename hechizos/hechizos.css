@@ -147,15 +147,39 @@ html, body {
 .hm-pool-todos:hover { color: #ccc; background: rgba(255,255,255,0.07); }
 
 /* ══════════════════════════════════════
+   HERRAMIENTAS OP (NUEVA BARRA TOP)
+══════════════════════════════════════ */
+#hm-op-tools {
+    position: fixed; top: 44px; left: 0; right: 0; height: 42px;
+    background: rgba(12,8,24,0.98);
+    border-bottom: 1px solid rgba(212,175,55,0.25);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    z-index: 190;
+    transform: translateY(-100%);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+body.op-panel-open #hm-op-tools { transform: translateY(0); }
+
+.tool-group {
+    display: flex; gap: 5px; padding: 0 10px; border-right: 1px solid rgba(255,255,255,0.08);
+}
+.tool-group:last-child { border-right: none; }
+
+/* ══════════════════════════════════════
    CANVAS
 ══════════════════════════════════════ */
 #hm-canvas-wrap {
     position: fixed;
     top: 44px; left: 0; right: 0; bottom: 32px;
     overflow: hidden; cursor: grab;
+    transition: left 0.25s cubic-bezier(0.4,0,0.2,1), right 0.25s cubic-bezier(0.4,0,0.2,1), top 0.25s cubic-bezier(0.4,0,0.2,1);
 }
 #hm-canvas-wrap:active { cursor: grabbing; }
 #hm-canvas { display: block; width: 100%; height: 100%; }
+
+/* Desplazamientos automáticos al abrir paneles */
+body.op-panel-open #hm-canvas-wrap { left: 300px; top: 86px; }
+body.side-panel-open #hm-canvas-wrap { right: 300px; }
 
 /* ══════════════════════════════════════
    DRAWER INFERIOR DESLIZABLE
@@ -173,7 +197,7 @@ html, body {
     font-size: 0.6em; color: #8a7a50;
     cursor: pointer; white-space: nowrap;
     font-family: 'Cinzel', serif; letter-spacing: 1px;
-    transition: color 0.15s, background 0.15s;
+    transition: color 0.15s, background 0.15s, left 0.25s cubic-bezier(0.4,0,0.2,1), transform 0.25s cubic-bezier(0.4,0,0.2,1);
     user-select: none;
 }
 #hm-drawer-tab:hover { color: #d4af37; background: rgba(20,15,35,0.98); }
@@ -187,11 +211,15 @@ html, body {
     height: 0;
     overflow: hidden;
     z-index: 110;
-    transition: height 0.25s cubic-bezier(0.4,0,0.2,1);
+    transition: height 0.25s cubic-bezier(0.4,0,0.2,1), left 0.25s cubic-bezier(0.4,0,0.2,1);
     background: rgba(8,6,18,0.98);
     border-top: 1px solid rgba(212,175,55,0.15);
 }
 #hm-drawer.open { height: min(56vh, 480px); }
+
+/* Ajuste del drawer si el panel izquierdo OP está abierto */
+body.op-panel-open #hm-drawer { left: 300px; }
+body.op-panel-open #hm-drawer-tab { left: calc(300px + 50%); transform: translateX(-50%); }
 
 #hm-drawer-inner {
     display: flex; flex-direction: column;
@@ -331,7 +359,7 @@ html, body {
 .adm-fila { display: flex; flex-wrap: wrap; gap: 5px; }
 
 /* ══════════════════════════════════════
-   PANEL LATERAL DERECHO
+   PANEL LATERAL DERECHO (INFO Y EDICIÓN INLINE)
 ══════════════════════════════════════ */
 #hm-side-panel {
     position: fixed; top: 44px; right: 0;
@@ -346,6 +374,7 @@ html, body {
 }
 #hm-side-panel.abierto { transform: translateX(0); }
 
+/* Cuando está abierto, empuja el canvas */
 body.side-panel-open #hm-canvas-wrap { right: 300px; }
 
 #hm-side-panel-header {
@@ -393,11 +422,30 @@ body.side-panel-open #hm-canvas-wrap { right: 300px; }
     padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 
-.sp-desc-field { margin-bottom: 7px; }
-.sp-desc-label { font-size: 0.6em; font-weight: 700; color: #d4af37; letter-spacing: 0.8px; text-transform: uppercase; }
-.sp-desc-val   { font-size: 0.7em; color: #8a8aaa; line-height: 1.5; margin-top: 2px; }
+.sp-desc-field { margin-bottom: 9px; }
+.sp-desc-label { font-size: 0.55em; font-weight: 700; color: #d4af37; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 2px; }
+.sp-desc-val   { font-size: 0.7em; color: #8a8aaa; line-height: 1.5; }
+.sp-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-/* Botones de acción */
+/* -- ESTILOS DE EDICIÓN INLINE (Parece texto hasta que haces clic) -- */
+.sp-inline-input, .sp-inline-area {
+    background: transparent; border: 1px solid transparent; border-radius: 4px;
+    color: #e0d8f0; font-family: inherit; width: 100%;
+    transition: background 0.15s, border-color 0.15s;
+    outline: none;
+}
+.sp-inline-input { font-size: 0.75em; padding: 3px 4px; margin-left: -4px; }
+.sp-inline-area { font-size: 0.7em; padding: 4px; margin-left: -4px; resize: vertical; line-height: 1.4; color: #8a8aaa; }
+
+.sp-inline-input:hover, .sp-inline-area:hover { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1); }
+.sp-inline-input:focus, .sp-inline-area:focus { background: rgba(15,10,30,0.9); border-color: rgba(212,175,55,0.5); color: #fff; }
+
+.sp-inline-title {
+    font-size: 1.1em; font-weight: 700; color: #c0524a; margin-bottom: 4px; padding: 2px 4px;
+}
+select.sp-inline-input option { background: #0d0c1a; color: #ccc; }
+
+/* Botones de acción (ahora en la izquierda, pero si los necesitas aquí, se mantienen) */
 .sp-action-row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
 .sp-btn {
     font-size: 0.62em; padding: 5px 11px; border-radius: 5px;
@@ -426,7 +474,9 @@ body.side-panel-open #hm-canvas-wrap { right: 300px; }
     display: none; flex-shrink: 0;
 }
 
-/* Portapapeles */
+/* ══════════════════════════════════════
+   PORTAPAPELES
+══════════════════════════════════════ */
 #hm-clipboard {
     position: fixed; bottom: 36px; right: 308px;
     max-width: 320px; width: max-content;
@@ -603,7 +653,7 @@ body.drawer-open #hm-op-panel {
 #hm-toast.show { opacity: 1; }
 
 /* ══════════════════════════════════════
-   PANEL OP IZQUIERDO DESLIZABLE
+   PANEL OP IZQUIERDO DESLIZABLE (AHORA MANUAL)
 ══════════════════════════════════════ */
 #hm-op-left {
     position: fixed; top: 44px; left: 0;
@@ -613,15 +663,13 @@ body.drawer-open #hm-op-panel {
     display: flex; flex-direction: column;
     z-index: 180;
     transform: translateX(-100%);
-    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), top 0.25s cubic-bezier(0.4,0,0.2,1), height 0.25s cubic-bezier(0.4,0,0.2,1);
     overflow: hidden;
 }
 #hm-op-left.abierto { transform: translateX(0); }
 
-/* Cuando el panel está abierto, el canvas se desplaza */
-body.op-panel-open #hm-canvas-wrap { left: 300px; }
-body.op-panel-open #hm-drawer      { left: 300px; }
-body.op-panel-open #hm-drawer-tab  { left: calc(300px + 50%); transform: translateX(-50%); }
+/* Cuando está abierto, baja para hacer espacio a la barra superior */
+body.op-panel-open #hm-op-left { top: 86px; height: calc(100vh - 86px - 32px); }
 
 #hm-op-left-header {
     display: flex; align-items: center; justify-content: space-between;
