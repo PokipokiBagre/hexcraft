@@ -1,5 +1,5 @@
 // ============================================================
-// mapa-ui.js — Toolbar, drawer, grimorio, panel OP izquierdo
+// mapa-ui.js — Toolbar, drawer, grimorio, panel OP izquierdo y Side Panel
 // /hechizos/mapa-ui.js
 // ============================================================
 
@@ -10,7 +10,7 @@ import {
     aplicarPropiedades, asignarHechizosAPJ,
     recargarDatos,
 } from './mapa-data.js';
-import { centrarCamara, centrarEnNodo, renderInfoBar, renderInfoStats, renderOpPanel } from './mapa-render.js';
+import { centrarCamara, centrarEnNodo, renderInfoBar, renderInfoStats } from './mapa-render.js';
 
 // ── Helpers ─────────────────────────────────────────────────
 const _norm = (s) => s ? s.toString().trim().toLowerCase()
@@ -40,244 +40,64 @@ export function actualizarBadgeSel() {
     const n = st.seleccionados.size;
     b.style.display = n > 0 ? 'inline' : 'none';
     b.textContent   = `${n} sel.`;
-    // Refrescar panel OP si está abierto en tab sel
+    // Refrescar panel OP si está abierto
     _refrescarOpPanel();
 }
 
+
 // ══════════════════════════════════════════════════════════════
-//  PANEL OP IZQUIERDO — deslizable, sin popups
+//  ACTUALIZACIÓN INLINE LOCAL Y GUARDADO DB
 // ══════════════════════════════════════════════════════════════
-let _opNodo = null; // nodo activo en el panel
+window._hmUpdateLocal = (field, el) => {
+    if (!st.nodoSel || !st.esAdmin) return;
+    let val = el.type === 'checkbox' ? el.checked : el.value;
+    if (['hex', 'vex', 'backcast', 'nextcast'].includes(field)) val = parseInt(val) || 0;
+    
+    st.nodoSel[field] = val;
+    st.nodoSel._dirty = true;
 
-export function abrirOpPanel(nodo) {
-    _opNodo = nodo;
-    const panel = document.getElementById('hm-op-left');
-    if (!panel) return;
-    panel.classList.add('abierto');
-    document.body.classList.add('op-panel-open');
-    _renderOpLeft();
-}
-
-export function cerrarOpPanel() {
-    _opNodo = null;
-    const panel = document.getElementById('hm-op-left');
-    if (!panel) return;
-    panel.classList.remove('abierto');
-    document.body.classList.remove('op-panel-open');
-}
-
-function _refrescarOpPanel() {
-    const panel = document.getElementById('hm-op-left');
-    if (!panel || !panel.classList.contains('abierto')) return;
-    _renderOpLeft();
-}
-
-function _renderOpLeft() {
-    const body = document.getElementById('hm-op-left-body');
-    if (!body) return;
-    const nodo = _opNodo;
-    if (!nodo) { cerrarOpPanel(); return; }
-
-    const esPosesion = st.posesiones.has(nodo);
-    const mostrar    = nodo.esConocido || esPosesion || st.esAdmin;
-    const color      = (st.colores[nodo.afinidad] || {}).t || '#888';
-    const safe       = nodo.id.replace(/'/g,"\\'");
-
-    // ── Sección: Identidad ──
-    const chips = [];
-    if (mostrar) {
-        chips.push(`<span class="op-l-chip" style="color:${color};border-color:${color}44;">${nodo.afinidad}</span>`);
-        chips.push(`<span class="op-l-chip">Cl.${nodo.clase}</span>`);
-        if (nodo.hex > 0) chips.push(`<span class="op-l-chip op-l-hex">⬡${nodo.hex} HEX</span>`);
-        if (nodo.vex > 0) chips.push(`<span class="op-l-chip op-l-vex">⬡${nodo.vex} VEX</span>`);
-        if (esPosesion)   chips.push(`<span class="op-l-chip op-l-pos">✓ Aprendido</span>`);
-        if (nodo.esEstado)   chips.push(`<span class="op-l-chip op-l-est">Estado</span>`);
-        if (nodo.esPrioridad)chips.push(`<span class="op-l-chip op-l-pri">↑ Prioridad</span>`);
-        if (nodo.afectaUsuario)  chips.push(`<span class="op-l-chip op-l-afx">👤 Usuario</span>`);
-        if (nodo.afectaObjetivo) chips.push(`<span class="op-l-chip op-l-afx">🎯 Objetivo</span>`);
-        if (nodo.afectaHechizos) chips.push(`<span class="op-l-chip op-l-afx">✦ Hechizos</span>`);
+    // Reflejo visual inmediato si afecta diseño base
+    if (['nombre', 'esConocido', 'afinidad', 'clase', 'hex', 'vex'].includes(field)) {
+        renderInfoBar(st.nodoSel);
+        calcSetsGlobales();
+        renderGrimorio(document.getElementById('hm-search-central')?.value || '');
     }
+};
 
-    // ── Sección: Campos de texto ──
-    const campos = mostrar ? [
-        { label:'RESUMEN',   val: nodo.resumen },
-        { label:'EFECTO',    val: nodo.efecto },
-        { label:'OVERCAST',  val: nodo.overcast },
-        { label:'UNDERCAST', val: nodo.undercast },
-        { label:'ESPECIAL',  val: nodo.especial },
-        { label:'NOTA',      val: nodo.nota },
-    ].filter(c => c.val) : [];
-
-    // ── Sección: Admin ──
-    let adminHtml = '';
-    if (st.esAdmin) {
-        const nSel = st.seleccionados.size;
-        const afinOpts = Object.keys(st.colores).map(a=>`<option value="${a}">${a}</option>`).join('');
-
-        adminHtml = `
-        <div class="op-l-sep"></div>
-        <div class="op-l-section-title">ACCIONES OP</div>
-        <div class="op-l-row">
-            <button class="op-l-btn ${nodo.esConocido?'op-l-warn':'op-l-gold'}"
-                onclick="window._hmToggleConocido('${safe}',${!nodo.esConocido})">
-                ${nodo.esConocido ? '🔒 Ocultar' : '👁 Publicar'}
-            </button>
-            <button class="op-l-btn op-l-green" onclick="window._hmModalAsignarPJLeft()">👤 Asignar a PJ</button>
-            ${esPosesion && st.jugadorPanel !== 'Todos' ?
-              `<button class="op-l-btn op-l-danger" onclick="window._hmQuitarDePJ('${safe}')">✕ Quitar de ${st.jugadorPanel}</button>` : ''}
-            ${nodo.esNuevo ?
-              `<button class="op-l-btn op-l-danger" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar nodo</button>` : ''}
-        </div>
-
-        <div class="op-l-sep"></div>
-        <div class="op-l-section-title">EDITAR HECHIZO</div>
-        <div class="op-l-edit-form" id="op-l-edit-form" data-id="${nodo.id}">
-            <div class="op-l-field-row">
-                <label>Nombre</label>
-                <input id="op-ed-nombre" value="${(nodo.nombre||'').replace(/"/g,'&quot;')}" placeholder="Nombre">
-            </div>
-            <div class="op-l-field-row">
-                <label>ID</label>
-                <input id="op-ed-id" value="${nodo.id}" ${nodo.esNuevo?'':'readonly style="opacity:0.4"'}>
-            </div>
-            <div class="op-l-field-row-2">
-                <div>
-                    <label>Clase</label>
-                    <select id="op-ed-clase">
-                        ${['1','2','3','4','5'].map(c=>`<option value="${c}" ${nodo.clase==c?'selected':''}>${c}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label>Afinidad</label>
-                    <select id="op-ed-afin">
-                        <option value="">—</option>
-                        ${afinOpts}
-                    </select>
-                </div>
-                <div>
-                    <label>HEX</label>
-                    <input id="op-ed-hex" type="number" value="${nodo.hex||0}" min="0">
-                </div>
-                <div>
-                    <label>VEX</label>
-                    <input id="op-ed-vex" type="number" value="${nodo.vex||0}" min="0">
-                </div>
-            </div>
-            <div class="op-l-field-row">
-                <label>Resumen</label>
-                <textarea id="op-ed-resumen" rows="2">${nodo.resumen||''}</textarea>
-            </div>
-            <div class="op-l-field-row">
-                <label>Efecto</label>
-                <textarea id="op-ed-efecto" rows="3">${nodo.efecto||''}</textarea>
-            </div>
-            <div class="op-l-field-row">
-                <label>Overcast</label>
-                <textarea id="op-ed-overcast" rows="2">${nodo.overcast||''}</textarea>
-            </div>
-            <div class="op-l-field-row">
-                <label>Undercast</label>
-                <textarea id="op-ed-undercast" rows="2">${nodo.undercast||''}</textarea>
-            </div>
-            <div class="op-l-field-row">
-                <label>Especial</label>
-                <textarea id="op-ed-especial" rows="2">${nodo.especial||''}</textarea>
-            </div>
-            <div class="op-l-field-row">
-                <label>Nota</label>
-                <input id="op-ed-nota" value="${(nodo.nota||'').replace(/"/g,'&quot;')}">
-            </div>
-            <div class="op-l-checks">
-                <label><input type="checkbox" id="op-ed-conocido" ${nodo.esConocido?'checked':''}> Conocido (publicado)</label>
-                <label><input type="checkbox" id="op-ed-estado" ${nodo.esEstado?'checked':''}> Hechizo-Estado</label>
-                <label><input type="checkbox" id="op-ed-prio" ${nodo.esPrioridad?'checked':''}> Prioridad</label>
-                <label><input type="checkbox" id="op-ed-afxusr" ${nodo.afectaUsuario?'checked':''}> Afecta Usuario</label>
-                <label><input type="checkbox" id="op-ed-afxobj" ${nodo.afectaObjetivo?'checked':''}> Afecta Objetivo</label>
-                <label><input type="checkbox" id="op-ed-afxhz" ${nodo.afectaHechizos?'checked':''}> Afecta Hechizos</label>
-            </div>
-            <div class="op-l-row" style="margin-top:8px;">
-                <button class="op-l-btn op-l-gold" onclick="window._hmGuardarHechizo()">💾 Guardar en DB</button>
-            </div>
-        </div>
-
-        <div class="op-l-sep"></div>
-        <div class="op-l-section-title">MULTI-SELECCIÓN ${nSel > 0 ? `(${nSel} sel.)` : ''}</div>
-        <div class="op-l-row">
-            <button class="op-l-btn ${st.modoSelMulti?'op-l-active':''}"
-                onclick="window._hmToggleMulti()">
-                ${st.modoSelMulti ? '☑ Multi-sel activo' : '☐ Multi-sel'}
-            </button>
-            ${nSel > 0 ? `
-            <button class="op-l-btn op-l-warn" onclick="window._hmLimpiarSel()">✕ Limpiar sel.</button>` : ''}
-        </div>
-        ${nSel > 0 ? `
-        <div class="op-l-row" style="margin-top:6px;">
-            <button class="op-l-btn op-l-green" onclick="window._hmBatchAsignarLeft()">👤 Asignar batch (${nSel})</button>
-            <button class="op-l-btn" onclick="window._hmBatchPropsLeft()">⚙ Props batch</button>
-        </div>
-        <div id="op-l-batch-form"></div>` : ''}
-
-        <div class="op-l-sep"></div>
-        <div class="op-l-section-title">HERRAMIENTAS OP</div>
-        <div class="op-l-row">
-            <button class="op-l-btn op-l-gold" onclick="window._hmNuevoNodo()">➕ Nuevo nodo</button>
-            <button class="op-l-btn ${st.modoConexion?'op-l-active':''}" onclick="window._hmToggleConexion()">
-                ↗ ${st.modoConexion ? 'Cancelar flecha' : 'Modo flecha'}
-            </button>
-        </div>
-        <div class="op-l-row" style="margin-top:6px;">
-            <button class="op-l-btn op-l-gold" onclick="window._hmGuardarPos()">💾 Guardar posiciones</button>
-            <button class="op-l-btn" onclick="window._hmAutoOrdenar()">🌀 Auto-ordenar</button>
-        </div>`;
-    }
-
-    body.innerHTML = `
-        <div class="op-l-nombre">${mostrar ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id)}</div>
-        <div class="op-l-chips">${chips.join('')}</div>
-        ${mostrar ? campos.map(c=>`
-            <div class="op-l-campo">
-                <div class="op-l-campo-label">${c.label}</div>
-                <div class="op-l-campo-val">${c.val}</div>
-            </div>`).join('') : `<div style="font-size:0.7em;color:#2a2a3a;font-style:italic;padding:8px 0;">Sellado — sin información</div>`}
-        ${adminHtml}
-    `;
-
-    // Set afinidad select value after render
-    const afinSel = document.getElementById('op-ed-afin');
-    if (afinSel) afinSel.value = nodo.afinidad || '';
-}
-
-// ── Guardar hechizo completo ──────────────────────────────────
 window._hmGuardarHechizo = async () => {
-    const nodo = _opNodo;
-    if (!nodo || !st.esAdmin) return;
+    const nodo = st.nodoSel;
+    if (!nodo || !st.esAdmin) { toast('Selecciona un hechizo primero'); return; }
 
     const payload = {
-        nombre:       document.getElementById('op-ed-nombre')?.value?.trim() || nodo.nombre,
-        clase:        document.getElementById('op-ed-clase')?.value || nodo.clase,
-        afinidad:     document.getElementById('op-ed-afin')?.value || nodo.afinidad,
-        hex_cost:     parseInt(document.getElementById('op-ed-hex')?.value)||0,
-        valor_vex:    parseInt(document.getElementById('op-ed-vex')?.value)||0,
-        resumen:      document.getElementById('op-ed-resumen')?.value || '',
-        efecto:       document.getElementById('op-ed-efecto')?.value || '',
-        overcast:     document.getElementById('op-ed-overcast')?.value || '',
-        undercast:    document.getElementById('op-ed-undercast')?.value || '',
-        especial:     document.getElementById('op-ed-especial')?.value || '',
-        nota:         document.getElementById('op-ed-nota')?.value || '',
-        es_conocido:  document.getElementById('op-ed-conocido')?.checked || false,
-        es_estado:    document.getElementById('op-ed-estado')?.checked || false,
-        es_prioridad: document.getElementById('op-ed-prio')?.checked || false,
-        afecta_usuario:  document.getElementById('op-ed-afxusr')?.checked || false,
-        afecta_objetivo: document.getElementById('op-ed-afxobj')?.checked || false,
-        afecta_hechizos: document.getElementById('op-ed-afxhz')?.checked || false,
+        nombre:       nodo.nombre,
+        clase:        nodo.clase,
+        afinidad:     nodo.afinidad,
+        hex_cost:     nodo.hex,
+        valor_vex:    nodo.vex,
+        backcast:     nodo.backcast,
+        nextcast:     nodo.nextcast,
+        resumen:      nodo.resumen,
+        efecto:       nodo.efecto,
+        overcast:     nodo.overcast,
+        undercast:    nodo.undercast,
+        especial:     nodo.especial,
+        nota:         nodo.nota,
+        es_conocido:  nodo.esConocido,
+        es_estado:    nodo.esEstado,
+        es_prioridad: nodo.esPrioridad,
+        afecta_usuario:  nodo.afectaUsuario,
+        afecta_objetivo: nodo.afectaObjetivo,
+        afecta_hechizos: nodo.afectaHechizos,
     };
 
     const { supabase } = await import('../hex-auth.js');
     let error;
 
     if (nodo.esNuevo) {
-        // Crear nodo nuevo
-        const newId = document.getElementById('op-ed-id')?.value?.trim() || nodo.id;
+        // En inserción, usamos el ID estático editado en el panel derecho o el temporal
+        const newIdInput = document.getElementById('sp-input-id');
+        const newId = newIdInput ? newIdInput.value.trim() : nodo.id;
+        
         ({ error } = await supabase.from('hechizos_nodos').insert({
             ...payload,
             hechizo_id: newId,
@@ -292,48 +112,300 @@ window._hmGuardarHechizo = async () => {
         ({ error } = await supabase.from('hechizos_nodos').update(payload).eq('hechizo_id', nodo.id));
     }
 
-    if (error) { toast('Error: ' + error.message); return; }
+    if (error) { toast('Error al guardar: ' + error.message); return; }
 
-    // Actualizar nodo en memoria
-    Object.assign(nodo, {
-        nombre: payload.nombre, clase: payload.clase, afinidad: payload.afinidad,
-        hex: payload.hex_cost, vex: payload.valor_vex,
-        resumen: payload.resumen, efecto: payload.efecto,
-        overcast: payload.overcast, undercast: payload.undercast, especial: payload.especial,
-        nota: payload.nota,
-        esConocido: payload.es_conocido, esEstado: payload.es_estado, esPrioridad: payload.es_prioridad,
-        afectaUsuario: payload.afecta_usuario, afectaObjetivo: payload.afecta_objetivo, afectaHechizos: payload.afecta_hechizos,
-        radio: payload.es_conocido ? 35 : 28,
-        _dirty: false,
-    });
-
+    nodo.radio = nodo.esConocido ? 35 : 28;
+    nodo._dirty = false;
+    
     calcSetsGlobales();
     renderInfoStats();
+    renderSidePanel(nodo); // Refresca por si cambió el ID a estático
     renderGrimorio(document.getElementById('hm-search-central')?.value || '');
-    _renderOpLeft();
-    toast('✓ Hechizo guardado');
+    toast('✓ Hechizo guardado en DB');
 };
 
-// ── Asignar PJ desde panel izquierdo ─────────────────────────
+
+// ══════════════════════════════════════════════════════════════
+//  PANEL LATERAL DERECHO — Info y Edición Inline Automática
+// ══════════════════════════════════════════════════════════════
+export function abrirSidePanel(nodo) {
+    const panel = document.getElementById('hm-side-panel');
+    if (!panel) return;
+    panel.classList.add('abierto');
+    document.body.classList.add('side-panel-open');
+    renderSidePanel(nodo);
+    
+    // Si el panel OP izquierdo está abierto, sincronizarlo
+    _refrescarOpPanel();
+}
+
+export function cerrarSidePanel() {
+    st.nodoSel = null;
+    const panel = document.getElementById('hm-side-panel');
+    if (panel) panel.classList.remove('abierto');
+    document.body.classList.remove('side-panel-open');
+    renderInfoBar(null);
+    _refrescarOpPanel();
+}
+window._hmCerrarSidePanel = cerrarSidePanel;
+
+export function renderSidePanel(nodo) {
+    const body = document.getElementById('hm-side-panel-body');
+    const titulo = document.getElementById('sp-titulo-txt');
+    if (!body) return;
+    if (!nodo) { body.innerHTML = ''; return; }
+
+    const esPosesion = st.posesiones.has(nodo);
+    const mostrar    = nodo.esConocido || esPosesion || st.esAdmin;
+    const color      = (st.colores[nodo.afinidad] || {}).t || '#888';
+    const nombreSafe = mostrar ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
+    
+    if (titulo) titulo.textContent = nombreSafe;
+
+    const afinOpts = Object.keys(st.colores).map(a=>`<option value="${a}" ${nodo.afinidad===a?'selected':''}>${a}</option>`).join('');
+    const claseOpts = ['1','2','3','4','5'].map(c=>`<option value="${c}" ${nodo.clase==c?'selected':''}>Clase ${c}</option>`).join('');
+
+    if (st.esAdmin) {
+        // MODO EDICIÓN INLINE (OP)
+        body.innerHTML = `
+            <div class="sp-desc-field" style="margin-bottom:12px;">
+                <input class="sp-inline-input sp-inline-title" style="color:${color}" value="${(nodo.nombre||'').replace(/"/g,'&quot;')}" onchange="window._hmUpdateLocal('nombre', this)">
+            </div>
+            
+            <div class="sp-desc-field">
+                <div class="sp-desc-label">ID Sistema</div>
+                ${nodo.esNuevo 
+                    ? `<input id="sp-input-id" class="sp-inline-input" value="${nodo.id}" style="color:#d4af37">`
+                    : `<div class="sp-desc-val" style="opacity:0.5">${nodo.id}</div>`}
+            </div>
+
+            <div class="sp-grid-2">
+                <div class="sp-desc-field">
+                    <div class="sp-desc-label">Afinidad</div>
+                    <select class="sp-inline-input" style="color:${color}" onchange="window._hmUpdateLocal('afinidad', this)">
+                        <option value="">—</option>${afinOpts}
+                    </select>
+                </div>
+                <div class="sp-desc-field">
+                    <div class="sp-desc-label">Clase</div>
+                    <select class="sp-inline-input" onchange="window._hmUpdateLocal('clase', this)">
+                        ${claseOpts}
+                    </select>
+                </div>
+                <div class="sp-desc-field">
+                    <div class="sp-desc-label">HEX</div>
+                    <input type="number" class="sp-inline-input" value="${nodo.hex||0}" min="0" onchange="window._hmUpdateLocal('hex', this)">
+                </div>
+                <div class="sp-desc-field">
+                    <div class="sp-desc-label">VEX</div>
+                    <input type="number" class="sp-inline-input" value="${nodo.vex||0}" min="0" onchange="window._hmUpdateLocal('vex', this)">
+                </div>
+                <div class="sp-desc-field">
+                    <div class="sp-desc-label">Backcast</div>
+                    <input type="number" class="sp-inline-input" value="${nodo.backcast||0}" min="0" onchange="window._hmUpdateLocal('backcast', this)">
+                </div>
+                <div class="sp-desc-field">
+                    <div class="sp-desc-label">Nextcast</div>
+                    <input type="number" class="sp-inline-input" value="${nodo.nextcast||0}" min="0" onchange="window._hmUpdateLocal('nextcast', this)">
+                </div>
+            </div>
+
+            <div style="height:1px;background:rgba(255,255,255,0.05);margin:10px 0;"></div>
+
+            <div class="sp-desc-field">
+                <div class="sp-desc-label">Resumen</div>
+                <textarea class="sp-inline-area" rows="2" onchange="window._hmUpdateLocal('resumen', this)">${nodo.resumen||''}</textarea>
+            </div>
+            <div class="sp-desc-field">
+                <div class="sp-desc-label">Efecto</div>
+                <textarea class="sp-inline-area" rows="4" onchange="window._hmUpdateLocal('efecto', this)">${nodo.efecto||''}</textarea>
+            </div>
+            <div class="sp-desc-field">
+                <div class="sp-desc-label">Overcast</div>
+                <textarea class="sp-inline-area" rows="2" onchange="window._hmUpdateLocal('overcast', this)">${nodo.overcast||''}</textarea>
+            </div>
+            <div class="sp-desc-field">
+                <div class="sp-desc-label">Undercast</div>
+                <textarea class="sp-inline-area" rows="2" onchange="window._hmUpdateLocal('undercast', this)">${nodo.undercast||''}</textarea>
+            </div>
+            <div class="sp-desc-field">
+                <div class="sp-desc-label">Especial</div>
+                <textarea class="sp-inline-area" rows="2" onchange="window._hmUpdateLocal('especial', this)">${nodo.especial||''}</textarea>
+            </div>
+            <div class="sp-desc-field">
+                <div class="sp-desc-label">Nota Privada OP</div>
+                <textarea class="sp-inline-area" rows="2" style="color:#d4a830;" onchange="window._hmUpdateLocal('nota', this)">${nodo.nota||''}</textarea>
+            </div>
+        `;
+    } else {
+        // MODO LECTURA NORMAL (JUGADOR)
+        const campos = mostrar ? [
+            { label:'Efecto',    val: nodo.efecto },
+            { label:'Resumen',   val: nodo.resumen },
+            { label:'Overcast',  val: nodo.overcast },
+            { label:'Undercast', val: nodo.undercast },
+            { label:'Especial',  val: nodo.especial },
+        ].filter(c => c.val) : [];
+
+        let gridHtml = '';
+        if (mostrar) {
+            gridHtml = `
+            <div class="sp-grid-2" style="margin-bottom:12px;">
+                <div class="sp-desc-field"><div class="sp-desc-label">Clase</div><div class="sp-desc-val">${nodo.clase}</div></div>
+                <div class="sp-desc-field"><div class="sp-desc-label">HEX</div><div class="sp-desc-val">${nodo.hex||0}</div></div>
+                ${nodo.vex > 0 ? `<div class="sp-desc-field"><div class="sp-desc-label">VEX</div><div class="sp-desc-val">${nodo.vex}</div></div>` : ''}
+                ${nodo.backcast > 0 ? `<div class="sp-desc-field"><div class="sp-desc-label">Backcast</div><div class="sp-desc-val">${nodo.backcast}</div></div>` : ''}
+                ${nodo.nextcast > 0 ? `<div class="sp-desc-field"><div class="sp-desc-label">Nextcast</div><div class="sp-desc-val">${nodo.nextcast}</div></div>` : ''}
+            </div>`;
+        }
+
+        body.innerHTML = `
+            <div class="sp-nodo-nombre" style="color:${color}">${nombreSafe}</div>
+            ${gridHtml}
+            ${mostrar ? campos.map(c => `
+                <div class="sp-desc-field">
+                    <div class="sp-desc-label">${c.label}</div>
+                    <div class="sp-desc-val">${c.val}</div>
+                </div>`).join('') : `<div style="font-size:0.7em;color:#2a2a3a;font-style:italic;">Sellado — sin información</div>`}
+        `;
+    }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  PANEL OP IZQUIERDO — Deslizable manual
+// ══════════════════════════════════════════════════════════════
+window._hmToggleOpLeft = () => {
+    const isAbierto = document.body.classList.toggle('op-panel-open');
+    const panel = document.getElementById('hm-op-left');
+    
+    if (isAbierto) {
+        panel.classList.add('abierto');
+        _renderOpTools();
+        _renderOpLeft();
+    } else {
+        panel.classList.remove('abierto');
+    }
+};
+
+function _refrescarOpPanel() {
+    const panel = document.getElementById('hm-op-left');
+    if (!panel || !panel.classList.contains('abierto')) return;
+    _renderOpLeft();
+}
+
+function _renderOpLeft() {
+    const body = document.getElementById('hm-op-left-body');
+    if (!body) return;
+    const nodo = st.nodoSel;
+    const nSel = st.seleccionados.size;
+
+    let html = '';
+
+    // SECCIÓN 1: ACCIONES SOBRE EL NODO ACTUAL (si hay uno seleccionado)
+    if (nodo) {
+        const safe = nodo.id.replace(/'/g,"\\'");
+        const esPosesion = st.posesiones.has(nodo);
+
+        html += `
+            <div class="op-l-section-title">Acciones del Hechizo</div>
+            <div class="op-l-row">
+                <button class="op-l-btn ${nodo.esConocido?'op-l-warn':'op-l-gold'}" onclick="window._hmToggleConocido('${safe}',${!nodo.esConocido})">
+                    ${nodo.esConocido ? '🔒 Ocultar' : '👁 Publicar'}
+                </button>
+                <button class="op-l-btn op-l-green" onclick="window._hmModalAsignarPJLeft()">👤 Asignar a PJ</button>
+                ${esPosesion && st.jugadorPanel !== 'Todos' ?
+                  `<button class="op-l-btn op-l-danger" onclick="window._hmQuitarDePJ('${safe}')">✕ Quitar</button>` : ''}
+                ${nodo.esNuevo ?
+                  `<button class="op-l-btn op-l-danger" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar</button>` : ''}
+            </div>
+            
+            <div class="op-l-sep"></div>
+            <div class="op-l-section-title">Características</div>
+            <div class="op-l-checks">
+                <label><input type="checkbox" onchange="window._hmUpdateLocal('esConocido', this)" ${nodo.esConocido?'checked':''}> Conocido (publicado)</label>
+                <label><input type="checkbox" onchange="window._hmUpdateLocal('esEstado', this)" ${nodo.esEstado?'checked':''}> Hechizo-Estado</label>
+                <label><input type="checkbox" onchange="window._hmUpdateLocal('esPrioridad', this)" ${nodo.esPrioridad?'checked':''}> Prioridad</label>
+                <label><input type="checkbox" onchange="window._hmUpdateLocal('afectaUsuario', this)" ${nodo.afectaUsuario?'checked':''}> Afecta Usuario</label>
+                <label><input type="checkbox" onchange="window._hmUpdateLocal('afectaObjetivo', this)" ${nodo.afectaObjetivo?'checked':''}> Afecta Objetivo</label>
+                <label><input type="checkbox" onchange="window._hmUpdateLocal('afectaHechizos', this)" ${nodo.afectaHechizos?'checked':''}> Afecta Hechizos</label>
+            </div>
+            
+            <div class="op-l-row" style="margin-top:12px;">
+                <button class="op-l-btn op-l-gold" style="width:100%" onclick="window._hmGuardarHechizo()">💾 Guardar en DB</button>
+            </div>
+            <div class="op-l-sep"></div>
+        `;
+    }
+
+    // SECCIÓN 2: MULTI-SELECCIÓN BATCH
+    html += `
+        <div class="op-l-section-title">Multi-selección ${nSel > 0 ? `(${nSel})` : ''}</div>
+        <div class="op-l-row">
+            <button class="op-l-btn ${st.modoSelMulti?'op-l-active':''}" onclick="window._hmToggleMultiLeft()">
+                ${st.modoSelMulti ? '☑ Multi-sel activo' : '☐ Activar Multi-sel'}
+            </button>
+            ${nSel > 0 ? `<button class="op-l-btn op-l-warn" onclick="window._hmLimpiarSel()">✕ Limpiar sel.</button>` : ''}
+        </div>
+        ${nSel > 0 ? `
+        <div class="op-l-row" style="margin-top:6px;">
+            <button class="op-l-btn op-l-green" onclick="window._hmBatchAsignarLeft()">👤 Asignar batch (${nSel})</button>
+            <button class="op-l-btn" onclick="window._hmBatchPropsLeft()">⚙ Props batch</button>
+        </div>
+        <div id="op-l-batch-form"></div>` : ''}
+    `;
+
+    body.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BARRA DE HERRAMIENTAS TOP (Inyectada al abrir Panel OP)
+// ══════════════════════════════════════════════════════════════
+function _renderOpTools() {
+    const bar = document.getElementById('hm-op-tools');
+    if (!bar) return;
+    
+    bar.innerHTML = `
+        <div class="tool-group">
+            <button class="hm-btn gold" onclick="window._hmNuevoNodo()">➕ Nuevo nodo</button>
+            <button class="hm-btn" id="hm-btn-flecha" onclick="window._hmToggleConexion()">
+                ↗ ${st.modoConexion ? 'Cancelar flecha' : 'Modo flecha'}
+            </button>
+        </div>
+        <div class="tool-group">
+            <button class="hm-btn gold" onclick="window._hmGuardarPos()">💾 Guardar posiciones</button>
+            <button class="hm-btn" onclick="window._hmAutoOrdenar()">🌀 Auto-ordenar</button>
+        </div>
+    `;
+    if (st.modoConexion) document.getElementById('hm-btn-flecha')?.classList.add('activo');
+}
+
+// ── Toggle multi-sel ───────────────────────
+window._hmToggleMultiLeft = () => {
+    st.modoSelMulti = !st.modoSelMulti;
+    if (!st.modoSelMulti) { st.seleccionados.clear(); actualizarBadgeSel(); }
+    _renderOpLeft();
+};
+window._hmToggleMulti = window._hmToggleMultiLeft;
+
+
+// ══════════════════════════════════════════════════════════════
+//  FORMS BATCH INLINE (Panel OP Izquierdo)
+// ══════════════════════════════════════════════════════════════
 window._hmModalAsignarPJLeft = () => {
-    const nodo = _opNodo;
+    const nodo = st.nodoSel;
     if (!nodo) return;
-    const form = document.getElementById('op-l-batch-form') ||
-                 document.querySelector('#hm-op-left-body');
+    const form = document.getElementById('op-l-batch-form') || document.querySelector('#hm-op-left-body');
     if (!form) return;
 
-    // Insertar el formulario inline en el panel
     const pjOpts = st.personajes.map(p=>`<option value="${p}">${p}</option>`).join('');
     const hexTotal = nodo.hex || 0;
 
-    // Find or create inline asignar section
     let sec = document.getElementById('op-l-asignar-sec');
     if (!sec) {
         sec = document.createElement('div');
         sec.id = 'op-l-asignar-sec';
-        const sepEl = document.querySelector('#hm-op-left-body .op-l-sep');
-        if (sepEl) form.querySelector('#hm-op-left-body')?.insertBefore(sec, sepEl);
-        else document.getElementById('hm-op-left-body')?.appendChild(sec);
+        document.getElementById('hm-op-left-body')?.appendChild(sec);
     }
     sec.innerHTML = `
         <div class="op-l-sep"></div>
@@ -491,20 +563,12 @@ window._hmConfirmarBatchProps = async () => {
     _renderOpLeft();
 };
 
-// ── Toggle multi-sel refrescando panel ───────────────────────
-window._hmToggleMultiLeft = () => {
-    st.modoSelMulti = !st.modoSelMulti;
-    if (!st.modoSelMulti) { st.seleccionados.clear(); actualizarBadgeSel(); }
-    _renderOpLeft();
-};
 
+// ══════════════════════════════════════════════════════════════
+//  POOLS, DRAWER Y GRIMORIO (Intacto)
+// ══════════════════════════════════════════════════════════════
 
-
-// ── Renderizar pools de PJ ───────────────────────────────────
 export function renderPools() {
-    // La diferenciación jugador/NPC viene de is_player en la DB,
-    // pero aquí solo tenemos st.jugadores (jugadores) y st.personajes (todos).
-    // NPCs = personajes que NO están en jugadores
     const npcs = st.personajes.filter(p => !st.jugadores.includes(p));
 
     const tarjeta = (nombre, poolId) => {
@@ -524,7 +588,6 @@ export function renderPools() {
     if (jugGrid) jugGrid.innerHTML = st.jugadores.map(j => tarjeta(j, 'jugadores')).join('') || '<span style="font-size:0.65em;color:#3a3a55;">Sin jugadores</span>';
     if (npcGrid) npcGrid.innerHTML = npcs.map(n => tarjeta(n, 'npcs')).join('') || '<span style="font-size:0.65em;color:#3a3a55;">Sin NPCs</span>';
 
-    // Actualizar botones activos
     const jugBtn = document.getElementById('pool-jug-btn');
     const npcBtn = document.getElementById('pool-npc-btn');
     const jugActivo = st.jugadores.includes(st.jugadorPanel);
@@ -544,37 +607,23 @@ window._hmCerrarPools = () => {
     document.querySelectorAll('.hm-pj-pool-dropdown').forEach(d => d.classList.remove('open'));
 };
 
-// Cerrar pools al clickar fuera
 document.addEventListener('click', e => {
     if (!e.target.closest('.hm-pj-pool-wrap')) window._hmCerrarPools();
 });
 
-// ══════════════════════════════════════════════════════════════
-//  TOOLBAR — ahora solo contiene lógica de ponds; el HTML ya está en index.html
-// ══════════════════════════════════════════════════════════════
 export function renderToolbar() {
     renderPools();
-    // Admin: mostrar tab admin en drawer
     const dtAdmin = document.getElementById('dt-admin');
     if (dtAdmin) dtAdmin.style.display = st.esAdmin ? '' : 'none';
 }
 
-// ══════════════════════════════════════════════════════════════
-//  DRAWER — grimorio + admin
-// ══════════════════════════════════════════════════════════════
 export function renderDrawer() {
-    // Mostrar/ocultar tab admin según rol
     const dtAdmin = document.getElementById('dt-admin');
     if (dtAdmin) dtAdmin.style.display = st.esAdmin ? '' : 'none';
-
-    // Renderizar grimorio inicial
     renderGrimorio('');
-
-    // Si hay admin, montar el pane admin
     if (st.esAdmin) _renderDrawerAdmin();
 }
 
-// ── Toggle drawer ─────────────────────────────────────────────
 window._hmToggleDrawer = () => {
     const drawer = document.getElementById('hm-drawer');
     const tab    = document.getElementById('hm-drawer-tab');
@@ -584,7 +633,6 @@ window._hmToggleDrawer = () => {
     document.body.classList.toggle('drawer-open', abierto);
 };
 
-// ── Cambiar pestaña interna del drawer ────────────────────────
 window._hmDrawerTab = (cual) => {
     document.getElementById('hm-pane-grimorio')?.classList.toggle('oculto', cual !== 'grimorio');
     document.getElementById('hm-pane-admin')?.classList.toggle('oculto',   cual !== 'admin');
@@ -592,22 +640,17 @@ window._hmDrawerTab = (cual) => {
     document.getElementById(`dt-${cual}`)?.classList.add('activo');
 };
 
-// ── Buscar en grimorio ────────────────────────────────────────
 window._hmBuscar = (query) => renderGrimorio(query);
 
-// ── Renderizar grimorio (acordeones por afinidad) ─────────────
 export function renderGrimorio(query = '') {
     const lista = document.getElementById('hm-grimorio-list');
     if (!lista) return;
 
     const q = query.toLowerCase().trim();
-
-    // Agrupar nodos por afinidad
     const grupos = {};
     st.nodos.forEach(nodo => {
         const af = nodo.afinidad || 'Desconocida';
         if (!grupos[af]) grupos[af] = [];
-        // Filtrar por búsqueda (admin ve todos; jugador solo ve conocidos/poseídos)
         const visible = nodo.esConocido || st.posesiones.has(nodo) || st.esAdmin;
         const nombre  = nodo.esConocido || st.esAdmin ? nodo.nombre : `Hechizo ${nodo.id.match(/\d+/)?.[0] || '?'}`;
         if (q && !nombre.toLowerCase().includes(q) && !af.toLowerCase().includes(q)) return;
@@ -620,7 +663,6 @@ export function renderGrimorio(query = '') {
         return;
     }
 
-    // Si hay búsqueda activa, abrir todos los grupos; si no, mantener estado previo
     const abiertos = new Set(
         q
             ? afinidades
@@ -667,152 +709,22 @@ export function renderGrimorio(query = '') {
     }).join('');
 }
 
-// ── Seleccionar nodo desde grimorio ──────────────────────────
 window._hmGrimorioSel = (id) => {
     const nodo = st.nodos.find(n => n.id === id);
     if (!nodo) return;
 
-    // Resaltar en lista
     document.querySelectorAll('.gr-hz-row').forEach(r => r.classList.remove('sel'));
     document.querySelector(`.gr-hz-row[data-id="${id}"]`)?.classList.add('sel');
 
-    // Seleccionar y centrar en canvas
     st.nodoSel = nodo;
     renderInfoBar(nodo);
     centrarEnNodo(nodo);
+    abrirSidePanel(nodo);
 };
+
 
 // ══════════════════════════════════════════════════════════════
-//  SIDE PANEL — información y acciones del nodo seleccionado
-// ══════════════════════════════════════════════════════════════
-export function renderSidePanel(nodo) {
-    const panel = document.getElementById('hm-side-panel');
-    const body  = document.getElementById('hm-side-panel-body');
-    const titulo = document.getElementById('sp-titulo-txt');
-    if (!panel || !body) return;
-
-    if (!nodo) {
-        panel.classList.remove('abierto');
-        document.body.classList.remove('side-panel-open');
-        // Also close left panel
-        cerrarOpPanel();
-        return;
-    }
-
-    panel.classList.add('abierto');
-    document.body.classList.add('side-panel-open');
-
-    // Sync title to left panel
-    const leftTitle = document.getElementById('hm-op-left-title');
-    if (leftTitle) leftTitle.textContent = mostrar ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
-
-    const esPosesion = st.posesiones.has(nodo);
-    const mostrar    = nodo.esConocido || esPosesion || st.esAdmin;
-    const color      = (st.colores[nodo.afinidad] || {}).t || '#888';
-    const nombre     = mostrar ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
-    const safe       = nodo.id.replace(/'/g, "\\'");
-
-    if (titulo) titulo.textContent = nombre;
-
-    const chips = [];
-    if (mostrar) {
-        chips.push(`<span style="color:${color};font-size:0.9em;font-weight:700;">${nodo.afinidad}</span>`);
-        chips.push(`<span class="sp-chip" style="color:#5a5a7a;border-color:rgba(255,255,255,0.08);background:transparent;">Cl.${nodo.clase}</span>`);
-        if (nodo.hex > 0) chips.push(`<span class="sp-chip sp-chip-hex">⬡${nodo.hex} HEX</span>`);
-        if (nodo.vex > 0) chips.push(`<span class="sp-chip sp-chip-vex">⬡${nodo.vex} VEX</span>`);
-        if (esPosesion)   chips.push(`<span class="sp-chip sp-chip-pos">✓ Aprendido</span>`);
-        if (nodo.esEstado)   chips.push(`<span class="sp-chip sp-chip-est">Estado</span>`);
-        if (nodo.esPrioridad)chips.push(`<span class="sp-chip sp-chip-pri">↑ Prioridad</span>`);
-    }
-
-    const campos = mostrar ? [
-        { label:'Efecto',    val: nodo.efecto },
-        { label:'Resumen',   val: nodo.resumen },
-        { label:'Overcast',  val: nodo.overcast },
-        { label:'Undercast', val: nodo.undercast },
-        { label:'Especial',  val: nodo.especial },
-    ].filter(c => c.val) : [];
-
-    let adminHtml = '';
-    if (st.esAdmin) {
-        const multiNodos = st.modoSelMulti && st.seleccionados.size > 0 ? [...st.seleccionados] : [nodo];
-        adminHtml = `
-        <div class="sp-section-title">Acciones OP</div>
-        <div class="sp-action-row">
-            <button class="sp-btn ${nodo.esConocido?'sp-btn-ocultar':'sp-btn-pub'}"
-                onclick="window._hmToggleConocido('${safe}',${!nodo.esConocido})">
-                ${nodo.esConocido ? '🔒 Ocultar' : '👁 Publicar'}
-            </button>
-            <button class="sp-btn sp-btn-props" onclick="window._hmModalPropiedades()">⚙ Propiedades</button>
-            <button class="sp-btn sp-btn-asignar" onclick="window._hmModalAsignarPJ()">👤 Asignar a PJ</button>
-            ${esPosesion && st.jugadorPanel !== 'Todos' ?
-              `<button class="sp-btn sp-btn-quitar" onclick="window._hmQuitarDePJ('${safe}')">✕ Quitar de ${st.jugadorPanel}</button>` : ''}
-            ${nodo.esNuevo ?
-              `<button class="sp-btn sp-btn-del" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar</button>` : ''}
-        </div>
-        <div class="sp-section-title">Multi-selección (${st.seleccionados.size > 0 ? st.seleccionados.size+' sel.' : 'ninguno'})</div>
-        <div class="sp-action-row">
-            <button class="sp-btn ${st.modoSelMulti?'sp-btn-pub':'sp-btn-props'}" onclick="window._hmToggleMulti()">
-                ${st.modoSelMulti ? '☑ Multi-sel activo' : '☐ Multi-sel'}
-            </button>
-            ${st.seleccionados.size > 0 ? `
-            <button class="sp-btn sp-btn-props" onclick="window._hmModalPropiedades()">⚙ Batch props</button>
-            <button class="sp-btn sp-btn-asignar" onclick="window._hmModalAsignarPJ()">👤 Asignar batch</button>
-            <button class="sp-btn sp-btn-quitar" onclick="window._hmLimpiarSel()">✕ Limpiar sel.</button>
-            ` : ''}
-        </div>`;
-    }
-
-    body.innerHTML = `
-        <div class="sp-nodo-nombre" style="color:${color}">${nombre}</div>
-        <div class="sp-nodo-meta">${chips.join('')}</div>
-        ${mostrar ? campos.map(c => `
-            <div class="sp-desc-field">
-                <div class="sp-desc-label">${c.label}</div>
-                <div class="sp-desc-val">${c.val}</div>
-            </div>`).join('') : `<div style="font-size:0.7em;color:#2a2a3a;font-style:italic;">Sellado — sin información</div>`}
-        ${nodo.nota && mostrar ? `<div class="sp-desc-field"><div class="sp-desc-label">📌 Nota</div><div class="sp-desc-val" style="color:#d4a830;">${nodo.nota}</div></div>` : ''}
-        ${adminHtml}
-    `;
-}
-
-window._hmCerrarSidePanel = () => {
-    st.nodoSel = null;
-    renderSidePanel(null);
-    renderInfoBar(null);
-};
-
-window._hmCerrarOpLeft = () => {
-    st.nodoSel = null;
-    renderInfoBar(null);
-    import('./mapa-ui.js').then(m => m.cerrarOpPanel()).catch(()=>{});
-};
-
-window._hmQuitarDePJ = async (id) => {
-    if (!st.jugadorPanel || st.jugadorPanel === 'Todos') { toast('Selecciona un PJ primero'); return; }
-    const nodo = st.nodos.find(n => n.id === id);
-    if (!nodo) return;
-    const { error } = await (await import('../hex-auth.js')).supabase
-        .from('hechizos_inventario')
-        .delete()
-        .eq('personaje_nombre', st.jugadorPanel)
-        .eq('hechizo_nombre', nodo.nombre);
-    if (error) { toast('Error: ' + error.message); return; }
-    await cargarInventarioPJ(st.jugadorPanel);
-    calcSetsGlobales();
-    renderSidePanel(nodo);
-    renderGrimorio(document.getElementById('hm-search-central')?.value || '');
-    toast(`✓ Quitado de ${st.jugadorPanel}`);
-};
-
-window._hmLimpiarSel = () => {
-    st.seleccionados.clear();
-    actualizarBadgeSel();
-    if (st.nodoSel) renderSidePanel(st.nodoSel);
-};
-
-// ══════════════════════════════════════════════════════════════
-//  PORTAPAPELES — resumen de operación de asignación
+//  PORTAPAPELES, MODALES ORIGINALES Y UTILIDADES
 // ══════════════════════════════════════════════════════════════
 function _mostrarClipboard(pj, hechizosAsignados, hexGastado, descubiertos) {
     const el = document.getElementById('hm-clipboard');
@@ -830,7 +742,6 @@ function _mostrarClipboard(pj, hechizosAsignados, hexGastado, descubiertos) {
     el.classList.add('visible');
 }
 
-// ── Renderizar panel admin ────────────────────────────────────
 function _renderDrawerAdmin() {
     const pane = document.getElementById('hm-pane-admin');
     if (!pane || !st.esAdmin) return;
@@ -856,10 +767,6 @@ function _renderDrawerAdmin() {
     `;
 }
 
-// ══════════════════════════════════════════════════════════════
-//  HANDLERS GLOBALES
-// ══════════════════════════════════════════════════════════════
-
 window._hmCambiarPJ = async (nombre) => {
     st.jugadorPanel = nombre;
     await cargarInventarioPJ(nombre);
@@ -867,16 +774,13 @@ window._hmCambiarPJ = async (nombre) => {
     renderInfoStats();
     renderGrimorio(document.getElementById('hm-search-central')?.value || '');
     renderPools();
-    // Si el side panel está abierto y tiene un nodo, actualizar
     if (st.nodoSel) renderSidePanel(st.nodoSel);
 };
 
 window._hmBuscarCentral = (query) => {
-    // Busca por nombre O por número ("7" o "hechizo 7")
     const q = query.trim().toLowerCase();
     const numMatch = q.match(/^(?:hechizo\s*)?(\d+)$/);
     if (numMatch) {
-        // Buscar por ID numérico
         const num = numMatch[1];
         const nodo = st.nodos.find(n => n.id.match(/\d+/)?.[0] === num);
         if (nodo) {
@@ -893,12 +797,6 @@ window._hmBuscarCentral = (query) => {
 
 window._hmCentrar = centrarCamara;
 
-window._hmCerrarOpPanel = () => {
-    st.nodoSel = null;
-    renderOpPanel(null);
-    document.getElementById('hm-info-nodo').innerHTML = '<span style="color:#444;">Clic en un hechizo para ver detalles</span>';
-};
-
 window._hmToggleConexion = () => {
     st.modoConexion = !st.modoConexion;
     st.tempFlecha   = null;
@@ -909,18 +807,6 @@ window._hmToggleConexion = () => {
     }
     const wrap = document.getElementById('hm-canvas-wrap');
     if (wrap) wrap.style.cursor = st.modoConexion ? 'crosshair' : 'grab';
-};
-
-window._hmToggleMulti = () => {
-    st.modoSelMulti = !st.modoSelMulti;
-    if (!st.modoSelMulti) { st.seleccionados.clear(); actualizarBadgeSel(); }
-    const btn = document.getElementById('hm-btn-multi');
-    if (btn) {
-        btn.classList.toggle('activo', st.modoSelMulti);
-        btn.textContent = st.modoSelMulti ? '☑ Multi-sel' : '☐ Multi-sel';
-    }
-    // También actualizar badge en toolbar si existe
-    actualizarBadgeSel();
 };
 
 window._hmNuevoNodo = () => {
@@ -941,7 +827,8 @@ window._hmNuevoNodo = () => {
     st.nodoSel = nodo;
     renderInfoBar(nodo);
     renderGrimorio(document.getElementById('hm-search-central')?.value || '');
-    toast('Nodo temporal creado. Abre Propiedades para guardarlo en DB.');
+    abrirSidePanel(nodo);
+    toast('Nodo creado. Edítalo a la derecha y guárdalo desde el Panel OP izquierdo.');
 };
 
 window._hmGuardarPos = async () => {
@@ -960,19 +847,37 @@ window._hmToggleConocido = async (id, nuevoValor) => {
         renderGrimorio(document.getElementById('hm-search-central')?.value || '');
     }
     toast(nuevoValor ? '👁 Publicado' : '🔒 Ocultado');
+    _refrescarOpPanel();
 };
 
 window._hmEliminarNuevo = (id) => {
     st.nodos   = st.nodos.filter(n => n.id !== id);
     st.enlaces = st.enlaces.filter(e => e.source.id!==id && e.target.id!==id);
     st.seleccionados.forEach(n => { if(n.id===id) st.seleccionados.delete(n); });
-    if (st.nodoSel?.id === id) { st.nodoSel=null; renderInfoBar(null); }
+    if (st.nodoSel?.id === id) cerrarSidePanel();
     actualizarBadgeSel();
     renderGrimorio(document.getElementById('hm-search-central')?.value || '');
     toast('Nodo descartado');
 };
 
-// ── Modal: Propiedades batch ──────────────────────────────────
+window._hmQuitarDePJ = async (id) => {
+    if (!st.jugadorPanel || st.jugadorPanel === 'Todos') { toast('Selecciona un PJ primero'); return; }
+    const nodo = st.nodos.find(n => n.id === id);
+    if (!nodo) return;
+    const { error } = await (await import('../hex-auth.js')).supabase
+        .from('hechizos_inventario')
+        .delete()
+        .eq('personaje_nombre', st.jugadorPanel)
+        .eq('hechizo_nombre', nodo.nombre);
+    if (error) { toast('Error: ' + error.message); return; }
+    await cargarInventarioPJ(st.jugadorPanel);
+    calcSetsGlobales();
+    renderSidePanel(nodo);
+    renderGrimorio(document.getElementById('hm-search-central')?.value || '');
+    toast(`✓ Quitado de ${st.jugadorPanel}`);
+};
+
+// ── Modales Originales ─────────────────────────────────────────
 window._hmModalPropiedades = () => {
     const nodos = _nodosOperacion();
     if (!nodos) return;
@@ -1049,7 +954,6 @@ window._hmAplicarProps = async (ids) => {
     renderGrimorio(document.getElementById('hm-search-central')?.value || '');
 };
 
-// ── Modal: Asignar PJ ─────────────────────────────────────────
 window._hmModalAsignarPJ = () => {
     const nodos = _nodosOperacion();
     if (!nodos) return;
@@ -1088,7 +992,6 @@ window._hmAplicarAsignar = async (nodosData) => {
     _cerrarModal();
     if (err) { toast('Error: ' + err); return; }
 
-    // Cobrar HEX si corresponde
     let hexGastado = 0;
     if (pct > 0 && ok > 0) {
         const hexBase = nodosData.reduce((s, n) => s + (n.hex || 0), 0);
@@ -1103,7 +1006,6 @@ window._hmAplicarAsignar = async (nodosData) => {
         }
     }
 
-    // Publicar si se pidió
     const descubiertos = [];
     if (publicar) {
         for (const n of nodosData) {
@@ -1115,7 +1017,6 @@ window._hmAplicarAsignar = async (nodosData) => {
         }
     }
 
-    // Portapapeles
     _mostrarClipboard(pj, nombresHz.slice(0, ok), hexGastado, descubiertos);
 
     toast(`✓ ${ok} de ${total} hechizo${total!==1?'s':''} asignado${ok!==1?'s':''} a ${pj}${hexGastado>0?` · −${hexGastado} HEX`:''}`);
@@ -1123,7 +1024,6 @@ window._hmAplicarAsignar = async (nodosData) => {
     if (st.nodoSel) renderSidePanel(st.nodoSel);
 };
 
-// ── Auto-ordenar (Fruchterman-Reingold) ───────────────────────
 window._hmAutoOrdenar = () => {
     if (!st.esAdmin) return;
     const nodos = st.nodos, enlaces = st.enlaces;
@@ -1163,7 +1063,6 @@ window._hmAutoOrdenar = () => {
     paso();
 };
 
-// ── Helpers modal ─────────────────────────────────────────────
 function _nodosOperacion() {
     const nodos = st.modoSelMulti && st.seleccionados.size > 0
         ? [...st.seleccionados]
