@@ -121,6 +121,7 @@ export async function cargarInventarioPJ(pjNombre) {
       nombre: row.hechizo_nombre,
       afinidad: row.hechizo_afinidad || '',
       hex_cost: row.hechizo_hex || 0,
+      es_conocido: false,   // sin cat no sabemos si es conocido → tratar como oculto
       _inv: row
     };
   });
