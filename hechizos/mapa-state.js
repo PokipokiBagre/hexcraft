@@ -46,9 +46,20 @@ export const st = {
     },
 
     // ── Selección ────────────────────────────────────────────
-    nodoSel:       null,          // nodo clickeado (info bar)
-    modoSelMulti:  false,         // modo selección múltiple activo
-    seleccionados: new Set(),     // nodos seleccionados en multi
+    nodoSel:       null,
+    modoSelMulti:  false,
+    seleccionados: new Set(),
+
+    // ── Selección rectangular ─────────────────────────────────
+    rectSel: {
+        activo: false,
+        startX: 0, startY: 0,   // coords mundo
+        endX:   0, endY:   0,
+    },
+
+    // ── Panel OP izquierdo ────────────────────────────────────
+    opPanelAbierto: false,
+    opTab: 'sel',               // 'sel' | 'nodo' | 'admin'
 
     // ── Modo conexión ─────────────────────────────────────────
     modoConexion: false,

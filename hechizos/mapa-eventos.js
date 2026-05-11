@@ -51,9 +51,14 @@ export function iniciarEventos() {
             st.drag.hasMoved      = false;
         } else {
             st.drag.nodoCandidate = null;
-            st.drag.activo        = true;
-            // Clic en vacío sin multi-sel: deseleccionar
-            if (!st.modoSelMulti) {
+            if (st.modoSelMulti) {
+                // Iniciar selección rectangular en vacío
+                st.rectSel.activo = true;
+                st.rectSel.startX = wp.x; st.rectSel.startY = wp.y;
+                st.rectSel.endX   = wp.x; st.rectSel.endY   = wp.y;
+                st.drag.activo = false;
+            } else {
+                st.drag.activo = true;
                 st.nodoSel = null;
                 renderInfoBar(null);
             }
@@ -96,6 +101,10 @@ export function iniciarEventos() {
             st.drag.nodo.x += dx / st.camara.zoom;
             st.drag.nodo.y += dy / st.camara.zoom;
             st.drag.nodo._dirty = true;
+        } else if (st.rectSel.activo) {
+            // Actualizar extremo del rectángulo de selección
+            st.rectSel.endX = wp.x;
+            st.rectSel.endY = wp.y;
         } else if (st.drag.activo) {
             // Pan de cámara
             st.camara.x += dx;
@@ -121,6 +130,22 @@ export function iniciarEventos() {
                 _crearEnlace(st.tempFlecha.source, nodo);
             }
             st.tempFlecha = null;
+        }
+
+        // Finalizar selección rectangular
+        if (st.rectSel.activo) {
+            st.rectSel.activo = false;
+            const minX = Math.min(st.rectSel.startX, st.rectSel.endX);
+            const maxX = Math.max(st.rectSel.startX, st.rectSel.endX);
+            const minY = Math.min(st.rectSel.startY, st.rectSel.endY);
+            const maxY = Math.max(st.rectSel.startY, st.rectSel.endY);
+            if (maxX - minX > 5 || maxY - minY > 5) {
+                st.nodos.forEach(n => {
+                    if (n.x >= minX && n.x <= maxX && n.y >= minY && n.y <= maxY)
+                        st.seleccionados.add(n);
+                });
+                actualizarBadgeSel();
+            }
         }
 
         // Candidato sin movimiento → fue un clic simple
@@ -174,14 +199,16 @@ export function iniciarEventos() {
 // ── Seleccionar nodo ─────────────────────────────────────────
 function _seleccionarNodo(nodo) {
     if (st.modoSelMulti) {
-        // Toggle en multi-sel
         if (st.seleccionados.has(nodo)) st.seleccionados.delete(nodo);
         else st.seleccionados.add(nodo);
         actualizarBadgeSel();
     }
-    // Siempre actualizar el nodo activo para la info bar
     st.nodoSel = nodo;
     renderInfoBar(nodo);
+    // Abrir panel OP izquierdo en la tab correcta
+    import('./mapa-ui.js').then(m => {
+        m.abrirOpPanel(nodo);
+    }).catch(()=>{});
 }
 
 // ── Crear enlace (con DB) ─────────────────────────────────────

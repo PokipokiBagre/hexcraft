@@ -104,7 +104,7 @@ html, body {
     display: none; position: absolute; top: calc(100% + 6px); left: 0;
     min-width: 220px; background: rgba(8,6,20,0.99);
     border: 1px solid rgba(212,175,55,0.22);
-    border-radius: 10px; z-index: 9000;
+    border-radius: 10px; z-index: 400;
     padding: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.8);
 }
 .hm-pj-pool-dropdown.open { display: block; }
@@ -369,15 +369,10 @@ body.side-panel-open #hm-canvas-wrap { right: 300px; }
     scrollbar-width: thin; scrollbar-color: rgba(212,175,55,0.15) transparent;
 }
 
-/* FIX: nombre del hechizo en panel — color neutro, suave (el color de afinidad va en los chips) */
+/* FIX: nombre del hechizo en panel — rojo profesional, no saturado */
 .sp-nodo-nombre {
     font-size: 0.92em; font-weight: 700; margin-bottom: 4px;
-    color: #d8d0e8; /* blanco ligeramente cálido, neutro y legible */
-}
-.sp-afecta-row { margin-top: 4px; }
-.sp-chip-afecta {
-    color: #7a8a9a; border-color: rgba(120,140,160,0.25);
-    background: rgba(100,120,140,0.07);
+    color: #c0524a; /* rojo suave, profesional */
 }
 .sp-nodo-meta {
     font-size: 0.64em; color: #5a5a78; margin-bottom: 12px;
@@ -606,3 +601,167 @@ body.drawer-open #hm-op-panel {
     white-space: nowrap;
 }
 #hm-toast.show { opacity: 1; }
+
+/* ══════════════════════════════════════
+   PANEL OP IZQUIERDO DESLIZABLE
+══════════════════════════════════════ */
+#hm-op-left {
+    position: fixed; top: 44px; left: 0;
+    width: 300px; height: calc(100vh - 44px - 32px);
+    background: rgba(6,4,16,0.98);
+    border-right: 1px solid rgba(212,175,55,0.15);
+    display: flex; flex-direction: column;
+    z-index: 180;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    overflow: hidden;
+}
+#hm-op-left.abierto { transform: translateX(0); }
+
+/* Cuando el panel está abierto, el canvas se desplaza */
+body.op-panel-open #hm-canvas-wrap { left: 300px; }
+body.op-panel-open #hm-drawer      { left: 300px; }
+body.op-panel-open #hm-drawer-tab  { left: calc(300px + 50%); transform: translateX(-50%); }
+
+#hm-op-left-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+}
+#hm-op-left-title {
+    font-family: 'Cinzel', serif; font-size: 0.72em;
+    color: #d4af37; letter-spacing: 1px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#hm-op-left-close {
+    background: none; border: none; color: #555; font-size: 1.1em;
+    cursor: pointer; padding: 2px 6px; flex-shrink: 0;
+}
+#hm-op-left-close:hover { color: #ccc; }
+
+#hm-op-left-body {
+    flex: 1; overflow-y: auto; padding: 10px 12px 20px;
+    scrollbar-width: thin; scrollbar-color: rgba(212,175,55,0.12) transparent;
+}
+
+/* Nombre del hechizo */
+.op-l-nombre {
+    font-size: 0.9em; font-weight: 700;
+    color: #e0d8f0; margin-bottom: 6px; line-height: 1.3;
+}
+
+/* Chips de metadatos */
+.op-l-chips {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;
+}
+.op-l-chip {
+    font-size: 0.62em; padding: 2px 7px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04); color: #888;
+}
+.op-l-hex  { color: #c9953a; border-color: rgba(212,175,55,0.3); background: rgba(212,175,55,0.07); }
+.op-l-vex  { color: #9a68c8; border-color: rgba(130,80,190,0.3); background: rgba(130,80,190,0.07); }
+.op-l-pos  { color: rgba(150,131,200,0.9); border-color: rgba(150,131,200,0.3); background: rgba(150,131,200,0.07); }
+.op-l-est  { color: #4ab3e8; border-color: rgba(74,179,232,0.3); background: rgba(74,179,232,0.06); }
+.op-l-pri  { color: #d4af37; border-color: rgba(212,175,55,0.3); background: rgba(212,175,55,0.07); }
+.op-l-afx  { color: #7a8a9a; border-color: rgba(120,140,160,0.25); background: rgba(100,120,140,0.07); }
+
+/* Campos de descripción */
+.op-l-campo { margin-bottom: 8px; }
+.op-l-campo-label {
+    font-size: 0.56em; font-weight: 700; color: #d4af37;
+    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px;
+}
+.op-l-campo-val {
+    font-size: 0.72em; color: #8a8aaa; line-height: 1.5;
+}
+
+/* Separador */
+.op-l-sep {
+    height: 1px; background: rgba(255,255,255,0.05);
+    margin: 10px 0;
+}
+
+/* Título de sección */
+.op-l-section-title {
+    font-size: 0.54em; letter-spacing: 1.5px; text-transform: uppercase;
+    color: #3a3a55; font-weight: 700; margin-bottom: 7px;
+}
+
+/* Fila de botones */
+.op-l-row {
+    display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px;
+}
+
+/* Botones del panel */
+.op-l-btn {
+    font-size: 0.62em; padding: 5px 10px; border-radius: 5px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: #888; cursor: pointer; white-space: nowrap;
+    transition: all 0.12s; font-family: inherit;
+}
+.op-l-btn:hover   { background: rgba(255,255,255,0.09); color: #ccc; }
+.op-l-gold        { background: rgba(212,175,55,0.09); border-color: rgba(212,175,55,0.35); color: #d4af37; }
+.op-l-gold:hover  { background: rgba(212,175,55,0.18); }
+.op-l-green       { background: rgba(50,200,100,0.09); border-color: rgba(50,200,100,0.35); color: #32c864; }
+.op-l-green:hover { background: rgba(50,200,100,0.18); }
+.op-l-warn        { background: rgba(180,50,50,0.09); border-color: rgba(180,70,70,0.35); color: #c97070; }
+.op-l-warn:hover  { background: rgba(180,50,50,0.18); }
+.op-l-danger      { background: rgba(180,50,50,0.09); border-color: rgba(180,70,70,0.35); color: #c97070; }
+.op-l-danger:hover{ background: rgba(180,50,50,0.18); }
+.op-l-active      { background: rgba(0,210,255,0.1); border-color: rgba(0,210,255,0.4); color: #00d2ff; }
+
+/* Formulario de edición */
+.op-l-edit-form { display: flex; flex-direction: column; gap: 6px; }
+
+.op-l-field-row { display: flex; flex-direction: column; gap: 3px; }
+.op-l-field-row label {
+    font-size: 0.58em; color: #666; text-transform: uppercase; letter-spacing: 0.8px;
+}
+.op-l-field-row input,
+.op-l-field-row textarea,
+.op-l-field-row select {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px; color: #ccc;
+    font-size: 0.72em; padding: 5px 8px;
+    font-family: inherit; outline: none;
+    resize: vertical;
+}
+.op-l-field-row input:focus,
+.op-l-field-row textarea:focus,
+.op-l-field-row select:focus { border-color: rgba(212,175,55,0.45); }
+.op-l-field-row select option { background: #0d0c1a; }
+
+.op-l-field-row-2 {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+.op-l-field-row-2 > div { display: flex; flex-direction: column; gap: 3px; }
+.op-l-field-row-2 label {
+    font-size: 0.58em; color: #666; text-transform: uppercase; letter-spacing: 0.8px;
+}
+.op-l-field-row-2 input,
+.op-l-field-row-2 select {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px; color: #ccc;
+    font-size: 0.72em; padding: 5px 8px;
+    font-family: inherit; outline: none;
+}
+.op-l-field-row-2 input:focus,
+.op-l-field-row-2 select:focus { border-color: rgba(212,175,55,0.45); }
+.op-l-field-row-2 select option { background: #0d0c1a; }
+
+.op-l-checks {
+    display: flex; flex-direction: column; gap: 5px;
+}
+.op-l-checks label {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 0.68em; color: #888; cursor: pointer;
+}
+.op-l-checks input[type=checkbox] {
+    accent-color: #d4af37; cursor: pointer;
+}

@@ -1,5 +1,5 @@
 // ============================================================
-// mapa-ui.js — Toolbar, drawer, grimorio, modales y handlers
+// mapa-ui.js — Toolbar, drawer, grimorio, panel OP izquierdo
 // /hechizos/mapa-ui.js
 // ============================================================
 
@@ -8,6 +8,7 @@ import {
     cargarInventarioPJ, calcSetsGlobales,
     guardarPosiciones, toggleConocido,
     aplicarPropiedades, asignarHechizosAPJ,
+    recargarDatos,
 } from './mapa-data.js';
 import { centrarCamara, centrarEnNodo, renderInfoBar, renderInfoStats, renderOpPanel } from './mapa-render.js';
 
@@ -39,10 +40,465 @@ export function actualizarBadgeSel() {
     const n = st.seleccionados.size;
     b.style.display = n > 0 ? 'inline' : 'none';
     b.textContent   = `${n} sel.`;
-    // Actualizar título del side panel si está abierto
-    const spTit = document.getElementById('sp-titulo-txt');
-    if (spTit && n > 0) spTit.textContent = `${n} hechizos seleccionados`;
+    // Refrescar panel OP si está abierto en tab sel
+    _refrescarOpPanel();
 }
+
+// ══════════════════════════════════════════════════════════════
+//  PANEL OP IZQUIERDO — deslizable, sin popups
+// ══════════════════════════════════════════════════════════════
+let _opNodo = null; // nodo activo en el panel
+
+export function abrirOpPanel(nodo) {
+    _opNodo = nodo;
+    const panel = document.getElementById('hm-op-left');
+    if (!panel) return;
+    panel.classList.add('abierto');
+    document.body.classList.add('op-panel-open');
+    _renderOpLeft();
+}
+
+export function cerrarOpPanel() {
+    _opNodo = null;
+    const panel = document.getElementById('hm-op-left');
+    if (!panel) return;
+    panel.classList.remove('abierto');
+    document.body.classList.remove('op-panel-open');
+}
+
+function _refrescarOpPanel() {
+    const panel = document.getElementById('hm-op-left');
+    if (!panel || !panel.classList.contains('abierto')) return;
+    _renderOpLeft();
+}
+
+function _renderOpLeft() {
+    const body = document.getElementById('hm-op-left-body');
+    if (!body) return;
+    const nodo = _opNodo;
+    if (!nodo) { cerrarOpPanel(); return; }
+
+    const esPosesion = st.posesiones.has(nodo);
+    const mostrar    = nodo.esConocido || esPosesion || st.esAdmin;
+    const color      = (st.colores[nodo.afinidad] || {}).t || '#888';
+    const safe       = nodo.id.replace(/'/g,"\\'");
+
+    // ── Sección: Identidad ──
+    const chips = [];
+    if (mostrar) {
+        chips.push(`<span class="op-l-chip" style="color:${color};border-color:${color}44;">${nodo.afinidad}</span>`);
+        chips.push(`<span class="op-l-chip">Cl.${nodo.clase}</span>`);
+        if (nodo.hex > 0) chips.push(`<span class="op-l-chip op-l-hex">⬡${nodo.hex} HEX</span>`);
+        if (nodo.vex > 0) chips.push(`<span class="op-l-chip op-l-vex">⬡${nodo.vex} VEX</span>`);
+        if (esPosesion)   chips.push(`<span class="op-l-chip op-l-pos">✓ Aprendido</span>`);
+        if (nodo.esEstado)   chips.push(`<span class="op-l-chip op-l-est">Estado</span>`);
+        if (nodo.esPrioridad)chips.push(`<span class="op-l-chip op-l-pri">↑ Prioridad</span>`);
+        if (nodo.afectaUsuario)  chips.push(`<span class="op-l-chip op-l-afx">👤 Usuario</span>`);
+        if (nodo.afectaObjetivo) chips.push(`<span class="op-l-chip op-l-afx">🎯 Objetivo</span>`);
+        if (nodo.afectaHechizos) chips.push(`<span class="op-l-chip op-l-afx">✦ Hechizos</span>`);
+    }
+
+    // ── Sección: Campos de texto ──
+    const campos = mostrar ? [
+        { label:'RESUMEN',   val: nodo.resumen },
+        { label:'EFECTO',    val: nodo.efecto },
+        { label:'OVERCAST',  val: nodo.overcast },
+        { label:'UNDERCAST', val: nodo.undercast },
+        { label:'ESPECIAL',  val: nodo.especial },
+        { label:'NOTA',      val: nodo.nota },
+    ].filter(c => c.val) : [];
+
+    // ── Sección: Admin ──
+    let adminHtml = '';
+    if (st.esAdmin) {
+        const nSel = st.seleccionados.size;
+        const afinOpts = Object.keys(st.colores).map(a=>`<option value="${a}">${a}</option>`).join('');
+
+        adminHtml = `
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title">ACCIONES OP</div>
+        <div class="op-l-row">
+            <button class="op-l-btn ${nodo.esConocido?'op-l-warn':'op-l-gold'}"
+                onclick="window._hmToggleConocido('${safe}',${!nodo.esConocido})">
+                ${nodo.esConocido ? '🔒 Ocultar' : '👁 Publicar'}
+            </button>
+            <button class="op-l-btn op-l-green" onclick="window._hmModalAsignarPJLeft()">👤 Asignar a PJ</button>
+            ${esPosesion && st.jugadorPanel !== 'Todos' ?
+              `<button class="op-l-btn op-l-danger" onclick="window._hmQuitarDePJ('${safe}')">✕ Quitar de ${st.jugadorPanel}</button>` : ''}
+            ${nodo.esNuevo ?
+              `<button class="op-l-btn op-l-danger" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar nodo</button>` : ''}
+        </div>
+
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title">EDITAR HECHIZO</div>
+        <div class="op-l-edit-form" id="op-l-edit-form" data-id="${nodo.id}">
+            <div class="op-l-field-row">
+                <label>Nombre</label>
+                <input id="op-ed-nombre" value="${(nodo.nombre||'').replace(/"/g,'&quot;')}" placeholder="Nombre">
+            </div>
+            <div class="op-l-field-row">
+                <label>ID</label>
+                <input id="op-ed-id" value="${nodo.id}" ${nodo.esNuevo?'':'readonly style="opacity:0.4"'}>
+            </div>
+            <div class="op-l-field-row-2">
+                <div>
+                    <label>Clase</label>
+                    <select id="op-ed-clase">
+                        ${['1','2','3','4','5'].map(c=>`<option value="${c}" ${nodo.clase==c?'selected':''}>${c}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label>Afinidad</label>
+                    <select id="op-ed-afin">
+                        <option value="">—</option>
+                        ${afinOpts}
+                    </select>
+                </div>
+                <div>
+                    <label>HEX</label>
+                    <input id="op-ed-hex" type="number" value="${nodo.hex||0}" min="0">
+                </div>
+                <div>
+                    <label>VEX</label>
+                    <input id="op-ed-vex" type="number" value="${nodo.vex||0}" min="0">
+                </div>
+            </div>
+            <div class="op-l-field-row">
+                <label>Resumen</label>
+                <textarea id="op-ed-resumen" rows="2">${nodo.resumen||''}</textarea>
+            </div>
+            <div class="op-l-field-row">
+                <label>Efecto</label>
+                <textarea id="op-ed-efecto" rows="3">${nodo.efecto||''}</textarea>
+            </div>
+            <div class="op-l-field-row">
+                <label>Overcast</label>
+                <textarea id="op-ed-overcast" rows="2">${nodo.overcast||''}</textarea>
+            </div>
+            <div class="op-l-field-row">
+                <label>Undercast</label>
+                <textarea id="op-ed-undercast" rows="2">${nodo.undercast||''}</textarea>
+            </div>
+            <div class="op-l-field-row">
+                <label>Especial</label>
+                <textarea id="op-ed-especial" rows="2">${nodo.especial||''}</textarea>
+            </div>
+            <div class="op-l-field-row">
+                <label>Nota</label>
+                <input id="op-ed-nota" value="${(nodo.nota||'').replace(/"/g,'&quot;')}">
+            </div>
+            <div class="op-l-checks">
+                <label><input type="checkbox" id="op-ed-conocido" ${nodo.esConocido?'checked':''}> Conocido (publicado)</label>
+                <label><input type="checkbox" id="op-ed-estado" ${nodo.esEstado?'checked':''}> Hechizo-Estado</label>
+                <label><input type="checkbox" id="op-ed-prio" ${nodo.esPrioridad?'checked':''}> Prioridad</label>
+                <label><input type="checkbox" id="op-ed-afxusr" ${nodo.afectaUsuario?'checked':''}> Afecta Usuario</label>
+                <label><input type="checkbox" id="op-ed-afxobj" ${nodo.afectaObjetivo?'checked':''}> Afecta Objetivo</label>
+                <label><input type="checkbox" id="op-ed-afxhz" ${nodo.afectaHechizos?'checked':''}> Afecta Hechizos</label>
+            </div>
+            <div class="op-l-row" style="margin-top:8px;">
+                <button class="op-l-btn op-l-gold" onclick="window._hmGuardarHechizo()">💾 Guardar en DB</button>
+            </div>
+        </div>
+
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title">MULTI-SELECCIÓN ${nSel > 0 ? `(${nSel} sel.)` : ''}</div>
+        <div class="op-l-row">
+            <button class="op-l-btn ${st.modoSelMulti?'op-l-active':''}"
+                onclick="window._hmToggleMulti()">
+                ${st.modoSelMulti ? '☑ Multi-sel activo' : '☐ Multi-sel'}
+            </button>
+            ${nSel > 0 ? `
+            <button class="op-l-btn op-l-warn" onclick="window._hmLimpiarSel()">✕ Limpiar sel.</button>` : ''}
+        </div>
+        ${nSel > 0 ? `
+        <div class="op-l-row" style="margin-top:6px;">
+            <button class="op-l-btn op-l-green" onclick="window._hmBatchAsignarLeft()">👤 Asignar batch (${nSel})</button>
+            <button class="op-l-btn" onclick="window._hmBatchPropsLeft()">⚙ Props batch</button>
+        </div>
+        <div id="op-l-batch-form"></div>` : ''}
+
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title">HERRAMIENTAS OP</div>
+        <div class="op-l-row">
+            <button class="op-l-btn op-l-gold" onclick="window._hmNuevoNodo()">➕ Nuevo nodo</button>
+            <button class="op-l-btn ${st.modoConexion?'op-l-active':''}" onclick="window._hmToggleConexion()">
+                ↗ ${st.modoConexion ? 'Cancelar flecha' : 'Modo flecha'}
+            </button>
+        </div>
+        <div class="op-l-row" style="margin-top:6px;">
+            <button class="op-l-btn op-l-gold" onclick="window._hmGuardarPos()">💾 Guardar posiciones</button>
+            <button class="op-l-btn" onclick="window._hmAutoOrdenar()">🌀 Auto-ordenar</button>
+        </div>`;
+    }
+
+    body.innerHTML = `
+        <div class="op-l-nombre">${mostrar ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id)}</div>
+        <div class="op-l-chips">${chips.join('')}</div>
+        ${mostrar ? campos.map(c=>`
+            <div class="op-l-campo">
+                <div class="op-l-campo-label">${c.label}</div>
+                <div class="op-l-campo-val">${c.val}</div>
+            </div>`).join('') : `<div style="font-size:0.7em;color:#2a2a3a;font-style:italic;padding:8px 0;">Sellado — sin información</div>`}
+        ${adminHtml}
+    `;
+
+    // Set afinidad select value after render
+    const afinSel = document.getElementById('op-ed-afin');
+    if (afinSel) afinSel.value = nodo.afinidad || '';
+}
+
+// ── Guardar hechizo completo ──────────────────────────────────
+window._hmGuardarHechizo = async () => {
+    const nodo = _opNodo;
+    if (!nodo || !st.esAdmin) return;
+
+    const payload = {
+        nombre:       document.getElementById('op-ed-nombre')?.value?.trim() || nodo.nombre,
+        clase:        document.getElementById('op-ed-clase')?.value || nodo.clase,
+        afinidad:     document.getElementById('op-ed-afin')?.value || nodo.afinidad,
+        hex_cost:     parseInt(document.getElementById('op-ed-hex')?.value)||0,
+        valor_vex:    parseInt(document.getElementById('op-ed-vex')?.value)||0,
+        resumen:      document.getElementById('op-ed-resumen')?.value || '',
+        efecto:       document.getElementById('op-ed-efecto')?.value || '',
+        overcast:     document.getElementById('op-ed-overcast')?.value || '',
+        undercast:    document.getElementById('op-ed-undercast')?.value || '',
+        especial:     document.getElementById('op-ed-especial')?.value || '',
+        nota:         document.getElementById('op-ed-nota')?.value || '',
+        es_conocido:  document.getElementById('op-ed-conocido')?.checked || false,
+        es_estado:    document.getElementById('op-ed-estado')?.checked || false,
+        es_prioridad: document.getElementById('op-ed-prio')?.checked || false,
+        afecta_usuario:  document.getElementById('op-ed-afxusr')?.checked || false,
+        afecta_objetivo: document.getElementById('op-ed-afxobj')?.checked || false,
+        afecta_hechizos: document.getElementById('op-ed-afxhz')?.checked || false,
+    };
+
+    const { supabase } = await import('../hex-auth.js');
+    let error;
+
+    if (nodo.esNuevo) {
+        // Crear nodo nuevo
+        const newId = document.getElementById('op-ed-id')?.value?.trim() || nodo.id;
+        ({ error } = await supabase.from('hechizos_nodos').insert({
+            ...payload,
+            hechizo_id: newId,
+            pos_x: Math.round(nodo.x),
+            pos_y: Math.round(nodo.y),
+        }));
+        if (!error) {
+            nodo.id = newId;
+            nodo.esNuevo = false;
+        }
+    } else {
+        ({ error } = await supabase.from('hechizos_nodos').update(payload).eq('hechizo_id', nodo.id));
+    }
+
+    if (error) { toast('Error: ' + error.message); return; }
+
+    // Actualizar nodo en memoria
+    Object.assign(nodo, {
+        nombre: payload.nombre, clase: payload.clase, afinidad: payload.afinidad,
+        hex: payload.hex_cost, vex: payload.valor_vex,
+        resumen: payload.resumen, efecto: payload.efecto,
+        overcast: payload.overcast, undercast: payload.undercast, especial: payload.especial,
+        nota: payload.nota,
+        esConocido: payload.es_conocido, esEstado: payload.es_estado, esPrioridad: payload.es_prioridad,
+        afectaUsuario: payload.afecta_usuario, afectaObjetivo: payload.afecta_objetivo, afectaHechizos: payload.afecta_hechizos,
+        radio: payload.es_conocido ? 35 : 28,
+        _dirty: false,
+    });
+
+    calcSetsGlobales();
+    renderInfoStats();
+    renderGrimorio(document.getElementById('hm-search-central')?.value || '');
+    _renderOpLeft();
+    toast('✓ Hechizo guardado');
+};
+
+// ── Asignar PJ desde panel izquierdo ─────────────────────────
+window._hmModalAsignarPJLeft = () => {
+    const nodo = _opNodo;
+    if (!nodo) return;
+    const form = document.getElementById('op-l-batch-form') ||
+                 document.querySelector('#hm-op-left-body');
+    if (!form) return;
+
+    // Insertar el formulario inline en el panel
+    const pjOpts = st.personajes.map(p=>`<option value="${p}">${p}</option>`).join('');
+    const hexTotal = nodo.hex || 0;
+
+    // Find or create inline asignar section
+    let sec = document.getElementById('op-l-asignar-sec');
+    if (!sec) {
+        sec = document.createElement('div');
+        sec.id = 'op-l-asignar-sec';
+        const sepEl = document.querySelector('#hm-op-left-body .op-l-sep');
+        if (sepEl) form.querySelector('#hm-op-left-body')?.insertBefore(sec, sepEl);
+        else document.getElementById('hm-op-left-body')?.appendChild(sec);
+    }
+    sec.innerHTML = `
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title">ASIGNAR A PERSONAJE</div>
+        <div class="op-l-field-row">
+            <label>Personaje</label>
+            <select id="op-asig-pj">${pjOpts}</select>
+        </div>
+        <div class="op-l-field-row">
+            <label>Costo HEX</label>
+            <select id="op-asig-hex">
+                <option value="0">Gratis</option>
+                <option value="50">50% — ${Math.round(hexTotal*0.5)} HEX</option>
+                <option value="100" selected>100% — ${hexTotal} HEX</option>
+            </select>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.7em;color:#888;margin:6px 0;">
+            <input type="checkbox" id="op-asig-pub"> Publicar al asignar
+        </label>
+        <div class="op-l-row">
+            <button class="op-l-btn op-l-green" onclick="window._hmConfirmarAsignar('${nodo.id.replace(/'/g,"\\'")}')">✓ Confirmar</button>
+            <button class="op-l-btn" onclick="document.getElementById('op-l-asignar-sec').remove()">✕ Cancelar</button>
+        </div>`;
+};
+
+window._hmConfirmarAsignar = async (id) => {
+    const nodo = st.nodos.find(n => n.id === id);
+    if (!nodo) return;
+    const pj = document.getElementById('op-asig-pj')?.value;
+    const pct = parseInt(document.getElementById('op-asig-hex')?.value||'100');
+    const publicar = document.getElementById('op-asig-pub')?.checked;
+    if (!pj) { toast('Selecciona un personaje'); return; }
+
+    const { ok, total, err } = await asignarHechizosAPJ([nodo.nombre], pj);
+    if (err) { toast('Error: ' + err); return; }
+
+    if (pct > 0 && ok > 0 && nodo.hex > 0) {
+        const hexGastado = Math.round(nodo.hex * pct / 100);
+        const { supabase } = await import('../hex-auth.js');
+        const { data: pjData } = await supabase.from('personajes').select('hex').eq('nombre', pj).single();
+        if (pjData) await supabase.from('personajes').update({ hex: Math.max(0,(pjData.hex||0)-hexGastado) }).eq('nombre', pj);
+    }
+    if (publicar) await toggleConocido(nodo.id, true);
+
+    document.getElementById('op-l-asignar-sec')?.remove();
+    toast(`✓ ${nodo.nombre} asignado a ${pj}`);
+    _renderOpLeft();
+};
+
+window._hmBatchAsignarLeft = () => {
+    const nodos = [...st.seleccionados];
+    if (nodos.length === 0) return;
+    const bf = document.getElementById('op-l-batch-form');
+    if (!bf) return;
+    const pjOpts = st.personajes.map(p=>`<option value="${p}">${p}</option>`).join('');
+    const hexTotal = nodos.reduce((s,n)=>s+(n.hex||0),0);
+    bf.innerHTML = `
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title">ASIGNAR BATCH A PJ</div>
+        <div class="op-l-field-row">
+            <label>Personaje</label>
+            <select id="op-batch-pj">${pjOpts}</select>
+        </div>
+        <div class="op-l-field-row">
+            <label>Costo HEX</label>
+            <select id="op-batch-hex">
+                <option value="0">Gratis</option>
+                <option value="100" selected>100% — ${hexTotal} HEX</option>
+            </select>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.7em;color:#888;margin:6px 0;">
+            <input type="checkbox" id="op-batch-pub"> Publicar al asignar
+        </label>
+        <div class="op-l-row">
+            <button class="op-l-btn op-l-green" onclick="window._hmConfirmarBatchAsignar()">✓ Confirmar (${nodos.length})</button>
+            <button class="op-l-btn" onclick="document.getElementById('op-l-batch-form').innerHTML=''">✕</button>
+        </div>`;
+};
+
+window._hmConfirmarBatchAsignar = async () => {
+    const nodos = [...st.seleccionados];
+    const pj = document.getElementById('op-batch-pj')?.value;
+    const pct = parseInt(document.getElementById('op-batch-hex')?.value||'100');
+    const publicar = document.getElementById('op-batch-pub')?.checked;
+    if (!pj || nodos.length === 0) return;
+
+    const { ok, total, err } = await asignarHechizosAPJ(nodos.map(n=>n.nombre), pj);
+    if (err) { toast('Error: ' + err); return; }
+    if (publicar) for (const n of nodos) if (!n.esConocido) await toggleConocido(n.id, true);
+    document.getElementById('op-l-batch-form').innerHTML = '';
+    toast(`✓ ${ok}/${total} hechizos asignados a ${pj}`);
+    _renderOpLeft();
+};
+
+window._hmBatchPropsLeft = () => {
+    const nodos = [...st.seleccionados];
+    if (nodos.length === 0) return;
+    const bf = document.getElementById('op-l-batch-form');
+    if (!bf) return;
+    const afinOpts = Object.keys(st.colores).map(a=>`<option value="${a}">${a}</option>`).join('');
+    bf.innerHTML = `
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title">PROPIEDADES BATCH (${nodos.length})</div>
+        <div class="op-l-field-row-2">
+            <div><label>HEX</label><input id="bp-hex" type="number" placeholder="—" min="0"></div>
+            <div><label>VEX</label><input id="bp-vex" type="number" placeholder="—" min="0"></div>
+            <div><label>Clase</label>
+                <select id="bp-clase">
+                    <option value="">—</option>
+                    ${['1','2','3','4','5'].map(c=>`<option value="${c}">${c}</option>`).join('')}
+                </select>
+            </div>
+            <div><label>Afinidad</label>
+                <select id="bp-afin"><option value="">—</option>${afinOpts}</select>
+            </div>
+        </div>
+        <div class="op-l-checks">
+            <label><input type="checkbox" id="bp-pub"> Publicar todos</label>
+            <label><input type="checkbox" id="bp-ocultar"> Ocultar todos</label>
+            <label><input type="checkbox" id="bp-prio"> Marcar prioridad</label>
+            <label><input type="checkbox" id="bp-estado"> Marcar estado</label>
+        </div>
+        <div class="op-l-row" style="margin-top:8px;">
+            <button class="op-l-btn op-l-gold" onclick="window._hmConfirmarBatchProps()">✓ Aplicar</button>
+            <button class="op-l-btn" onclick="document.getElementById('op-l-batch-form').innerHTML=''">✕</button>
+        </div>`;
+};
+
+window._hmConfirmarBatchProps = async () => {
+    const ids = [...st.seleccionados].map(n=>n.id);
+    const hex = document.getElementById('bp-hex')?.value.trim();
+    const vex = document.getElementById('bp-vex')?.value.trim();
+    const clase = document.getElementById('bp-clase')?.value;
+    const afin = document.getElementById('bp-afin')?.value;
+    const pub = document.getElementById('bp-pub')?.checked;
+    const oc  = document.getElementById('bp-ocultar')?.checked;
+    const prio = document.getElementById('bp-prio')?.checked;
+    const est  = document.getElementById('bp-estado')?.checked;
+
+    const payload = {};
+    if (hex !== '')   payload.hex_cost     = parseInt(hex)||0;
+    if (vex !== '')   payload.valor_vex    = parseInt(vex)||0;
+    if (clase)        payload.clase        = clase;
+    if (afin)         payload.afinidad     = afin;
+    if (pub)          payload.es_conocido  = true;
+    if (oc)           payload.es_conocido  = false;
+    if (prio)         payload.es_prioridad = true;
+    if (est)          payload.es_estado    = true;
+
+    if (!Object.keys(payload).length) { toast('Sin cambios'); return; }
+    const { ok, err } = await aplicarPropiedades(ids, payload);
+    document.getElementById('op-l-batch-form').innerHTML = '';
+    toast(`✓ ${ok} actualizado${ok!==1?'s':''}${err?` · ${err} error${err!==1?'es':''}`:''}`);
+    calcSetsGlobales();
+    _renderOpLeft();
+};
+
+// ── Toggle multi-sel refrescando panel ───────────────────────
+window._hmToggleMultiLeft = () => {
+    st.modoSelMulti = !st.modoSelMulti;
+    if (!st.modoSelMulti) { st.seleccionados.clear(); actualizarBadgeSel(); }
+    _renderOpLeft();
+};
+
+
 
 // ── Renderizar pools de PJ ───────────────────────────────────
 export function renderPools() {
@@ -238,11 +694,17 @@ export function renderSidePanel(nodo) {
     if (!nodo) {
         panel.classList.remove('abierto');
         document.body.classList.remove('side-panel-open');
+        // Also close left panel
+        cerrarOpPanel();
         return;
     }
 
     panel.classList.add('abierto');
     document.body.classList.add('side-panel-open');
+
+    // Sync title to left panel
+    const leftTitle = document.getElementById('hm-op-left-title');
+    if (leftTitle) leftTitle.textContent = mostrar ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
 
     const esPosesion = st.posesiones.has(nodo);
     const mostrar    = nodo.esConocido || esPosesion || st.esAdmin;
@@ -264,20 +726,12 @@ export function renderSidePanel(nodo) {
     }
 
     const campos = mostrar ? [
-        { label:'Resumen',   val: nodo.resumen },
         { label:'Efecto',    val: nodo.efecto },
+        { label:'Resumen',   val: nodo.resumen },
         { label:'Overcast',  val: nodo.overcast },
         { label:'Undercast', val: nodo.undercast },
         { label:'Especial',  val: nodo.especial },
     ].filter(c => c.val) : [];
-
-    // Indicadores de afecta_*
-    const afectaChips = [];
-    if (mostrar) {
-        if (nodo.afectaUsuario)  afectaChips.push(`<span class="sp-chip sp-chip-afecta">👤 Afecta usuario</span>`);
-        if (nodo.afectaObjetivo) afectaChips.push(`<span class="sp-chip sp-chip-afecta">🎯 Afecta objetivo</span>`);
-        if (nodo.afectaHechizos) afectaChips.push(`<span class="sp-chip sp-chip-afecta">✦ Afecta hechizos</span>`);
-    }
 
     let adminHtml = '';
     if (st.esAdmin) {
@@ -310,9 +764,8 @@ export function renderSidePanel(nodo) {
     }
 
     body.innerHTML = `
-        <div class="sp-nodo-nombre">${nombre}</div>
+        <div class="sp-nodo-nombre" style="color:${color}">${nombre}</div>
         <div class="sp-nodo-meta">${chips.join('')}</div>
-        ${afectaChips.length ? `<div class="sp-nodo-meta sp-afecta-row">${afectaChips.join('')}</div>` : ''}
         ${mostrar ? campos.map(c => `
             <div class="sp-desc-field">
                 <div class="sp-desc-label">${c.label}</div>
@@ -327,6 +780,12 @@ window._hmCerrarSidePanel = () => {
     st.nodoSel = null;
     renderSidePanel(null);
     renderInfoBar(null);
+};
+
+window._hmCerrarOpLeft = () => {
+    st.nodoSel = null;
+    renderInfoBar(null);
+    import('./mapa-ui.js').then(m => m.cerrarOpPanel()).catch(()=>{});
 };
 
 window._hmQuitarDePJ = async (id) => {

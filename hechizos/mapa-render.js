@@ -123,6 +123,27 @@ export function dibujar() {
 
     ctx.setTransform(1,0,0,1,0,0);
 
+    // ── Rectángulo de selección (screen space) ──
+    if (st.rectSel.activo) {
+        const toScr = (wx,wy) => ({
+            x: wx * camara.zoom + camara.x,
+            y: wy * camara.zoom + camara.y,
+        });
+        const a = toScr(st.rectSel.startX, st.rectSel.startY);
+        const b = toScr(st.rectSel.endX,   st.rectSel.endY);
+        const rx = Math.min(a.x,b.x), ry = Math.min(a.y,b.y);
+        const rw = Math.abs(a.x-b.x),  rh = Math.abs(a.y-b.y);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(212,175,55,0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6,4]);
+        ctx.strokeRect(rx, ry, rw, rh);
+        ctx.fillStyle = 'rgba(212,175,55,0.06)';
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+
     // Actualizar zoom label
     const zl = document.getElementById('hm-zoom-label');
     if (zl) zl.textContent = Math.round(camara.zoom*100) + '%';
@@ -187,8 +208,14 @@ function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesio
         const esIrrel=hayEnfoque&&!enfoqRel.has(nodo)&&nodoSel!==nodo;
 
         let colorN, colorT;
+        // En modo multi-sel: nodos no seleccionados se muestran apagados con tinte
+        const apagadoMulti = modoSelMulti && seleccionados.size > 0 && !enSelMulti && nodoSel !== nodo;
         if (esNuevo) {
             colorN=C.NUEVO; colorT=C.NUEVO;
+        } else if (apagadoMulti) {
+            // Gris con tinte según si es conocido (violeta) o no (amarillo apagado)
+            colorN = esDes ? 'rgba(100,90,130,0.45)' : 'rgba(100,95,70,0.38)';
+            colorT = esDes ? 'rgba(130,120,160,0.5)' : 'rgba(120,115,85,0.45)';
         } else if (hayEnfoque) {
             if (esEnfocado)       { colorN=esDes?C.POS:esApr?C.APR:esPos?C.PJ:'rgba(200,195,220,0.95)'; colorT=colorN; }
             else if (esPrecedente){ colorN=C.PREV; colorT=C.PREV; }
@@ -204,7 +231,7 @@ function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesio
             colorT=esDes?(esPar?C.RASTR:C.POS):esApr?C.APR:'rgba(160,155,175,0.9)';
         }
 
-        ctx.globalAlpha = esIrrel ? 0.4 : 1.0;
+        ctx.globalAlpha = (esIrrel || apagadoMulti) ? (apagadoMulti ? 0.55 : 0.4) : 1.0;
 
         const forma = (extraR=0) => {
             const R=nodo.radio+extraR;
@@ -318,9 +345,9 @@ export function renderInfoBar(nodo) {
 
     if (!nodo) {
         el.innerHTML = '<span style="color:#444;">Clic en un hechizo para ver detalles</span>';
-        renderOpPanel(null);
-        // Llamar al side panel para que se cierre (lazy import)
-        import('./mapa-ui.js').then(m => m.renderSidePanel(null)).catch(()=>{});
+        // Panel OP flotante desactivado — todo está en el panel izquierdo
+        // renderOpPanel(null);
+        import('./mapa-ui.js').then(m => m.cerrarOpPanel()).catch(()=>{});
         return;
     }
 
@@ -342,11 +369,19 @@ export function renderInfoBar(nodo) {
     }
     el.innerHTML = parts.join('<span style="color:#1a1a2a;margin:0 5px;">·</span>');
 
-    // Abrir side panel con detalles
-    import('./mapa-ui.js').then(m => m.renderSidePanel(nodo)).catch(()=>{});
+    // Abrir panel OP izquierdo con detalles
+    import('./mapa-ui.js').then(m => {
+        if (nodo) {
+            const title = document.getElementById('hm-op-left-title');
+            if (title) title.textContent = (nodo.esConocido||st.esAdmin) ? nodo.nombre : (nodo.id.match(/\d+/) ? `Hechizo ${nodo.id.match(/\d+/)[0]}` : nodo.id);
+            m.abrirOpPanel(nodo);
+        } else {
+            m.cerrarOpPanel();
+        }
+    }).catch(()=>{});
 
-    // Panel OP flotante solo si NO hay side panel (fallback)
-    renderOpPanel(nodo);
+    // Panel OP flotante desactivado — todo está en el panel izquierdo
+    // renderOpPanel(nodo);
 }
 
 // ── Panel OP (flotante sobre info bar) ───────────────────────
