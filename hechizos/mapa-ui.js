@@ -594,105 +594,87 @@ window._hmAjustarNum = (id, delta) => {
 };
 
 // ── Navegación rápida con flechas en el panel derecho ──────────
-// Orden de campos navegables (↓/↑ entre ellos, Shift+↓/↑ en checks)
 (function _initSidePanelKeyNav() {
-    // IDs de inputs/selects/textareas del panel (en orden visual)
     const FIELD_IDS = [
         'sp-ed-efecto', 'sp-ed-resumen', 'sp-ed-overcast',
         'sp-ed-undercast', 'sp-ed-especial', 'sp-ed-nota',
-        'sp-ed-nombre',
-        'sp-ed-clase', 'sp-ed-afin',
+        'sp-ed-nombre', 'sp-ed-clase', 'sp-ed-afin',
         'sp-ed-hex', 'sp-ed-vex', 'sp-ed-backcast', 'sp-ed-nextcast',
     ];
-    // IDs de checkboxes (navegables también)
     const CHECK_IDS = [
         'sp-ed-conocido', 'sp-ed-estado', 'sp-ed-prio',
         'sp-ed-afxusr', 'sp-ed-afxobj', 'sp-ed-afxhz',
     ];
-    // Todos en orden: primero campos, luego checks
     const ALL_IDS = [...FIELD_IDS, ...CHECK_IDS];
 
+    const _clearFocus = () =>
+        document.querySelectorAll('.sp-check-row.sp-check-focused')
+            .forEach(l => l.classList.remove('sp-check-focused'));
+
+    const _focusField = (el) => {
+        el.focus();
+        if (el.tagName === 'INPUT' && el.type !== 'checkbox') el.select?.();
+    };
+
+    const _focusCheck = (el) => {
+        _clearFocus();
+        el.closest('label')?.classList.add('sp-check-focused');
+        el.focus();
+    };
+
+    const _navigate = (dir) => {
+        const focused = document.activeElement;
+        const idx = ALL_IDS.indexOf(focused?.id);
+        if (idx === -1) return false;
+        const nextIdx = idx + dir;
+        if (nextIdx < 0 || nextIdx >= ALL_IDS.length) return false;
+        const nextEl = document.getElementById(ALL_IDS[nextIdx]);
+        if (!nextEl) return false;
+        CHECK_IDS.includes(ALL_IDS[nextIdx]) ? _focusCheck(nextEl) : _focusField(nextEl);
+        return true;
+    };
+
     document.addEventListener('keydown', (e) => {
-        // Solo actuar si el foco está dentro del panel derecho
         const panel = document.getElementById('hm-side-panel');
-        if (!panel || !panel.classList.contains('abierto')) return;
+        if (!panel?.classList.contains('abierto')) return;
         if (!panel.contains(document.activeElement)) return;
 
         const focused = document.activeElement;
-        const focusedId = focused?.id;
-
-        // En textareas, flechas mueven cursor → no interferir (solo Tab navega)
-        if (focused?.tagName === 'TEXTAREA') return;
-
-        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-
-        // Encuentra posición actual
-        const idx = ALL_IDS.indexOf(focusedId);
-        const isCheck = CHECK_IDS.includes(focusedId);
-
-        // Si estamos en un input numérico (.sp-num-input), bloquear flechas del browser
-        // (ya son type=text, pero por si acaso)
-        if (focused?.classList.contains('sp-num-input')) {
-            e.preventDefault();
-        }
-
-        if (idx === -1) return; // campo no registrado, dejar comportamiento default
-        e.preventDefault();
-
+        const isArrow = e.key === 'ArrowDown' || e.key === 'ArrowUp';
         const dir = e.key === 'ArrowDown' ? 1 : -1;
-        const nextIdx = idx + dir;
-        if (nextIdx < 0 || nextIdx >= ALL_IDS.length) return;
 
-        const nextId = ALL_IDS[nextIdx];
-        const nextEl = document.getElementById(nextId);
-        if (!nextEl) return;
-
-        const nextIsCheck = CHECK_IDS.includes(nextId);
-
-        if (nextIsCheck) {
-            // Enfocar el label contenedor para resalte visual
-            const label = nextEl.closest('label');
-            if (label) {
-                // Marcar visualmente con clase
-                document.querySelectorAll('.sp-check-row.sp-check-focused')
-                    .forEach(l => l.classList.remove('sp-check-focused'));
-                label.classList.add('sp-check-focused');
-            }
-            nextEl.focus();
-
-            // Shift + flecha → toggle check
-            if (e.shiftKey) {
-                nextEl.checked = !nextEl.checked;
-            }
-        } else {
-            document.querySelectorAll('.sp-check-row.sp-check-focused')
-                .forEach(l => l.classList.remove('sp-check-focused'));
-            nextEl.focus();
-            // Seleccionar texto si es input de texto
-            if (nextEl.tagName === 'INPUT' && nextEl.type !== 'checkbox') {
-                nextEl.select?.();
-            }
+        // ── Enter en checkbox: toggle ──────────────────────────
+        if (e.key === 'Enter' && focused?.type === 'checkbox') {
+            e.preventDefault();
+            focused.checked = !focused.checked;
+            return;
         }
-    });
 
-    // Shift+Space para toggle cuando un checkbox está enfocado
-    document.addEventListener('keydown', (e) => {
-        if (e.key !== ' ' && e.key !== 'Spacebar') return;
-        if (!e.shiftKey) return;
-        const focused = document.activeElement;
-        if (!focused || focused.type !== 'checkbox') return;
-        const panel = document.getElementById('hm-side-panel');
-        if (!panel?.contains(focused)) return;
+        // ── Flechas en textarea: saltar solo desde borde ───────
+        if (focused?.tagName === 'TEXTAREA' && isArrow) {
+            const val = focused.value;
+            const pos = focused.selectionStart;
+            const atStart = pos === 0;
+            const atEnd   = pos === val.length;
+            if ((dir === -1 && atStart) || (dir === 1 && atEnd)) {
+                e.preventDefault();
+                _navigate(dir);
+            }
+            // Si no está en el borde, dejar que el browser mueva el cursor normal
+            return;
+        }
+
+        // ── Flechas en el resto de campos ─────────────────────
+        if (!isArrow) return;
+        const idx = ALL_IDS.indexOf(focused?.id);
+        if (idx === -1) return;
         e.preventDefault();
-        focused.checked = !focused.checked;
+        _navigate(dir);
     });
 
-    // Limpiar resalte al cambiar foco fuera de checks
+    // ── Limpiar resalte al salir de un check ──────────────────
     document.addEventListener('focusin', (e) => {
-        if (!CHECK_IDS.includes(e.target?.id)) {
-            document.querySelectorAll('.sp-check-row.sp-check-focused')
-                .forEach(l => l.classList.remove('sp-check-focused'));
-        }
+        if (!CHECK_IDS.includes(e.target?.id)) _clearFocus();
     });
 })();
 
