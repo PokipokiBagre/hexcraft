@@ -6,6 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mapa de Hechizos — HEX ROL</title>
     <link rel="icon" type="image/png" id="dynamic-favicon" href="../img/icon.png">
+    <script>
+        // Favicon dinámico: intenta desde storage, fallback a local
+        (function() {
+            var sel = localStorage.getItem('hex_selected') || 'hex1';
+            var configs = window.hexConfigs;
+            if (configs && configs[sel] && configs[sel].storageUrl) {
+                var fav = document.getElementById('dynamic-favicon');
+                if (fav) fav.href = configs[sel].storageUrl + '/imginterfaz/icon.png';
+            }
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="hechizos.css">

@@ -15,14 +15,17 @@ async function init() {
     st.canvas = document.getElementById('hm-canvas');
     st.ctx    = st.canvas.getContext('2d');
 
-    // ── Detectar rol (admin) ─────────────────────────────────
+    // ── Detectar rol (admin) + favicon ───────────────────────
     try {
+        // hexAuth.init() detecta rol, setea favicon y badge
+        if (window.hexAuth) await window.hexAuth.init();
+
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             const { data: perfil } = await supabase
                 .from('perfiles_usuario')
                 .select('rol')
-                .eq('user_id', user.id)
+                .eq('id', user.id)   // ← corregido: era 'user_id'
                 .single();
             st.esAdmin = perfil?.rol === 'master' || perfil?.rol === 'admin';
         }

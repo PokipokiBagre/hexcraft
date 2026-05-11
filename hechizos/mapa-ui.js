@@ -264,12 +264,20 @@ export function renderSidePanel(nodo) {
     }
 
     const campos = mostrar ? [
-        { label:'Efecto',    val: nodo.efecto },
         { label:'Resumen',   val: nodo.resumen },
+        { label:'Efecto',    val: nodo.efecto },
         { label:'Overcast',  val: nodo.overcast },
         { label:'Undercast', val: nodo.undercast },
         { label:'Especial',  val: nodo.especial },
     ].filter(c => c.val) : [];
+
+    // Indicadores de afecta_*
+    const afectaChips = [];
+    if (mostrar) {
+        if (nodo.afectaUsuario)  afectaChips.push(`<span class="sp-chip sp-chip-afecta">👤 Afecta usuario</span>`);
+        if (nodo.afectaObjetivo) afectaChips.push(`<span class="sp-chip sp-chip-afecta">🎯 Afecta objetivo</span>`);
+        if (nodo.afectaHechizos) afectaChips.push(`<span class="sp-chip sp-chip-afecta">✦ Afecta hechizos</span>`);
+    }
 
     let adminHtml = '';
     if (st.esAdmin) {
@@ -302,8 +310,9 @@ export function renderSidePanel(nodo) {
     }
 
     body.innerHTML = `
-        <div class="sp-nodo-nombre" style="color:${color}">${nombre}</div>
+        <div class="sp-nodo-nombre">${nombre}</div>
         <div class="sp-nodo-meta">${chips.join('')}</div>
+        ${afectaChips.length ? `<div class="sp-nodo-meta sp-afecta-row">${afectaChips.join('')}</div>` : ''}
         ${mostrar ? campos.map(c => `
             <div class="sp-desc-field">
                 <div class="sp-desc-label">${c.label}</div>
