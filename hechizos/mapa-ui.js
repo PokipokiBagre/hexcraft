@@ -361,6 +361,9 @@ function _mostrarClipboard(pj, hechizosAsignados, hexGastado, descubiertos) {
     `;
     el.classList.add('visible');
 }
+
+// ── Renderizar panel admin ────────────────────────────────────
+function _renderDrawerAdmin() {
     const pane = document.getElementById('hm-pane-admin');
     if (!pane || !st.esAdmin) return;
 
