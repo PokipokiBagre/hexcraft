@@ -11,15 +11,6 @@ import {
 } from './mapa-data.js';
 import { centrarCamara, centrarEnNodo, renderInfoBar, renderInfoStats, renderOpPanel } from './mapa-render.js';
 
-// ── Badge multi-sel ──────────────────────────────────────────
-export function actualizarBadgeSel() {
-    const b = document.getElementById('hm-sel-badge');
-    if (!b) return;
-    const n = st.seleccionados.size;
-    b.style.display = n > 0 ? 'inline' : 'none';
-    b.textContent   = `${n} sel.`;
-}
-
 // ── Helpers ─────────────────────────────────────────────────
 const _norm = (s) => s ? s.toString().trim().toLowerCase()
     .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
