@@ -321,6 +321,17 @@ function _toast(msg, err = false) {
 function _colorVars(c) { return `--slot-bg:${c.bg};--slot-border:${c.border};--slot-text:${c.text};--slot-glow:${c.glow};`; }
 const _esAdmin = () => estadoUI?.esAdmin === true;
 
+// Devuelve el nombre visible de un hechizo según si es conocido o es admin
+// Si oculto y no admin → muestra el hechizo_id (ej: "Hechizo 9")
+const _nombreHz = (hz) => {
+  if (_esAdmin()) return hz.nombre;
+  if (hz.es_conocido || hz.esConocido) return hz.nombre;
+  return hz.hechizo_id || hz.id || hz.nombre; // fallback al ID
+};
+
+// Devuelve true si el usuario puede ver los detalles del hechizo
+const _puedeVerHz = (hz) => _esAdmin() || !!(hz.es_conocido || hz.esConocido);
+
 function _render() {
   const drawer = document.getElementById('hxc-drawer');
   if (!drawer) return;
@@ -489,29 +500,35 @@ function _renderSlot(pj, grupo, idx) {
     const estados = hxState.estadosPorPj[pj.nombre] || [];
     if (estados.length > 0) {
       estadosBlocks = estados.map(e => {
-        // Guardar info del catálogo en el mapa para el tooltip
         const cat = hxState.catalogoDB.find(h =>
           _norm(h.hechizo_id) === _norm(e.hechizo_id) || _norm(h.nombre) === _norm(e.hechizo_nombre)
         );
         const tipKey = 'est_' + _norm(e.hechizo_id || e.hechizo_nombre);
-        _hzTooltipMap[tipKey] = {
-          nombre:   e.hechizo_nombre,
-          afinidad: e.afinidad || '',
-          hex_cost: cat?.hex_cost ?? 0,
-          clase:    cat?.clase   || '',
-          efecto:   cat?.efecto  || '',
-          overcast: cat?.overcast || '',
-          undercast:cat?.undercast || '',
-          especial: cat?.especial  || '',
+        const puedeVerEst = _puedeVerHz(cat || { es_conocido: false, hechizo_id: e.hechizo_id });
+        const nombreEstVis = puedeVerEst ? e.hechizo_nombre : (e.hechizo_id || e.hechizo_nombre);
+        _hzTooltipMap[tipKey] = puedeVerEst ? {
+          nombre:    e.hechizo_nombre,
+          afinidad:  e.afinidad || '',
+          hex_cost:  cat?.hex_cost ?? 0,
+          clase:     cat?.clase   || '',
+          efecto:    cat?.efecto  || '',
+          overcast:  cat?.overcast || '',
+          undercast: cat?.undercast || '',
+          especial:  cat?.especial  || '',
+        } : {
+          nombre: nombreEstVis, afinidad: '', hex_cost: 0,
+          clase: '', efecto: '', overcast: '', undercast: '', especial: '',
         };
-        // data-hxf-id permite a panel-hexcast-flechas.js identificar este bloque como objetivo
         const hxfId = `${pj.nombre.replace(/[^a-zA-Z0-9]/g,'_')}_${e.id}`;
         return `<div class="hxc-estado-block" style="${vars}"
           data-hxf-id="${hxfId}"
           onmousedown="if(window.fxMouseDownEstado&&window.fxMouseDownEstado(event,'${hxfId}'))event.preventDefault()"
           onclick="event.stopPropagation();window._hxcShowHzTooltipXY(event,'${tipKey}')"
           onmouseleave="window._hxcHideHzTooltip()">
-          <span class="hxc-estado-block-nombre">${e.hechizo_nombre}</span>
+          <span class="hxc-estado-block-nombre">${nombreEstVis}</span>
+          <span class="hxc-estado-block-afin">${puedeVerEst ? (e.afinidad||'') : ''}</span>
+          <button class="hxc-estado-block-del" onclick="event.stopPropagation();window._hxcHideHzTooltip();window._hxcQuitarEstado('${pj.nombre.replace(/'/g,"\\'")}',${e.id})">×</button>
+        </div>`;
           <span class="hxc-estado-block-afin">${e.afinidad||''}</span>
           <button class="hxc-estado-block-del" onclick="event.stopPropagation();window._hxcHideHzTooltip();window._hxcQuitarEstado('${pj.nombre.replace(/'/g,"\\'")}',${e.id})">×</button>
         </div>`;
@@ -549,22 +566,28 @@ function _renderLateralPanel() {
     const rows = filtrado.length > 0
       ? filtrado.map(h => {
           const hzKey = _norm(h.hechizo_id || h.nombre);
-          const esEstado = h.es_estado;
-          // Guardar en mapa para tooltip (evita problemas de escape en atributos HTML)
-          _hzTooltipMap[hzKey] = {
+          const esEstado = h.es_conocido || h.esConocido;   // solo mostrar badge si visible
+          const puedeVer = _puedeVerHz(h);
+          const nombreVis = _nombreHz(h);
+          // Solo guardar datos en el tooltip si el usuario puede verlos
+          _hzTooltipMap[hzKey] = puedeVer ? {
             nombre: h.nombre, afinidad: h.afinidad||'', hex_cost: h.hex_cost||0,
             clase: h.clase||'', efecto: h.efecto||'', overcast: h.overcast||'',
             undercast: h.undercast||'', especial: h.especial||''
+          } : {
+            nombre: nombreVis, afinidad: '', hex_cost: 0,
+            clase: '', efecto: '', overcast: '', undercast: '', especial: ''
           };
-          return `<div class="hxc-lat-hz ${esEstado?'es-estado':''}"
+          const hzEstadoBadge = h.es_estado && puedeVer ? `<span class="hxc-lat-hz-badge">estado</span>` : '';
+          return `<div class="hxc-lat-hz ${h.es_estado&&puedeVer?'es-estado':''}"
             onclick="window._hxcAgregarHz('${p.grupo}',${p.idx},'${hzKey}')"
             onmouseenter="window._hxcShowHzTooltip(event,'${hzKey}')"
             onmouseleave="window._hxcHideHzTooltip()">
             <div style="flex:1;min-width:0;">
-              <div class="hxc-lat-hz-nombre">${h.nombre}${esEstado?`<span class="hxc-lat-hz-badge">estado</span>`:''}</div>
-              <div class="hxc-lat-hz-afin">${h.afinidad||'—'}</div>
+              <div class="hxc-lat-hz-nombre">${nombreVis}${hzEstadoBadge}</div>
+              <div class="hxc-lat-hz-afin">${puedeVer ? (h.afinidad||'—') : '—'}</div>
             </div>
-            <span class="hxc-lat-hz-cost">${h.hex_cost||0}</span>
+            <span class="hxc-lat-hz-cost">${puedeVer ? (h.hex_cost||0) : '?'}</span>
           </div>`;
         }).join('')
       : `<div class="hxc-lat-empty">${busq ? 'Sin resultados' : 'Sin hechizos en inventario'}</div>`;
@@ -581,13 +604,17 @@ function _renderLateralPanel() {
       : catalogoEstados;
 
     const catalogoRows = filtCatalogo.length > 0
-      ? filtCatalogo.map(h => `<div class="hxc-lat-hz es-estado" onclick="window._hxcAgregarEstado('${pj.nombre.replace(/'/g,"\\'")}','${h.hechizo_id}','${h.nombre.replace(/'/g,"\\'")}','${h.afinidad||''}')">
+      ? filtCatalogo.map(h => {
+          const puedeVer = _puedeVerHz(h);
+          const nombreVis = _nombreHz(h);
+          return `<div class="hxc-lat-hz es-estado" onclick="window._hxcAgregarEstado('${pj.nombre.replace(/'/g,"\\'")}','${h.hechizo_id}','${h.nombre.replace(/'/g,"\\'")}','${h.afinidad||''}')">
           <div style="flex:1;min-width:0;">
-            <div class="hxc-lat-hz-nombre">${h.nombre}</div>
-            <div class="hxc-lat-hz-afin">${h.afinidad||'—'}</div>
+            <div class="hxc-lat-hz-nombre">${nombreVis}</div>
+            <div class="hxc-lat-hz-afin">${puedeVer ? (h.afinidad||'—') : '—'}</div>
           </div>
           <span class="hxc-lat-hz-cost">+</span>
-        </div>`).join('')
+        </div>`;
+        }).join('')
       : `<div class="hxc-lat-empty">Sin hechizos estado en catálogo</div>`;
 
     body = `
@@ -786,6 +813,8 @@ function _renderStack(esHistorico) {
     const vars    = _colorVars(item.color);
     const hz      = item.hechizo;
     const esEstado = !!(hz.es_estado);
+    const puedeVerEsteHz = _puedeVerHz(hz);
+    const nombreVisHz    = _nombreHz(hz);
     const priCls  = item.esPrioridad ? 'prioridad' : '';
     const estadoCls = esEstado ? 'es-estado' : '';
     const resCls  = item.resultado ? `res-${item.resultado}` : '';
@@ -891,20 +920,22 @@ function _renderStack(esHistorico) {
         ${cdEditorHtml}
         <div class="hxc-detail-stats">
           <div>Afinidad: <span>${item.afinidadEfectiva}</span></div>
-          <div>Costo HEX: <span>${item.costoBase}</span>${hz.valor_vex > 0 ? `<span style="color:#b060e8;margin-left:8px;">+ VEX: ${hz.valor_vex}</span>` : ''}</div>
+          <div>Costo HEX: <span>${item.costoBase}</span>${hz.valor_vex > 0 && puedeVerEsteHz ? `<span style="color:#b060e8;margin-left:8px;">+ VEX: ${hz.valor_vex}</span>` : ''}</div>
           ${item.mult>1?`<div>Con CD: <span style="color:#e8a030;">NC mín. ${item.ncNecesario}</span></div>`:''}
-          <div>Afinidad Hz: <span>${hz.afinidad||'—'}</span></div>
           ${hz.clase?`<div>Clase: <span>${hz.clase}</span></div>`:''}
+          ${puedeVerEsteHz ? `
+          <div>Afinidad Hz: <span>${hz.afinidad||'—'}</span></div>
           ${objetivosStr ? `<div>Afecta: <span>${objetivosStr}</span></div>` : ''}
           ${hz.backcast > 0 ? `<div>Backcast: <span style="color:#70a8e8;">←${hz.backcast}</span></div>` : ''}
           ${hz.nextcast > 0 ? `<div>Nextcast: <span style="color:#e87840;">${hz.nextcast}→</span></div>` : ''}
           ${hz.es_prioridad ? `<div>Prioridad: <span style="color:#d4af37;">↑ automática</span></div>` : ''}
           ${hz.nota ? `<div>Nota: <span style="color:#d4a830;">📌 ${hz.nota}</span></div>` : ''}
+          ` : ''}
         </div>
         ${nc!==null?`<div class="hxc-nc-calc">NC: <strong>${nc}</strong> / necesario: ${item.ncNecesario} — ${nc>=item.ncNecesario?'<span style="color:#3ecf6e;">ÉXITO</span>':'<span style="color:#e85050;">FALLO</span>'}</div>`:''}
         ${gastoHtml}
-        ${campos.map(c=>`<div class="hxc-hz-field"><div class="hxc-hz-field-label">${c.label}</div><div class="hxc-hz-field-val">${c.val}</div></div>`).join('')}
-        ${!campos.length?`<div style="font-size:0.65em;color:#555;font-style:italic;">Sin descripción.</div>`:''}
+        ${puedeVerEsteHz ? campos.map(c=>`<div class="hxc-hz-field"><div class="hxc-hz-field-label">${c.label}</div><div class="hxc-hz-field-val">${c.val}</div></div>`).join('') : ''}
+        ${puedeVerEsteHz && !campos.length?`<div style="font-size:0.65em;color:#555;font-style:italic;">Sin descripción.</div>`:''}
       </div>`;
     }
 
@@ -914,7 +945,7 @@ function _renderStack(esHistorico) {
         onclick="window._hxcToggleItem(${i})">
         <div class="hxc-item-color-dot ${esEstado ? 'es-estado' : ''}"></div>
         <span class="hxc-item-pj">${item.pjNombre}</span>
-        <span class="hxc-item-hz">${hz.nombre}</span>
+        <span class="hxc-item-hz">${nombreVisHz}</span>
         ${item.esPrioridad?`<span class="hxc-prioridad-flag">↑</span>`:''}
         ${metaHtml}
         ${extraMeta}
@@ -1204,6 +1235,7 @@ window._hxcIrTurno = async (idxRaw) => {
         hechizo: {
           hechizo_id: row.hechizo_id, nombre: row.hechizo_nombre,
           afinidad: row.hechizo_afinidad, hex_cost: row.hechizo_hex_cost,
+          es_conocido:     cat?.es_conocido   ?? false,
           resumen:         cat?.resumen         || '',
           efecto:          cat?.efecto          || '',
           overcast:        cat?.overcast        || '',
