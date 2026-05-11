@@ -17,6 +17,7 @@ export const C = {
     L_RASTR:'rgba(188,180,156,0.15)',
     L_OC:   'rgba(70,70,80,0.15)',
     L_PJ:   'rgba(0,210,255,0.6)',
+    DEL:    'rgba(220,60,60,0.95)',   // color flechas en modo eliminar
 };
 
 export const st = {
@@ -53,17 +54,23 @@ export const st = {
     // ── Selección rectangular ─────────────────────────────────
     rectSel: {
         activo: false,
-        startX: 0, startY: 0,   // coords mundo
+        startX: 0, startY: 0,
         endX:   0, endY:   0,
     },
 
     // ── Panel OP izquierdo ────────────────────────────────────
     opPanelAbierto: false,
-    opTab: 'sel',               // 'sel' | 'nodo' | 'admin'
+    opTab: 'sel',
 
     // ── Modo conexión ─────────────────────────────────────────
-    modoConexion: false,
-    tempFlecha:   null,           // { source, endX, endY }
+    modoConexion:       false,
+    tempFlecha:         null,   // { source, endX, endY }
+
+    // ── Modo eliminar flecha ──────────────────────────────────
+    modoEliminarFlecha: false,
+
+    // ── Portapapeles (último resultado de asignación) ─────────
+    clipboard: null,  // { pj, hechizos:[], hexGastado, descubiertos:[] }
 
     // ── Canvas ───────────────────────────────────────────────
     canvas: null,
