@@ -68,6 +68,7 @@ export const st = {
 
     // ── Modo eliminar flecha ──────────────────────────────────
     modoEliminarFlecha: false,
+    enlaceHover:        null,   // enlace bajo el cursor en modo eliminar
 
     // ── Portapapeles (último resultado de asignación) ─────────
     clipboard: null,  // { pj, hechizos:[], hexGastado, descubiertos:[] }

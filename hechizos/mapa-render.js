@@ -99,7 +99,7 @@ export function dibujar() {
     const hayEnfoque = enfocado !== null;
 
     // ── ENLACES ──
-    _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, enfocado, enfoqPrev, enfoqNext, hayEnfoque, sf);
+    _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, enfocado, enfoqPrev, enfoqNext, hayEnfoque, sf, st.modoEliminarFlecha, st.enlaceHover);
 
     // Flecha temporal (modo conexión)
     if (modoConexion && tempFlecha) {
@@ -150,7 +150,7 @@ export function dibujar() {
 }
 
 // ── Dibujar enlaces ──────────────────────────────────────────
-function _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, enfocado, enfoqPrev, enfoqNext, hayEnfoque, sf) {
+function _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, enfocado, enfoqPrev, enfoqNext, hayEnfoque, sf, modoEliminarFlecha, enlaceHover) {
     const esTodos = st.jugadorPanel === 'Todos';
     enlaces.forEach(e => {
         const dx = e.target.x-e.source.x, dy = e.target.y-e.source.y;
@@ -175,11 +175,21 @@ function _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, en
         else if (esTodos)       { color='rgba(120,110,160,0.45)'; lw=1/sf; }
         else if (!e.target.esConocido&&!tA) { dash=[6/sf,5/sf]; }
 
+        // ── Override en modo eliminar flecha ──
+        if (modoEliminarFlecha) {
+            const esHover = enlaceHover === e;
+            color = esHover ? 'rgba(255,70,70,1)' : C.DEL;
+            lw    = esHover ? 3.5/sf : 1.5/sf;
+            dash  = [];
+            if (esHover) { ctx.shadowBlur=12; ctx.shadowColor='rgba(255,60,60,0.8)'; }
+        }
+
         ctx.beginPath();
         ctx.moveTo(e.source.x, e.source.y);
         ctx.lineTo(tx, ty);
         ctx.strokeStyle=color; ctx.lineWidth=lw;
         ctx.setLineDash(dash); ctx.stroke(); ctx.setLineDash([]);
+        ctx.shadowBlur=0;
 
         const hl = lw*3 + 8/sf;
         ctx.beginPath();

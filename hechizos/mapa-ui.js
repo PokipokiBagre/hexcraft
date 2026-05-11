@@ -80,7 +80,25 @@ function _renderOpLeft() {
     const nodo = st.nodoSel;
     const safe = nodo ? nodo.id.replace(/'/g,"\\'") : '';
     const esPosesion = nodo ? st.posesiones.has(nodo) : false;
-    const afinOpts = Object.keys(st.colores).map(a=>`<option value="${a}">${a}</option>`).join('');
+
+    // ── Portapapeles ──
+    let clipHtml = '';
+    if (st.clipboard) {
+        const cb = st.clipboard;
+        clipHtml = `
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title">📋 ÚLTIMO RESULTADO</div>
+        <div class="op-l-clipboard">
+            <div class="op-clip-pj">${cb.pj}</div>
+            ${cb.hechizos.length > 0
+              ? `<div class="op-clip-row"><span class="op-clip-lbl">Asignado${cb.hechizos.length>1?'s':''}:</span> ${cb.hechizos.join(', ')}</div>` : ''}
+            ${cb.hexGastado > 0
+              ? `<div class="op-clip-row"><span class="op-clip-lbl">Hex Gastado:</span> −${cb.hexGastado}</div>` : ''}
+            ${cb.descubiertos && cb.descubiertos.length > 0
+              ? `<div class="op-clip-row"><span class="op-clip-lbl">Descubiertos:</span> ${cb.descubiertos.join(', ')}</div>` : ''}
+            <button class="op-l-btn" style="margin-top:4px;font-size:0.68em;" onclick="st_clearClip()">✕ Limpiar</button>
+        </div>`;
+    }
 
     body.innerHTML = `
         <!-- ═══ HERRAMIENTAS ═══ -->
@@ -92,10 +110,10 @@ function _renderOpLeft() {
             </button>
         </div>
         <div class="op-l-row">
-            <button class="op-l-btn ${st.modoSelMulti ? 'op-l-active' : ''}" onclick="window._hmToggleMulti()" id="op-btn-multi">
-                ${st.modoSelMulti ? '☑ Multi-sel activo' : '☐ Multi-sel'}
+            <button class="op-l-btn ${st.modoEliminarFlecha ? 'op-l-danger op-l-active' : ''}"
+                onclick="window._hmToggleEliminarFlecha()" id="op-btn-antif">
+                ✂ ${st.modoEliminarFlecha ? 'Cancelar anti-flecha' : 'Anti-flecha'}
             </button>
-            ${nSel > 0 ? `<button class="op-l-btn op-l-warn" onclick="window._hmLimpiarSel()">✕ Limpiar (${nSel})</button>` : ''}
         </div>
         <div class="op-l-row">
             <button class="op-l-btn op-l-gold" onclick="window._hmGuardarPos()">💾 Guardar posiciones</button>
@@ -113,19 +131,30 @@ function _renderOpLeft() {
                 ${nodo.esConocido ? '🔒 Ocultar' : '👁 Publicar'}
             </button>
             <button class="op-l-btn op-l-green" onclick="window._hmModalAsignarPJLeft()">👤 Asignar a PJ</button>
+        </div>
+        <div class="op-l-row">
             ${esPosesion && st.jugadorPanel !== 'Todos'
               ? `<button class="op-l-btn op-l-danger" onclick="window._hmQuitarDePJ('${safe}')">✕ Quitar de ${st.jugadorPanel}</button>` : ''}
             ${nodo.esNuevo
-              ? `<button class="op-l-btn op-l-danger" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar nodo</button>` : ''}
+              ? `<button class="op-l-btn op-l-danger" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar nodo</button>`
+              : `<button class="op-l-btn op-l-danger" onclick="window._hmEliminarHechizo('${safe}')">🗑 Eliminar hechizo</button>`}
         </div>
         ` : `<div style="font-size:0.68em;color:#333;padding:4px 0;">Selecciona un hechizo en el mapa</div>`}
 
         <div id="op-l-asignar-sec"></div>
 
+        ${clipHtml}
+
         <div class="op-l-sep"></div>
 
         <!-- ═══ MULTI-SELECCIÓN Y BATCH ═══ -->
         <div class="op-l-section-title">MULTI-SELECCIÓN ${nSel > 0 ? `(${nSel} sel.)` : ''}</div>
+        <div class="op-l-row">
+            <button class="op-l-btn ${st.modoSelMulti ? 'op-l-active' : ''}" onclick="window._hmToggleMulti()" id="op-btn-multi">
+                ${st.modoSelMulti ? '☑ Multi-sel activo' : '☐ Multi-sel'}
+            </button>
+            ${nSel > 0 ? `<button class="op-l-btn op-l-warn" onclick="window._hmLimpiarSel()">✕ Limpiar (${nSel})</button>` : ''}
+        </div>
         ${nSel > 0 ? `
         <div class="op-l-row">
             <button class="op-l-btn op-l-green" onclick="window._hmBatchAsignarLeft()">👤 Asignar batch (${nSel})</button>
@@ -135,7 +164,8 @@ function _renderOpLeft() {
         ` : `<div style="font-size:0.68em;color:#333;padding:4px 0;">Activa multi-sel y selecciona nodos</div>`}
     `;
 
-    // Sincronizar valor del select de afinidad si hay nodo
+    // Exponer limpiar clipboard
+    window.st_clearClip = () => { st.clipboard = null; _renderOpLeft(); };
 }
 
 // ── Asignar PJ desde panel izquierdo ─────────────────────────
@@ -182,13 +212,17 @@ window._hmConfirmarAsignar = async (id) => {
     const { ok, total, err } = await asignarHechizosAPJ([nodo.nombre], pj);
     if (err) { toast('Error: ' + err); return; }
 
+    let hexGastado = 0;
     if (pct > 0 && ok > 0 && nodo.hex > 0) {
-        const hexGastado = Math.round(nodo.hex * pct / 100);
+        hexGastado = Math.round(nodo.hex * pct / 100);
         const { supabase } = await import('../hex-auth.js');
         const { data: pjData } = await supabase.from('personajes').select('hex').eq('nombre', pj).single();
         if (pjData) await supabase.from('personajes').update({ hex: Math.max(0,(pjData.hex||0)-hexGastado) }).eq('nombre', pj);
     }
     if (publicar) await toggleConocido(nodo.id, true);
+
+    // Guardar en portapapeles
+    st.clipboard = { pj, hechizos: [nodo.nombre], hexGastado, descubiertos: publicar ? [nodo.nombre] : [] };
 
     const sec = document.getElementById('op-l-asignar-sec');
     if (sec) sec.innerHTML = '';
@@ -236,7 +270,9 @@ window._hmConfirmarBatchAsignar = async () => {
 
     const { ok, total, err } = await asignarHechizosAPJ(nodos.map(n=>n.nombre), pj);
     if (err) { toast('Error: ' + err); return; }
-    if (publicar) for (const n of nodos) if (!n.esConocido) await toggleConocido(n.id, true);
+    const descubiertos = [];
+    if (publicar) for (const n of nodos) if (!n.esConocido) { await toggleConocido(n.id, true); descubiertos.push(n.nombre); }
+    st.clipboard = { pj, hechizos: nodos.map(n=>n.nombre), hexGastado: 0, descubiertos };
     const bf = document.getElementById('op-l-batch-form');
     if (bf) bf.innerHTML = '';
     toast(`✓ ${ok}/${total} hechizos asignados a ${pj}`);
@@ -399,19 +435,6 @@ export function renderSidePanel(nodo) {
         ).join('');
 
         adminHtml = `
-        <div class="sp-section-title">Acciones OP</div>
-        <div class="sp-action-row">
-            <button class="sp-btn ${nodo.esConocido ? 'sp-btn-ocultar' : 'sp-btn-pub'}"
-                onclick="window._hmToggleConocido('${safe}',${!nodo.esConocido})">
-                ${nodo.esConocido ? '🔒 Ocultar' : '👁 Publicar'}
-            </button>
-            <button class="sp-btn sp-btn-asignar" onclick="window._hmModalAsignarPJLeft()">👤 Asignar a PJ</button>
-            ${esPosesion && st.jugadorPanel !== 'Todos'
-              ? `<button class="sp-btn sp-btn-quitar" onclick="window._hmQuitarDePJ('${safe}')">✕ Quitar de ${st.jugadorPanel}</button>` : ''}
-            ${nodo.esNuevo
-              ? `<button class="sp-btn sp-btn-del" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar</button>` : ''}
-        </div>
-
         <div class="sp-section-title">Editar hechizo</div>
         <div class="sp-desc-field">
             <div class="sp-desc-label">Nombre</div>
@@ -421,7 +444,7 @@ export function renderSidePanel(nodo) {
         <div class="sp-desc-field">
             <div class="sp-desc-label">ID</div>
             <input class="sp-inline-input" id="sp-ed-id"
-                value="${nodo.id}" ${nodo.esNuevo ? '' : 'readonly style="opacity:0.4"'}>
+                value="${nodo.id}" readonly style="opacity:0.4">
         </div>
 
         <div class="sp-section-title">Características</div>
@@ -811,7 +834,13 @@ window._hmCerrarOpLeft = () => cerrarOpPanel();
 window._hmToggleConexion = () => {
     st.modoConexion = !st.modoConexion;
     st.tempFlecha   = null;
-    // Actualizar botones en panel izquierdo y drawer
+    if (st.modoConexion) {
+        // Desactivar anti-flecha si estaba activo
+        st.modoEliminarFlecha = false;
+        st.enlaceHover = null;
+        const baf = document.getElementById('op-btn-antif');
+        if (baf) { baf.classList.remove('op-l-active', 'op-l-danger'); baf.textContent = '✂ Anti-flecha'; }
+    }
     const btns = ['hm-btn-flecha', 'op-btn-flecha'];
     btns.forEach(id => {
         const btn = document.getElementById(id);
@@ -846,9 +875,18 @@ window._hmNuevoNodo = () => {
     if (!wrap) return;
     const cx = (wrap.clientWidth /2 - st.camara.x) / st.camara.zoom;
     const cy = (wrap.clientHeight/2 - st.camara.y) / st.camara.zoom;
-    const id = `hechizo_nuevo_${Date.now()}`;
+
+    // Auto-ID: buscar el número más bajo disponible en la secuencia
+    const nums = new Set(
+        st.nodos.map(n => { const m = n.id.match(/^hechizo[_\s]?(\d+)$/i); return m ? parseInt(m[1]) : null; })
+               .filter(n => n !== null)
+    );
+    let seq = 1;
+    while (nums.has(seq)) seq++;
+    const id = `hechizo_${seq}`;
+
     const nodo = {
-        id, nombre: 'Nuevo Hechizo', afinidad:'Desconocida', clase:'1',
+        id, nombre: `Hechizo ${seq}`, afinidad:'Desconocida', clase:'1',
         hex:0, vex:0, nota:'', esConocido:false, esNuevo:true,
         esEstado:false, esPrioridad:false, backcast:0, nextcast:0,
         afectaHechizos:false, afectaUsuario:false, afectaObjetivo:false,
@@ -859,9 +897,8 @@ window._hmNuevoNodo = () => {
     st.nodoSel = nodo;
     renderInfoBar(nodo);
     renderGrimorio(document.getElementById('hm-search-central')?.value || '');
-    // Abrir side panel derecho para editar
     renderSidePanel(nodo);
-    toast('Nodo temporal creado. Edita los campos y guarda en DB.');
+    toast(`Nodo temporal creado (ID: ${id}). Edita y guarda en DB.`);
 };
 
 window._hmGuardarPos = async () => {
@@ -896,6 +933,63 @@ window._hmEliminarNuevo = (id) => {
     actualizarBadgeSel();
     renderGrimorio(document.getElementById('hm-search-central')?.value || '');
     toast('Nodo descartado');
+};
+
+window._hmEliminarHechizo = async (id) => {
+    if (!st.esAdmin) return;
+    const nodo = st.nodos.find(n => n.id === id);
+    if (!nodo) return;
+    if (nodo.esNuevo) { window._hmEliminarNuevo(id); return; }
+
+    if (!confirm(`¿Eliminar "${nodo.nombre}" y todas sus conexiones? Esta acción no se puede deshacer.`)) return;
+
+    const { supabase } = await import('../hex-auth.js');
+
+    // Borrar strings de este nodo
+    await supabase.from('hechizos_strings').delete().eq('source_id', nodo.id);
+    await supabase.from('hechizos_strings').delete().eq('target_id', nodo.id);
+    // Borrar inventario
+    await supabase.from('hechizos_inventario').delete().eq('hechizo_nombre', nodo.nombre);
+    // Borrar nodo
+    const { error } = await supabase.from('hechizos_nodos').delete().eq('hechizo_id', nodo.id);
+    if (error) { toast('Error al eliminar: ' + error.message); return; }
+
+    // Actualizar estado local
+    st.enlaces = st.enlaces.filter(e => e.source !== nodo && e.target !== nodo);
+    st.nodos   = st.nodos.filter(n => n !== nodo);
+    st.nodos.forEach(n => { n.incomingSources = n.incomingSources.filter(s => s !== nodo); });
+    st.seleccionados.delete(nodo);
+    st.posesiones.delete(nodo);
+    st.rastreo.delete(nodo);
+    if (st.nodoSel === nodo) {
+        st.nodoSel = null;
+        renderInfoBar(null);
+        renderSidePanel(null);
+    }
+    calcSetsGlobales();
+    actualizarBadgeSel();
+    renderGrimorio(document.getElementById('hm-search-central')?.value || '');
+    renderInfoStats();
+    if (st.esAdmin) _renderOpLeft();
+    toast('🗑 Hechizo eliminado');
+};
+
+window._hmToggleEliminarFlecha = () => {
+    st.modoEliminarFlecha = !st.modoEliminarFlecha;
+    if (st.modoEliminarFlecha) {
+        st.modoConexion = false;
+        st.tempFlecha   = null;
+        // Apagar botón modo flecha
+        const bf = document.getElementById('op-btn-flecha');
+        if (bf) { bf.classList.remove('op-l-active'); bf.textContent = '↗ Modo flecha'; }
+    }
+    st.enlaceHover = null;
+    const wrap = document.getElementById('hm-canvas-wrap');
+    if (wrap) wrap.style.cursor = st.modoEliminarFlecha ? 'crosshair' : 'grab';
+    if (st.esAdmin) _renderOpLeft();
+    toast(st.modoEliminarFlecha
+        ? '✂ Anti-flecha activo — clic sobre una flecha para eliminarla'
+        : 'Modo anti-flecha cancelado', 3000);
 };
 
 window._hmQuitarDePJ = async (id) => {

@@ -1,8 +1,3 @@
-// ============================================================
-// mapa-eventos.js — Interacción con el canvas (mouse, touch)
-// /hechizos/mapa-eventos.js
-// ============================================================
-
 import { st } from './mapa-state.js';
 import { calcSetsGlobales, persistirEnlace } from './mapa-data.js';
 import { renderInfoBar } from './mapa-render.js';
@@ -22,7 +17,6 @@ export function iniciarEventos() {
     };
 
     const nodoEn = (wx, wy) => {
-        // Iterar en orden inverso para respetar z-order visual
         for (let i = st.nodos.length - 1; i >= 0; i--) {
             const n = st.nodos[i];
             if (n.esEstado) {
@@ -35,10 +29,36 @@ export function iniciarEventos() {
         return null;
     };
 
+    // Distancia punto a segmento (espacio mundo)
+    const _distSeg = (px, py, ax, ay, bx, by) => {
+        const dx = bx-ax, dy = by-ay;
+        const lenSq = dx*dx + dy*dy;
+        if (lenSq === 0) return Math.hypot(px-ax, py-ay);
+        const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / lenSq));
+        return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+    };
+
+    const enlaceEn = (wx, wy) => {
+        const threshold = 14 / st.camara.zoom;
+        let best = null, bestD = threshold;
+        st.enlaces.forEach(e => {
+            const d = _distSeg(wx, wy, e.source.x, e.source.y, e.target.x, e.target.y);
+            if (d < bestD) { bestD = d; best = e; }
+        });
+        return best;
+    };
+
     // ── MOUSE DOWN ───────────────────────────────────────────
     wrap.addEventListener('mousedown', e => {
         const wp   = worldPos(e.clientX, e.clientY);
         const nodo = nodoEn(wp.x, wp.y);
+
+        // Modo eliminar flecha: click en enlace lo borra
+        if (st.modoEliminarFlecha) {
+            const enlace = enlaceEn(wp.x, wp.y);
+            if (enlace) _eliminarEnlace(enlace);
+            return;
+        }
 
         if (st.modoConexion) {
             if (nodo) st.tempFlecha = { source: nodo, endX: wp.x, endY: wp.y };
@@ -52,7 +72,6 @@ export function iniciarEventos() {
         } else {
             st.drag.nodoCandidate = null;
             if (st.modoSelMulti) {
-                // Iniciar selección rectangular en vacío
                 st.rectSel.activo = true;
                 st.rectSel.startX = wp.x; st.rectSel.startY = wp.y;
                 st.rectSel.endX   = wp.x; st.rectSel.endY   = wp.y;
@@ -74,7 +93,14 @@ export function iniciarEventos() {
         const dy = e.clientY - st.drag.lastY;
         const wp = worldPos(e.clientX, e.clientY);
 
-        // Modo conexión: arrastrar flecha temporal
+        // Modo eliminar: resaltar enlace bajo cursor
+        if (st.modoEliminarFlecha) {
+            st.enlaceHover = enlaceEn(wp.x, wp.y);
+            wrap.style.cursor = st.enlaceHover ? 'pointer' : 'crosshair';
+            st.drag.lastX = e.clientX; st.drag.lastY = e.clientY;
+            return;
+        }
+
         if (st.modoConexion && st.tempFlecha) {
             st.tempFlecha.endX = wp.x;
             st.tempFlecha.endY = wp.y;
@@ -83,30 +109,25 @@ export function iniciarEventos() {
             return;
         }
 
-        // Detectar si supera umbral de movimiento (4px) para activar drag
         const moved = Math.hypot(
             e.clientX - (st.drag.startX||e.clientX),
             e.clientY - (st.drag.startY||e.clientY)
         ) > 4;
 
         if (st.drag.nodoCandidate && moved && st.esAdmin) {
-            // Activar drag del nodo candidato
             st.drag.nodo          = st.drag.nodoCandidate;
             st.drag.nodoCandidate = null;
             st.drag.hasMoved      = true;
         }
 
         if (st.drag.nodo) {
-            // Mover nodo seleccionado
             st.drag.nodo.x += dx / st.camara.zoom;
             st.drag.nodo.y += dy / st.camara.zoom;
             st.drag.nodo._dirty = true;
         } else if (st.rectSel.activo) {
-            // Actualizar extremo del rectángulo de selección
             st.rectSel.endX = wp.x;
             st.rectSel.endY = wp.y;
         } else if (st.drag.activo) {
-            // Pan de cámara
             st.camara.x += dx;
             st.camara.y += dy;
         }
@@ -114,17 +135,17 @@ export function iniciarEventos() {
         st.drag.lastX = e.clientX;
         st.drag.lastY = e.clientY;
 
-        // Cursor
         const n = nodoEn(wp.x, wp.y);
         wrap.style.cursor = st.modoConexion ? 'crosshair' : (n ? 'pointer' : 'grab');
     });
 
     // ── MOUSE UP ─────────────────────────────────────────────
     wrap.addEventListener('mouseup', e => {
+        if (st.modoEliminarFlecha) return; // ya manejado en mousedown
+
         const wp   = worldPos(e.clientX, e.clientY);
         const nodo = nodoEn(wp.x, wp.y);
 
-        // Modo conexión: crear enlace al soltar
         if (st.modoConexion && st.tempFlecha) {
             if (nodo && nodo !== st.tempFlecha.source) {
                 _crearEnlace(st.tempFlecha.source, nodo);
@@ -132,7 +153,6 @@ export function iniciarEventos() {
             st.tempFlecha = null;
         }
 
-        // Finalizar selección rectangular
         if (st.rectSel.activo) {
             st.rectSel.activo = false;
             const minX = Math.min(st.rectSel.startX, st.rectSel.endX);
@@ -148,7 +168,6 @@ export function iniciarEventos() {
             }
         }
 
-        // Candidato sin movimiento → fue un clic simple
         if (st.drag.nodoCandidate && !st.drag.hasMoved) {
             _seleccionarNodo(st.drag.nodoCandidate);
         }
@@ -205,7 +224,6 @@ function _seleccionarNodo(nodo) {
     }
     st.nodoSel = nodo;
     renderInfoBar(nodo);
-    // Abrir panel OP izquierdo en la tab correcta
     import('./mapa-ui.js').then(m => {
         m.abrirOpPanel(nodo);
     }).catch(()=>{});
@@ -220,4 +238,25 @@ async function _crearEnlace(src, tgt) {
     calcSetsGlobales();
     const ok = await persistirEnlace(src, tgt);
     toast(ok ? '✓ Enlace creado' : '✓ Enlace creado (guardado pendiente para nodos nuevos)');
+}
+
+// ── Eliminar enlace (con DB) ──────────────────────────────────
+async function _eliminarEnlace(enlace) {
+    // Quitar del estado local
+    st.enlaces = st.enlaces.filter(e => e !== enlace);
+    enlace.target.incomingSources = enlace.target.incomingSources.filter(s => s !== enlace.source);
+    if (st.enlaceHover === enlace) st.enlaceHover = null;
+    calcSetsGlobales();
+
+    // Eliminar de DB
+    try {
+        const { supabase } = await import('../hex-auth.js');
+        await supabase.from('hechizos_strings')
+            .delete()
+            .eq('source_id', enlace.source.id)
+            .eq('target_id', enlace.target.id);
+        toast('🗑 Flecha eliminada');
+    } catch(err) {
+        toast('Flecha eliminada (sin conexión DB)');
+    }
 }
