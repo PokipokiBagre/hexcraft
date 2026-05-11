@@ -319,6 +319,8 @@ export function renderInfoBar(nodo) {
     if (!nodo) {
         el.innerHTML = '<span style="color:#444;">Clic en un hechizo para ver detalles</span>';
         renderOpPanel(null);
+        // Llamar al side panel para que se cierre (lazy import)
+        import('./mapa-ui.js').then(m => m.renderSidePanel(null)).catch(()=>{});
         return;
     }
 
@@ -340,7 +342,10 @@ export function renderInfoBar(nodo) {
     }
     el.innerHTML = parts.join('<span style="color:#1a1a2a;margin:0 5px;">·</span>');
 
-    // Panel OP flotante con acciones
+    // Abrir side panel con detalles
+    import('./mapa-ui.js').then(m => m.renderSidePanel(nodo)).catch(()=>{});
+
+    // Panel OP flotante solo si NO hay side panel (fallback)
     renderOpPanel(nodo);
 }
 
