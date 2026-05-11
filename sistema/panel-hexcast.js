@@ -520,23 +520,20 @@ function _renderSlot(pj, grupo, idx) {
           clase: '', efecto: '', overcast: '', undercast: '', especial: '',
         };
         const hxfId = `${pj.nombre.replace(/[^a-zA-Z0-9]/g,'_')}_${e.id}`;
-        return `<div class="hxc-estado-block" style="${vars}"
-          data-hxf-id="${hxfId}"
-          onmousedown="if(window.fxMouseDownEstado&&window.fxMouseDownEstado(event,'${hxfId}'))event.preventDefault()"
-          onclick="event.stopPropagation();window._hxcShowHzTooltipXY(event,'${tipKey}')"
-          onmouseleave="window._hxcHideHzTooltip()">
-          <span class="hxc-estado-block-nombre">${nombreEstVis}</span>
-          <span class="hxc-estado-block-afin">${puedeVerEst ? (e.afinidad||'') : ''}</span>
-          <button class="hxc-estado-block-del" onclick="event.stopPropagation();window._hxcHideHzTooltip();window._hxcQuitarEstado('${pj.nombre.replace(/'/g,"\\'")}',${e.id})">×</button>
-        </div>`;
-          <span class="hxc-estado-block-afin">${e.afinidad||''}</span>
-          <button class="hxc-estado-block-del" onclick="event.stopPropagation();window._hxcHideHzTooltip();window._hxcQuitarEstado('${pj.nombre.replace(/'/g,"\\'")}',${e.id})">×</button>
-        </div>`;
-      }).join('');
-    }
-  }
+      return `<div class="hxc-estado-block" style="${vars}"
+              data-hxf-id="${hxfId}"
+              onmousedown="if(window.fxMouseDownEstado&&window.fxMouseDownEstado(event,'${hxfId}'))event.preventDefault()"
+              onclick="event.stopPropagation();window._hxcShowHzTooltipXY(event,'${tipKey}')"
+              onmouseleave="window._hxcHideHzTooltip()">
+              <span class="hxc-estado-block-nombre">${nombreEstVis}</span>
+              <span class="hxc-estado-block-afin">${puedeVerEst ? (e.afinidad||'') : ''}</span>
+              <button class="hxc-estado-block-del" onclick="event.stopPropagation();window._hxcHideHzTooltip();window._hxcQuitarEstado('${pj.nombre.replace(/'/g,"\\'")}',${e.id})">×</button>
+            </div>`;
+          }).join('');
+        }
+      }
 
-  return slotEl + estadosBlocks;
+      return slotEl + estadosBlocks;
 }
 
 // Mapa en memoria para datos de tooltip de hechizos (evita escape de JSON en atributos HTML)
