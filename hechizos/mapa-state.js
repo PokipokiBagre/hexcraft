@@ -27,6 +27,7 @@ export const st = {
     colores:      {},        // afinidad → { t, b }
     jugadores:    [],        // jugadores activos
     personajes:   [],        // todos los personajes activos
+    iconosPj:     {},        // nombre → icono_override
 
     // ── Vista / filtro PJ ────────────────────────────────────
     jugadorPanel: 'Todos',

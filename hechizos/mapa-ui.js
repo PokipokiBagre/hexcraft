@@ -20,7 +20,8 @@ const _norm = (s) => s ? s.toString().trim().toLowerCase()
 const _sb = () => {
     try { return window.currentConfig?.storageUrl || ''; } catch { return ''; }
 };
-const _imgPj = (nombre) => `${_sb()}/imgpersonajes/${_norm(nombre)}icon.png`;
+const _imgPj = (nombre) => `${_sb()}/imgpersonajes/${_norm(st.iconosPj?.[nombre] || nombre)}icon.png`;
+const _imgPjAlt = (nombre) => `${_sb()}/imgpersonajes/${_norm(st.iconosPj?.[nombre] || nombre)}_icon.png`;
 const _fall  = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
 // ── Toast ────────────────────────────────────────────────────
@@ -689,7 +690,7 @@ export function renderPools() {
             title="${nombre}">
             <img class="hm-pool-avatar"
                 src="${_imgPj(nombre)}"
-                onerror="this.onerror=null;this.src='${_fall()}'">
+                onerror="this.src='${_imgPjAlt(nombre)}';this.onerror=()=>{this.onerror=null;this.src='${_fall()}'}">
             <span class="hm-pool-nombre">${nombre}</span>
         </div>`;
     };

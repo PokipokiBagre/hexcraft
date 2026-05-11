@@ -12,8 +12,8 @@ export async function cargarDatos() {
         supabase.from('hechizos_nodos').select('*'),
         supabase.from('hechizos_strings').select('source_id, target_id'),
         supabase.from('hechizos_afinidades').select('afinidad, color_t, color_b'),
-        supabase.from('personajes').select('nombre').eq('is_player', true).eq('is_active', true).order('nombre'),
-        supabase.from('personajes').select('nombre').eq('is_active', true).order('nombre'),
+        supabase.from('personajes').select('nombre,icono_override').eq('is_player', true).eq('is_active', true).order('nombre'),
+        supabase.from('personajes').select('nombre,icono_override').eq('is_active', true).order('nombre'),
     ]);
 
     // Colores de afinidad
@@ -70,6 +70,12 @@ export async function cargarDatos() {
     // Personajes
     st.jugadores  = (jugRes.data || []).map(p => p.nombre);
     st.personajes  = (pjRes.data || []).map(p => p.nombre);
+
+    // Mapa nombre → icono_override (para imágenes correctas en los pools)
+    st.iconosPj = {};
+    (pjRes.data || []).forEach(p => {
+        st.iconosPj[p.nombre] = p.icono_override || p.nombre;
+    });
 }
 
 // ── Inventario de un PJ ──────────────────────────────────────
