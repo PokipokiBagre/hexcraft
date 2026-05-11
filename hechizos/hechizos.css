@@ -20,7 +20,6 @@ html, body {
     border-bottom: 1px solid rgba(212,175,55,0.18);
     display: flex; align-items: center; gap: 0;
     z-index: 200; flex-shrink: 0;
-    overflow: visible;
 }
 #hm-nav-left {
     display: flex; align-items: center; gap: 8px;
@@ -42,7 +41,7 @@ html, body {
 #hm-toolbar {
     display: flex; align-items: center; gap: 5px;
     padding: 0 10px; flex: 1; height: 100%;
-    overflow: visible; scrollbar-width: none;
+    overflow-x: auto; scrollbar-width: none;
 }
 #hm-toolbar::-webkit-scrollbar { display: none; }
 .hm-tab-sep {
@@ -159,7 +158,6 @@ html, body {
     position: fixed;
     top: 44px; left: 0; right: 0; bottom: 32px;
     overflow: hidden; cursor: grab;
-    z-index: 1;
     transition: left 0.25s cubic-bezier(0.4,0,0.2,1), right 0.25s cubic-bezier(0.4,0,0.2,1);
 }
 #hm-canvas-wrap:active { cursor: grabbing; }
@@ -822,13 +820,38 @@ body.drawer-open #hm-op-panel {
     font-size: 0.68em;
     display: flex; flex-direction: column; gap: 4px;
 }
+.op-clip-header {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding-bottom: 5px;
+}
 .op-clip-pj {
     color: rgba(150,131,200,0.95);
     font-weight: 700; font-size: 1.05em;
     letter-spacing: 0.5px;
 }
-.op-clip-row { color: #999; line-height: 1.4; }
-.op-clip-lbl { color: #666; }
+.op-clip-total {
+    color: #e06060; font-size: 0.95em; font-weight: 600;
+}
+.op-clip-restante {
+    color: #555; font-size: 0.88em;
+}
+.op-clip-lista {
+    display: flex; flex-direction: column; gap: 3px;
+    max-height: 180px; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: rgba(150,131,200,0.2) transparent;
+}
+.op-clip-linea {
+    color: #888; line-height: 1.4;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+}
+.op-clip-hex  { color: #e06060; font-weight: 600; }
+.op-clip-pct  { color: #666; font-size: 0.9em; }
+.op-clip-gratis { color: #3ecf6e; font-weight: 600; }
+.op-clip-pub  { color: #d4af37; font-size: 0.88em; }
+.op-clip-row  { color: #999; line-height: 1.4; }
+.op-clip-lbl  { color: #666; }
 
 /* ── Botones de edición rápida numérica (±50 / ±1) ── */
 .sp-num-row {

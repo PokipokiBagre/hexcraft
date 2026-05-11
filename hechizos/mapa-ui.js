@@ -20,8 +20,7 @@ const _norm = (s) => s ? s.toString().trim().toLowerCase()
 const _sb = () => {
     try { return window.currentConfig?.storageUrl || ''; } catch { return ''; }
 };
-const _imgPj = (nombre) => `${_sb()}/imgpersonajes/${_norm(st.iconosPj?.[nombre] || nombre)}icon.png`;
-const _imgPjAlt = (nombre) => `${_sb()}/imgpersonajes/${_norm(st.iconosPj?.[nombre] || nombre)}_icon.png`;
+const _imgPj = (nombre) => `${_sb()}/imgpersonajes/${_norm(nombre)}icon.png`;
 const _fall  = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
 // ── Toast ────────────────────────────────────────────────────
@@ -86,18 +85,37 @@ function _renderOpLeft() {
     let clipHtml = '';
     if (st.clipboard) {
         const cb = st.clipboard;
+        const pctLabel = cb.pct === 0 ? 'Gratis' : cb.pct === 100 ? '100%' : `${cb.pct}%`;
+
+        // Líneas por hechizo
+        let lineasHtml = '';
+        if (cb.detalles && cb.detalles.length > 0) {
+            lineasHtml = cb.detalles.map(d => {
+                const costoTxt = d.hexCobrado > 0
+                    ? `<span class="op-clip-hex">−${d.hexCobrado} HEX</span>${d.pct !== 100 ? ` <span class="op-clip-pct">(${d.pct}%)</span>` : ''}`
+                    : `<span class="op-clip-gratis">Gratis</span>`;
+                const pubTxt = cb.descubiertos?.includes(d.nombre) ? ' <span class="op-clip-pub">↑ publicado</span>' : '';
+                return `<div class="op-clip-linea">${d.nombre} ${costoTxt}${pubTxt}</div>`;
+            }).join('');
+        } else if (cb.hechizos?.length > 0) {
+            lineasHtml = cb.hechizos.map(h => {
+                const pubTxt = cb.descubiertos?.includes(h) ? ' <span class="op-clip-pub">↑ publicado</span>' : '';
+                return `<div class="op-clip-linea">${h} <span class="op-clip-gratis">Gratis</span>${pubTxt}</div>`;
+            }).join('');
+        }
+
         clipHtml = `
         <div class="op-l-sep"></div>
-        <div class="op-l-section-title">📋 ÚLTIMO RESULTADO</div>
+        <div class="op-l-section-title">📋 ÚLTIMO BATCH</div>
         <div class="op-l-clipboard">
-            <div class="op-clip-pj">${cb.pj}</div>
-            ${cb.hechizos.length > 0
-              ? `<div class="op-clip-row"><span class="op-clip-lbl">Asignado${cb.hechizos.length>1?'s':''}:</span> ${cb.hechizos.join(', ')}</div>` : ''}
-            ${cb.hexGastado > 0
-              ? `<div class="op-clip-row"><span class="op-clip-lbl">Hex Gastado:</span> −${cb.hexGastado}</div>` : ''}
-            ${cb.descubiertos && cb.descubiertos.length > 0
-              ? `<div class="op-clip-row"><span class="op-clip-lbl">Descubiertos:</span> ${cb.descubiertos.join(', ')}</div>` : ''}
-            <button class="op-l-btn" style="margin-top:4px;font-size:0.68em;" onclick="st_clearClip()">✕ Limpiar</button>
+            <div class="op-clip-header">
+                <span class="op-clip-pj">${cb.pj}</span>
+                ${cb.hexGastado > 0 ? `<span class="op-clip-total">−${cb.hexGastado} HEX total</span>` : ''}
+                ${cb.hexRestante !== null ? `<span class="op-clip-restante">(restante: ${cb.hexRestante})</span>` : ''}
+            </div>
+            <div class="op-clip-lista">${lineasHtml}</div>
+            <button class="op-l-btn" style="margin-top:6px;font-size:0.65em;width:100%;" onclick="window._hmCopiarClipboard()">📋 Copiar al portapapeles</button>
+            <button class="op-l-btn op-l-warn" style="margin-top:3px;font-size:0.65em;width:100%;" onclick="st_clearClip()">✕ Limpiar</button>
         </div>`;
     }
 
@@ -167,6 +185,28 @@ function _renderOpLeft() {
 
     // Exponer limpiar clipboard
     window.st_clearClip = () => { st.clipboard = null; _renderOpLeft(); };
+
+    // Copiar resumen al portapapeles del sistema
+    window._hmCopiarClipboard = () => {
+        const cb = st.clipboard;
+        if (!cb) return;
+        let txt = `${cb.pj}\n`;
+        if (cb.detalles?.length > 0) {
+            cb.detalles.forEach(d => {
+                const costo = d.hexCobrado > 0 ? `−${d.hexCobrado} HEX${d.pct !== 100 ? ` (${d.pct}%)` : ''}` : 'Gratis';
+                const pub = cb.descubiertos?.includes(d.nombre) ? ' · publicado' : '';
+                txt += `${d.nombre} ${costo}${pub}\n`;
+            });
+        } else {
+            (cb.hechizos||[]).forEach(h => {
+                const pub = cb.descubiertos?.includes(h) ? ' · publicado' : '';
+                txt += `${h} Gratis${pub}\n`;
+            });
+        }
+        if (cb.hexGastado > 0) txt += `Total: −${cb.hexGastado} HEX`;
+        if (cb.hexRestante !== null) txt += ` (restante: ${cb.hexRestante})`;
+        navigator.clipboard?.writeText(txt.trim()).then(() => toast('📋 Copiado'));
+    };
 }
 
 // ── Asignar PJ desde panel izquierdo ─────────────────────────
@@ -271,9 +311,45 @@ window._hmConfirmarBatchAsignar = async () => {
 
     const { ok, total, err } = await asignarHechizosAPJ(nodos.map(n=>n.nombre), pj);
     if (err) { toast('Error: ' + err); return; }
+
+    // Calcular HEX gastado total y detalles por hechizo
+    let hexGastado = 0;
+    const detalles = []; // { nombre, hexBase, hexCobrado, pct }
+    if (pct > 0 && ok > 0) {
+        const { supabase } = await import('../hex-auth.js');
+        const { data: pjData } = await supabase.from('personajes').select('hex').eq('nombre', pj).single();
+        const hexActual = pjData?.hex || 0;
+        for (const n of nodos) {
+            if (n.hex > 0) {
+                const cobrado = Math.round(n.hex * pct / 100);
+                hexGastado += cobrado;
+                detalles.push({ nombre: n.nombre, hexBase: n.hex, hexCobrado: cobrado, pct });
+            } else {
+                detalles.push({ nombre: n.nombre, hexBase: 0, hexCobrado: 0, pct });
+            }
+        }
+        if (hexGastado > 0) {
+            await supabase.from('personajes')
+                .update({ hex: Math.max(0, hexActual - hexGastado) })
+                .eq('nombre', pj);
+        }
+    } else {
+        nodos.forEach(n => detalles.push({ nombre: n.nombre, hexBase: n.hex||0, hexCobrado: 0, pct: 0 }));
+    }
+
     const descubiertos = [];
     if (publicar) for (const n of nodos) if (!n.esConocido) { await toggleConocido(n.id, true); descubiertos.push(n.nombre); }
-    st.clipboard = { pj, hechizos: nodos.map(n=>n.nombre), hexGastado: 0, descubiertos };
+
+    // Obtener hex actualizado del PJ para mostrarlo en el portapapeles
+    let hexRestante = null;
+    if (hexGastado > 0) {
+        const { supabase } = await import('../hex-auth.js');
+        const { data: pjFinal } = await supabase.from('personajes').select('hex').eq('nombre', pj).single();
+        hexRestante = pjFinal?.hex ?? null;
+    }
+
+    st.clipboard = { pj, hechizos: nodos.map(n=>n.nombre), hexGastado, descubiertos, detalles, hexRestante, pct };
+
     const bf = document.getElementById('op-l-batch-form');
     if (bf) bf.innerHTML = '';
     toast(`✓ ${ok}/${total} hechizos asignados a ${pj}`);
@@ -690,7 +766,7 @@ export function renderPools() {
             title="${nombre}">
             <img class="hm-pool-avatar"
                 src="${_imgPj(nombre)}"
-                onerror="this.src='${_imgPjAlt(nombre)}';this.onerror=()=>{this.onerror=null;this.src='${_fall()}'}">
+                onerror="this.onerror=null;this.src='${_fall()}'">
             <span class="hm-pool-nombre">${nombre}</span>
         </div>`;
     };
