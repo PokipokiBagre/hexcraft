@@ -305,54 +305,49 @@ window._hmBatchAsignarLeft = () => {
 window._hmConfirmarBatchAsignar = async () => {
     const nodos = [...st.seleccionados];
     const pj = document.getElementById('op-batch-pj')?.value;
-    const pct = parseInt(document.getElementById('op-batch-hex')?.value||'100');
+    const pct = parseInt(document.getElementById('op-batch-hex')?.value || '100');
     const publicar = document.getElementById('op-batch-pub')?.checked;
     if (!pj || nodos.length === 0) return;
 
-    const { ok, total, err } = await asignarHechizosAPJ(nodos.map(n=>n.nombre), pj);
-    if (err) { toast('Error: ' + err); return; }
+    // ── Calcular costo total antes de asignar ────────────────
+    const { supabase } = await import('../hex-auth.js');
+    const { data: pjData } = await supabase.from('personajes').select('hex').eq('nombre', pj).single();
+    const hexActual = pjData?.hex ?? 0;
 
-    // Calcular HEX gastado total y detalles por hechizo
     let hexGastado = 0;
-    const detalles = []; // { nombre, hexBase, hexCobrado, pct }
-    if (pct > 0 && ok > 0) {
-        const { supabase } = await import('../hex-auth.js');
-        const { data: pjData } = await supabase.from('personajes').select('hex').eq('nombre', pj).single();
-        const hexActual = pjData?.hex || 0;
-        for (const n of nodos) {
-            if (n.hex > 0) {
-                const cobrado = Math.round(n.hex * pct / 100);
-                hexGastado += cobrado;
-                detalles.push({ nombre: n.nombre, hexBase: n.hex, hexCobrado: cobrado, pct });
-            } else {
-                detalles.push({ nombre: n.nombre, hexBase: 0, hexCobrado: 0, pct });
-            }
-        }
-        if (hexGastado > 0) {
-            await supabase.from('personajes')
-                .update({ hex: Math.max(0, hexActual - hexGastado) })
-                .eq('nombre', pj);
-        }
-    } else {
-        nodos.forEach(n => detalles.push({ nombre: n.nombre, hexBase: n.hex||0, hexCobrado: 0, pct: 0 }));
+    const detalles = [];
+    for (const n of nodos) {
+        const cobrado = pct > 0 ? Math.round((n.hex || 0) * pct / 100) : 0;
+        hexGastado += cobrado;
+        detalles.push({ nombre: n.nombre, hexBase: n.hex || 0, hexCobrado: cobrado, pct });
     }
 
+    // ── Validar que tenga HEX suficiente ────────────────────
+    if (hexGastado > 0 && hexActual < hexGastado) {
+        toast(`✘ ${pj} no tiene HEX suficiente (tiene ${hexActual}, necesita ${hexGastado})`);
+        return;
+    }
+
+    // ── Asignar hechizos ─────────────────────────────────────
+    const { ok, total, err } = await asignarHechizosAPJ(nodos.map(n => n.nombre), pj);
+    if (err) { toast('Error: ' + err); return; }
+
+    // ── Descontar HEX ────────────────────────────────────────
+    let hexRestante = hexActual;
+    if (hexGastado > 0) {
+        hexRestante = hexActual - hexGastado;
+        await supabase.from('personajes').update({ hex: hexRestante }).eq('nombre', pj);
+    }
+
+    // ── Publicar si corresponde ──────────────────────────────
     const descubiertos = [];
     if (publicar) for (const n of nodos) if (!n.esConocido) { await toggleConocido(n.id, true); descubiertos.push(n.nombre); }
 
-    // Obtener hex actualizado del PJ para mostrarlo en el portapapeles
-    let hexRestante = null;
-    if (hexGastado > 0) {
-        const { supabase } = await import('../hex-auth.js');
-        const { data: pjFinal } = await supabase.from('personajes').select('hex').eq('nombre', pj).single();
-        hexRestante = pjFinal?.hex ?? null;
-    }
-
-    st.clipboard = { pj, hechizos: nodos.map(n=>n.nombre), hexGastado, descubiertos, detalles, hexRestante, pct };
+    st.clipboard = { pj, hechizos: nodos.map(n => n.nombre), hexGastado, descubiertos, detalles, hexRestante, pct };
 
     const bf = document.getElementById('op-l-batch-form');
     if (bf) bf.innerHTML = '';
-    toast(`✓ ${ok}/${total} hechizos asignados a ${pj}`);
+    toast(`✓ ${ok}/${total} hechizos asignados a ${pj} · −${hexGastado} HEX · restante: ${hexRestante}`);
     _renderOpLeft();
 };
 
