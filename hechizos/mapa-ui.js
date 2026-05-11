@@ -11,16 +11,6 @@ import {
 } from './mapa-data.js';
 import { centrarCamara, centrarEnNodo, renderInfoBar, renderInfoStats, renderOpPanel } from './mapa-render.js';
 
-// ── Toast ────────────────────────────────────────────────────
-export function toast(msg, dur=2300) {
-    const t = document.getElementById('hm-toast');
-    if (!t) return;
-    t.textContent = msg;
-    t.classList.add('show');
-    clearTimeout(t._tid);
-    t._tid = setTimeout(() => t.classList.remove('show'), dur);
-}
-
 // ── Badge multi-sel ──────────────────────────────────────────
 export function actualizarBadgeSel() {
     const b = document.getElementById('hm-sel-badge');
