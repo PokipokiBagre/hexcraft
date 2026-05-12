@@ -672,7 +672,7 @@ function _renderDerecho(body, nombre) {
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 80);
     }
-
+}
 // ── Detalle de misión (panel derecho, solo Unirse/Salir) ───────
 function _renderDetalle(m, nombrePJ, esAdmin) {
     const jugs   = Array.isArray(m.jugadores) ? m.jugadores : [];
