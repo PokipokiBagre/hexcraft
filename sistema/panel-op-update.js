@@ -14,6 +14,7 @@ const opState = {
     seleccionados: new Set(),
     log: [],
     historial: [],
+    filtro: 'jugadores',   // 'jugadores' | 'npcs' | 'todos'
 };
 
 // ── CSS ───────────────────────────────────────────────────────
@@ -141,6 +142,26 @@ function _css() {
 }
 .op-sel-all:hover { color: #b080e0; }
 
+/* ── Filtro tabs ── */
+.op-filtro-tabs {
+    display: flex; align-items: center; gap: 4px;
+    margin-bottom: 6px; flex-shrink: 0; flex-wrap: wrap;
+}
+.op-filtro-tab {
+    font-size: 0.52em; padding: 2px 9px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.03);
+    color: #666; cursor: pointer; font-family: inherit;
+    font-weight: 600; letter-spacing: 0.5px;
+    transition: all 0.12s;
+}
+.op-filtro-tab:hover { border-color: rgba(124,77,170,0.35); color: #aaa; }
+.op-filtro-tab.active {
+    background: rgba(124,77,170,0.2);
+    border-color: rgba(124,77,170,0.55);
+    color: #c8a0f0;
+}
+
 /* ── Acciones ── */
 .op-actions-scroll { flex: 1; overflow-y: auto; scrollbar-width: thin; }
 .op-actions-grid {
@@ -239,16 +260,68 @@ function _pjsSeleccionados() {
 function _renderChips() {
     const grid = document.getElementById('op-pj-grid');
     if (!grid) return;
-    const jugadores = Object.entries(personajes)
+
+    // Filtrar según el filtro activo
+    const todos = Object.entries(personajes)
         .filter(([, p]) => p.isActive)
         .sort(([a], [b]) => a.localeCompare(b));
-    grid.innerHTML = jugadores.map(([nombre, p]) => {
+
+    const filtrados = todos.filter(([, p]) => {
+        if (opState.filtro === 'jugadores') return p.isPlayer;
+        if (opState.filtro === 'npcs')      return !p.isPlayer;
+        return true;
+    });
+
+    // Actualizar estado visual de los tabs
+    ['jugadores','npcs','todos'].forEach(f => {
+        const btn = document.getElementById('op-filtro-' + f);
+        if (btn) btn.classList.toggle('active', opState.filtro === f);
+    });
+
+    // Actualizar contador
+    const countEl = document.getElementById('op-sel-count');
+    if (countEl) countEl.textContent = opState.seleccionados.size;
+
+    // Diff sin-parpadeo: no reemplazamos innerHTML completo.
+    // Creamos/reutilizamos chips existentes para evitar que las imágenes se recarguen.
+    const existentes = new Map();
+    grid.querySelectorAll('.op-pj-chip').forEach(el => {
+        existentes.set(el.dataset.nombre, el);
+    });
+
+    const nuevoNombres = new Set(filtrados.map(([n]) => n));
+
+    // Remover chips que ya no pertenecen al filtro actual
+    existentes.forEach((el, nombre) => {
+        if (!nuevoNombres.has(nombre)) el.remove();
+    });
+
+    // Insertar/actualizar/reordenar chips
+    filtrados.forEach(([nombre, p], i) => {
         const sel = opState.seleccionados.has(nombre);
-        return `<div class="op-pj-chip ${sel ? 'sel' : ''}" onclick="window._opTogglePJ('${nombre.replace(/'/g,"\\'")}')" >
-            <img src="${_imgPj(p, nombre)}" onerror="this.style.display='none'">
-            ${nombre}
-        </div>`;
-    }).join('');
+        let chip = existentes.get(nombre);
+
+        if (!chip) {
+            // Crear chip nuevo (imagen se crea una sola vez)
+            chip = document.createElement('div');
+            chip.className = 'op-pj-chip';
+            chip.dataset.nombre = nombre;
+            chip.onclick = () => window._opTogglePJ(nombre);
+
+            const img = document.createElement('img');
+            img.src = _imgPj(p, nombre);
+            img.onerror = function() { this.style.display = 'none'; };
+            chip.appendChild(img);
+            chip.appendChild(document.createTextNode(' ' + nombre));
+        }
+
+        // Actualizar clase 'sel' sin tocar la imagen
+        chip.classList.toggle('sel', sel);
+
+        // Reordenar si hace falta (appendChild mueve el nodo sin recrearlo)
+        const children = [...grid.children];
+        if (children[i] !== chip) grid.appendChild(chip);
+    });
 }
 
 function _renderLog() {
@@ -484,9 +557,12 @@ function _montar() {
             <!-- COL 1: Selección PJs -->
             <div class="op-col">
                 <div class="op-col-title">Personajes</div>
-                <span class="op-sel-all" onclick="window._opSelAll()">
-                    Seleccionar todos · <span id="op-sel-count">0</span>
-                </span>
+                <div class="op-filtro-tabs" id="op-filtro-tabs">
+                    <button id="op-filtro-jugadores" class="op-filtro-tab active" onclick="window._opSetFiltro('jugadores')">Jugadores</button>
+                    <button id="op-filtro-npcs"      class="op-filtro-tab"        onclick="window._opSetFiltro('npcs')">NPCs</button>
+                    <button id="op-filtro-todos"     class="op-filtro-tab"        onclick="window._opSetFiltro('todos')">Todos</button>
+                    <span class="op-sel-all" onclick="window._opSelAll()">sel. todos · <span id="op-sel-count">0</span></span>
+                </div>
                 <div class="op-pj-grid" id="op-pj-grid"></div>
             </div>
 
@@ -638,6 +714,11 @@ window._opPushGuarda = () => _darPushVexGuarda('guarda');
 window._opUndo       = () => _undo();
 window._opCopiarLog  = () => _copiarLog();
 window._opLimpiarLog = () => { opState.log = []; _renderLog(); };
+
+window._opSetFiltro = (f) => {
+    opState.filtro = f;
+    _renderChips();
+};
 
 // ── Exportar ──────────────────────────────────────────────────
 export function montarOpPanel() {
