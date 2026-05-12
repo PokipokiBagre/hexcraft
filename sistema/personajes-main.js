@@ -77,7 +77,20 @@ window.mostrarVista = function(vista) {
     const tab = document.querySelector(`.tab-btn[data-vista="${vista}"]`);
     if (tab) tab.classList.add('active');
 
-    if (vista === 'catalogo') renderCatalogo();
+    if (vista === 'catalogo') {
+        renderCatalogo();
+        // Sincronizar clases active de los botones con el estado real
+        document.querySelectorAll('.filtro-rol').forEach(b => {
+            const val = b.textContent.trim();
+            const map = { 'Todos':'Todos', 'Jugadores':'Jugador', 'NPCs':'NPC' };
+            b.classList.toggle('active', map[val] === estadoUI.filtroRol || (val === 'Todos' && estadoUI.filtroRol === 'Todos'));
+        });
+        document.querySelectorAll('.filtro-act').forEach(b => {
+            const val = b.textContent.trim();
+            const map = { 'Ambos':'Todos', 'Activos':'Activo', 'Inactivos':'Inactivo' };
+            b.classList.toggle('active', map[val] === estadoUI.filtroAct);
+        });
+    }
     if (vista === 'crear')    inicializarFormulario();
     if (vista === 'formulas') {
         renderFormulas();
