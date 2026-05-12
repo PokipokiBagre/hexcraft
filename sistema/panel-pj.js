@@ -102,6 +102,8 @@ function _inyectarEstilos() {
 .ppj-hpush-btn{width:100%;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.35);border-radius:6px;color:#d4af37;font-size:0.7em;font-weight:700;padding:6px 4px;cursor:pointer;transition:background 0.15s;font-family:'Cinzel',serif;letter-spacing:0.5px;}
 .ppj-hpush-btn:hover:not(:disabled){background:rgba(212,175,55,0.28);}
 .ppj-hpush-btn:disabled{opacity:0.3;cursor:default;}
+.hex-pcard-cancel{width:100%;margin-top:5px;background:rgba(220,80,80,0.08);border:1px solid rgba(220,80,80,0.25);border-radius:6px;color:#e06060;font-size:0.65em;font-weight:600;padding:5px 4px;cursor:pointer;transition:background 0.15s;font-family:'Inter',system-ui,sans-serif;letter-spacing:0.5px;}
+.hex-pcard-cancel:hover{background:rgba(220,80,80,0.18);}
 .ppj-contenido-row{display:flex;gap:6px;align-items:center;margin-top:5px;}
 .ppj-contenido-input{flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:5px;color:#d4af37;font-size:0.8em;padding:4px 6px;font-weight:700;text-align:center;}
 .ppj-hlog-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,0.02);border-radius:6px;border:1px solid rgba(255,255,255,0.04);margin-bottom:5px;}
@@ -283,7 +285,7 @@ export function abrirPanelPJ(nombre) {
     const prevPJ = estadoUI.pjSeleccionado;
     if (prevPJ !== nombre) {
         const hexBody = document.getElementById('ppj-hex-body');
-        if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pj; }
+        if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pjRendered; }
     }
     estadoUI.pjSeleccionado = nombre;
     estadoUI.panelAbierto   = true;
@@ -531,6 +533,39 @@ async function _tabHex(nombre, body) {
         if (pasadas >= limite) return '✓ Disponible';
         const s = Math.ceil((limite - pasadas) * 3600);
         return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+    };
+
+    // ── Tarjeta especial de Asistencia con botón "Cancelar" para OP ──
+    const _pushCardAsistencia = () => {
+        const isOp = estadoUI.esAdmin;
+        const disp = _dispAsistencia();
+        const cdTxt = _restAsistencia() + ' · diario';
+        const ultLog = _ultimoDe('asistencia');
+        // "Cancelar" solo si: es OP + hay un registro hoy + asistencia bloqueada
+        const puedeCancel = isOp && !disp && ultLog?.id;
+        const isAvail = disp && isOp;
+        return `
+        <div class="hex-pcard ${disp ? 'avail' : ''} ${!isOp ? 'locked' : ''}">
+            <div class="hex-pcard-glow"></div>
+            <div class="hex-pcard-label">Asistencia</div>
+            <div class="hex-pcard-amt">+300</div>
+            <div class="hex-pcard-cd">
+                ${disp
+                    ? `<span class="hex-pcard-cd-avail">✓ ${cdTxt.split(' · ')[0]}</span>`
+                    : `<span class="hex-pcard-cd-wait">${cdTxt.split(' · ')[0]}</span>`}
+                <span class="hex-pcard-cd-freq">diario</span>
+            </div>
+            <button class="hex-pcard-btn ${!isOp ? 'hex-pcard-btn-locked' : ''}"
+                    ${isAvail ? '' : 'disabled'}
+                    onclick="${isOp ? `window._ppjEjecutarHexPush('${safe}','asistencia',300)` : ''}">
+                ${!isOp ? '🔒 Solo OP' : 'Otorgar'}
+            </button>
+            ${puedeCancel ? `
+            <button class="hex-pcard-cancel"
+                    onclick="window._ppjCancelarAsistencia(${ultLog.id},'${safe}')">
+                ↩ Cancelar
+            </button>` : ''}
+        </div>`;
     };
 
     const _pushCard = (tipo, label, monto, disp, cdTxt) => {
@@ -1040,7 +1075,7 @@ async function _tabHex(nombre, body) {
             <div class="htab-divider-line htab-divider-rev"></div>
         </div>
         <div class="htab-push-grid">
-            ${_pushCard('asistencia','Asistencia',300,_dispAsistencia(),_restAsistencia()+' · diario')}
+            ${_pushCardAsistencia()}
             ${_pushCard('turno_extra','Turno Extra',500,cdT>=72,_cdRest(cdT,72)+' · c/3 días')}
             ${_pushCard('contenido','Contenido','100–1000',cdC>=72,_cdRest(cdC,72)+' · c/3 días')}
         </div>
@@ -3017,7 +3052,7 @@ window._ppjEjecutarHexPush = async (nombre, tipo, cantidad) => {
     window.mostrarToast?.(`✨ +${cantidad} HEX (${tipo.replace('_',' ')}) → ${nombre}`);
     // Forzar re-render completo del hexBody para mostrar el nuevo log y cooldowns correctos
     const hexBody = document.getElementById('ppj-hex-body');
-    if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pj; _tabHex(nombre, hexBody); }
+    if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pjRendered; _tabHex(nombre, hexBody); }
 };
 
 window._ppjDeleteHexLog = async (id, nombre) => {
@@ -3025,7 +3060,18 @@ window._ppjDeleteHexLog = async (id, nombre) => {
     if (!confirm('¿Eliminar este registro?')) return;
     await supabase.from('hex_push_log').delete().eq('id', id);
     const hexBody = document.getElementById('ppj-hex-body');
-    if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pj; _tabHex(nombre, hexBody); }
+    if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pjRendered; _tabHex(nombre, hexBody); }
+};
+
+// Cancelar asistencia: borra el registro del día (marca como disponible) sin devolver HEX
+window._ppjCancelarAsistencia = async (id, nombre) => {
+    if (!estadoUI.esAdmin) return;
+    if (!confirm(`¿Cancelar la asistencia de ${nombre}? El HEX no se descuenta — solo queda disponible para otorgar de nuevo.`)) return;
+    const { error } = await supabase.from('hex_push_log').delete().eq('id', id);
+    if (error) { window.mostrarToast?.('Error al cancelar asistencia', true); return; }
+    window.mostrarToast?.(`↩ Asistencia de ${nombre} cancelada — disponible de nuevo`);
+    const hexBody = document.getElementById('ppj-hex-body');
+    if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pjRendered; _tabHex(nombre, hexBody); }
 };
 
 window._ppjToggleEquipar = async (personaje, objeto, equipar) => {
