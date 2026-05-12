@@ -577,24 +577,33 @@ async function _tabHex(nombre, body) {
     };
 
     const vexHtml = s.vex_max>0?`
-    <div style="padding:24px 24px 20px;border-bottom:1px solid rgba(154,80,220,0.12);background:linear-gradient(180deg,rgba(60,20,110,0.08) 0%,transparent 100%);">
-        <div style="font-size:0.52em;letter-spacing:3px;text-transform:uppercase;color:rgba(154,80,220,0.45);margin-bottom:10px;">Vex Actual</div>
-        <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;">
-            <div style="font-family:'Cinzel',serif;font-size:2.4em;color:#b070e8;line-height:1;text-shadow:0 0 20px rgba(154,80,220,0.3);">
-                ${Math.floor(p.vex_actual||0)}<span style="font-size:0.35em;color:#6a3a9a;margin-left:8px;letter-spacing:1px;">/ ${s.vex_max}</span>
-            </div>
-            ${canEdit?`<div style="display:flex;gap:5px;padding-bottom:6px;">
-                <button class="ppj-ctrl-btn" style="border-color:rgba(154,80,220,0.3);color:#9a50dc;" onclick="window.modStat('${safe}','vex_actual',-50)">−50</button>
-                <button class="ppj-ctrl-btn" style="border-color:rgba(154,80,220,0.3);color:#9a50dc;" onclick="window.modStat('${safe}','vex_actual',50)">+50</button>
+    <div class="htab-vex-root">
+        <div class="htab-vex-bg-glow"></div>
+        <div class="htab-vex-header">
+            <span class="htab-vex-label">Vex Actual</span>
+            ${canEdit?`<div style="display:flex;gap:5px;">
+                <button class="htab-vex-ctrl" onclick="window.modStat('${safe}','vex_actual',-50)">−50</button>
+                <button class="htab-vex-ctrl" onclick="window.modStat('${safe}','vex_actual',50)">+50</button>
             </div>`:''}
         </div>
-        <div style="height:5px;border-radius:3px;background:rgba(154,80,220,0.1);overflow:hidden;">
-            <div style="height:100%;width:${pctVex}%;background:linear-gradient(90deg,#6a20c0,#b070e8);border-radius:3px;box-shadow:0 0 8px rgba(154,80,220,0.45);"></div>
+        <div class="htab-vex-number-row">
+            <div class="htab-vex-number">${Math.floor(p.vex_actual||0)}</div>
+            <div class="htab-vex-max-col">
+                <span class="htab-vex-slash">/</span>
+                <span class="htab-vex-max">${s.vex_max}</span>
+            </div>
         </div>
-        <div style="font-size:0.52em;color:#3a2a58;margin-top:6px;font-family:monospace;">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
+        <div class="htab-vex-bar-wrap">
+            <div class="htab-vex-bar-track">
+                <div class="htab-vex-bar-fill" style="width:${pctVex}%"></div>
+                <div class="htab-vex-bar-shine" style="width:${pctVex}%"></div>
+            </div>
+            <div class="htab-vex-pct">${pctVex}%</div>
+        </div>
+        <div class="htab-vex-formula">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
     </div>
-    <div style="padding:18px 24px;border-bottom:1px solid rgba(255,255,255,0.04);">
-        <div style="font-size:0.52em;letter-spacing:2.5px;text-transform:uppercase;color:#3a3a58;font-weight:700;margin-bottom:12px;">Pushes de Energía</div>
+    <div class="htab-energia-root">
+        <div class="htab-energia-label">Pushes de Energía</div>
         ${_push('vex','VEX')}
         ${_push('guarda','Guarda')}
     </div>`:'';
@@ -603,62 +612,157 @@ async function _tabHex(nombre, body) {
     <style>
     .htab-root{font-family:'Inter',system-ui,sans-serif;}
 
-    /* ── HERO ── */
+    /* ── HERO HEX ── */
     .htab-hero{
-        padding:32px 24px 28px;text-align:center;position:relative;overflow:hidden;
+        padding:40px 24px 32px;text-align:center;position:relative;overflow:hidden;
         background:
-            radial-gradient(ellipse 140% 90% at 50% -10%, rgba(212,175,55,0.11) 0%, transparent 60%),
-            linear-gradient(180deg,#0a0810 0%,#07050e 100%);
-        border-bottom:1px solid rgba(212,175,55,0.14);
+            radial-gradient(ellipse 120% 70% at 50% -5%, rgba(212,175,55,0.13) 0%, transparent 55%),
+            radial-gradient(ellipse 60% 40% at 50% 30%, rgba(212,175,55,0.04) 0%, transparent 70%),
+            linear-gradient(180deg,#0b0909 0%,#07050e 100%);
+        border-bottom:1px solid rgba(212,175,55,0.16);
     }
+    /* subtle crosshatch grid */
     .htab-hero::before{
-        content:'';position:absolute;inset:0;pointer-events:none;
+        content:'';position:absolute;inset:0;pointer-events:none;opacity:0.6;
         background:
-            repeating-linear-gradient(0deg,transparent,transparent 28px,rgba(212,175,55,0.018) 29px),
-            repeating-linear-gradient(90deg,transparent,transparent 28px,rgba(212,175,55,0.018) 29px);
+            repeating-linear-gradient(0deg,transparent,transparent 32px,rgba(212,175,55,0.015) 33px),
+            repeating-linear-gradient(90deg,transparent,transparent 32px,rgba(212,175,55,0.015) 33px);
     }
+    /* bottom edge gradient line */
     .htab-hero::after{
-        content:'';position:absolute;bottom:0;left:10%;right:10%;height:1px;
-        background:linear-gradient(90deg,transparent,rgba(212,175,55,0.45),transparent);
+        content:'';position:absolute;bottom:0;left:8%;right:8%;height:1px;
+        background:linear-gradient(90deg,transparent,rgba(212,175,55,0.55),transparent);
     }
     .htab-hero-sub{
-        font-size:0.5em;letter-spacing:5px;text-transform:uppercase;
-        color:rgba(212,175,55,0.3);margin-bottom:16px;position:relative;
+        font-size:0.49em;letter-spacing:5px;text-transform:uppercase;
+        color:rgba(212,175,55,0.28);margin-bottom:18px;position:relative;font-family:'Cinzel',serif;
     }
-    .htab-hex-amount{
-        font-family:'Cinzel',serif;font-size:3.4em;color:#d4af37;letter-spacing:4px;
-        line-height:1;position:relative;
-        text-shadow:0 0 40px rgba(212,175,55,0.4),0 0 80px rgba(212,175,55,0.15),0 3px 12px rgba(0,0,0,0.9);
-        margin:14px 0 8px;
+    /* Hex icon */
+    .htab-hex-icon{display:block;margin:0 auto 6px;filter:drop-shadow(0 0 12px rgba(212,175,55,0.35));}
+    /* currency label under icon */
+    .htab-currency-label{
+        font-size:0.5em;letter-spacing:4px;color:rgba(212,175,55,0.32);
+        text-transform:uppercase;margin-bottom:10px;font-family:'Cinzel',serif;
     }
-    .htab-hex-amount-wrap{position:relative;display:inline-block;}
+    /* wrap for ◆ decorators */
+    .htab-hex-amount-wrap{position:relative;display:inline-block;margin-bottom:6px;}
     .htab-hex-amount-wrap::before,
     .htab-hex-amount-wrap::after{
-        content:'◆';font-size:0.18em;color:rgba(212,175,55,0.25);
+        content:'◆';font-size:0.16em;color:rgba(212,175,55,0.22);
         position:absolute;top:50%;transform:translateY(-50%);letter-spacing:0;
     }
-    .htab-hex-amount-wrap::before{right:calc(100% + 10px);}
-    .htab-hex-amount-wrap::after{left:calc(100% + 10px);}
-    .htab-currency-label{
-        font-size:0.55em;letter-spacing:3px;color:rgba(212,175,55,0.38);
-        text-transform:uppercase;margin-bottom:18px;font-family:'Cinzel',serif;
+    .htab-hex-amount-wrap::before{right:calc(100% + 14px);}
+    .htab-hex-amount-wrap::after{left:calc(100% + 14px);}
+    /* the big number */
+    .htab-hex-amount{
+        font-family:'Cinzel',serif;font-size:3.8em;color:#d4af37;letter-spacing:5px;
+        line-height:1;
+        text-shadow:
+            0 0 50px rgba(212,175,55,0.45),
+            0 0 100px rgba(212,175,55,0.15),
+            0 4px 16px rgba(0,0,0,0.95);
     }
-
-    /* hex icon svg */
-    .htab-hex-icon{display:block;margin:0 auto 4px;opacity:0.9;filter:drop-shadow(0 0 8px rgba(212,175,55,0.3));}
-
-    /* ── ADJUST BUTTONS ── */
-    .htab-btn-section{padding:14px 20px 4px;position:relative;}
-    .htab-btn-section-label{font-size:0.5em;letter-spacing:2px;color:#2e2e40;text-transform:uppercase;font-weight:700;text-align:center;margin-bottom:8px;}
-    .htab-btn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;max-width:460px;margin:0 auto 5px;}
+    /* thin horizontal rule under number */
+    .htab-hex-rule{
+        width:80px;height:1px;margin:14px auto 20px;
+        background:linear-gradient(90deg,transparent,rgba(212,175,55,0.4),transparent);
+    }
+    /* adjust buttons */
+    .htab-btn-section{padding:0 16px 6px;position:relative;}
+    .htab-btn-section-label{font-size:0.48em;letter-spacing:2px;color:#2a2a3a;text-transform:uppercase;font-weight:700;text-align:center;margin-bottom:8px;}
+    .htab-btn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;max-width:440px;margin:0 auto 5px;}
     .htab-btn{
-        background:rgba(212,175,55,0.04);border:1px solid rgba(212,175,55,0.12);
-        border-radius:6px;color:#8a6820;font-size:0.7em;font-weight:700;padding:8px 2px;
-        cursor:pointer;transition:all 0.13s;font-family:inherit;position:relative;overflow:hidden;
+        background:rgba(212,175,55,0.04);border:1px solid rgba(212,175,55,0.11);
+        border-radius:6px;color:#7a5e18;font-size:0.69em;font-weight:700;padding:8px 2px;
+        cursor:pointer;transition:all 0.13s;font-family:inherit;
+        box-shadow:inset 0 1px 0 rgba(212,175,55,0.04);
     }
-    .htab-btn:hover{background:rgba(212,175,55,0.12);border-color:rgba(212,175,55,0.32);color:#d4af37;box-shadow:0 0 10px rgba(212,175,55,0.07);}
-    .htab-btn.neg{color:#7a3030;border-color:rgba(180,50,50,0.18);background:rgba(180,50,50,0.04);}
-    .htab-btn.neg:hover{background:rgba(180,50,50,0.11);border-color:rgba(180,50,50,0.35);color:#e07070;}
+    .htab-btn:hover{background:rgba(212,175,55,0.12);border-color:rgba(212,175,55,0.3);color:#d4af37;box-shadow:0 0 8px rgba(212,175,55,0.06);}
+    .htab-btn.neg{color:#6a2828;border-color:rgba(170,40,40,0.15);background:rgba(170,40,40,0.035);}
+    .htab-btn.neg:hover{background:rgba(170,40,40,0.1);border-color:rgba(170,40,40,0.32);color:#e07070;}
+
+    /* ── VEX SECTION ── */
+    .htab-vex-root{
+        position:relative;overflow:hidden;
+        padding:26px 24px 22px;
+        border-bottom:1px solid rgba(154,80,220,0.14);
+        background:
+            radial-gradient(ellipse 90% 80% at 20% 50%, rgba(80,20,160,0.07) 0%, transparent 60%),
+            radial-gradient(ellipse 60% 60% at 80% 0%, rgba(154,80,220,0.05) 0%, transparent 55%),
+            linear-gradient(180deg,rgba(40,10,80,0.1) 0%,transparent 100%);
+    }
+    .htab-vex-root::before{
+        content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
+        background:linear-gradient(90deg,transparent,rgba(154,80,220,0.4),transparent);
+    }
+    .htab-vex-bg-glow{
+        position:absolute;top:-40px;left:-20px;width:200px;height:200px;
+        background:radial-gradient(ellipse,rgba(100,30,200,0.08) 0%,transparent 70%);
+        pointer-events:none;
+    }
+    .htab-vex-header{
+        display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;position:relative;
+    }
+    .htab-vex-label{
+        font-size:0.5em;letter-spacing:3.5px;text-transform:uppercase;
+        color:rgba(154,80,220,0.5);font-weight:700;font-family:'Cinzel',serif;
+    }
+    .htab-vex-ctrl{
+        background:rgba(154,80,220,0.07);border:1px solid rgba(154,80,220,0.22);
+        border-radius:5px;color:#9a50dc;font-size:0.68em;font-weight:700;
+        padding:4px 10px;cursor:pointer;transition:all 0.14s;
+    }
+    .htab-vex-ctrl:hover{background:rgba(154,80,220,0.16);border-color:rgba(154,80,220,0.5);}
+    .htab-vex-number-row{
+        display:flex;align-items:flex-end;gap:10px;margin-bottom:18px;position:relative;
+    }
+    .htab-vex-number{
+        font-family:'Cinzel',serif;font-size:3.2em;color:#b070e8;line-height:1;
+        text-shadow:
+            0 0 40px rgba(154,80,220,0.5),
+            0 0 80px rgba(154,80,220,0.18),
+            0 3px 12px rgba(0,0,0,0.9);
+        letter-spacing:3px;
+    }
+    .htab-vex-max-col{display:flex;flex-direction:column;padding-bottom:6px;gap:0;}
+    .htab-vex-slash{font-size:0.85em;color:rgba(154,80,220,0.2);line-height:1;font-family:'Cinzel',serif;}
+    .htab-vex-max{font-size:1em;color:rgba(154,80,220,0.35);font-family:'Cinzel',serif;font-weight:600;line-height:1.2;}
+    /* progress bar */
+    .htab-vex-bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:10px;position:relative;}
+    .htab-vex-bar-track{
+        flex:1;height:8px;border-radius:4px;
+        background:rgba(154,80,220,0.08);
+        border:1px solid rgba(154,80,220,0.12);
+        overflow:hidden;position:relative;
+        box-shadow:inset 0 1px 3px rgba(0,0,0,0.4);
+    }
+    .htab-vex-bar-fill{
+        position:absolute;inset:0;right:auto;
+        background:linear-gradient(90deg,#4a10a0,#9a50dc,#c080f8);
+        border-radius:4px;
+        box-shadow:0 0 12px rgba(154,80,220,0.6),0 0 4px rgba(154,80,220,0.4);
+        transition:width 0.5s cubic-bezier(.4,0,.2,1);
+    }
+    .htab-vex-bar-shine{
+        position:absolute;top:0;left:0;height:50%;
+        background:linear-gradient(180deg,rgba(255,255,255,0.15),transparent);
+        border-radius:4px 4px 0 0;
+        pointer-events:none;
+        transition:width 0.5s cubic-bezier(.4,0,.2,1);
+    }
+    .htab-vex-pct{font-size:0.6em;color:rgba(154,80,220,0.4);font-weight:700;min-width:32px;text-align:right;font-family:'Cinzel',serif;}
+    .htab-vex-formula{font-size:0.5em;color:#2a1a40;font-family:monospace;margin-top:2px;position:relative;}
+
+    /* ── ENERGIA (push blocks inside vex area) ── */
+    .htab-energia-root{
+        padding:18px 24px 16px;
+        border-bottom:1px solid rgba(255,255,255,0.04);
+        background:linear-gradient(180deg,rgba(30,10,60,0.06) 0%,transparent 100%);
+    }
+    .htab-energia-label{
+        font-size:0.49em;letter-spacing:2.5px;text-transform:uppercase;
+        color:#2e2e4a;font-weight:700;margin-bottom:12px;
+    }
 
     /* ── PUSHES SECTION ── */
     .htab-pushes-section{
@@ -772,22 +876,24 @@ async function _tabHex(nombre, body) {
 
     <div class="htab-hero">
         <div class="htab-hero-sub">Panel de Recursos</div>
-        <svg class="htab-hex-icon" width="80" height="70" viewBox="0 0 100 88" fill="none">
-            <polygon points="50,2 94,25 94,63 50,86 6,63 6,25" stroke="rgba(212,175,55,0.28)" stroke-width="1.2"/>
-            <polygon points="50,13 83,31 83,57 50,75 17,57 17,31" stroke="rgba(212,175,55,0.1)" stroke-width="0.8"/>
-            <polygon points="50,24 72,37 72,51 50,64 28,51 28,37" stroke="rgba(212,175,55,0.06)" stroke-width="0.6"/>
-            <line x1="50" y1="2" x2="50" y2="8" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="94" y1="25" x2="89" y2="28" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="94" y1="63" x2="89" y2="60" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="50" y1="86" x2="50" y2="80" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="6" y1="63" x2="11" y2="60" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="6" y1="25" x2="11" y2="28" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
-            <circle cx="50" cy="44" r="3" fill="rgba(212,175,55,0.35)"/>
+        <svg class="htab-hex-icon" width="72" height="64" viewBox="0 0 100 88" fill="none">
+            <polygon points="50,2 94,25 94,63 50,86 6,63 6,25" stroke="rgba(212,175,55,0.32)" stroke-width="1.2"/>
+            <polygon points="50,14 82,31 82,57 50,74 18,57 18,31" stroke="rgba(212,175,55,0.11)" stroke-width="0.9"/>
+            <polygon points="50,26 70,37 70,51 50,62 30,51 30,37" stroke="rgba(212,175,55,0.06)" stroke-width="0.6"/>
+            <line x1="50" y1="2" x2="50" y2="9" stroke="rgba(212,175,55,0.8)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="94" y1="25" x2="88" y2="29" stroke="rgba(212,175,55,0.8)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="94" y1="63" x2="88" y2="59" stroke="rgba(212,175,55,0.8)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="50" y1="86" x2="50" y2="79" stroke="rgba(212,175,55,0.8)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="6" y1="63" x2="12" y2="59" stroke="rgba(212,175,55,0.8)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="6" y1="25" x2="12" y2="29" stroke="rgba(212,175,55,0.8)" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="50" cy="44" r="2.5" fill="rgba(212,175,55,0.5)"/>
+            <circle cx="50" cy="44" r="6" stroke="rgba(212,175,55,0.12)" stroke-width="1"/>
         </svg>
         <div class="htab-currency-label">HEX</div>
         <div class="htab-hex-amount-wrap">
             <div class="htab-hex-amount">${(p.hex||0).toLocaleString()}</div>
         </div>
+        <div class="htab-hex-rule"></div>
         ${canEdit?`
         <div class="htab-btn-section">
             <div class="htab-btn-section-label">Ajustar</div>
