@@ -673,58 +673,58 @@ async function _tabHex(nombre, body) {
         background:linear-gradient(90deg,transparent,rgba(212,175,55,0.55),transparent);
     }
     .htab-hero-sub{
-        font-size:0.49em;letter-spacing:5px;text-transform:uppercase;
-        color:rgba(212,175,55,0.28);margin-bottom:18px;position:relative;font-family:'Cinzel',serif;
+        font-size:0.58em;letter-spacing:5px;text-transform:uppercase;
+        color:rgba(212,175,55,0.55);margin-bottom:18px;position:relative;font-family:'Cinzel',serif;
     }
     /* Hex icon */
     .htab-hex-icon{display:block;margin:0 auto 6px;filter:drop-shadow(0 0 12px rgba(212,175,55,0.35));}
     /* currency label under icon */
     .htab-currency-label{
-        font-size:0.5em;letter-spacing:4px;color:rgba(212,175,55,0.32);
+        font-size:0.6em;letter-spacing:5px;color:rgba(212,175,55,0.55);
         text-transform:uppercase;margin-bottom:10px;font-family:'Cinzel',serif;
     }
     /* wrap for ◆ decorators */
     .htab-hex-amount-wrap{position:relative;display:inline-block;margin-bottom:6px;}
     .htab-hex-amount-wrap::before,
     .htab-hex-amount-wrap::after{
-        content:'◆';font-size:0.16em;color:rgba(212,175,55,0.22);
+        content:'◆';font-size:0.18em;color:rgba(212,175,55,0.35);
         position:absolute;top:50%;transform:translateY(-50%);letter-spacing:0;
     }
     .htab-hex-amount-wrap::before{right:calc(100% + 14px);}
     .htab-hex-amount-wrap::after{left:calc(100% + 14px);}
     /* the big number */
     .htab-hex-amount{
-        font-family:'Cinzel',serif;font-size:3.8em;color:#d4af37;letter-spacing:5px;
+        font-family:'Cinzel',serif;font-size:3.8em;color:#e8c84a;letter-spacing:5px;
         line-height:1;
         text-shadow:
-            0 0 50px rgba(212,175,55,0.45),
-            0 0 100px rgba(212,175,55,0.15),
+            0 0 50px rgba(212,175,55,0.55),
+            0 0 100px rgba(212,175,55,0.2),
             0 4px 16px rgba(0,0,0,0.95);
     }
     /* thin horizontal rule under number */
     .htab-hex-rule{
         width:80px;height:1px;margin:14px auto 20px;
-        background:linear-gradient(90deg,transparent,rgba(212,175,55,0.4),transparent);
+        background:linear-gradient(90deg,transparent,rgba(212,175,55,0.5),transparent);
     }
     /* adjust buttons */
     .htab-btn-section{padding:0 16px 6px;position:relative;}
-    .htab-btn-section-label{font-size:0.48em;letter-spacing:2px;color:#2a2a3a;text-transform:uppercase;font-weight:700;text-align:center;margin-bottom:8px;}
+    .htab-btn-section-label{font-size:0.58em;letter-spacing:2px;color:rgba(212,175,55,0.4);text-transform:uppercase;font-weight:700;text-align:center;margin-bottom:8px;}
     .htab-btn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;max-width:440px;margin:0 auto 5px;}
     .htab-btn{
-        background:rgba(212,175,55,0.04);border:1px solid rgba(212,175,55,0.11);
-        border-radius:6px;color:#7a5e18;font-size:0.69em;font-weight:700;padding:8px 2px;
+        background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.18);
+        border-radius:6px;color:#a07830;font-size:0.72em;font-weight:700;padding:8px 2px;
         cursor:pointer;transition:all 0.13s;font-family:inherit;
         box-shadow:inset 0 1px 0 rgba(212,175,55,0.04);
     }
-    .htab-btn:hover{background:rgba(212,175,55,0.12);border-color:rgba(212,175,55,0.3);color:#d4af37;box-shadow:0 0 8px rgba(212,175,55,0.06);}
-    .htab-btn.neg{color:#6a2828;border-color:rgba(170,40,40,0.15);background:rgba(170,40,40,0.035);}
-    .htab-btn.neg:hover{background:rgba(170,40,40,0.1);border-color:rgba(170,40,40,0.32);color:#e07070;}
+    .htab-btn:hover{background:rgba(212,175,55,0.15);border-color:rgba(212,175,55,0.38);color:#e8c84a;box-shadow:0 0 8px rgba(212,175,55,0.08);}
+    .htab-btn.neg{color:#8a3535;border-color:rgba(180,50,50,0.25);background:rgba(180,50,50,0.06);}
+    .htab-btn.neg:hover{background:rgba(180,50,50,0.14);border-color:rgba(180,50,50,0.42);color:#f08080;}
 
     /* ── VEX SECTION ── */
     .htab-vex-root{
         position:relative;overflow:hidden;
         padding:26px 24px 22px;
-        border-bottom:1px solid rgba(154,80,220,0.14);
+        border-bottom:1px solid rgba(154,80,220,0.2);
         background:
             radial-gradient(ellipse 90% 80% at 20% 50%, rgba(80,20,160,0.07) 0%, transparent 60%),
             radial-gradient(ellipse 60% 60% at 80% 0%, rgba(154,80,220,0.05) 0%, transparent 55%),
@@ -732,7 +732,7 @@ async function _tabHex(nombre, body) {
     }
     .htab-vex-root::before{
         content:'';position:absolute;top:0;left:12%;right:12%;height:1px;
-        background:linear-gradient(90deg,transparent,rgba(154,80,220,0.4),transparent);
+        background:linear-gradient(90deg,transparent,rgba(154,80,220,0.5),transparent);
     }
     .htab-vex-bg-glow{
         position:absolute;top:-40px;left:-20px;width:200px;height:200px;
@@ -743,94 +743,94 @@ async function _tabHex(nombre, body) {
         display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;position:relative;
     }
     .htab-vex-label{
-        font-size:0.5em;letter-spacing:3.5px;text-transform:uppercase;
-        color:rgba(154,80,220,0.5);font-weight:700;font-family:'Cinzel',serif;
+        font-size:0.62em;letter-spacing:3px;text-transform:uppercase;
+        color:rgba(190,130,255,0.75);font-weight:700;font-family:'Cinzel',serif;
     }
     .htab-vex-ctrl{
-        background:rgba(154,80,220,0.07);border:1px solid rgba(154,80,220,0.22);
-        border-radius:5px;color:#9a50dc;font-size:0.68em;font-weight:700;
-        padding:4px 10px;cursor:pointer;transition:all 0.14s;
+        background:rgba(154,80,220,0.12);border:1px solid rgba(154,80,220,0.35);
+        border-radius:5px;color:#c090f0;font-size:0.75em;font-weight:700;
+        padding:5px 12px;cursor:pointer;transition:all 0.14s;
     }
-    .htab-vex-ctrl:hover{background:rgba(154,80,220,0.16);border-color:rgba(154,80,220,0.5);}
+    .htab-vex-ctrl:hover{background:rgba(154,80,220,0.24);border-color:rgba(154,80,220,0.65);color:#d8b0ff;}
     .htab-vex-number-row{
         display:flex;align-items:flex-end;gap:10px;margin-bottom:18px;position:relative;
     }
     .htab-vex-number{
-        font-family:'Cinzel',serif;font-size:3.2em;color:#b070e8;line-height:1;
+        font-family:'Cinzel',serif;font-size:3.2em;color:#d0a0ff;line-height:1;
         text-shadow:
-            0 0 40px rgba(154,80,220,0.5),
-            0 0 80px rgba(154,80,220,0.18),
+            0 0 40px rgba(154,80,220,0.6),
+            0 0 80px rgba(154,80,220,0.2),
             0 3px 12px rgba(0,0,0,0.9);
         letter-spacing:3px;
     }
     .htab-vex-max-col{display:flex;flex-direction:column;padding-bottom:6px;gap:0;}
-    .htab-vex-slash{font-size:0.85em;color:rgba(154,80,220,0.2);line-height:1;font-family:'Cinzel',serif;}
-    .htab-vex-max{font-size:1em;color:rgba(154,80,220,0.35);font-family:'Cinzel',serif;font-weight:600;line-height:1.2;}
+    .htab-vex-slash{font-size:0.85em;color:rgba(190,130,255,0.4);line-height:1;font-family:'Cinzel',serif;}
+    .htab-vex-max{font-size:1em;color:rgba(190,130,255,0.65);font-family:'Cinzel',serif;font-weight:600;line-height:1.2;}
     /* progress bar */
     .htab-vex-bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:10px;position:relative;}
     .htab-vex-bar-track{
         flex:1;height:8px;border-radius:4px;
-        background:rgba(154,80,220,0.08);
-        border:1px solid rgba(154,80,220,0.12);
+        background:rgba(154,80,220,0.12);
+        border:1px solid rgba(154,80,220,0.18);
         overflow:hidden;position:relative;
         box-shadow:inset 0 1px 3px rgba(0,0,0,0.4);
     }
     .htab-vex-bar-fill{
         position:absolute;inset:0;right:auto;
-        background:linear-gradient(90deg,#4a10a0,#9a50dc,#c080f8);
+        background:linear-gradient(90deg,#5a20b0,#a060e8,#d090ff);
         border-radius:4px;
-        box-shadow:0 0 12px rgba(154,80,220,0.6),0 0 4px rgba(154,80,220,0.4);
+        box-shadow:0 0 14px rgba(154,80,220,0.7),0 0 4px rgba(154,80,220,0.5);
         transition:width 0.5s cubic-bezier(.4,0,.2,1);
     }
     .htab-vex-bar-shine{
         position:absolute;top:0;left:0;height:50%;
-        background:linear-gradient(180deg,rgba(255,255,255,0.15),transparent);
+        background:linear-gradient(180deg,rgba(255,255,255,0.18),transparent);
         border-radius:4px 4px 0 0;
         pointer-events:none;
         transition:width 0.5s cubic-bezier(.4,0,.2,1);
     }
-    .htab-vex-pct{font-size:0.6em;color:rgba(154,80,220,0.4);font-weight:700;min-width:32px;text-align:right;font-family:'Cinzel',serif;}
-    .htab-vex-formula{font-size:0.5em;color:#2a1a40;font-family:monospace;margin-top:2px;position:relative;}
+    .htab-vex-pct{font-size:0.68em;color:rgba(190,130,255,0.7);font-weight:700;min-width:32px;text-align:right;font-family:'Cinzel',serif;}
+    .htab-vex-formula{font-size:0.55em;color:rgba(154,80,220,0.3);font-family:monospace;margin-top:2px;position:relative;}
 
     /* ── ENERGIA (push blocks + reset countdown) ── */
     .htab-energia-root{
         padding:18px 24px 16px;
-        border-bottom:1px solid rgba(255,255,255,0.04);
+        border-bottom:1px solid rgba(255,255,255,0.05);
         background:linear-gradient(180deg,rgba(30,10,60,0.06) 0%,transparent 100%);
     }
     .htab-energia-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
     .htab-energia-label{
-        font-size:0.49em;letter-spacing:2.5px;text-transform:uppercase;
-        color:#2e2e4a;font-weight:700;
+        font-size:0.6em;letter-spacing:2px;text-transform:uppercase;
+        color:rgba(160,140,200,0.65);font-weight:700;
     }
-    /* Reset countdown badge */
+    /* Reset countdown badge — más visible */
     .htab-reset-badge{
-        display:flex;align-items:center;gap:5px;
-        background:rgba(154,80,220,0.06);
-        border:1px solid rgba(154,80,220,0.16);
-        border-radius:20px;padding:3px 10px 3px 7px;
+        display:flex;align-items:center;gap:6px;
+        background:rgba(154,80,220,0.14);
+        border:1px solid rgba(154,80,220,0.35);
+        border-radius:8px;padding:5px 12px 5px 10px;
         transition:all 0.3s;
     }
     .htab-reset-badge.htab-reset-urgent{
-        background:rgba(200,60,60,0.08);
-        border-color:rgba(200,60,60,0.25);
+        background:rgba(200,60,60,0.14);
+        border-color:rgba(200,60,60,0.4);
         animation:ppj-pulse-badge 2s ease-in-out infinite;
     }
     @keyframes ppj-pulse-badge{
         0%,100%{box-shadow:0 0 0 0 rgba(200,60,60,0);}
-        50%{box-shadow:0 0 8px 2px rgba(200,60,60,0.18);}
+        50%{box-shadow:0 0 10px 2px rgba(200,60,60,0.25);}
     }
     .htab-reset-icon{
-        font-size:0.7em;color:rgba(154,80,220,0.5);
+        font-size:0.9em;color:rgba(190,130,255,0.8);
         display:inline-block;
     }
-    .htab-reset-badge.htab-reset-urgent .htab-reset-icon{color:rgba(220,80,80,0.7);}
+    .htab-reset-badge.htab-reset-urgent .htab-reset-icon{color:rgba(240,100,100,0.9);}
     .htab-reset-txt{
-        font-family:'Cinzel',serif;font-size:0.6em;font-weight:700;
-        color:rgba(154,80,220,0.45);letter-spacing:1px;
+        font-family:'Cinzel',serif;font-size:0.78em;font-weight:700;
+        color:#c8a0f8;letter-spacing:1.5px;
         font-variant-numeric:tabular-nums;
     }
-    .htab-reset-badge.htab-reset-urgent .htab-reset-txt{color:rgba(220,100,100,0.8);}
+    .htab-reset-badge.htab-reset-urgent .htab-reset-txt{color:#ff8080;}
     .htab-reset-sub{font-size:0.47em;color:#2a1a40;text-transform:uppercase;letter-spacing:1px;margin-top:1px;}
 
     /* ── PUSHES SECTION ── */
@@ -842,11 +842,11 @@ async function _tabHex(nombre, body) {
         position:relative;
     }
     .htab-pushes-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
-    .htab-divider-line{flex:1;height:1px;background:linear-gradient(90deg,rgba(212,175,55,0.2),transparent);}
-    .htab-divider-rev{background:linear-gradient(90deg,transparent,rgba(212,175,55,0.2));}
+    .htab-divider-line{flex:1;height:1px;background:linear-gradient(90deg,rgba(212,175,55,0.25),transparent);}
+    .htab-divider-rev{background:linear-gradient(90deg,transparent,rgba(212,175,55,0.25));}
     .htab-pushes-title{
-        font-family:'Cinzel',serif;font-size:0.58em;letter-spacing:2.5px;
-        color:rgba(212,175,55,0.6);text-transform:uppercase;white-space:nowrap;
+        font-family:'Cinzel',serif;font-size:0.65em;letter-spacing:2.5px;
+        color:rgba(212,175,55,0.75);text-transform:uppercase;white-space:nowrap;
     }
 
     /* ── PUSH CARDS ── */
@@ -880,21 +880,21 @@ async function _tabHex(nombre, body) {
     .hex-pcard-glow{display:none;}
     .hex-pcard.avail .hex-pcard-glow{display:block;}
     .hex-pcard-label{
-        font-size:0.55em;letter-spacing:1.8px;text-transform:uppercase;
-        color:rgba(212,175,55,0.45);font-weight:700;margin-bottom:8px;
+        font-size:0.62em;letter-spacing:1.5px;text-transform:uppercase;
+        color:rgba(212,175,55,0.7);font-weight:700;margin-bottom:8px;
     }
     .hex-pcard-amt{
-        font-family:'Cinzel',serif;font-size:1.25em;color:#d4af37;font-weight:700;
+        font-family:'Cinzel',serif;font-size:1.3em;color:#e8c84a;font-weight:700;
         line-height:1;margin-bottom:7px;
-        text-shadow:0 0 12px rgba(212,175,55,0.25);
+        text-shadow:0 0 14px rgba(212,175,55,0.35);
     }
     .hex-pcard-cd{
-        font-size:0.56em;min-height:28px;margin-bottom:9px;
+        font-size:0.6em;min-height:28px;margin-bottom:9px;
         display:flex;flex-direction:column;gap:2px;align-items:center;
     }
-    .hex-pcard-cd-avail{color:#4a7a54;font-weight:600;}
-    .hex-pcard-cd-wait{color:#5a4a28;}
-    .hex-pcard-cd-freq{color:#3a3a58;margin-top:1px;}
+    .hex-pcard-cd-avail{color:#5ecf7a;font-weight:600;}
+    .hex-pcard-cd-wait{color:#9a7a38;}
+    .hex-pcard-cd-freq{color:rgba(200,170,100,0.45);margin-top:1px;}
     .hex-pcard-btn{
         width:100%;
         background:linear-gradient(180deg,rgba(212,175,55,0.1) 0%,rgba(212,175,55,0.05) 100%);
@@ -924,22 +924,22 @@ async function _tabHex(nombre, body) {
 
     /* ── HISTORIAL ── */
     .htab-hlog-section{padding:20px 20px 6px;}
-    .htab-hlog-title{font-size:0.5em;letter-spacing:2.5px;text-transform:uppercase;color:#3a3a58;font-weight:700;margin-bottom:12px;}
+    .htab-hlog-title{font-size:0.6em;letter-spacing:2px;text-transform:uppercase;color:rgba(180,160,220,0.55);font-weight:700;margin-bottom:12px;}
     .htab-hlog{
         display:flex;align-items:center;gap:9px;padding:9px 12px;
-        background:rgba(255,255,255,0.016);border-radius:8px;
-        border:1px solid rgba(255,255,255,0.04);margin-bottom:5px;
+        background:rgba(255,255,255,0.02);border-radius:8px;
+        border:1px solid rgba(255,255,255,0.05);margin-bottom:5px;
         transition:background 0.15s;
     }
-    .htab-hlog:hover{background:rgba(255,255,255,0.028);}
-    .htab-chip{font-size:0.59em;font-weight:700;letter-spacing:0.5px;padding:2px 9px;border-radius:10px;flex-shrink:0;white-space:nowrap;}
-    .htab-chip-a{background:rgba(62,207,110,0.1);color:#3ecf6e;border:1px solid rgba(62,207,110,0.22);}
-    .htab-chip-t{background:rgba(74,179,232,0.1);color:#4ab3e8;border:1px solid rgba(74,179,232,0.22);}
-    .htab-chip-c{background:rgba(212,175,55,0.1);color:#d4af37;border:1px solid rgba(212,175,55,0.22);}
-    .htab-hamt{font-family:'Cinzel',serif;font-size:0.88em;color:#d4af37;font-weight:700;min-width:46px;}
-    .htab-htime{font-size:0.62em;color:#3a3a58;flex:1;}
-    .htab-hdel{background:none;border:none;color:#2e2e48;font-size:0.88em;cursor:pointer;padding:2px 5px;border-radius:3px;transition:color 0.13s;}
-    .htab-hdel:hover{color:#c44;}
+    .htab-hlog:hover{background:rgba(255,255,255,0.035);}
+    .htab-chip{font-size:0.62em;font-weight:700;letter-spacing:0.5px;padding:2px 9px;border-radius:10px;flex-shrink:0;white-space:nowrap;}
+    .htab-chip-a{background:rgba(62,207,110,0.12);color:#50e87a;border:1px solid rgba(62,207,110,0.28);}
+    .htab-chip-t{background:rgba(74,179,232,0.12);color:#5cc8f8;border:1px solid rgba(74,179,232,0.28);}
+    .htab-chip-c{background:rgba(212,175,55,0.12);color:#e8c84a;border:1px solid rgba(212,175,55,0.28);}
+    .htab-hamt{font-family:'Cinzel',serif;font-size:0.9em;color:#e8c84a;font-weight:700;min-width:46px;}
+    .htab-htime{font-size:0.65em;color:rgba(160,150,190,0.6);flex:1;}
+    .htab-hdel{background:none;border:none;color:#3a3a58;font-size:0.88em;cursor:pointer;padding:2px 5px;border-radius:3px;transition:color 0.13s;}
+    .htab-hdel:hover{color:#e05050;}
     </style>
     <div class="htab-root">
 
