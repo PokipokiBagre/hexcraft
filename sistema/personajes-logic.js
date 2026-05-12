@@ -217,8 +217,26 @@ export function mapPersonaje(row) {
             mando: row.ef_mando||0, psiquica: row.ef_psiquica||0, oscura: row.ef_oscura||0 };
 
     // afin_hcz = afinidades de hechizos (calculado por trigger desde el inventario)
-    const afinHz = row.afin_hcz && typeof row.afin_hcz === 'object' ? row.afin_hcz
-        : { fisica:0, energetica:0, espiritual:0, mando:0, psiquica:0, oscura:0 };
+    // Las claves en DB pueden estar capitalizadas/acentuadas: "Física", "Oscura", etc.
+    // Normalizamos al esquema interno: fisica, energetica, espiritual, mando, psiquica, oscura
+    const _normAfin = (obj) => {
+        if (!obj || typeof obj !== 'object') return {};
+        const MAP = {
+            'fisica':'fisica','física':'fisica',
+            'energetica':'energetica','energética':'energetica',
+            'espiritual':'espiritual',
+            'mando':'mando',
+            'psiquica':'psiquica','psíquica':'psiquica',
+            'oscura':'oscura',
+        };
+        const result = {};
+        for (const [k, v] of Object.entries(obj)) {
+            const norm = MAP[k.toLowerCase()] || k.toLowerCase();
+            result[norm] = (result[norm] || 0) + (Number(v) || 0);
+        }
+        return result;
+    };
+    const afinHz = _normAfin(row.afin_hcz);
     const bonos = row.bonos_stats && typeof row.bonos_stats === 'object' ? row.bonos_stats
         : { vida_roja:0, vida_azul:0, guarda:0, dano_rojo:0, dano_azul:0 };
 

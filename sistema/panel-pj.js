@@ -1335,7 +1335,8 @@ function _tabStats(nombre) {
         const base  = af.base?.[a.key]  || 0;
         const extra = af.extra?.[a.key] || 0;
         const alter = af.alter?.[a.key] || 0;
-        const total = base + extra + alter;
+        const hz    = (p.afin_hcz || p.afinidadesHz || {})[a.key] || 0;
+        const total = base + hz + extra + alter;
         const cdVal = p[`cd_${a.key}`] ?? 0.5;
         return `<div class="ppj-afin-block">
             <div class="ppj-afin-header"><span class="ppj-afin-name">${a.label}</span><span class="ppj-afin-total">${total}</span></div>
@@ -1345,6 +1346,10 @@ function _tabStats(nombre) {
                 <span class="ppj-afin-val">${base}</span>
                 ${estadoUI.esAdmin?`<button class="ppj-ctrl-btn" onclick="window.modAfin('${safe}','${a.key}',1)">+</button>`:''}
             </div>
+            ${hz !== 0 ? `<div class="ppj-afin-row">
+                <span class="ppj-afin-src-lbl" style="background:rgba(80,200,140,0.18);color:#50c88c;border-color:rgba(80,200,140,0.35);">Hz</span>
+                <span class="ppj-afin-val" style="color:#50c88c;">${hz > 0 ? '+' : ''}${hz}</span>
+            </div>` : ''}
             <div class="ppj-afin-row">
                 <span class="ppj-afin-src-lbl src-ext">Ext</span>
                 ${estadoUI.esAdmin?`<button class="ppj-ctrl-btn" onclick="window.modAfinExtra('${safe}','${a.key}',-1)">−</button>`:''}
@@ -1418,14 +1423,11 @@ async function _tabHechizos(nombre, body) {
     // ── Inventario del personaje ─────────────────────────────────
     const { data: invHz } = await supabase
         .from('hechizos_inventario')
-        .select('hechizo_nombre, hechizo_afinidad, hechizo_hex, tipo, origen, es_temporal')
+        .select('hechizo_nombre, hechizo_afinidad, hechizo_hex, tipo, origen')
         .eq('personaje_nombre', nombre);
 
     const lista = (invHz || []).filter(h => (h.hechizo_afinidad || '').toLowerCase() !== 'hex');
     const invSet = new Set(lista.map(h => (h.hechizo_nombre || '').toLowerCase().trim()));
-    // Set de hechizos temporales del PJ
-    const tempSet = new Set(lista.filter(h => h.es_temporal).map(h => (h.hechizo_nombre || '').toLowerCase().trim()));
-    const tempCount = tempSet.size;
 
     const hNombres = lista.map(h => h.hechizo_nombre);
     let nodosMapInv = {};
@@ -1494,34 +1496,6 @@ async function _tabHechizos(nombre, body) {
 .ppj-hz-str-tag .rm{color:#ff526f;}
 .ppj-hz-str-add{font-size:0.72em;color:#4a4a68;cursor:pointer;padding:3px 8px;border-radius:12px;border:1px dashed rgba(255,255,255,0.1);}
 .ppj-hz-str-add:hover{color:#888;border-color:rgba(255,255,255,0.2);}
-.ppj-hz-temp-badge{font-size:0.58em;color:#c8a820;background:rgba(232,200,64,0.1);border:1px solid rgba(232,200,64,0.3);padding:1px 7px;border-radius:10px;letter-spacing:0.5px;font-weight:600;flex-shrink:0;}
-.ppj-hz-card-temp{border-color:rgba(232,200,64,0.2)!important;background:rgba(232,200,64,0.03)!important;}
-.ppj-hz-card-temp .ppj-hz-nombre{color:#d4a820;}
-.ppj-hz-temp-count{font-size:0.75em;color:#c8a820;background:rgba(232,200,64,0.1);border:1px solid rgba(232,200,64,0.25);padding:1px 8px;border-radius:10px;letter-spacing:0;}
-.ppj-hz-temp-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
-.ppj-hz-temp-btn{font-size:0.68em;padding:5px 10px;border-radius:6px;cursor:pointer;border:1px solid;font-family:inherit;transition:background 0.15s;font-weight:600;}
-.ppj-hz-temp-btn-copy{background:rgba(74,179,232,0.08);color:#4ab3e8;border-color:rgba(74,179,232,0.3);}
-.ppj-hz-temp-btn-copy:hover{background:rgba(74,179,232,0.18);}
-.ppj-hz-temp-btn-del{background:rgba(220,80,80,0.08);color:#e06060;border-color:rgba(220,80,80,0.3);}
-.ppj-hz-temp-btn-del:hover{background:rgba(220,80,80,0.18);}
-.ppj-hz-temp-actions{flex-wrap:wrap;gap:4px;align-items:center;}
-.ppj-cat-temp{background:rgba(232,200,64,0.1);color:#d4a820;border:1px solid rgba(232,200,64,0.35);border-radius:5px;font-size:0.7em;padding:3px 7px;cursor:pointer;transition:background 0.15s;font-weight:600;font-family:inherit;}
-.ppj-cat-temp:hover{background:rgba(232,200,64,0.22);}
-.ppj-temp-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;}
-.ppj-temp-modal{background:linear-gradient(160deg,#100c00,#07060e);border:1px solid rgba(232,200,64,0.3);border-radius:14px;padding:24px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;}
-.ppj-temp-modal h3{font-family:Cinzel,serif;color:#d4af37;font-size:0.9em;margin:0 0 14px;letter-spacing:1px;}
-.ppj-temp-modal-pj-list{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
-.ppj-temp-modal-pj-btn{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;color:#ccc;font-size:0.8em;padding:9px 14px;cursor:pointer;text-align:left;transition:all 0.15s;font-family:inherit;}
-.ppj-temp-modal-pj-btn:hover{background:rgba(232,200,64,0.08);border-color:rgba(232,200,64,0.3);color:#d4af37;}
-.ppj-temp-modal-footer{display:flex;justify-content:flex-end;margin-top:14px;}
-.ppj-temp-modal-cancel{background:transparent;border:1px solid rgba(255,255,255,0.1);color:#5a5a78;font-size:0.78em;padding:7px 16px;border-radius:6px;cursor:pointer;font-family:inherit;}
-.ppj-temp-hz-preview{margin-top:12px;display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto;}
-.ppj-temp-hz-item{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:7px 10px;display:flex;align-items:center;gap:8px;font-size:0.78em;color:#ccc;}
-.ppj-temp-hz-item-nombre{flex:1;}
-.ppj-temp-hz-item-af{font-size:0.75em;padding:1px 7px;border-radius:10px;color:#888;background:rgba(255,255,255,0.04);}
-.ppj-temp-confirm-row{margin-top:14px;display:flex;gap:8px;justify-content:flex-end;}
-.ppj-temp-confirm-btn{background:rgba(232,200,64,0.15);border:1px solid rgba(232,200,64,0.4);color:#d4af37;font-size:0.78em;padding:8px 16px;border-radius:6px;cursor:pointer;font-family:Cinzel,serif;}
-.ppj-temp-confirm-btn:hover{background:rgba(232,200,64,0.3);}
 `;
         document.head.appendChild(s);
     }
@@ -1546,7 +1520,6 @@ async function _tabHechizos(nombre, body) {
         const nd  = nodosMapInv[h.hechizo_nombre] || {};
         const cls = nd.clase ? `Clase ${nd.clase}` : '';
         const safeHzId = (nd.hechizo_id || '').replace(/'/g, "\\'");
-        const safeNombre = (h.hechizo_nombre || '').replace(/'/g, "\\'");
         const editBtn = esAdmin && nd.hechizo_id
             ? `<button class="ppj-ctrl-btn" style="margin-left:auto;font-size:0.65em;" onclick="window._ppjAbrirEditorHz('${safeHzId}','${safe}','inv')">✏️</button>`
             : '';
@@ -1562,43 +1535,11 @@ async function _tabHechizos(nombre, body) {
         const castBadge = castParts.length ? `<span class="ppj-hz-badge ppj-hz-badge-cast">⟳ ${castParts.join(' ')}</span>` : '';
         const afTargets = [nd.afecta_hechizos?'🌀':'', nd.afecta_usuario?'🧙':'', nd.afecta_objetivo?'🎯':''].filter(Boolean).join('');
         const afBadge  = afTargets ? `<span class="ppj-hz-badge ppj-hz-badge-afecta">${afTargets}</span>` : '';
-
-        // ── Temporal logic ──────────────────────────────────────────
-        const esTemp = !!h.es_temporal;
-        const tempBadge = esTemp
-            ? `<span class="ppj-hz-temp-badge">⏳ temporal</span>`
-            : '';
-
-        const hexCostOfi = h.hechizo_hex || 0;
-        const halfOfi    = Math.round(hexCostOfi * 0.5);
-
-        // Botones de admin bajo la card
-        let adminBtns = '';
-        if (esAdmin) {
-            if (esTemp) {
-                // Hechizo temporal: opciones para oficializar o deasignar
-                adminBtns = `<div class="ppj-cat-actions ppj-hz-temp-actions">
-                    <span style="font-size:0.6em;color:#6a5a20;letter-spacing:0.5px;font-weight:600;text-transform:uppercase;align-self:center;">Oficializar:</span>
-                    <button class="ppj-cat-btn ppj-cat-free" onclick="window._ppjOficializarHz('${safe}','${safeNombre}','gratis')">✅ Gratis</button>
-                    ${hexCostOfi > 0 ? `<button class="ppj-cat-btn ppj-cat-half" onclick="window._ppjOficializarHz('${safe}','${safeNombre}','50')">🔵 −${halfOfi}</button>
-                    <button class="ppj-cat-btn ppj-cat-full" onclick="window._ppjOficializarHz('${safe}','${safeNombre}','100')">🟡 −${hexCostOfi}</button>` : ''}
-                    <button class="ppj-cat-btn ppj-cat-deasign" style="margin-left:auto;" onclick="window._ppjDeasignarHzNombre('${safe}','${safeNombre}')">✕</button>
-                </div>`;
-            } else {
-                // Hechizo oficial: deasignar + opción de marcar como temporal
-                adminBtns = `<div class="ppj-cat-actions">
-                    <button class="ppj-cat-btn ppj-cat-temp" onclick="window._ppjMarcarComoTemporal('${safe}','${safeNombre}')">⏳ Temporal</button>
-                    <button class="ppj-cat-btn ppj-cat-deasign" style="margin-left:auto;" onclick="window._ppjDeasignarHzNombre('${safe}','${safeNombre}')">✕ Deasignar</button>
-                </div>`;
-            }
-        }
-
-        return `<div class="ppj-hz-card${esTemp ? ' ppj-hz-card-temp' : ''}" data-hz-nombre="${(h.hechizo_nombre||'').toLowerCase()}"
+        return `<div class="ppj-hz-card" data-hz-nombre="${(h.hechizo_nombre||'').toLowerCase()}"
             style="cursor:pointer;"
             onclick="if(window.centrarEnHechizo && '${safeHzId}') window.centrarEnHechizo('${safeHzId}')">
             <div class="ppj-hz-header">
                 <span class="ppj-hz-nombre">${h.hechizo_nombre}</span>
-                ${tempBadge}
                 ${hexInv}${vexInv}${clsBadge}
                 ${notaInv}
                 ${editBtn}
@@ -1608,24 +1549,14 @@ async function _tabHechizos(nombre, body) {
                 ${_campo('Efecto',nd.efecto)}${_campo('Resumen',nd.resumen)}
                 ${_campo('Overcast',nd.overcast)}${_campo('Undercast',nd.undercast)}${_campo('Especial',nd.especial)}
             </div>
-            ${adminBtns}
         </div>`;
     };
 
     let html = `<div class="ppj-section">
-        <div class="ppj-section-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="ppj-section-title">
             Hechizos aprendidos${lista.length?' ('+lista.length+')':''}
-            ${tempCount > 0 && esAdmin ? `<span class="ppj-hz-temp-count">⏳ ${tempCount} temporales</span>` : ''}
         </div>
         <input class="ppj-hz-search" id="ppj-hz-buscador" placeholder="Buscar hechizo aprendido…" oninput="window._ppjBuscarHz(this.value)">
-        ${esAdmin ? `<div class="ppj-hz-temp-toolbar" id="ppj-hz-temp-toolbar">
-            <button class="ppj-hz-temp-btn ppj-hz-temp-btn-copy" onclick="window._ppjObtenerTemporalesDeOtro('${safe}')">
-                📋 Obtener temporales de otro PJ
-            </button>
-            ${tempCount > 0 ? `<button class="ppj-hz-temp-btn ppj-hz-temp-btn-del" onclick="window._ppjQuitarTodosTemporales('${safe}')">
-                ⏳✕ Quitar todos los temporales (${tempCount})
-            </button>` : ''}
-        </div>` : ''}
         ${esAdmin?`<button class="ppj-hz-new-btn ppj-hz-new-inv" onclick="window._ppjNuevoHechizoPj('${safe}')">
             <span class="ppj-hz-new-icon">✨</span>
             <div>
@@ -1716,8 +1647,7 @@ async function _tabHechizos(nombre, body) {
             const btnsAsign = `<button class="ppj-cat-btn ppj-cat-free" onclick="window._ppjAsignarHz('${safe}','${safeHzId}','gratis')">✅ Gratis</button>
                 ${hexCost > 0 ? `<button class="ppj-cat-btn ppj-cat-half" onclick="window._ppjAsignarHz('${safe}','${safeHzId}','50')">🔵 −${half}</button>
                 <button class="ppj-cat-btn ppj-cat-full" onclick="window._ppjAsignarHz('${safe}','${safeHzId}','100')">🟡 −${hexCost}</button>
-                <button class="ppj-cat-btn ppj-cat-over" onclick="window._ppjAsignarHz('${safe}','${safeHzId}','200')">🔴 −${doble}</button>` : ''}
-                <button class="ppj-cat-btn ppj-cat-temp" onclick="window._ppjAsignarHz('${safe}','${safeHzId}','temporal')">⏳ Temporal</button>`;
+                <button class="ppj-cat-btn ppj-cat-over" onclick="window._ppjAsignarHz('${safe}','${safeHzId}','200')">🔴 −${doble}</button>` : ''}`;
 
             // Badge oculto solo para admin
             const ocultoBadge = esAdmin && !n.es_conocido
@@ -3277,13 +3207,10 @@ window._ppjAsignarHz = async (nombrePJ, hechizo_id, modo) => {
     if (!nodo) { window.mostrarToast?.('Hechizo no encontrado', true); return; }
 
     const hexCost = nodo.hex_cost || 0;
-    const esTemporal = modo === 'temporal';
     let cobro = 0;
-    if (!esTemporal) {
-        if (modo === '50')  cobro = Math.round(hexCost * 0.5);
-        if (modo === '100') cobro = hexCost;
-        if (modo === '200') cobro = hexCost * 2;
-    }
+    if (modo === '50')  cobro = Math.round(hexCost * 0.5);
+    if (modo === '100') cobro = hexCost;
+    if (modo === '200') cobro = hexCost * 2;
 
     if (cobro > 0 && (p.hex || 0) < cobro) {
         window.mostrarToast?.(`HEX insuficiente (tiene ${p.hex||0}, necesita ${cobro})`, true);
@@ -3295,9 +3222,8 @@ window._ppjAsignarHz = async (nombrePJ, hechizo_id, modo) => {
         hechizo_nombre:   nodo.nombre,
         hechizo_afinidad: nodo.afinidad || '',
         hechizo_hex:      hexCost,
-        tipo:        esTemporal ? 'temporal' : 'aprendido',
-        origen:      cobro > 0 ? 'Compra' : (esTemporal ? 'Temporal' : 'OP'),
-        es_temporal: esTemporal,
+        tipo:   'aprendido',
+        origen: cobro > 0 ? 'Compra' : 'OP'
     });
     if (error) { window.mostrarToast?.('Error al asignar: ' + error.message, true); return; }
 
@@ -3308,15 +3234,14 @@ window._ppjAsignarHz = async (nombrePJ, hechizo_id, modo) => {
         window.renderCatalogo?.();
     }
 
-    const modoTxt = esTemporal ? '⏳ temporal'
-        : { gratis:'gratis', '50':`−${Math.round(hexCost*0.5)} HEX (50%)`, '100':`−${hexCost} HEX`, '200':`−${hexCost*2} HEX (200%)` }[modo] || '';
+    const modoTxt = { gratis:'gratis', '50':`−${Math.round(hexCost*0.5)} HEX (50%)`, '100':`−${hexCost} HEX`, '200':`−${hexCost*2} HEX (200%)` }[modo] || '';
     window.mostrarToast?.(`✨ "${nodo.nombre}" → ${nombrePJ} ${modoTxt}`);
 
     const body = document.getElementById('ppj-body');
     if (body) _tabHechizos(nombrePJ, body);
 };
 
-// Deasignar hechizo de un personaje (por hechizo_id del catálogo)
+// Deasignar hechizo de un personaje
 window._ppjDeasignarHz = async (nombrePJ, hechizo_id) => {
     if (!estadoUI.esAdmin) return;
 
@@ -3336,219 +3261,6 @@ window._ppjDeasignarHz = async (nombrePJ, hechizo_id) => {
 
     const body = document.getElementById('ppj-body');
     if (body) _tabHechizos(nombrePJ, body);
-};
-
-// Deasignar por nombre directo (usado desde cards del inventario)
-window._ppjDeasignarHzNombre = async (nombrePJ, hechizNombre) => {
-    if (!estadoUI.esAdmin) return;
-    if (!confirm(`¿Deasignar "${hechizNombre}" de ${nombrePJ}?`)) return;
-    const { error } = await supabase.from('hechizos_inventario')
-        .delete()
-        .eq('personaje_nombre', nombrePJ)
-        .eq('hechizo_nombre', hechizNombre);
-    if (error) { window.mostrarToast?.('Error: ' + error.message, true); return; }
-    window.mostrarToast?.(`✅ "${hechizNombre}" deasignado de ${nombrePJ}`);
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHechizos(nombrePJ, body);
-};
-
-// ── Marcar un hechizo oficial como temporal ───────────────────
-window._ppjMarcarComoTemporal = async (nombrePJ, hechizNombre) => {
-    if (!estadoUI.esAdmin) return;
-    const { error } = await supabase.from('hechizos_inventario')
-        .update({ es_temporal: true, tipo: 'temporal', origen: 'Temporal' })
-        .eq('personaje_nombre', nombrePJ)
-        .eq('hechizo_nombre', hechizNombre);
-    if (error) { window.mostrarToast?.('Error: ' + error.message, true); return; }
-    window.mostrarToast?.(`⏳ "${hechizNombre}" marcado como temporal`);
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHechizos(nombrePJ, body);
-};
-
-// ── Oficializar hechizo temporal (quitar es_temporal, opcionalmente cobrar HEX) ──
-window._ppjOficializarHz = async (nombrePJ, hechizNombre, modo) => {
-    if (!estadoUI.esAdmin) return;
-    const p = personajes[nombrePJ]; if (!p) return;
-
-    // Obtener datos del nodo para saber el hex_cost
-    const { data: nodo } = await supabase.from('hechizos_nodos')
-        .select('hex_cost').eq('nombre', hechizNombre).single();
-    const hexCost = nodo?.hex_cost || 0;
-
-    let cobro = 0;
-    if (modo === '50')  cobro = Math.round(hexCost * 0.5);
-    if (modo === '100') cobro = hexCost;
-
-    if (cobro > 0 && (p.hex || 0) < cobro) {
-        window.mostrarToast?.(`HEX insuficiente (tiene ${p.hex||0}, necesita ${cobro})`, true);
-        return;
-    }
-
-    // Marcar como oficial
-    const { error } = await supabase.from('hechizos_inventario')
-        .update({ es_temporal: false, tipo: 'aprendido', origen: cobro > 0 ? 'Compra' : 'OP' })
-        .eq('personaje_nombre', nombrePJ)
-        .eq('hechizo_nombre', hechizNombre);
-    if (error) { window.mostrarToast?.('Error al oficializar: ' + error.message, true); return; }
-
-    if (cobro > 0) {
-        p.hex = Math.max(0, (p.hex || 0) - cobro);
-        encolarCambio(nombrePJ, 'hex', p.hex);
-        window.actualizarBtnSync?.();
-        window.renderCatalogo?.();
-    }
-
-    const modoTxt = { gratis: 'gratis', '50': `−${Math.round(hexCost*0.5)} HEX (50%)`, '100': `−${hexCost} HEX (100%)` }[modo] || '';
-    window.mostrarToast?.(`✓ "${hechizNombre}" oficializado ${modoTxt}`);
-
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHechizos(nombrePJ, body);
-};
-
-// ── Quitar TODOS los hechizos temporales de un personaje ──────
-window._ppjQuitarTodosTemporales = async (nombrePJ) => {
-    if (!estadoUI.esAdmin) return;
-    if (!confirm(`¿Quitar todos los hechizos temporales de ${nombrePJ}?`)) return;
-    const { error } = await supabase.from('hechizos_inventario')
-        .delete()
-        .eq('personaje_nombre', nombrePJ)
-        .eq('es_temporal', true);
-    if (error) { window.mostrarToast?.('Error: ' + error.message, true); return; }
-    window.mostrarToast?.(`⏳✕ Temporales de ${nombrePJ} eliminados`);
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHechizos(nombrePJ, body);
-};
-
-// ── Obtener hechizos de otro PJ como temporales ───────────────
-// Muestra modal de selección de PJ, luego diff de inventarios,
-// y asigna como temporales los que A no tiene (ni oficiales ni temporales).
-window._ppjObtenerTemporalesDeOtro = async (nombrePJDestino) => {
-    if (!estadoUI.esAdmin) return;
-
-    // Cargar lista de todos los personajes activos (excepto el actual)
-    const { data: todosPersonajes } = await supabase.from('personajes')
-        .select('nombre').eq('is_active', true).order('nombre');
-    const otros = (todosPersonajes || []).filter(p => p.nombre !== nombrePJDestino);
-
-    // Inventario actual del destino (para el diff)
-    const { data: invDestino } = await supabase.from('hechizos_inventario')
-        .select('hechizo_nombre').eq('personaje_nombre', nombrePJDestino);
-    const invDestinoSet = new Set((invDestino || []).map(h => (h.hechizo_nombre || '').toLowerCase().trim()));
-
-    // Modal de selección de PJ fuente
-    const modalBg = document.createElement('div');
-    modalBg.className = 'ppj-temp-modal-bg';
-    modalBg.innerHTML = `
-        <div class="ppj-temp-modal">
-            <h3>📋 Obtener temporales de otro PJ</h3>
-            <div style="font-size:0.75em;color:#5a5a78;margin-bottom:10px;">
-                Selecciona el personaje fuente. Se asignarán como temporales los hechizos que tenga
-                <strong style="color:#888;">${nombrePJDestino}</strong> no tiene (ni oficiales ni temporales).
-            </div>
-            <div class="ppj-temp-modal-pj-list" id="ppj-temp-pj-list">
-                ${otros.map(p => `<button class="ppj-temp-modal-pj-btn" onclick="window._ppjTempSeleccionarFuente('${p.nombre.replace(/'/g,"\\'")}','${nombrePJDestino.replace(/'/g,"\\'")}',this)">${p.nombre}</button>`).join('')}
-            </div>
-            <div id="ppj-temp-preview-section"></div>
-            <div class="ppj-temp-modal-footer">
-                <button class="ppj-temp-modal-cancel" onclick="this.closest('.ppj-temp-modal-bg').remove()">Cancelar</button>
-            </div>
-        </div>`;
-    document.body.appendChild(modalBg);
-
-    // Guardar invDestinoSet en el modal para usarlo al seleccionar fuente
-    modalBg._invDestinoSet = invDestinoSet;
-};
-
-window._ppjTempSeleccionarFuente = async (nombreFuente, nombreDestino, btn) => {
-    // Resaltar seleccionado
-    document.querySelectorAll('.ppj-temp-modal-pj-btn').forEach(b => b.style.borderColor = '');
-    if (btn) btn.style.borderColor = 'rgba(232,200,64,0.6)';
-
-    const modalBg = btn?.closest('.ppj-temp-modal-bg');
-    const invDestinoSet = modalBg?._invDestinoSet || new Set();
-    const preview = document.getElementById('ppj-temp-preview-section');
-    if (!preview) return;
-    preview.innerHTML = `<div style="font-size:0.75em;color:#5a5a78;padding:8px 0;">Cargando inventario de ${nombreFuente}…</div>`;
-
-    // Cargar inventario de la fuente
-    const { data: invFuente } = await supabase.from('hechizos_inventario')
-        .select('hechizo_nombre, hechizo_afinidad')
-        .eq('personaje_nombre', nombreFuente);
-
-    // Diff: hechizos que tiene la fuente y NO tiene el destino
-    const nuevos = (invFuente || []).filter(h =>
-        !invDestinoSet.has((h.hechizo_nombre || '').toLowerCase().trim())
-    );
-
-    if (nuevos.length === 0) {
-        preview.innerHTML = `<div style="font-size:0.75em;color:#5a5a78;padding:12px 0 4px;text-align:center;">
-            ${nombreDestino} ya tiene todos los hechizos de ${nombreFuente}</div>`;
-        return;
-    }
-
-    const safeDest   = nombreDestino.replace(/'/g, "\\'");
-    const safeFuente = nombreFuente.replace(/'/g, "\\'");
-
-    preview.innerHTML = `
-        <div style="font-size:0.72em;color:#888;margin-top:12px;margin-bottom:6px;">
-            <strong style="color:#c8a820;">${nuevos.length}</strong> hechizos nuevos para asignar como temporales:
-        </div>
-        <div class="ppj-temp-hz-preview">
-            ${nuevos.map(h => `
-                <div class="ppj-temp-hz-item">
-                    <span class="ppj-temp-hz-item-nombre">${h.hechizo_nombre}</span>
-                    <span class="ppj-temp-hz-item-af">${h.hechizo_afinidad || ''}</span>
-                </div>`).join('')}
-        </div>
-        <div class="ppj-temp-confirm-row">
-            <button class="ppj-temp-confirm-btn"
-                onclick="window._ppjConfirmarTemporalesDeFuente('${safeDest}','${safeFuente}',this)">
-                ⏳ Asignar ${nuevos.length} como temporales
-            </button>
-        </div>`;
-
-    // Guardar lista en el DOM para usar en confirmación
-    preview._nuevos = nuevos;
-};
-
-window._ppjConfirmarTemporalesDeFuente = async (nombreDestino, nombreFuente, btn) => {
-    const preview = btn?.closest('#ppj-temp-preview-section');
-    const nuevos  = preview?._nuevos;
-    if (!nuevos || nuevos.length === 0) return;
-
-    btn.disabled = true;
-    btn.textContent = 'Asignando…';
-
-    // Inventario actual del destino (refrescar antes de insertar)
-    const { data: invActual } = await supabase.from('hechizos_inventario')
-        .select('hechizo_nombre').eq('personaje_nombre', nombreDestino);
-    const yaExisten = new Set((invActual || []).map(h => (h.hechizo_nombre || '').toLowerCase().trim()));
-
-    const rows = nuevos
-        .filter(h => !yaExisten.has((h.hechizo_nombre || '').toLowerCase().trim()))
-        .map(h => ({
-            personaje_nombre: nombreDestino,
-            hechizo_nombre:   h.hechizo_nombre,
-            hechizo_afinidad: h.hechizo_afinidad || '',
-            hechizo_hex:      0,
-            tipo:             'temporal',
-            origen:           `De ${nombreFuente}`,
-            es_temporal:      true,
-        }));
-
-    if (rows.length === 0) {
-        window.mostrarToast?.('Sin nuevos hechizos que asignar (ya los tiene todos)');
-        btn.closest('.ppj-temp-modal-bg')?.remove();
-        return;
-    }
-
-    const { error } = await supabase.from('hechizos_inventario').insert(rows);
-    if (error) { window.mostrarToast?.('Error: ' + error.message, true); btn.disabled = false; return; }
-
-    window.mostrarToast?.(`⏳ ${rows.length} hechizos temporales de ${nombreFuente} → ${nombreDestino}`);
-    btn.closest('.ppj-temp-modal-bg')?.remove();
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHechizos(nombreDestino, body);
 };
 
 
