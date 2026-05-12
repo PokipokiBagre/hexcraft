@@ -416,6 +416,31 @@ function _renderSesiones(drawer) {
     </div>`;
 }
 
+// ── Render preservando scroll del panel lateral ───────────────
+// Úsalo cuando solo cambia el stack o los estados, no la estructura del panel lateral.
+// Guarda el scroll de: columnas A/B, stack, y panel lateral (inventario/estados).
+function _renderConScrollGuardado() {
+  const drawer = document.getElementById('hxc-drawer');
+  if (!drawer) { _render(); return; }
+
+  // Capturar todos los scrolls relevantes antes del render
+  const scrollLateral = document.getElementById('hxc-lateral-panel')
+    ?.querySelector('.hxc-lat-body')?.scrollTop ?? null;
+  const scrollColA  = drawer.querySelector('.hxc-col:not(.hxc-col-b)')?.scrollTop ?? 0;
+  const scrollColB  = drawer.querySelector('.hxc-col-b')?.scrollTop ?? 0;
+  const scrollStack = drawer.querySelector('.hxc-stack')?.scrollTop ?? 0;
+
+  _render();
+
+  // Restaurar después del render (el render ya restaura colA/B/stack, pero no el lateral)
+  if (scrollLateral !== null) {
+    requestAnimationFrame(() => {
+      const latBody = document.getElementById('hxc-lateral-panel')?.querySelector('.hxc-lat-body');
+      if (latBody) latBody.scrollTop = scrollLateral;
+    });
+  }
+}
+
 function _renderCast(drawer) {
   // Guardar scroll de columnas y stack antes de destruir el DOM
   const scrollA    = drawer.querySelector('.hxc-col:not(.hxc-col-b)')?.scrollTop ?? 0;
@@ -1681,7 +1706,7 @@ window._hxcAgregarHz = (grupo, idx, hzId) => {
           || inv.find(h=>_norm(h.hechizo_id||h.nombre)===hzId);
   if (!hz) return;
   agregarHechizo(pj.nombre, grupo, idx, hz);
-  _render();
+  _renderConScrollGuardado();
 };
 
 // ── Estados activos (por turno) ───────────────────────────────
@@ -1728,7 +1753,7 @@ window._hxcAgregarEstado = async (nombre, hechizo_id, hechizo_nombre, afinidad) 
   if (error) { _toast('Error: ' + error.message, true); return; }
   hxState.estadosPorPj[nombre] = [...actuales, data];
   _toast(`✦ ${hechizo_nombre} → ${nombre}`);
-  _render();
+  _renderConScrollGuardado();
 };
 
 window._hxcQuitarEstado = async (nombre, estadoId) => {
@@ -1736,7 +1761,7 @@ window._hxcQuitarEstado = async (nombre, estadoId) => {
   if (error) { _toast('Error: ' + error.message, true); return; }
   hxState.estadosPorPj[nombre] = (hxState.estadosPorPj[nombre] || []).filter(e => e.id !== estadoId);
   _toast('Estado quitado');
-  _render();
+  _renderConScrollGuardado();
 };
 
 // ── Evento ────────────────────────────────────────────────────
@@ -1767,7 +1792,7 @@ window._hxcConfirmarEvento = (grupo, idx) => {
 window._hxcToggleItem = (idx) => {
   if (fxClickItem(parseInt(idx))) return; // interceptado por modo flecha
   hxState.stack[idx].abierto = !hxState.stack[idx].abierto;
-  _render();
+  _renderConScrollGuardado();
 };
 
 window._hxcSetDado = (idx, val) => {
@@ -1812,7 +1837,7 @@ function _actualizarResEl(el, item) {
   }
 }
 
-window._hxcToggleOpt = (idx, campo) => { const item=hxState.stack[idx]; if(!item) return; item[campo]=!item[campo]; if(campo==='infalible') evaluarItem(item); _render(); };
+window._hxcToggleOpt = (idx, campo) => { const item=hxState.stack[idx]; if(!item) return; item[campo]=!item[campo]; if(campo==='infalible') evaluarItem(item); _renderConScrollGuardado(); };
 
 window._hxcToggleInfalible = (idx) => {
   const item = hxState.stack[idx]; if (!item) return;
@@ -1822,7 +1847,7 @@ window._hxcToggleInfalible = (idx) => {
   const turnoIdx = hxState.turnos.findIndex(t => t.id === hxState.turnoActivo?.id);
   const esHistorico = turnoIdx < hxState.turnos.length - 1;
   if (esHistorico && _esAdmin()) window._hxcGuardarItemDB(item);
-  _render();
+  _renderConScrollGuardado();
 };
 
 window._hxcToggleFallo = (idx) => {
@@ -1833,9 +1858,9 @@ window._hxcToggleFallo = (idx) => {
   const turnoIdx = hxState.turnos.findIndex(t => t.id === hxState.turnoActivo?.id);
   const esHistorico = turnoIdx < hxState.turnos.length - 1;
   if (esHistorico && _esAdmin()) window._hxcGuardarItemDB(item);
-  _render();
+  _renderConScrollGuardado();
 };
-window._hxcSetPrioridad = (idx) => { moverAPrioridad(hxState.stack[idx].id); _render(); };
+window._hxcSetPrioridad = (idx) => { moverAPrioridad(hxState.stack[idx].id); _renderConScrollGuardado(); };
 
 // ── CD editable por OP ────────────────────────────────────────
 // Guarda un cdOverride en el item específico y recalcula hacia adelante.
@@ -1879,7 +1904,7 @@ function _aplicarCdCambio(stackIdx, nuevoCdPct) {
     multPrevio[k] = mult;
   });
 
-  _render();
+  _renderConScrollGuardado();
 }
 
 window._hxcCdSet  = (stackIdx, pct) => { if (!isNaN(pct) && pct >= 0) _aplicarCdCambio(stackIdx, pct); };
@@ -1905,7 +1930,7 @@ window._hxcRemover = async (idx) => {
     await supabase.from('hexcast_lanzamientos').delete().eq('id', item.id);
   }
   removerHechizo(item.id);
-  _render();
+  _renderConScrollGuardado();
 };
 
 window._hxcToggleToolbar = () => {
