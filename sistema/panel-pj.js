@@ -587,14 +587,14 @@ async function _tabHex(nombre, body) {
         <div class="ppj-section-title">Historial de pushes</div>
         ${histHTML}
     </div>
-    <div class="ppj-section">
+    ${(estadoUI.esAdmin||!p.isPlayer)?`<div class="ppj-section">
         <div class="ppj-section-title">Imagen del personaje</div>
         <div class="ppj-img-wrap" onclick="window.abrirSubirImagen('${safe}')">
             <img class="ppj-img-preview" src="${_imgPj(p.iconoOverride||nombre)}"
-                 onerror="if(this.src!=='${_fallback()}')this.src='${_fallback()}'">
-            ${(estadoUI.esAdmin||!p.isPlayer)?`<div class="ppj-img-overlay">📷 Cambiar imagen</div>`:''}
+                 onerror="this.style.display='none'">
+            <div class="ppj-img-overlay">📷 Cambiar imagen</div>
         </div>
-    </div>`;
+    </div>`:''}`;
 }
 
 // ─────────────────────────────────────────────────────────────
