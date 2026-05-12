@@ -565,35 +565,41 @@ window._hmConfirmarDispersarVex = async () => {
     const pasos   = Math.floor((max - min) / 50) + 1;
     const valores = Array.from({length: pasos}, (_, i) => min + i * 50);
 
-    // Calcular todos los valores en local primero
+    // Calcular todos los valores aleatoriamente en local
     let conVex = 0;
     const rows = nodos.map(n => {
         const toca     = Math.random() < prob;
         const nuevoVex = toca ? valores[Math.floor(Math.random() * valores.length)] : 0;
         if (toca) conVex++;
-        return { hechizo_id: n.id, valor_vex: nuevoVex, _nodo: n };
+        return { nodo: n, nuevoVex };
     });
 
-    // Un solo upsert batch en lugar de N updates secuenciales
+    toast(`⏳ Aplicando VEX a ${nodos.length} hechizos…`);
+
     const { supabase } = await import('../hex-auth.js');
-    const payload = rows.map(r => ({ hechizo_id: r.hechizo_id, valor_vex: r.valor_vex }));
 
-    // Supabase upsert en lotes de 500 para no exceder límites
-    const CHUNK = 500;
-    let err = 0;
-    for (let i = 0; i < payload.length; i += CHUNK) {
-        const { error } = await supabase
-            .from('hechizos_nodos')
-            .upsert(payload.slice(i, i + CHUNK), { onConflict: 'hechizo_id' });
-        if (error) { err++; }
+    // Lanzar todos los updates en paralelo (en chunks de 50 simultáneos)
+    const CHUNK = 50;
+    let errCount = 0;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+        const batch = rows.slice(i, i + CHUNK);
+        const results = await Promise.all(
+            batch.map(r =>
+                supabase.from('hechizos_nodos')
+                    .update({ valor_vex: r.nuevoVex })
+                    .eq('hechizo_id', r.nodo.id)
+            )
+        );
+        results.forEach((res, idx) => {
+            if (res.error) { errCount++; }
+            else { batch[idx].nodo.vex = batch[idx].nuevoVex; }
+        });
     }
-
-    // Actualizar estado local solo si no hubo error total
-    if (!err) rows.forEach(r => { r._nodo.vex = r.valor_vex; });
 
     const bf = document.getElementById('op-l-batch-form');
     if (bf) bf.innerHTML = '';
-    toast(`✦ VEX dispersado: ${conVex}/${nodos.length} recibieron VEX${err ? ` · error en batch` : ''}`);
+    const ok = nodos.length - errCount;
+    toast(`✦ VEX dispersado: ${conVex}/${ok} recibieron VEX${errCount ? ` · ${errCount} errores` : ''}`);
     _renderOpLeft();
 };
 
@@ -716,26 +722,32 @@ window._hmConfirmarEliminarVex = async () => {
     const afectados = _hmEvFiltrarAfectados();
     if (!afectados || afectados.length === 0) { toast('Ningún hechizo coincide con el filtro'); return; }
 
+    toast(`⏳ Eliminando VEX de ${afectados.length} hechizos…`);
+
     const { supabase } = await import('../hex-auth.js');
-    const ids = afectados.map(n => n.id);
 
-    // Un solo UPDATE con IN en lugar de N updates secuenciales
-    const CHUNK = 500;
-    let err = 0;
-    for (let i = 0; i < ids.length; i += CHUNK) {
-        const { error } = await supabase
-            .from('hechizos_nodos')
-            .update({ valor_vex: 0 })
-            .in('hechizo_id', ids.slice(i, i + CHUNK));
-        if (error) { err++; }
+    // Updates en paralelo por chunks de 50
+    const CHUNK = 50;
+    let errCount = 0;
+    for (let i = 0; i < afectados.length; i += CHUNK) {
+        const batch = afectados.slice(i, i + CHUNK);
+        const results = await Promise.all(
+            batch.map(n =>
+                supabase.from('hechizos_nodos')
+                    .update({ valor_vex: 0 })
+                    .eq('hechizo_id', n.id)
+            )
+        );
+        results.forEach((res, idx) => {
+            if (res.error) { errCount++; }
+            else { batch[idx].vex = 0; }
+        });
     }
-
-    // Actualizar estado local
-    if (!err) afectados.forEach(n => { n.vex = 0; });
 
     const bf = document.getElementById('op-l-batch-form');
     if (bf) bf.innerHTML = '';
-    toast(`✕ VEX eliminado de ${afectados.length} hechizo${afectados.length!==1?'s':''}${err ? ` · error en batch` : ''}`);
+    const ok = afectados.length - errCount;
+    toast(`✕ VEX eliminado de ${ok} hechizo${ok!==1?'s':''}${errCount ? ` · ${errCount} errores` : ''}`);
     _renderOpLeft();
 };
 
