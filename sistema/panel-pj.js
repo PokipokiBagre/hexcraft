@@ -60,8 +60,8 @@ function _inyectarEstilos() {
 #panel-pj-root.obj-mode #ppj-col-main{width:50vw;}
 #panel-pj-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1199;opacity:0;pointer-events:none;transition:opacity 0.28s;}
 #panel-pj-overlay.open{opacity:1;pointer-events:all;}
-/* Col HEX: pegada al borde derecho del área libre, = right:25vw, width:50vw */
-#ppj-col-main{position:fixed;top:0;right:25vw;width:50vw;height:100vh;background:#08080f;border-left:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;overflow:hidden;box-shadow:-8px 0 40px rgba(0,0,0,0.6);}
+/* Col HEX: pegada al borde IZQUIERDO de la pantalla, width:50vw */
+#ppj-col-main{position:fixed;top:0;left:0;width:50vw;height:100vh;background:#08080f;border-right:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;overflow:hidden;box-shadow:8px 0 40px rgba(0,0,0,0.6);}
 /* Col STATS: pegada al borde derecho de la pantalla, width:25vw */
 #ppj-col-stats{position:fixed;top:0;right:0;width:25vw;min-width:280px;height:100vh;background:#070710;border-left:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;overflow:hidden;}
 #ppj-col-stats .ppj-header{border-bottom:1px solid rgba(255,255,255,0.06);background:#070710;}
