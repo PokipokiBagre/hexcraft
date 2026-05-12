@@ -225,7 +225,7 @@ async function _render() {
       <button class="hxev-close" onclick="window._hxevCerrar()">×</button>
     </div>
     <div class="hxev-body">
-      ${await _renderStats(p, s)}
+      ${await _renderStats(p, s, pOrig)}
       ${_renderHechizos()}
       ${_renderObjetos()}
     </div>
@@ -268,7 +268,7 @@ function _cambioLabel(c) {
 }
 
 // ── Panel Stats ───────────────────────────────────────────────
-async function _renderStats(p, s) {
+async function _renderStats(p, s, pOrig) {
   if (!p || !s) return `<div class="hxev-panel"><div class="hxev-panel-title">Stats</div>
     <div class="hxev-stats-body"><div class="hxev-list-empty">Sin personaje</div></div></div>`;
 
