@@ -90,7 +90,7 @@ export const PUSH_COOLDOWN_DEFAULT = {
 // Estado de UI
 export let estadoUI = {
     vista: 'catalogo',       // 'catalogo' | 'crear' | 'formulas'
-    filtroRol: 'Todos',
+    filtroRol: 'Jugadores',
     filtroAct: 'Activo',
     busqueda: '',
     esAdmin: false,
