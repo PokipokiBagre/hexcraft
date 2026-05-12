@@ -759,85 +759,6 @@ body.drawer-open #hm-op-panel {
 .op-l-danger      { background: rgba(180,50,50,0.09); border-color: rgba(180,70,70,0.35); color: #c97070; }
 .op-l-danger:hover{ background: rgba(180,50,50,0.18); }
 .op-l-active      { background: rgba(0,210,255,0.1); border-color: rgba(0,210,255,0.4); color: #00d2ff; }
-.op-l-vex-disp        { background: rgba(154,80,220,0.1); border-color: rgba(154,80,220,0.35); color: #c090f0; }
-.op-l-vex-disp:hover  { background: rgba(154,80,220,0.22); border-color: rgba(154,80,220,0.6); color: #d8b0ff; }
-
-/* ── VEX Stats block ── */
-.op-vex-stats {
-    margin: 8px 0 4px;
-    padding: 10px 12px;
-    background: rgba(154,80,220,0.055);
-    border: 1px solid rgba(154,80,220,0.18);
-    border-radius: 8px;
-    position: relative;
-    overflow: hidden;
-}
-.op-vex-stats::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 15%; right: 15%; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(154,80,220,0.4), transparent);
-}
-.op-vex-stats-title {
-    font-size: 0.54em;
-    letter-spacing: 1.8px;
-    text-transform: uppercase;
-    color: rgba(154,80,220,0.55);
-    font-weight: 700;
-    margin-bottom: 8px;
-}
-.op-vex-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    margin-bottom: 8px;
-}
-.op-vex-stat {
-    text-align: center;
-    padding: 5px 2px;
-    background: rgba(0,0,0,0.2);
-    border-radius: 5px;
-    border: 1px solid rgba(255,255,255,0.04);
-}
-.op-vex-stat-val {
-    font-family: 'Cinzel', serif;
-    font-size: 1em;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: 3px;
-}
-.op-vex-stat-lbl {
-    font-size: 0.56em;
-    color: #444;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-/* progress bar showing % with VEX */
-.op-vex-bar-wrap {
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(154,80,220,0.1);
-    border: 1px solid rgba(154,80,220,0.12);
-    overflow: hidden;
-    margin-top: 6px;
-}
-.op-vex-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #6020b0, #b070e8);
-    border-radius: 2px;
-    box-shadow: 0 0 6px rgba(154,80,220,0.5);
-    transition: width 0.4s ease;
-}
-/* distribution row */
-.op-vex-dist {
-    margin-top: 6px;
-    font-size: 0.58em;
-    color: #555;
-    line-height: 1.6;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
 
 /* Formulario de edición */
 .op-l-edit-form { display: flex; flex-direction: column; gap: 6px; }
@@ -1164,6 +1085,33 @@ body.drawer-open #hm-op-panel {
 .hz-tabla td input[type=checkbox] {
     accent-color: #d4af37; cursor: pointer;
     width: 13px; height: 13px;
+}
+
+/* Celdas de texto clickeables para edición inline */
+.hz-tabla td.hz-cell-text-view {
+    cursor: text;
+    transition: background 0.12s;
+}
+.hz-tabla td.hz-cell-text-view:hover {
+    background: rgba(212,175,55,0.05);
+    outline: 1px solid rgba(212,175,55,0.18);
+    outline-offset: -1px;
+}
+.hz-tabla td.hz-cell-text-view textarea {
+    width: 100%; font-size: inherit; font-family: inherit;
+    background: #0d0d1a; border: 1px solid rgba(212,175,55,0.35);
+    border-radius: 3px; color: #ccc; padding: 2px 4px; resize: vertical;
+}
+
+/* Cabeceras de columna con menú contextual */
+.hz-tabla thead th[oncontextmenu] {
+    position: relative;
+}
+.hz-tabla thead th[oncontextmenu]:hover::after {
+    content: '⋮';
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    font-size: 0.8em; color: rgba(212,175,55,0.35);
+    pointer-events: none;
 }
 
 /* Botón editar/borrar en fila */

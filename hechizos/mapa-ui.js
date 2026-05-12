@@ -1656,9 +1656,9 @@ window._hmModalAsignarPJ = () => {
         { key:'clase',          label:'Clase',      w:'4%',  type:'clase' },
         { key:'hex_cost',       label:'HEX',        w:'4%',  type:'num' },
         { key:'valor_vex',      label:'VEX',        w:'4%',  type:'num' },
-        { key:'es_conocido',    label:'Conocido',   w:'4%',  type:'bool' },
-        { key:'es_estado',      label:'Estado',     w:'4%',  type:'bool' },
-        { key:'es_prioridad',   label:'Prioridad',  w:'4%',  type:'bool' },
+        { key:'es_conocido',    label:'CON…',       w:'4%',  type:'bool' },
+        { key:'es_estado',      label:'ESTA…',      w:'4%',  type:'bool' },
+        { key:'es_prioridad',   label:'PRIO…',      w:'4%',  type:'bool' },
         { key:'backcast',       label:'Bk',         w:'3%',  type:'num' },
         { key:'nextcast',       label:'Nx',         w:'3%',  type:'num' },
         { key:'resumen',        label:'Resumen',    w:'10%', type:'text' },
@@ -1667,8 +1667,146 @@ window._hmModalAsignarPJ = () => {
         { key:'undercast',      label:'Undercast',  w:'7%',  type:'text' },
         { key:'especial',       label:'Especial',   w:'5%',  type:'text' },
         { key:'nota',           label:'Nota',       w:'5%',  type:'text' },
-        { key:'_acc',           label:'',           w:'5%',  type:'actions' },
+        { key:'_acc',           label:'',           w:'3%',  type:'actions' },
     ];
+
+    // ── Portapapeles de columna ───────────────────────────────
+    const COL_CLIP = { key: null, values: [] };  // { key, values: [] }
+
+    // Menú contextual de columna
+    function _showColMenu(key, label, e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('hz-col-menu')?.remove();
+
+        const col = NCOLS.find(c => c.key === key);
+        if (!col || col.type === 'ro' || col.type === 'actions') return;
+
+        const isNum  = col.type === 'num';
+        const isBool = col.type === 'bool';
+
+        const menu = document.createElement('div');
+        menu.id = 'hz-col-menu';
+        menu.style.cssText = `
+            position:fixed;left:${e.clientX}px;top:${e.clientY}px;z-index:9999;
+            background:#12121e;border:1px solid rgba(212,175,55,0.3);border-radius:8px;
+            padding:6px 0;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,0.7);
+            font-family:'Inter',system-ui,sans-serif;font-size:0.78em;
+        `;
+
+        const item = (icon, txt, danger, fn) => {
+            const d = document.createElement('div');
+            d.style.cssText = `padding:7px 14px;cursor:pointer;display:flex;gap:8px;align-items:center;
+                color:${danger?'#e07070':'#ccc'};transition:background 0.1s;`;
+            d.onmouseenter = () => d.style.background = 'rgba(255,255,255,0.06)';
+            d.onmouseleave = () => d.style.background = 'transparent';
+            d.innerHTML = `<span style="opacity:0.6;width:16px;text-align:center;">${icon}</span> ${txt}`;
+            d.onclick = () => { menu.remove(); fn(); };
+            return d;
+        };
+        const sep = () => {
+            const d = document.createElement('div');
+            d.style.cssText = 'height:1px;background:rgba(255,255,255,0.06);margin:4px 0;';
+            return d;
+        };
+
+        const title = document.createElement('div');
+        title.style.cssText = 'padding:4px 14px 8px;font-size:0.85em;color:rgba(212,175,55,0.7);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:2px;';
+        title.textContent = label;
+        menu.appendChild(title);
+
+        // Copiar columna
+        menu.appendChild(item('📋', 'Copiar columna', false, () => {
+            COL_CLIP.key = key;
+            COL_CLIP.values = TS.nFilt.map(r => r[key] ?? (isNum ? 0 : ''));
+            toast(`📋 Columna "${label}" copiada (${COL_CLIP.values.length} valores)`);
+        }));
+
+        // Pegar columna (si hay clip compatible)
+        if (COL_CLIP.key === key && COL_CLIP.values.length > 0) {
+            menu.appendChild(item('📥', `Pegar columna (${COL_CLIP.values.length} valores)`, false, async () => {
+                if (!confirm(`¿Pegar ${COL_CLIP.values.length} valores en columna "${label}"? Esto sobrescribirá los datos en todas las filas filtradas.`)) return;
+                const { supabase } = await import('../hex-auth.js');
+                const filt = TS.nFilt;
+                let ok = 0;
+                for (let i = 0; i < Math.min(filt.length, COL_CLIP.values.length); i++) {
+                    const r = filt[i];
+                    const val = isNum ? (parseInt(COL_CLIP.values[i]) || 0)
+                              : isBool ? !!COL_CLIP.values[i]
+                              : COL_CLIP.values[i];
+                    const { error } = await supabase.from('hechizos_nodos').update({ [key]: val }).eq('id', r.id);
+                    if (!error) { r[key] = val; ok++; }
+                }
+                _nFilter();
+                toast(`✓ Columna pegada en ${ok} filas`);
+            }));
+        }
+
+        menu.appendChild(sep());
+
+        if (isNum) {
+            menu.appendChild(item('0️⃣', 'Poner toda la columna a 0', true, async () => {
+                if (!confirm(`¿Poner columna "${label}" a 0 en ${TS.nFilt.length} filas filtradas?`)) return;
+                const { supabase } = await import('../hex-auth.js');
+                // Parallel chunks
+                const CHUNK = 50;
+                let ok = 0;
+                for (let i = 0; i < TS.nFilt.length; i += CHUNK) {
+                    const batch = TS.nFilt.slice(i, i + CHUNK);
+                    const results = await Promise.all(
+                        batch.map(r => supabase.from('hechizos_nodos').update({ [key]: 0 }).eq('id', r.id))
+                    );
+                    results.forEach((res, idx) => { if (!res.error) { batch[idx][key] = 0; ok++; } });
+                }
+                _nFilter();
+                toast(`✓ ${ok} filas → ${label} = 0`);
+            }));
+
+            menu.appendChild(item('✏', 'Llenar toda la columna con un valor…', false, async () => {
+                const val = prompt(`Valor para columna "${label}" en ${TS.nFilt.length} filas:`, '0');
+                if (val === null) return;
+                const num = parseInt(val) || 0;
+                const { supabase } = await import('../hex-auth.js');
+                const CHUNK = 50;
+                let ok = 0;
+                for (let i = 0; i < TS.nFilt.length; i += CHUNK) {
+                    const batch = TS.nFilt.slice(i, i + CHUNK);
+                    const results = await Promise.all(
+                        batch.map(r => supabase.from('hechizos_nodos').update({ [key]: num }).eq('id', r.id))
+                    );
+                    results.forEach((res, idx) => { if (!res.error) { batch[idx][key] = num; ok++; } });
+                }
+                _nFilter();
+                toast(`✓ ${ok} filas → ${label} = ${num}`);
+            }));
+        }
+
+        if (isBool) {
+            ['true','false'].forEach(v => {
+                menu.appendChild(item(v==='true'?'☑':'☐', `Marcar toda la columna como ${v==='true'?'verdadero':'falso'}`, v==='false', async () => {
+                    const boolVal = v === 'true';
+                    if (!confirm(`¿Poner columna "${label}" a ${v} en ${TS.nFilt.length} filas?`)) return;
+                    const { supabase } = await import('../hex-auth.js');
+                    const CHUNK = 50;
+                    let ok = 0;
+                    for (let i = 0; i < TS.nFilt.length; i += CHUNK) {
+                        const batch = TS.nFilt.slice(i, i + CHUNK);
+                        const results = await Promise.all(
+                            batch.map(r => supabase.from('hechizos_nodos').update({ [key]: boolVal }).eq('id', r.id))
+                        );
+                        results.forEach((res, idx) => { if (!res.error) { batch[idx][key] = boolVal; ok++; } });
+                    }
+                    _nFilter();
+                    toast(`✓ ${ok} filas → ${label} = ${v}`);
+                }));
+            });
+        }
+
+        document.body.appendChild(menu);
+        // Cerrar al hacer clic fuera
+        const close = (e) => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('mousedown', close); } };
+        setTimeout(() => document.addEventListener('mousedown', close), 10);
+    }
 
     // ── Montar DOM ───────────────────────────────────────────
     function _mount() {
@@ -1836,7 +1974,11 @@ window._hmModalAsignarPJ = () => {
                 : '';
             const onclick = c.type !== 'actions'
                 ? `onclick="window._hmTablasNSort('${c.key}')"` : '';
-            return `<th style="width:${c.w}" class="${cls}" ${onclick}>${c.label}</th>`;
+            const oncontextmenu = (c.type !== 'ro' && c.type !== 'actions')
+                ? `oncontextmenu="window._hmColMenu('${c.key}','${c.label}',event)"` : '';
+            const title = (c.type !== 'ro' && c.type !== 'actions')
+                ? `title="Clic derecho → opciones de columna"` : '';
+            return `<th style="width:${c.w}" class="${cls}" ${onclick} ${oncontextmenu} ${title}>${c.label}</th>`;
         }).join('');
 
         const rowsHtml = slice.map(r => _nRowHtml(r)).join('');
@@ -1858,50 +2000,101 @@ window._hmModalAsignarPJ = () => {
     }
 
     function _nRowHtml(r) {
-        const editing = TS.nEditing === r.id;
-        const buf = editing ? TS.nBuf : r;
         const afinOpts = TS.afinidades.map(a =>
-            `<option value="${a}" ${(buf.afinidad||r.afinidad)===a?'selected':''}>${a}</option>`
+            `<option value="${a}" ${r.afinidad===a?'selected':''}>${a}</option>`
         ).join('');
         const claseOpts = ['1','2','3','4','5'].map(c =>
-            `<option value="${c}" ${String(buf.clase||r.clase)===c?'selected':''}>${c}</option>`
+            `<option value="${c}" ${String(r.clase)===c?'selected':''}>${c}</option>`
         ).join('');
 
-        return `<tr data-nid="${r.id}" class="${editing?'hz-row-sel':''}">
+        return `<tr data-nid="${r.id}">
             ${NCOLS.map(c => {
                 if (c.type === 'ro') return `<td class="hz-cell-id">${r[c.key]}</td>`;
+
                 if (c.type === 'actions') return `<td class="hz-cell-actions">
-                    ${editing
-                        ? `<button class="hz-row-btn save" onclick="window._hmTablasNSave(${r.id})">✓</button>
-                           <button class="hz-row-btn cancel" onclick="window._hmTablasNCancelEdit()">✕</button>`
-                        : `<button class="hz-row-btn" onclick="window._hmTablasNEdit(${r.id})">✏</button>
-                           <button class="hz-row-btn del" onclick="window._hmTablasNDel(${r.id},'${(r.nombre||'').replace(/'/g,"\\'")}')">🗑</button>`
-                    }</td>`;
-                if (c.type === 'bool') return `<td class="hz-cell-bool">
-                    <input type="checkbox" ${(editing?buf[c.key]:r[c.key])?'checked':''} ${editing?`onchange="window._hmTablasNBufBool('${c.key}',this.checked)"`:'disabled'}>
+                    <button class="hz-row-btn del" onclick="window._hmTablasNDel(${r.id},'${(r.nombre||'').replace(/'/g,"\\'")}')">🗑</button>
                     </td>`;
+
+                if (c.type === 'bool') return `<td class="hz-cell-bool">
+                    <input type="checkbox" ${r[c.key]?'checked':''}
+                        onchange="window._hmTablasInlineUpdate(${r.id},'${c.key}',this.checked,'bool')">
+                    </td>`;
+
                 if (c.type === 'num') return `<td class="hz-cell-num">
-                    ${editing
-                        ? `<input type="number" value="${buf[c.key]??r[c.key]??0}" min="0" style="width:52px;text-align:right;" oninput="window._hmTablasNBuf('${c.key}',this.value)">`
-                        : (r[c.key]??0)}</td>`;
+                    <input type="number" value="${r[c.key]??0}" min="0"
+                        style="width:52px;text-align:right;background:transparent;border:1px solid transparent;border-radius:3px;color:inherit;font-size:inherit;padding:1px 3px;"
+                        onfocus="this.style.borderColor='rgba(212,175,55,0.4)'"
+                        onblur="this.style.borderColor='transparent';window._hmTablasInlineUpdate(${r.id},'${c.key}',this.value,'num')"
+                        onkeydown="if(event.key==='Enter')this.blur()">
+                    </td>`;
+
                 if (c.type === 'afin') return `<td class="hz-cell-afin">
-                    ${editing
-                        ? `<select onchange="window._hmTablasNBuf('${c.key}',this.value)">${afinOpts}</select>`
-                        : (r[c.key]||'')}</td>`;
+                    <select style="background:transparent;border:none;color:inherit;font-size:inherit;cursor:pointer;max-width:100%;"
+                        onchange="window._hmTablasInlineUpdate(${r.id},'${c.key}',this.value,'text')">${afinOpts}</select>
+                    </td>`;
+
                 if (c.type === 'clase') return `<td>
-                    ${editing
-                        ? `<select onchange="window._hmTablasNBuf('${c.key}',this.value)">${claseOpts}</select>`
-                        : (r[c.key]||'')}</td>`;
-                // text
-                const val = editing ? (buf[c.key]??r[c.key]??'') : (r[c.key]||'');
-                const disp = String(val).length > 40 ? String(val).substring(0,40)+'…' : String(val);
-                return `<td title="${String(r[c.key]||'').replace(/"/g,'&quot;')}">
-                    ${editing
-                        ? `<input type="text" value="${String(buf[c.key]??r[c.key]??'').replace(/"/g,'&quot;')}" oninput="window._hmTablasNBuf('${c.key}',this.value)">`
-                        : `<span>${disp}</span>`}</td>`;
+                    <select style="background:transparent;border:none;color:inherit;font-size:inherit;cursor:pointer;"
+                        onchange="window._hmTablasInlineUpdate(${r.id},'${c.key}',this.value,'text')">${claseOpts}</select>
+                    </td>`;
+
+                // text — clic para editar inline
+                const val = String(r[c.key] || '');
+                const disp = val.length > 38 ? val.substring(0,38)+'…' : val;
+                return `<td title="${val.replace(/"/g,'&quot;')}" class="hz-cell-text-view"
+                    onclick="window._hmTablasInlineTextEdit(this,${r.id},'${c.key}')">
+                    <span>${disp}</span>
+                    </td>`;
             }).join('')}
         </tr>`;
     }
+
+    // ── Inline update — guarda directamente sin buffer ───────
+    window._hmTablasInlineUpdate = async (id, key, rawVal, type) => {
+        const r = TS.nRows.find(r => r.id === id);
+        if (!r) return;
+        const val = type === 'num'  ? (parseInt(rawVal) || 0)
+                  : type === 'bool' ? !!rawVal
+                  : rawVal;
+        if (r[key] === val) return; // sin cambio
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const { error } = await supabase.from('hechizos_nodos').update({ [key]: val }).eq('id', id);
+            if (error) throw error;
+            r[key] = val;
+            // También actualizar en nFilt
+            const rf = TS.nFilt.find(r => r.id === id);
+            if (rf) rf[key] = val;
+        } catch(e) { toast('Error guardando: ' + e.message); }
+    };
+
+    // Texto largo: clic convierte la celda en textarea, blur guarda
+    window._hmTablasInlineTextEdit = (td, id, key) => {
+        if (td.querySelector('textarea,input')) return; // ya editando
+        const r = TS.nRows.find(r => r.id === id);
+        if (!r) return;
+        const val = r[key] || '';
+        td.innerHTML = '';
+        const inp = document.createElement('textarea');
+        inp.value = val;
+        inp.rows = Math.min(4, Math.max(1, Math.ceil(val.length / 35)));
+        inp.style.cssText = 'width:100%;font-size:inherit;font-family:inherit;background:#0d0d1a;border:1px solid rgba(212,175,55,0.35);border-radius:3px;color:#ccc;padding:2px 4px;resize:vertical;';
+        inp.onblur = async () => {
+            const newVal = inp.value;
+            await window._hmTablasInlineUpdate(id, key, newVal, 'text');
+            // Restaurar vista
+            const disp = newVal.length > 38 ? newVal.substring(0,38)+'…' : newVal;
+            td.innerHTML = `<span>${disp}</span>`;
+            td.onclick = () => window._hmTablasInlineTextEdit(td, id, key);
+        };
+        inp.onkeydown = (e) => { if (e.key === 'Escape') inp.blur(); };
+        td.appendChild(inp);
+        inp.focus();
+        inp.select();
+    };
+
+    // Exponer menú de columna
+    window._hmColMenu = _showColMenu;
 
     // ── Filtro / sort / render STRINGS ───────────────────────
     function _sFilter() {
@@ -1940,24 +2133,25 @@ window._hmModalAsignarPJ = () => {
         if (count) count.textContent = ` (${total}/${TS.sRows.length})`;
 
         const rowsHtml = slice.map(r => {
-            const editing = TS.sEditing === r.id;
-            const buf = editing ? TS.sBuf : r;
-            return `<tr data-sid="${r.id}" class="${editing?'hz-row-sel':''}">
+            return `<tr data-sid="${r.id}">
                 <td class="hz-cell-id" style="width:8%">${r.id}</td>
-                <td class="hz-str-src" style="width:37%">${editing
-                    ? `<input type="text" value="${buf.source_id||''}" oninput="window._hmTablasSBuf('source_id',this.value)">`
-                    : (r.source_id||'')}</td>
+                <td class="hz-str-src" style="width:37%">
+                    <input type="text" value="${r.source_id||''}"
+                        style="width:100%;background:transparent;border:1px solid transparent;border-radius:3px;color:inherit;font-size:inherit;padding:1px 4px;"
+                        onfocus="this.style.borderColor='rgba(212,175,55,0.3)'"
+                        onblur="this.style.borderColor='transparent';window._hmTablasSInlineUpdate(${r.id},'source_id',this.value)"
+                        onkeydown="if(event.key==='Enter')this.blur()">
+                </td>
                 <td style="width:4%;text-align:center;color:#555;">→</td>
-                <td class="hz-str-tgt" style="width:37%">${editing
-                    ? `<input type="text" value="${buf.target_id||''}" oninput="window._hmTablasSBuf('target_id',this.value)">`
-                    : (r.target_id||'')}</td>
+                <td class="hz-str-tgt" style="width:37%">
+                    <input type="text" value="${r.target_id||''}"
+                        style="width:100%;background:transparent;border:1px solid transparent;border-radius:3px;color:inherit;font-size:inherit;padding:1px 4px;"
+                        onfocus="this.style.borderColor='rgba(212,175,55,0.3)'"
+                        onblur="this.style.borderColor='transparent';window._hmTablasSInlineUpdate(${r.id},'target_id',this.value)"
+                        onkeydown="if(event.key==='Enter')this.blur()">
+                </td>
                 <td style="width:14%;text-align:right;white-space:nowrap;">
-                    ${editing
-                        ? `<button class="hz-row-btn save" onclick="window._hmTablasSave(${r.id})">✓</button>
-                           <button class="hz-row-btn cancel" onclick="window._hmTablasSCancelEdit()">✕</button>`
-                        : `<button class="hz-row-btn" onclick="window._hmTablasSEdit(${r.id})">✏</button>
-                           <button class="hz-row-btn del" onclick="window._hmTablasSDelStr(${r.id})">🗑</button>`
-                    }
+                    <button class="hz-row-btn del" onclick="window._hmTablasSDelStr(${r.id})">🗑</button>
                 </td>
             </tr>`;
         }).join('');
@@ -2162,7 +2356,21 @@ window._hmModalAsignarPJ = () => {
     };
     window._hmTablasSPage   = (p) => { TS.sPage=p; _sRender(); };
 
-    // Strings — edición
+    // Strings — edición inline directa
+    window._hmTablasSInlineUpdate = async (id, key, val) => {
+        const r = TS.sRows.find(r => r.id === id);
+        if (!r || r[key] === val) return;
+        try {
+            const { supabase } = await import('../hex-auth.js');
+            const { error } = await supabase.from('hechizos_strings').update({ [key]: val }).eq('id', id);
+            if (error) throw error;
+            r[key] = val;
+            const rf = TS.sFilt.find(r => r.id === id);
+            if (rf) rf[key] = val;
+        } catch(e) { toast('Error: ' + e.message); }
+    };
+
+    // Strings — edición (legacy, kept for compatibility)
     window._hmTablasSEdit = (id) => {
         const r = TS.sRows.find(r=>r.id===id); if (!r) return;
         TS.sEditing=id; TS.sBuf={...r}; _sRender();
