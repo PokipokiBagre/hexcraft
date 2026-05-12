@@ -216,43 +216,90 @@ function _renderOpLeft() {
         </div>
         ${(() => {
             const todos   = [...st.seleccionados];
+
+            // ── VEX ──
             const conVex  = todos.filter(n => n.vex > 0);
             const sinVex  = todos.filter(n => !n.vex);
             const totalV  = conVex.reduce((s, n) => s + n.vex, 0);
             const mediaV  = conVex.length ? Math.round(totalV / conVex.length) : 0;
-            const pctCon  = Math.round(conVex.length / todos.length * 100);
-            // Distribución por rangos
-            const rangos  = [[1,99],[100,199],[200,299],[300,399],[400,499],[500,699],[700,999],[1000,Infinity]];
-            const dist    = rangos.map(([lo,hi]) => {
+            const pctVex  = Math.round(conVex.length / todos.length * 100);
+            const rangosV = [[1,99],[100,199],[200,299],[300,399],[400,499],[500,699],[700,999],[1000,Infinity]];
+            const distV   = rangosV.map(([lo,hi]) => {
                 const cnt = conVex.filter(n => n.vex >= lo && n.vex <= hi).length;
-                return cnt > 0 ? `<span style="color:#888;">${lo === 1000 ? '≥1000' : lo+'–'+hi}:</span> <strong style="color:#c090f0;">${cnt}</strong>` : '';
-            }).filter(Boolean).join(' &nbsp;');
+                return cnt > 0 ? `<span style="color:#666;">${lo===1000?'≥1k':lo+'–'+hi}:</span> <b style="color:#c090f0;">${cnt}</b>` : '';
+            }).filter(Boolean).join(' <span style="color:#2a2a3a;">·</span> ');
+
+            // ── HEX ──
+            const conHex  = todos.filter(n => (n.hex || 0) > 0);
+            const totalH  = todos.reduce((s, n) => s + (n.hex || 0), 0);
+            const mediaH  = conHex.length ? Math.round(totalH / conHex.length) : 0;
+            const maxH    = conHex.length ? Math.max(...conHex.map(n => n.hex)) : 0;
+            const minH    = conHex.length ? Math.min(...conHex.map(n => n.hex)) : 0;
+
+            const S = {
+                wrap:    'margin:8px 0 4px;border-radius:8px;overflow:hidden;',
+                header:  'font-size:0.54em;letter-spacing:1.8px;text-transform:uppercase;font-weight:700;padding:6px 10px 5px;',
+                grid:    'display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:0 8px 8px;',
+                cell:    'text-align:center;padding:5px 2px;background:rgba(0,0,0,0.2);border-radius:5px;border:1px solid rgba(255,255,255,0.04);',
+                val:     'font-family:"Cinzel",serif;font-size:1em;font-weight:700;line-height:1;margin-bottom:3px;',
+                lbl:     'font-size:0.55em;color:#444;text-transform:uppercase;letter-spacing:0.5px;',
+                bar:     'height:4px;background:rgba(255,255,255,0.05);border-radius:2px;margin:0 8px 4px;overflow:hidden;',
+                dist:    'font-size:0.58em;padding:0 8px 8px;display:flex;flex-wrap:wrap;gap:5px;line-height:1.6;',
+                pct:     'font-size:0.57em;text-align:center;padding:0 8px 6px;',
+            };
+
             return `
-            <div class="op-vex-stats">
-                <div class="op-vex-stats-title">Lectura VEX — selección</div>
-                <div class="op-vex-stats-grid">
-                    <div class="op-vex-stat">
-                        <div class="op-vex-stat-val" style="color:#c090f0;">${conVex.length}</div>
-                        <div class="op-vex-stat-lbl">con VEX</div>
+            <div style="${S.wrap}background:rgba(154,80,220,0.055);border:1px solid rgba(154,80,220,0.18);position:relative;">
+                <div style="${S.header}color:rgba(190,130,255,0.7);">✦ Lectura VEX</div>
+                <div style="${S.grid}">
+                    <div style="${S.cell}">
+                        <div style="${S.val}color:#c090f0;">${conVex.length}</div>
+                        <div style="${S.lbl}">con VEX</div>
                     </div>
-                    <div class="op-vex-stat">
-                        <div class="op-vex-stat-val" style="color:#555;">${sinVex.length}</div>
-                        <div class="op-vex-stat-lbl">sin VEX</div>
+                    <div style="${S.cell}">
+                        <div style="${S.val}color:#555;">${sinVex.length}</div>
+                        <div style="${S.lbl}">sin VEX</div>
                     </div>
-                    <div class="op-vex-stat">
-                        <div class="op-vex-stat-val" style="color:#a0c8f0;">${mediaV}</div>
-                        <div class="op-vex-stat-lbl">media</div>
+                    <div style="${S.cell}">
+                        <div style="${S.val}color:#a0c8f0;">${mediaV.toLocaleString()}</div>
+                        <div style="${S.lbl}">media</div>
                     </div>
-                    <div class="op-vex-stat">
-                        <div class="op-vex-stat-val" style="color:#d4af37;">${totalV.toLocaleString()}</div>
-                        <div class="op-vex-stat-lbl">total</div>
+                    <div style="${S.cell}">
+                        <div style="${S.val}color:#d4af37;">${totalV.toLocaleString()}</div>
+                        <div style="${S.lbl}">total</div>
                     </div>
                 </div>
-                <div class="op-vex-bar-wrap">
-                    <div class="op-vex-bar-fill" style="width:${pctCon}%;"></div>
+                <div style="${S.bar}">
+                    <div style="height:100%;width:${pctVex}%;background:linear-gradient(90deg,#6020b0,#b070e8);border-radius:2px;box-shadow:0 0 6px rgba(154,80,220,0.5);"></div>
                 </div>
-                <div style="font-size:0.58em;color:#444;margin-top:2px;text-align:center;">${pctCon}% tienen VEX</div>
-                ${dist ? `<div class="op-vex-dist">${dist}</div>` : ''}
+                <div style="${S.pct}color:#444;">${pctVex}% tienen VEX</div>
+                ${distV ? `<div style="${S.dist}">${distV}</div>` : ''}
+            </div>
+
+            <div style="${S.wrap}margin-top:6px;background:rgba(212,175,55,0.04);border:1px solid rgba(212,175,55,0.16);">
+                <div style="${S.header}color:rgba(212,175,55,0.7);">⬡ Lectura HEX</div>
+                <div style="${S.grid}">
+                    <div style="${S.cell}">
+                        <div style="${S.val}color:#e8c84a;">${totalH.toLocaleString()}</div>
+                        <div style="${S.lbl}">total</div>
+                    </div>
+                    <div style="${S.cell}">
+                        <div style="${S.val}color:#c9a830;">${mediaH.toLocaleString()}</div>
+                        <div style="${S.lbl}">media</div>
+                    </div>
+                    <div style="${S.cell}">
+                        <div style="${S.val}color:#a07820;">${maxH.toLocaleString()}</div>
+                        <div style="${S.lbl}">máx</div>
+                    </div>
+                    <div style="${S.cell}">
+                        <div style="${S.val}color:#6a5010;">${minH.toLocaleString()}</div>
+                        <div style="${S.lbl}">mín</div>
+                    </div>
+                </div>
+                <div style="${S.bar}">
+                    <div style="height:100%;width:${Math.round(conHex.length/todos.length*100)}%;background:linear-gradient(90deg,#7a5010,#d4af37);border-radius:2px;box-shadow:0 0 6px rgba(212,175,55,0.4);"></div>
+                </div>
+                <div style="${S.pct}color:#444;">${conHex.length}/${todos.length} tienen HEX · ${Math.round(conHex.length/todos.length*100)}%</div>
             </div>`;
         })()}
         <div id="op-l-batch-form"></div>
