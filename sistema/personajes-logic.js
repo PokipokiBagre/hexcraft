@@ -194,6 +194,26 @@ export function getMayorAfinidad(p) {
     return max > 0 ? mayor : null;
 }
 
+// Normaliza las keys del JSONB afin_hcz que vienen en formato label ("Física")
+// al formato interno snake_case ("fisica") usado en el resto del sistema
+function _normalizarAfinHcz(raw) {
+    if (!raw || typeof raw !== 'object') return {};
+    const MAP = {
+        'física':     'fisica',    'fisica':     'fisica',
+        'energética': 'energetica','energetica': 'energetica',
+        'espiritual': 'espiritual',
+        'mando':      'mando',
+        'psíquica':   'psiquica',  'psiquica':   'psiquica',
+        'oscura':     'oscura'
+    };
+    const result = {};
+    for (const [k, v] of Object.entries(raw)) {
+        const norm = MAP[k.toLowerCase()];
+        if (norm) result[norm] = (result[norm] || 0) + (Number(v) || 0);
+    }
+    return result;
+}
+
 // Mapea un registro crudo de Supabase al formato interno
 // Compatible con schema nuevo (afin_base/afin_extra/afin_alter JSONB + bonos_stats + cd_*)
 // y schema antiguo (columnas af_fisica, hz_fisica, etc.) como fallback
@@ -249,11 +269,11 @@ export function mapPersonaje(row) {
         afin_alter: { ..._afin0, ...afinAlter },
         // Alias legacy para compatibilidad con buildContext y renderCatalogo
         afinidadesBase: { ..._afin0, ...afinBase  },
-        afinidadesHz:   { ..._afin0, ...(row.afin_hcz && typeof row.afin_hcz === 'object' ? row.afin_hcz : {}) },
+        afinidadesHz:   { ..._afin0, ..._normalizarAfinHcz(row.afin_hcz) },
         afinidadesEf:   { ..._afin0, ...afinAlter },
         afinidadesBf:   { ..._afin0, ...afinExtra },
         // afin_hcz: afinidades calculadas desde inventario de hechizos (solo lectura, calculado por DB)
-        afin_hcz: { ..._afin0, ...(row.afin_hcz && typeof row.afin_hcz === 'object' ? row.afin_hcz : {}) },
+        afin_hcz: { ..._afin0, ..._normalizarAfinHcz(row.afin_hcz) },
         // Bonos de stats calculados (del trigger o manual)
         bonos_stats: bonos,
         bono_vida_roja: bonos.vida_roja || 0,
