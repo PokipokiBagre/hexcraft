@@ -1878,21 +1878,26 @@ window._hmModalAsignarPJ = () => {
 
         const el = document.activeElement;
         if (!el) return;
-        const isNum      = el.tagName === 'INPUT' && el.type === 'number';
-        const isCheckbox = el.tagName === 'INPUT' && el.type === 'checkbox';
-        const isSelect   = el.tagName === 'SELECT';
-        const isTextarea = el.tagName === 'TEXTAREA';
-        const isText     = el.tagName === 'INPUT' && el.type === 'text';
-        if (!isNum && !isCheckbox && !isSelect && !isTextarea && !isText) return;
 
         const td    = el.closest('td');
         const tr    = td?.closest('tr');
         const tbody = tr?.closest('tbody');
         if (!td || !tr || !tbody) return;
 
-        const rows   = [...tbody.querySelectorAll('tr')];
-        const ri     = rows.indexOf(tr);
         const colKey = el.dataset.colkey || td.dataset.colkey;
+        const col    = NCOLS.find(c => c.key === colKey);
+
+        const isCheckbox = el.type === 'checkbox';
+        const isSelect   = el.tagName === 'SELECT';
+        const isTextarea = el.tagName === 'TEXTAREA';
+        // num cols now use type="text" with inputmode="numeric"
+        const isNum      = col?.type === 'num';
+        const isText     = el.tagName === 'INPUT' && !isCheckbox && !isNum;
+
+        if (!isCheckbox && !isSelect && !isTextarea && !isNum && !isText) return;
+
+        const rows = [...tbody.querySelectorAll('tr')];
+        const ri   = rows.indexOf(tr);
 
         const _focusRow = (targetRi) => {
             const targetTr = rows[targetRi];
@@ -1904,14 +1909,14 @@ window._hmModalAsignarPJ = () => {
                 const targetTd = [...targetTr.querySelectorAll('td')][ci];
                 targetEl = targetTd?.querySelector('input,select');
                 if (!targetEl && targetTd?.classList.contains('hz-cell-text-view')) {
-                    e.preventDefault(); if (isNum) el.blur(); targetTd.click(); return true;
+                    e.preventDefault(); el.blur(); targetTd.click(); return true;
                 }
             }
             if (!targetEl) return false;
             e.preventDefault();
-            if (isNum) el.blur();
+            el.blur(); // trigger save on num inputs
             targetEl.focus();
-            if (targetEl.select && targetEl.type !== 'checkbox') targetEl.select();
+            if (targetEl.select) targetEl.select();
             return true;
         };
 
@@ -1920,8 +1925,8 @@ window._hmModalAsignarPJ = () => {
             const ci  = tds.indexOf(td);
             for (let i = ci + dir; i >= 0 && i < tds.length; i += dir) {
                 const inp = tds[i].querySelector('input,select');
-                if (inp) { e.preventDefault(); if (isNum) el.blur(); inp.focus(); if (inp.select && inp.type !== 'checkbox') inp.select(); return; }
-                if (tds[i].classList.contains('hz-cell-text-view')) { e.preventDefault(); if (isNum) el.blur(); tds[i].click(); return; }
+                if (inp) { e.preventDefault(); el.blur(); inp.focus(); if (inp.select) inp.select(); return; }
+                if (tds[i].classList.contains('hz-cell-text-view')) { e.preventDefault(); el.blur(); tds[i].click(); return; }
             }
         };
 
@@ -1936,18 +1941,22 @@ window._hmModalAsignarPJ = () => {
         }
 
         if (isNum) {
-            if (e.key === 'ArrowDown' || e.key === 'Enter') { _focusRow(ri + 1); return; }
-            if (e.key === 'ArrowUp')                         { _focusRow(ri - 1); return; }
-            // ←→ se dejan pasar — mueven cursor dentro del número
+            // type="text" so arrows are free — intercept all four
+            if (e.key === 'ArrowDown' || e.key === 'Enter') { e.preventDefault(); _focusRow(ri + 1); return; }
+            if (e.key === 'ArrowUp')    { e.preventDefault(); _focusRow(ri - 1); return; }
+            if (e.key === 'ArrowRight') { _focusCol(1);  return; }
+            if (e.key === 'ArrowLeft')  { _focusCol(-1); return; }
         }
 
         if (isSelect) {
-            if (e.key === 'ArrowDown' && !e.altKey) { _focusRow(ri + 1); return; }
-            if (e.key === 'ArrowUp'   && !e.altKey) { _focusRow(ri - 1); return; }
+            if (e.key === 'ArrowDown' && !e.altKey) { e.preventDefault(); _focusRow(ri + 1); return; }
+            if (e.key === 'ArrowUp'   && !e.altKey) { e.preventDefault(); _focusRow(ri - 1); return; }
         }
 
         if (isText || isTextarea) {
-            if (e.key === 'Enter' && !e.shiftKey) { _focusRow(ri + 1); return; }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _focusRow(ri + 1); return; }
+            if (e.key === 'ArrowDown') { e.preventDefault(); _focusRow(ri + 1); return; }
+            if (e.key === 'ArrowUp')   { e.preventDefault(); _focusRow(ri - 1); return; }
         }
     });
 
@@ -2116,11 +2125,10 @@ window._hmModalAsignarPJ = () => {
                     </td>`;
 
                 if (c.type === 'num') return `<td class="hz-cell-num" data-colkey="${c.key}">
-                    <input type="number" value="${r[c.key]??0}" min="0" data-colkey="${c.key}"
+                    <input type="text" inputmode="numeric" pattern="[0-9]*" value="${r[c.key]??0}" data-colkey="${c.key}"
                         style="width:52px;text-align:right;background:transparent;border:1px solid transparent;border-radius:3px;color:inherit;font-size:inherit;padding:1px 3px;"
-                        onfocus="this.style.borderColor='rgba(212,175,55,0.4)'"
-                        onblur="this.style.borderColor='transparent';window._hmTablasInlineUpdate(${r.id},'${c.key}',this.value,'num')"
-                        onkeydown="if(event.key==='Enter'){this.blur();}">
+                        onfocus="this.style.borderColor='rgba(212,175,55,0.4)';this.select()"
+                        onblur="this.style.borderColor='transparent';window._hmTablasInlineUpdate(${r.id},'${c.key}',this.value,'num')">
                     </td>`;
 
                 if (c.type === 'afin') return `<td class="hz-cell-afin" data-colkey="${c.key}">
