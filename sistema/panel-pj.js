@@ -302,6 +302,11 @@ export function cerrarPanelPJ() {
         Object.values(window._ppjResetIntervals).forEach(id => clearInterval(id));
         window._ppjResetIntervals = {};
     }
+    // Limpiar partículas HEX
+    if (window._ppjParticleRAF) {
+        cancelAnimationFrame(window._ppjParticleRAF);
+        window._ppjParticleRAF = null;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -660,6 +665,13 @@ async function _tabHex(nombre, body) {
             linear-gradient(180deg,#0b0909 0%,#07050e 100%);
         border-bottom:1px solid rgba(212,175,55,0.16);
     }
+    /* particle canvas — fills the hero absolutely behind content */
+    .htab-particle-canvas{
+        position:absolute;inset:0;width:100%;height:100%;
+        pointer-events:none;z-index:0;
+    }
+    /* everything inside hero needs z-index to sit above canvas */
+    .htab-hero > *:not(.htab-particle-canvas){ position:relative; z-index:1; }
     /* subtle crosshatch grid */
     .htab-hero::before{
         content:'';position:absolute;inset:0;pointer-events:none;opacity:0.6;
@@ -944,6 +956,7 @@ async function _tabHex(nombre, body) {
     <div class="htab-root">
 
     <div class="htab-hero">
+        <canvas class="htab-particle-canvas" id="ppj-hex-particles-${_norm(nombre)}"></canvas>
         <div class="htab-hero-sub">Panel de Recursos</div>
         <svg class="htab-hex-icon" width="72" height="64" viewBox="0 0 100 88" fill="none">
             <polygon points="50,2 94,25 94,63 50,86 6,63 6,25" stroke="rgba(212,175,55,0.32)" stroke-width="1.2"/>
@@ -1022,11 +1035,147 @@ async function _tabHex(nombre, body) {
     if (s.vex_max > 0) {
         requestAnimationFrame(() => _startResetCountdown(nombre));
     }
+
+    // ── Partículas HEX ─────────────────────────────────────────
+    requestAnimationFrame(() => _startHexParticles(_norm(nombre), p.hex || 0));
 }
 
-
 // ─────────────────────────────────────────────────────────────
-// TAB: STATS
+// PARTÍCULAS ANIMADAS EN EL HERO HEX
+// Puntos y brillos que suben — algunos son hexágonos diminutos.
+// Velocidad escala con el valor de HEX del personaje.
+// ─────────────────────────────────────────────────────────────
+function _startHexParticles(normNombre, hexVal) {
+    const canvas = document.getElementById('ppj-hex-particles-' + normNombre);
+    if (!canvas) return;
+
+    // Limpiar loop anterior si existe
+    if (window._ppjParticleRAF) cancelAnimationFrame(window._ppjParticleRAF);
+
+    const ctx = canvas.getContext('2d');
+
+    // Ajustar tamaño del canvas al contenedor
+    const resize = () => {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width  = rect.width  || 400;
+        canvas.height = rect.height || 280;
+    };
+    resize();
+
+    const W = () => canvas.width;
+    const H = () => canvas.height;
+
+    // ── Velocidad según HEX ──────────────────────────────────
+    // 0–1000: muy lenta, 2000–3000: normal, 5000+: rápida, 10000+: ultra
+    const speedFactor = (hv) => {
+        if (hv <= 0)      return 0.12;
+        if (hv <= 1000)   return 0.15 + (hv / 1000) * 0.2;
+        if (hv <= 3000)   return 0.35 + ((hv - 1000) / 2000) * 0.4;
+        if (hv <= 5000)   return 0.75 + ((hv - 3000) / 2000) * 0.55;
+        if (hv <= 10000)  return 1.3  + ((hv - 5000) / 5000) * 1.2;
+        return 2.5 + Math.min((hv - 10000) / 5000, 1) * 1.5;
+    };
+    const BASE_SPEED = speedFactor(hexVal);
+
+    // Cantidad de partículas también escala (más HEX = más brillos)
+    const COUNT = Math.max(18, Math.min(60, Math.floor(18 + hexVal / 300)));
+
+    // ── Tipos de partícula ────────────────────────────────────
+    // 85% puntos/glow, 15% hexágonos diminutos (casi imperceptibles)
+    const makeParticle = () => {
+        const isHex = Math.random() < 0.15;
+        return {
+            x:      Math.random() * (W() || 400),
+            y:      (H() || 280) + Math.random() * 40,   // empieza bajo el canvas
+            size:   isHex
+                        ? (1.5 + Math.random() * 2.5)    // hexágono: 1.5–4px radio
+                        : (0.8 + Math.random() * 2),     // punto: 0.8–2.8px
+            speed:  BASE_SPEED * (0.4 + Math.random() * 1.2),
+            drift:  (Math.random() - 0.5) * 0.25,        // deriva lateral suave
+            alpha:  0.1 + Math.random() * 0.45,
+            alphaT: 0,                                    // phase para pulso
+            alphaSpd: 0.01 + Math.random() * 0.025,
+            rot:    Math.random() * Math.PI * 2,          // solo hexágonos usan esto
+            rotSpd: (Math.random() - 0.5) * 0.012,
+            isHex,
+        };
+    };
+
+    let particles = Array.from({ length: COUNT }, makeParticle);
+    // Distribuirlas verticalmente al inicio
+    particles.forEach(p => { p.y = Math.random() * (H() || 280); });
+
+    // ── Dibujar hexágono diminuto ─────────────────────────────
+    const drawTinyHex = (x, y, r, rot, alpha) => {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i;
+            const px = r * Math.cos(a), py = r * Math.sin(a);
+            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = `rgba(212,175,55,${alpha * 0.9})`;
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+        // leve fill interior
+        ctx.fillStyle = `rgba(212,175,55,${alpha * 0.08})`;
+        ctx.fill();
+        ctx.restore();
+    };
+
+    // ── Loop de animación ─────────────────────────────────────
+    const loop = () => {
+        ctx.clearRect(0, 0, W(), H());
+
+        particles.forEach(pt => {
+            // Movimiento
+            pt.y    -= pt.speed;
+            pt.x    += pt.drift;
+            pt.rot  += pt.rotSpd;
+            pt.alphaT += pt.alphaSpd;
+
+            // Alpha pulsante
+            const pulse = Math.sin(pt.alphaT) * 0.18;
+            const a = Math.max(0, Math.min(1, pt.alpha + pulse));
+
+            // Fade-out al acercarse a la cima
+            const fadeTop = Math.min(1, pt.y / 40);
+            const finalA = a * fadeTop;
+
+            if (pt.isHex) {
+                drawTinyHex(pt.x, pt.y, pt.size, pt.rot, finalA);
+            } else {
+                // Punto con glow suave
+                const grd = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, pt.size * 2.5);
+                grd.addColorStop(0,   `rgba(240,210,100,${finalA})`);
+                grd.addColorStop(0.4, `rgba(212,175,55,${finalA * 0.55})`);
+                grd.addColorStop(1,   `rgba(212,175,55,0)`);
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, pt.size * 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = grd;
+                ctx.fill();
+                // núcleo duro brillante
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, pt.size * 0.5, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,240,160,${finalA * 0.9})`;
+                ctx.fill();
+            }
+
+            // Reciclar cuando sale por arriba o por los lados
+            if (pt.y < -10 || pt.x < -20 || pt.x > W() + 20) {
+                Object.assign(pt, makeParticle());
+                pt.y = H() + 5;
+            }
+        });
+
+        window._ppjParticleRAF = requestAnimationFrame(loop);
+    };
+
+    loop();
+}
 // ─────────────────────────────────────────────────────────────
 function _tabStats(nombre) {
     const p = personajes[nombre]; if (!p) return '';
