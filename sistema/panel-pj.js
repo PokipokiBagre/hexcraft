@@ -463,6 +463,22 @@ async function _tabHex(nombre, body) {
     const safe = nombre.replace(/'/g, "\\'");
     const canEdit = estadoUI.esAdmin || !p.isPlayer;
 
+    // ── Fast path: si el body ya está renderizado, solo actualizar número y partículas ──
+    // Evita recrear el canvas y reiniciar las partículas en cada cambio de HEX
+    const existingCanvas = body.querySelector('.htab-particle-canvas');
+    const existingAmt    = body.querySelector('.htab-hex-amount');
+    if (existingCanvas && existingAmt) {
+        existingAmt.textContent = (p.hex || 0).toLocaleString();
+        // Actualizar velocidad de partículas sin reiniciarlas
+        const canvasId = existingCanvas.id;
+        const inst = window._ppjParticleInstances?.[canvasId];
+        if (inst && inst.alive) {
+            inst.hexVal    = p.hex || 0;
+            inst.baseSpeed = _hexSpeedFactor(p.hex || 0);
+        }
+        return;
+    }
+
     const { data: logs } = await supabase
         .from('hex_push_log')
         .select('id, tipo, cantidad, nota, created_at')
