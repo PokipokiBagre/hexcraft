@@ -94,14 +94,14 @@ function _inyectarEstilos() {
 .ppj-hex-btn.neg{color:#e06060;border-color:rgba(220,80,80,0.2);background:rgba(220,80,80,0.05);}
 .ppj-hex-btn.neg:hover{background:rgba(220,80,80,0.12);}
 .ppj-hpush-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
-.ppj-hpush-card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px 8px;text-align:center;}
-.ppj-hpush-card.available{border-color:rgba(212,175,55,0.3);}
-.ppj-hpush-label{font-size:0.64em;color:#5a5a78;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase;}
-.ppj-hpush-amt{font-size:1em;font-weight:700;color:#d4af37;font-family:'Cinzel',serif;margin-bottom:4px;}
+.ppj-hpush-card{background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.2);border-radius:10px;padding:12px 8px;text-align:center;transition:all 0.15s;}
+.ppj-hpush-card.available{border-color:rgba(212,175,55,0.45);background:rgba(212,175,55,0.09);box-shadow:0 0 12px rgba(212,175,55,0.08);}
+.ppj-hpush-label{font-size:0.62em;color:#7a6a30;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase;font-weight:600;}
+.ppj-hpush-amt{font-size:1.15em;font-weight:700;color:#d4af37;font-family:'Cinzel',serif;margin-bottom:4px;}
 .ppj-hpush-cd{font-size:0.6em;color:#4a4a68;margin-bottom:6px;min-height:14px;}
-.ppj-hpush-btn{width:100%;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:5px;color:#d4af37;font-size:0.68em;font-weight:700;padding:5px 4px;cursor:pointer;transition:background 0.15s;font-family:'Cinzel',serif;}
-.ppj-hpush-btn:hover:not(:disabled){background:rgba(212,175,55,0.22);}
-.ppj-hpush-btn:disabled{opacity:0.35;cursor:default;}
+.ppj-hpush-btn{width:100%;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.35);border-radius:6px;color:#d4af37;font-size:0.7em;font-weight:700;padding:6px 4px;cursor:pointer;transition:background 0.15s;font-family:'Cinzel',serif;letter-spacing:0.5px;}
+.ppj-hpush-btn:hover:not(:disabled){background:rgba(212,175,55,0.28);}
+.ppj-hpush-btn:disabled{opacity:0.3;cursor:default;}
 .ppj-contenido-row{display:flex;gap:6px;align-items:center;margin-top:5px;}
 .ppj-contenido-input{flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:5px;color:#d4af37;font-size:0.8em;padding:4px 6px;font-weight:700;text-align:center;}
 .ppj-hlog-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,0.02);border-radius:6px;border:1px solid rgba(255,255,255,0.04);margin-bottom:5px;}
@@ -547,34 +547,52 @@ async function _tabHex(nombre, body) {
     };
 
     const vexHtml = s.vex_max>0?`
-    <div class="ppj-section">
-        <div class="ppj-section-title">VEX</div>
-        <div class="ppj-vida-block">
-            <div class="ppj-vida-header"><span class="ppj-vida-label" style="color:#9a50dc;">VEX</span>
-                <div class="ppj-vida-ctrl">
-                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',-50)">−50</button>`:''}
-                    <span class="ppj-vida-xy"><span class="actual" style="color:#9a50dc;">${Math.floor(p.vex_actual||0)}</span><span class="sep">/</span><span class="maximo">${s.vex_max}</span></span>
-                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',50)">+50</button>`:''}
+    <div class="ppj-section" style="padding:0;">
+        <!-- VEX — mismo peso visual que HEX -->
+        <div style="background:linear-gradient(135deg,rgba(154,80,220,0.08),rgba(80,0,140,0.12));border-bottom:1px solid rgba(154,80,220,0.15);padding:14px 16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <span style="font-family:'Cinzel',serif;font-size:0.7em;letter-spacing:2px;color:#9a50dc;text-transform:uppercase;">⚡ VEX</span>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',-50)" style="border-color:rgba(154,80,220,0.3);">−50</button>`:''}
+                    <span style="font-family:'Cinzel',serif;font-size:1.6em;color:#b070e8;letter-spacing:1px;">${Math.floor(p.vex_actual||0)}<span style="font-size:0.45em;color:#6a3a9a;margin-left:4px;">/ ${s.vex_max}</span></span>
+                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',50)" style="border-color:rgba(154,80,220,0.3);">+50</button>`:''}
                 </div>
-            </div><div class="ppj-vex-bar"><div class="ppj-vex-fill" style="width:${pctVex}%"></div></div>
+            </div>
+            <div class="ppj-vex-bar" style="height:8px;border-radius:4px;"><div class="ppj-vex-fill" style="width:${pctVex}%;border-radius:4px;"></div></div>
+            <div class="ppj-formula" style="margin-top:5px;">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
         </div>
-        <div class="ppj-formula">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
-    </div>
-    <div class="ppj-section"><div class="ppj-section-title">Pushes</div>
-        ${_push('vex','VEX','⚡')}${_push('guarda','Guarda','🛡')}
-        ${!s.vex_max&&!s.guarda_max?'<div class="ppj-empty" style="padding:8px 0;">Sin pushes disponibles</div>':''}
+        <!-- Pushes VEX/Guarda -->
+        <div style="padding:10px 16px;">
+            <div style="font-size:0.6em;letter-spacing:1.5px;text-transform:uppercase;color:#3a3a58;font-weight:600;margin-bottom:8px;">Pushes</div>
+            ${_push('vex','VEX','⚡')}${_push('guarda','Guarda','🛡')}
+            ${!s.vex_max&&!s.guarda_max?'<div class="ppj-empty" style="padding:8px 0;">Sin pushes disponibles</div>':''}
+        </div>
     </div>`:'';
 
     body.innerHTML = `
-    <div class="ppj-section">
-        <div class="ppj-section-title">Saldo HEX</div>
-        <div class="ppj-hex-val">${(p.hex||0).toLocaleString()}</div>
-        ${canEdit?`<div class="ppj-hex-grid">${btnsN}</div><div class="ppj-hex-grid" style="margin-top:5px;">${btnsP}</div>`:''}
+    <!-- HEX hero -->
+    <div style="background:linear-gradient(160deg,rgba(212,175,55,0.07),rgba(120,90,0,0.12));border-bottom:1px solid rgba(212,175,55,0.15);padding:18px 16px 14px;text-align:center;position:relative;">
+        <div style="font-family:'Cinzel',serif;font-size:0.6em;letter-spacing:3px;color:#7a6a30;text-transform:uppercase;margin-bottom:2px;">Saldo HEX</div>
+        <!-- Hexágono decorativo -->
+        <svg width="120" height="104" viewBox="0 0 120 104" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);opacity:0.06;pointer-events:none;">
+            <polygon points="60,2 114,30 114,74 60,102 6,74 6,30" fill="none" stroke="#d4af37" stroke-width="2"/>
+            <polygon points="60,16 100,38 100,66 60,88 20,66 20,38" fill="none" stroke="#d4af37" stroke-width="1"/>
+        </svg>
+        <div style="font-family:'Cinzel',serif;font-size:2.8em;color:#d4af37;letter-spacing:3px;line-height:1;position:relative;">${(p.hex||0).toLocaleString()}</div>
+        ${canEdit?`
+        <div class="ppj-hex-grid" style="margin-top:10px;">${btnsN}</div>
+        <div class="ppj-hex-grid" style="margin-top:5px;">${btnsP}</div>`:''}
     </div>
     ${vexHtml}
-    ${estadoUI.esAdmin?`<div class="ppj-section">
-        <div class="ppj-section-title">Pushes de HEX</div>
-        <div class="ppj-hpush-grid">
+    ${estadoUI.esAdmin?`
+    <!-- Pushes de HEX — destacados para uso frecuente -->
+    <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="font-size:0.6em;letter-spacing:1.5px;text-transform:uppercase;color:#d4af37;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:16px;height:1px;background:rgba(212,175,55,0.4);"></span>
+            Pushes de HEX
+            <span style="display:inline-block;width:16px;height:1px;background:rgba(212,175,55,0.4);"></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
             ${_pushCard('asistencia','Asistencia',300,cdA>=24,_cdRest(cdA,24)+' · diario')}
             ${_pushCard('turno_extra','Turno Extra',500,cdT>=72,_cdRest(cdT,72)+' · c/3 días')}
             ${_pushCard('contenido','Contenido','100–1000',cdC>=72,_cdRest(cdC,72)+' · c/3 días')}
@@ -593,6 +611,7 @@ async function _tabHex(nombre, body) {
         </div>
     </div>`:''}`;
 }
+
 
 // ─────────────────────────────────────────────────────────────
 // TAB: STATS
@@ -1418,7 +1437,7 @@ function _renderObjIzq() {
         const btnNuevo  = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirCrear()" style="flex:1;">✨ Nuevo</button>` : '';
         const btnForja  = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirForja()" style="flex:1;">⚒️ Forja</button>` : '';
         const btnTransf = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirTransfer()" style="flex:1;">⇄ Mover</button>` : '';
-        const btnImg    = esAdmin ? `<button class="pobj-btn-gold" onclick="window._pobjAbrirImagenes()" style="flex:1;">🖼️ Imgs</button>` : '';
+        const btnImg    = `<button class="pobj-btn-gold" onclick="window._pobjAbrirImagenes()" style="flex:1;">🖼️ Imgs</button>`;
 
         const listaHTML = lista.length === 0
             ? `<div class="ppj-empty" style="padding:20px 0;font-size:0.72em;">Sin resultados</div>`
@@ -1448,7 +1467,7 @@ function _renderObjIzq() {
             }).join('');
 
         contenidoScroll = `
-        ${esAdmin ? `<div style="display:flex;gap:4px;margin-bottom:6px;">${btnNuevo}${btnForja}${btnTransf}${btnImg}</div>` : ''}
+        <div style="display:flex;gap:4px;margin-bottom:6px;">${btnNuevo}${btnForja}${btnTransf}${btnImg}</div>
         <input class="pobj-search-izq" placeholder="Buscar en catálogo…" value="${_objState.busqCat}" oninput="window._pobjBusqCat(this.value)">
         <div class="pobj-filtros">
             ${TIPOS_FILTRO.map(t=>`<button class="pobj-fbtn ${_objState.filtroTipo===t?'on':''}" onclick="window._pobjFiltroTipo('${t.replace(/'/g,"\\'")}')">${t}</button>`).join('')}
@@ -2287,7 +2306,7 @@ window._pobjImgSubir = async (file) => {
         const canvas=document.createElement('canvas'); canvas.width=img.naturalWidth; canvas.height=img.naturalHeight;
         canvas.getContext('2d').drawImage(img,0,0); URL.revokeObjectURL(url);
         canvas.toBlob(async(blob)=>{
-            const {error}=await supabase.storage.from('imgobjetos').upload(path,blob,{upsert:true,contentType:'image/png'});
+            const {error}=await supabase.storage.from('imagenes-hex').upload(`imgobjetos/${path}`,blob,{upsert:true,contentType:'image/png'});
             if(error){if(status)status.innerHTML=`<span style="color:#ff6060">Error: ${error.message}</span>`;return;}
             if(status)status.innerHTML=`<span style="color:#3ecf6e">✅ Imagen actualizada</span>`;
         },'image/png');
