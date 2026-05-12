@@ -571,16 +571,16 @@ async function _tabHex(nombre, body) {
 
     body.innerHTML = `
     <!-- HEX hero -->
-    <div style="background:linear-gradient(160deg,rgba(212,175,55,0.07),rgba(120,90,0,0.12));border-bottom:1px solid rgba(212,175,55,0.15);padding:18px 16px 14px;text-align:center;position:relative;">
-        <div style="font-family:'Cinzel',serif;font-size:0.6em;letter-spacing:3px;color:#7a6a30;text-transform:uppercase;margin-bottom:2px;">Saldo HEX</div>
-        <!-- Hexágono decorativo -->
-        <svg width="120" height="104" viewBox="0 0 120 104" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);opacity:0.06;pointer-events:none;">
+    <div style="background:linear-gradient(160deg,rgba(212,175,55,0.07),rgba(120,90,0,0.12));border-bottom:1px solid rgba(212,175,55,0.15);padding:32px 16px 20px;text-align:center;">
+        <!-- Hexágonos decorativos — detrás del texto, en flujo normal -->
+        <svg width="140" height="122" viewBox="0 0 120 104" style="display:block;margin:0 auto 4px;opacity:0.07;pointer-events:none;">
             <polygon points="60,2 114,30 114,74 60,102 6,74 6,30" fill="none" stroke="#d4af37" stroke-width="2"/>
             <polygon points="60,16 100,38 100,66 60,88 20,66 20,38" fill="none" stroke="#d4af37" stroke-width="1"/>
         </svg>
-        <div style="font-family:'Cinzel',serif;font-size:2.8em;color:#d4af37;letter-spacing:3px;line-height:1;position:relative;">${(p.hex||0).toLocaleString()}</div>
+        <div style="font-family:'Cinzel',serif;font-size:0.6em;letter-spacing:3px;color:#7a6a30;text-transform:uppercase;margin-bottom:4px;">Saldo HEX</div>
+        <div style="font-family:'Cinzel',serif;font-size:2.8em;color:#d4af37;letter-spacing:3px;line-height:1;">${(p.hex||0).toLocaleString()}</div>
         ${canEdit?`
-        <div class="ppj-hex-grid" style="margin-top:10px;">${btnsN}</div>
+        <div class="ppj-hex-grid" style="margin-top:14px;">${btnsN}</div>
         <div class="ppj-hex-grid" style="margin-top:5px;">${btnsP}</div>`:''}
     </div>
     ${vexHtml}
