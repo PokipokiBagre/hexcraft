@@ -54,14 +54,18 @@ function _inyectarEstilos() {
     const st = document.createElement('style');
     st.id = 'panel-pj-styles';
     st.textContent = `
-#panel-pj-root{position:fixed;top:0;right:0;width:75vw;height:100vh;background:transparent;border:none;display:flex;flex-direction:row;z-index:1200;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);font-family:'Inter',system-ui,sans-serif;}
-#panel-pj-root.open{transform:translateX(0);}
-#panel-pj-root.hz-mode{width:75vw;}
-#panel-pj-root.obj-mode{width:75vw;}
+#panel-pj-root{position:fixed;top:0;right:0;width:100vw;height:100vh;background:transparent;border:none;display:block;z-index:1200;transform:translateX(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);font-family:'Inter',system-ui,sans-serif;pointer-events:none;}
+#panel-pj-root.open{transform:translateX(0);pointer-events:auto;}
+#panel-pj-root.hz-mode #ppj-col-main{width:50vw;}
+#panel-pj-root.obj-mode #ppj-col-main{width:50vw;}
 #panel-pj-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1199;opacity:0;pointer-events:none;transition:opacity 0.28s;}
 #panel-pj-overlay.open{opacity:1;pointer-events:all;}
-#ppj-col-main{flex:0 0 66.66%;width:66.66%;height:100vh;background:#08080f;border-left:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;overflow:hidden;box-shadow:-8px 0 40px rgba(0,0,0,0.6);}
-#ppj-col-stats{flex:0 0 33.33%;width:33.33%;height:100vh;background:#070710;border-left:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;overflow:hidden;}
+/* Col HEX: pegada al borde derecho del área libre, = right:25vw, width:50vw */
+#ppj-col-main{position:fixed;top:0;right:25vw;width:50vw;height:100vh;background:#08080f;border-left:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;overflow:hidden;box-shadow:-8px 0 40px rgba(0,0,0,0.6);}
+/* Col STATS: pegada al borde derecho de la pantalla, width:25vw */
+#ppj-col-stats{position:fixed;top:0;right:0;width:25vw;min-width:280px;height:100vh;background:#070710;border-left:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;overflow:hidden;}
+/* Tabs van en col-stats */
+#ppj-col-stats .ppj-tabs{flex-shrink:0;background:#0a0a14;}
 #ppj-col-stats .ppj-body{padding-bottom:20px;}
 #ppj-col-stats .ppj-section{padding:10px 12px;}
 .ppj-header{display:flex;align-items:center;gap:12px;padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;min-height:68px;}
@@ -208,7 +212,7 @@ function _inyectarEstilos() {
 .ppj-loader{display:flex;align-items:center;justify-content:center;padding:20px;color:#3a3a58;font-size:0.75em;gap:8px;}
 .ppj-loader::before{content:'';width:14px;height:14px;border:2px solid rgba(212,175,55,0.2);border-top-color:#d4af37;border-radius:50%;animation:ppj-spin 0.8s linear infinite;}
 @keyframes ppj-spin{to{transform:rotate(360deg);}}
-.ppj-footer{position:absolute;bottom:0;left:0;right:0;padding:10px 16px;background:linear-gradient(to top,#08080f 70%,transparent);display:flex;gap:8px;flex-shrink:0;}
+.ppj-footer{position:sticky;bottom:0;padding:10px 16px;background:linear-gradient(to top,#08080f 80%,transparent);display:flex;gap:8px;flex-shrink:0;}
 .ppj-btn-editar{flex:1;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:6px;color:#d4af37;font-size:0.78em;font-weight:600;padding:9px;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:0.5px;transition:background 0.15s;}
 .ppj-btn-editar:hover{background:rgba(212,175,55,0.15);}
 .ppj-hz-new-btn{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;font-size:0.75em;font-family:'Cinzel',serif;cursor:pointer;transition:all 0.15s;letter-spacing:0.5px;border:1px solid;margin:10px 0 8px;width:100%;box-sizing:border-box;text-align:left;}
@@ -262,12 +266,13 @@ function _crearEstructura() {
     root.innerHTML = `
         <div id="ppj-col-main">
             <div class="ppj-header" id="ppj-header"></div>
-            <div class="ppj-tabs"   id="ppj-tabs"></div>
-            <div class="ppj-body"   id="ppj-body"></div>
+            <div class="ppj-body"   id="ppj-hex-body"></div>
             <div class="ppj-footer" id="ppj-footer"></div>
         </div>
         <div id="ppj-col-stats">
-            <div class="ppj-body" id="ppj-stats-body" style="display:none;"></div>
+            <div class="ppj-tabs"   id="ppj-tabs"></div>
+            <div class="ppj-body"   id="ppj-body"></div>
+            <div class="ppj-body"   id="ppj-stats-body" style="display:none;"></div>
         </div>`;
     document.body.appendChild(root);
 }
@@ -354,36 +359,33 @@ function _renderTab(nombre, tab) {
     document.querySelectorAll('.ppj-tab').forEach(b =>
         b.classList.toggle('active', b.getAttribute('onclick')?.includes(`'${tab}'`))
     );
+    const hexBody   = document.getElementById('ppj-hex-body');
     const body      = document.getElementById('ppj-body');
     const statsBody = document.getElementById('ppj-stats-body');
 
-    body.innerHTML = `<div class="ppj-loader">Cargando…</div>`;
+    // Col-stats: stats-body visible solo en tab Stats, ppj-body visible en el resto
+    if (tab === 'stats') {
+        if (body)      { body.style.display = 'none'; body.innerHTML = ''; }
+        if (statsBody) { statsBody.style.display = ''; const _sy = statsBody.scrollTop; statsBody.innerHTML = _tabStats(nombre); if (_sy > 0) statsBody.scrollTop = _sy; }
+        // Col-main: contenido HEX
+        if (hexBody)   { _tabHex(nombre, hexBody); }
+    } else {
+        if (statsBody) { statsBody.style.display = 'none'; }
+        if (body)      { body.style.display = ''; body.innerHTML = `<div class="ppj-loader">Cargando…</div>`; }
+        // Col-main en tabs no-stats: limpia el hex-body (no se usa)
+        if (hexBody)   { hexBody.innerHTML = ''; }
+    }
 
-    // Col-stats: solo visible en tab Stats
-    if (statsBody) statsBody.style.display = tab === 'stats' ? '' : 'none';
-
-    // Cerrar minimapa si cambiamos a otro tab
     if (tab !== 'hechizos') {
         cerrarMinimapa();
         document.getElementById('panel-pj-root')?.classList.remove('hz-mode');
     } else {
         document.getElementById('panel-pj-root')?.classList.add('hz-mode');
     }
-    if (tab !== 'objetos') {
-        _cerrarPanelObjetos();
-    }
-    if (tab !== 'misiones') {
-        cerrarTabMisiones();
-    }
+    if (tab !== 'objetos')  _cerrarPanelObjetos();
+    if (tab !== 'misiones') cerrarTabMisiones();
 
     switch(tab) {
-        case 'stats': {
-            // Col-main: contenido HEX
-            _tabHex(nombre, body);
-            // Col-stats: Stats + Afinidades
-            if (statsBody) { const _sy = statsBody.scrollTop; statsBody.innerHTML = _tabStats(nombre); if (_sy > 0) statsBody.scrollTop = _sy; }
-            break;
-        }
         case 'hechizos': _tabHechizosConMapa(nombre, body);  break;
         case 'objetos':  _tabObjetos(nombre, body);           break;
         case 'misiones': renderTabMisiones(nombre, body);      break;
@@ -2554,10 +2556,8 @@ export function refreshPanelPJ() {
     _renderHeader(nombre);
     const tab = _tabActivo[nombre] || 'stats';
     if (tab === 'stats') {
-        // Col-main: hex
-        const body = document.getElementById('ppj-body');
-        if (body) _tabHex(nombre, body);
-        // Col-stats: stats+afinidades
+        const hexBody = document.getElementById('ppj-hex-body');
+        if (hexBody) _tabHex(nombre, hexBody);
         const statsBody = document.getElementById('ppj-stats-body');
         if (statsBody) { const _sy = statsBody.scrollTop; statsBody.innerHTML = _tabStats(nombre); if (_sy > 0) statsBody.scrollTop = _sy; }
     }
