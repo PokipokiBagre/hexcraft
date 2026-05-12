@@ -588,6 +588,7 @@ function _montar() {
                                 <button class="op-btn op-btn-hex" onclick="window._opHexCustom()">ok</button>
                             </div>
                             <div class="op-btns" style="margin-top:6px;">
+                                <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opHexPush('asistencia',300)">Reporte +300</button>
                                 <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opHexPush('turno_extra',500)">Turno +500</button>
                                 <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opHexPushCustom()">Contenido</button>
                             </div>

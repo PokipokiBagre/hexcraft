@@ -279,6 +279,12 @@ function _crearEstructura() {
 // ─────────────────────────────────────────────────────────────
 export function abrirPanelPJ(nombre) {
     _crearEstructura();
+    // Si cambia de PJ, limpiar el hexBody para que _tabHex recargue logs y cooldowns frescos
+    const prevPJ = estadoUI.pjSeleccionado;
+    if (prevPJ !== nombre) {
+        const hexBody = document.getElementById('ppj-hex-body');
+        if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pj; }
+    }
     estadoUI.pjSeleccionado = nombre;
     estadoUI.panelAbierto   = true;
     document.getElementById('ppj-col-main').style.display  = 'none'; // se muestra solo en tab stats
@@ -463,11 +469,13 @@ async function _tabHex(nombre, body) {
     const safe = nombre.replace(/'/g, "\\'");
     const canEdit = estadoUI.esAdmin || !p.isPlayer;
 
-    // ── Fast path: si el body ya está renderizado, solo actualizar número y partículas ──
-    // Evita recrear el canvas y reiniciar las partículas en cada cambio de HEX
+    // ── Fast path: solo si el body ya está renderizado PARA ESTE MISMO PJ ──
+    // Evita recrear el canvas y reiniciar las partículas en cada cambio de HEX.
+    // Si cambió el personaje (body.dataset.pj !== nombre), forzar re-render completo
+    // para recargar los logs de DB correctos y mostrar cooldowns del PJ nuevo.
     const existingCanvas = body.querySelector('.htab-particle-canvas');
     const existingAmt    = body.querySelector('.htab-hex-amount');
-    if (existingCanvas && existingAmt) {
+    if (existingCanvas && existingAmt && body.dataset.pj === nombre) {
         existingAmt.textContent = (p.hex || 0).toLocaleString();
         // Actualizar velocidad de partículas sin reiniciarlas
         const canvasId = existingCanvas.id;
@@ -478,6 +486,8 @@ async function _tabHex(nombre, body) {
         }
         return;
     }
+    // Marcar el body con el PJ actual para que el fast path funcione en próximas llamadas
+    body.dataset.pj = nombre;
 
     const { data: logs } = await supabase
         .from('hex_push_log')
@@ -2982,16 +2992,17 @@ window._ppjEjecutarHexPush = async (nombre, tipo, cantidad) => {
     window.actualizarBtnSync?.();
     window.renderCatalogo?.();
     window.mostrarToast?.(`✨ +${cantidad} HEX (${tipo.replace('_',' ')}) → ${nombre}`);
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHex(nombre, body);
+    // Forzar re-render completo del hexBody para mostrar el nuevo log y cooldowns correctos
+    const hexBody = document.getElementById('ppj-hex-body');
+    if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pj; _tabHex(nombre, hexBody); }
 };
 
 window._ppjDeleteHexLog = async (id, nombre) => {
     if (!estadoUI.esAdmin) return;
     if (!confirm('¿Eliminar este registro?')) return;
     await supabase.from('hex_push_log').delete().eq('id', id);
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHex(nombre, body);
+    const hexBody = document.getElementById('ppj-hex-body');
+    if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pj; _tabHex(nombre, hexBody); }
 };
 
 window._ppjToggleEquipar = async (personaje, objeto, equipar) => {
