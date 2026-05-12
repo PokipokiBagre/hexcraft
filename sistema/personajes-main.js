@@ -16,6 +16,7 @@ import { cargarDatos, sincronizarCola, guardarFormulasBD,
 import { renderCatalogo, renderFormulas,
          previsualizarFormulaConPJ, renderPreviewCompleto } from './personajes-ui.js';
 import { abrirPanelPJ, cerrarPanelPJ, refreshPanelPJ } from './panel-pj.js';
+import { montarOpPanel, refrescarOpPanel } from './panel-op-update.js';
 
 window.hexConfigs = hexConfigs;
 
@@ -38,6 +39,7 @@ function _iniciarTimerCooldown() {
 window.onload = async () => {
     await hexAuth.init();
     estadoUI.esAdmin = hexAuth.esAdmin();
+    if (estadoUI.esAdmin) montarOpPanel();
 
     const badge = document.getElementById('hex-session-badge');
     if (badge) badge.innerHTML = hexAuth.renderStatusBadge();
@@ -53,6 +55,7 @@ window.onload = async () => {
     if (loader) loader.style.display = 'none';
 
     mostrarVista('catalogo');
+    refrescarOpPanel();
     _iniciarTimerCooldown();
 
     const urlParams = new URLSearchParams(window.location.search);
