@@ -214,19 +214,18 @@ export function iniciarEventos() {
         lastTouchDist = d;
     }, { passive: true });
 
-    // ── TECLADO — navegación por flechas entre nodos ─────────
-    // ← → navegan entre vecinos del nodo seleccionado (salientes primero, luego entrantes)
-    // ↑ ↓ navegan el historial de selección (atrás / adelante)
+    // ── TECLADO — navegación direccional entre nodos ──────────
+    // ← → ↑ ↓  mueven al nodo MÁS CERCANO en esa dirección cardinal
+    // Tab / Shift+Tab ciclan por los vecinos conectados (salientes primero)
     // Escape cierra el side panel
     // No actúa si el foco está en un input/textarea
 
-    const _navHistorial = [];  // pila de nodos visitados
-    let   _navIdx       = -1;  // posición actual en la pila
+    const _navHistorial = [];
+    let   _navIdx       = -1;
 
     const _irA = (nodo, empujarHistorial = true) => {
         if (!nodo || nodo === st.nodoSel) return;
         if (empujarHistorial) {
-            // Truncar el futuro si navegamos desde un punto intermedio
             if (_navIdx < _navHistorial.length - 1)
                 _navHistorial.splice(_navIdx + 1);
             _navHistorial.push(nodo);
@@ -236,44 +235,56 @@ export function iniciarEventos() {
         renderInfoBar(nodo);
         import('./mapa-ui.js').then(m => {
             m.abrirOpPanel(nodo);
-            // Centrar cámara suavemente en el nodo destino
-            if (typeof m.centrarEnNodoSuave === 'function') {
-                m.centrarEnNodoSuave(nodo);
-            } else {
-                // Fallback: centrado directo
-                import('./mapa-render.js').then(r => {
-                    if (r.centrarEnNodo) r.centrarEnNodo(nodo);
-                });
-            }
+            if (typeof m.centrarEnNodoSuave === 'function') m.centrarEnNodoSuave(nodo);
         }).catch(() => {});
     };
 
-    // Vecinos del nodo actual: salientes primero, luego entrantes
-    const _vecinos = (nodo) => {
-        const salientes = st.enlaces
-            .filter(e => e.source === nodo)
-            .map(e => e.target);
-        const entrantes = st.enlaces
-            .filter(e => e.target === nodo)
-            .map(e => e.source);
-        // Dedup preservando orden
-        const vistos = new Set();
-        return [...salientes, ...entrantes].filter(n => {
-            if (vistos.has(n)) return false;
-            vistos.add(n); return true;
+    // Vecino más cercano en una dirección (ángulo ±45° del eje dado)
+    // dir: 'left' | 'right' | 'up' | 'down'
+    const _nodoEnDireccion = (desde, dir) => {
+        // Vectores de referencia por dirección
+        const ref = { left:[-1,0], right:[1,0], up:[0,-1], down:[0,1] };
+        const [rx, ry] = ref[dir];
+
+        let mejor = null;
+        let mejorScore = Infinity;
+
+        st.nodos.forEach(n => {
+            if (n === desde) return;
+            const dx = n.x - desde.x;
+            const dy = n.y - desde.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 1) return;
+
+            // Proyección sobre el eje de referencia (cuánto va en esa dirección)
+            const dot = (dx * rx + dy * ry) / dist;
+            // Solo considerar nodos dentro del cono de ±60°
+            // dot > cos(60°) = 0.5
+            if (dot < 0.5) return;
+
+            // Score: prioriza cercanía pero también alineación
+            // Menos dist y más dot = mejor
+            const score = dist / dot;
+            if (score < mejorScore) { mejorScore = score; mejor = n; }
         });
+
+        return mejor;
     };
 
-    // Índice de vecino actual (para ← →)
-    let _vecinoIdx = 0;
+    // Vecinos conectados para Tab
+    const _vecinos = (nodo) => {
+        const salientes = st.enlaces.filter(e => e.source === nodo).map(e => e.target);
+        const entrantes = st.enlaces.filter(e => e.target === nodo).map(e => e.source);
+        const vistos = new Set();
+        return [...salientes, ...entrantes].filter(n => {
+            if (vistos.has(n)) return false; vistos.add(n); return true;
+        });
+    };
+    let _tabIdx = 0;
 
     document.addEventListener('keydown', e => {
-        // Ignorar si el foco está en un input, textarea o elemento editable
         const tag = document.activeElement?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
-
-        // Necesitamos un nodo seleccionado para navegar (excepto Escape)
-        const actual = st.nodoSel;
 
         if (e.key === 'Escape') {
             import('./mapa-ui.js').then(m => {
@@ -282,66 +293,46 @@ export function iniciarEventos() {
             return;
         }
 
+        const actual = st.nodoSel;
         if (!actual) return;
 
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const dirMap = {
+            'ArrowLeft':  'left',
+            'ArrowRight': 'right',
+            'ArrowUp':    'up',
+            'ArrowDown':  'down',
+        };
+
+        if (dirMap[e.key]) {
             e.preventDefault();
-            const vecinos = _vecinos(actual);
-            if (vecinos.length === 0) {
-                import('./mapa-ui.js').then(m => { if (m.toast) m.toast('Sin conexiones'); }).catch(() => {});
-                return;
-            }
-            // Resetear índice si cambiamos de nodo desde fuera
-            if (!vecinos[_vecinoIdx]) _vecinoIdx = 0;
-            if (e.key === 'ArrowRight') {
-                _vecinoIdx = (_vecinoIdx + 1) % vecinos.length;
+            const destino = _nodoEnDireccion(actual, dirMap[e.key]);
+            if (destino) {
+                _irA(destino);
             } else {
-                _vecinoIdx = (_vecinoIdx - 1 + vecinos.length) % vecinos.length;
+                import('./mapa-ui.js').then(m => {
+                    if (m.toast) m.toast('Sin nodos en esa dirección');
+                }).catch(() => {});
             }
-            _irA(vecinos[_vecinoIdx]);
+            return;
         }
 
-        if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            // Retroceder en historial
-            if (_navIdx > 0) {
-                _navIdx--;
-                const destino = _navHistorial[_navIdx];
-                _irA(destino, false);
-            }
-        }
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            // Avanzar en historial
-            if (_navIdx < _navHistorial.length - 1) {
-                _navIdx++;
-                const destino = _navHistorial[_navIdx];
-                _irA(destino, false);
-            }
-        }
-
-        // Tab también salta al siguiente vecino (más cómodo en teclado)
         if (e.key === 'Tab') {
             e.preventDefault();
             const vecinos = _vecinos(actual);
             if (vecinos.length === 0) return;
-            _vecinoIdx = e.shiftKey
-                ? (_vecinoIdx - 1 + vecinos.length) % vecinos.length
-                : (_vecinoIdx + 1) % vecinos.length;
-            _irA(vecinos[_vecinoIdx]);
+            _tabIdx = e.shiftKey
+                ? (_tabIdx - 1 + vecinos.length) % vecinos.length
+                : (_tabIdx + 1) % vecinos.length;
+            _irA(vecinos[_tabIdx]);
         }
     });
 
-    // Cuando el usuario hace clic en un nodo directamente, actualizar historial
-    // (lo hacemos exponiendo un helper que _seleccionarNodo puede llamar)
     window._hmNavPush = (nodo) => {
         if (_navHistorial[_navIdx] === nodo) return;
-        if (_navIdx < _navHistorial.length - 1)
-            _navHistorial.splice(_navIdx + 1);
+        if (_navIdx < _navHistorial.length - 1) _navHistorial.splice(_navIdx + 1);
         _navHistorial.push(nodo);
         _navIdx = _navHistorial.length - 1;
-        _vecinoIdx = 0; // resetear índice de vecino al cambiar de nodo manualmente
+        _tabIdx = 0;
     };
 }
 
