@@ -80,11 +80,6 @@ window.mostrarVista = function(vista) {
     if (vista === 'catalogo') renderCatalogo();
     if (vista === 'crear')    inicializarFormulario();
     if (vista === 'formulas') {
-        if (!estadoUI.esAdmin) {
-            mostrarToast('Solo el OP puede editar fórmulas', true);
-            window.mostrarVista('catalogo');
-            return;
-        }
         renderFormulas();
     }
 };

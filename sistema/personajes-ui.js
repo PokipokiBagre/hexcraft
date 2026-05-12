@@ -236,6 +236,7 @@ export function renderFormulas() {
             </div>
         </div>`;
 
+    const _ro = !estadoUI.esAdmin;  // readonly para no-OP
     const formulasHTML = Object.entries(formulas).map(([key, f]) => `
         <div class="formula-item" id="fitem-${key}">
             <div class="formula-item-header">
@@ -243,11 +244,11 @@ export function renderFormulas() {
                 <span class="formula-aplica tag tag-dim">${f.aplica}</span>
             </div>
             <div class="formula-input-row">
-                <input class="formula-input" id="finput-${key}"
+                <input class="formula-input${_ro?' formula-input-ro':''}" id="finput-${key}"
                     value="${f.expr}"
-                    onfocus="window.setFormulaActiva('${key}')"
-                    oninput="window.previsualizarFormula('${key}')">
-                <select class="formula-aplica-sel" id="faplica-${key}" onchange="window.cambiarAplica('${key}',this.value)">
+                    ${_ro ? 'readonly tabindex="-1"' : `onfocus="window.setFormulaActiva('${key}')" oninput="window.previsualizarFormula('${key}')"`}>
+                <select class="formula-aplica-sel" id="faplica-${key}"
+                    ${_ro ? 'disabled' : `onchange="window.cambiarAplica('${key}',this.value)"`}>
                     <option value="todos"       ${f.aplica==='todos'       ?'selected':''}>Todos</option>
                     <option value="jugador"     ${f.aplica==='jugador'     ?'selected':''}>Solo Jugadores</option>
                     <option value="npc_sistema" ${f.aplica==='npc_sistema' ?'selected':''}>NPC Sistema</option>
@@ -264,10 +265,9 @@ export function renderFormulas() {
             </div>
             <div class="formula-item-desc">${f.descripcion || ''}</div>
             <div class="formula-input-row">
-                <input class="formula-input" id="pinput-${key}"
+                <input class="formula-input${_ro?' formula-input-ro':''}" id="pinput-${key}"
                     value="${f.expr}"
-                    onfocus="window.setFormulaActiva('${key}')"
-                    oninput="window.previsualizarPushFormula('${key}')">
+                    ${_ro ? 'readonly tabindex="-1"' : `onfocus="window.setFormulaActiva('${key}')" oninput="window.previsualizarPushFormula('${key}')"`}>
             </div>
             <div class="formula-preview" id="pprev-${key}"></div>
         </div>
@@ -281,13 +281,13 @@ export function renderFormulas() {
             <div class="push-cooldown-grid">
                 <div class="push-cd-field">
                     <label>VEX (minutos)</label>
-                    <input type="number" id="push-cooldown-vex" class="formula-input" style="width:80px;"
-                        value="${pushCooldown.vex}" min="1">
+                    <input type="number" id="push-cooldown-vex" class="formula-input${_ro?' formula-input-ro':''}" style="width:80px;"
+                        value="${pushCooldown.vex}" min="1" ${_ro?'readonly tabindex="-1"':''}>
                 </div>
                 <div class="push-cd-field">
                     <label>Guarda (minutos)</label>
-                    <input type="number" id="push-cooldown-guarda" class="formula-input" style="width:80px;"
-                        value="${pushCooldown.guarda}" min="1">
+                    <input type="number" id="push-cooldown-guarda" class="formula-input${_ro?' formula-input-ro':''}" style="width:80px;"
+                        value="${pushCooldown.guarda}" min="1" ${_ro?'readonly tabindex="-1"':''}>
                 </div>
             </div>
         </div>`;
@@ -296,7 +296,7 @@ export function renderFormulas() {
         <div class="formula-item">
             <div class="formula-item-header">
                 <span class="formula-item-label">Umbrales — ${label}</span>
-                <button class="btn-ghost btn-ghost-xs" onclick="window.agregarUmbral('${recurso}')">+ Añadir</button>
+${!_ro ? `<button class="btn-ghost btn-ghost-xs" onclick="window.agregarUmbral('${recurso}')">+ Añadir</button>` : ''}
             </div>
             <div class="umbral-help">
                 Variables disponibles en condición: <code>pct_vida_roja</code> (0–100), <code>vida_azul</code> (valor absoluto máx calculado)
@@ -304,14 +304,14 @@ export function renderFormulas() {
             <div id="umbrales-${recurso}">
                 ${(pushUmbrales[recurso] || []).map((u, idx) => `
                     <div class="umbral-row" data-umbral-idx="${idx}">
-                        <input class="formula-input umbral-desc" data-campo="descripcion"
-                            value="${u.descripcion}" placeholder="Descripción">
-                        <input class="formula-input umbral-cond" data-campo="condicion"
-                            value="${u.condicion}" placeholder="condición JS">
-                        <input type="number" class="formula-input umbral-pushes" data-campo="pushes"
-                            value="${u.pushes}" min="1" style="width:56px;" title="Pushes otorgados">
-                        <button class="ctrl-btn ctrl-btn-xs icon-btn-danger"
-                            onclick="window.eliminarUmbral('${recurso}',${idx})">✕</button>
+                        <input class="formula-input umbral-desc${_ro?' formula-input-ro':''}" data-campo="descripcion"
+                            value="${u.descripcion}" placeholder="Descripción" ${_ro?'readonly tabindex="-1"':''}>
+                        <input class="formula-input umbral-cond${_ro?' formula-input-ro':''}" data-campo="condicion"
+                            value="${u.condicion}" placeholder="condición JS" ${_ro?'readonly tabindex="-1"':''}>
+                        <input type="number" class="formula-input umbral-pushes${_ro?' formula-input-ro':''}" data-campo="pushes"
+                            value="${u.pushes}" min="1" style="width:56px;" title="Pushes otorgados" ${_ro?'readonly tabindex="-1"':''}>
+${!_ro ? `<button class="ctrl-btn ctrl-btn-xs icon-btn-danger"
+                            onclick="window.eliminarUmbral('${recurso}',${idx})">✕</button>` : ''}
                     </div>
                 `).join('')}
             </div>
@@ -319,16 +319,21 @@ export function renderFormulas() {
 
     const pjOptions = Object.keys(personajes).map(n => `<option value="${n}">${n}</option>`).join('');
 
+    if (!document.getElementById('formula-ro-styles')) {
+        const s = document.createElement('style');
+        s.id = 'formula-ro-styles';
+        s.textContent = '.formula-input-ro{opacity:0.6;cursor:default;background:rgba(255,255,255,0.02)!important;border-color:rgba(255,255,255,0.06)!important;color:#999!important;pointer-events:none;user-select:text;} .formula-ro-banner{display:flex;align-items:center;gap:8px;padding:8px 14px;margin-bottom:16px;background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.15);border-radius:7px;font-size:0.72em;color:#7a6a30;}';
+        document.head.appendChild(s);
+    }
+
     cont.innerHTML = `
-        ${poolHTML}
+        ${estadoUI.esAdmin ? poolHTML : ""}
+        ${!estadoUI.esAdmin ? '<div class="formula-ro-banner">🔒 Vista de solo lectura — solo el OP puede editar las fórmulas</div>' : ''}
 
         <div class="formulas-block">
             <div class="formulas-block-title">Stats derivados de afinidades</div>
             ${formulasHTML}
-            <div class="formula-actions">
-                <button class="btn-secondary" onclick="window.resetFormulas()">Restaurar defaults</button>
-                <button class="btn-primary" onclick="window.guardarFormulas()">Guardar fórmulas</button>
-            </div>
+            ${!estadoUI.esAdmin ? '' : `<div class="formula-actions"><button class="btn-secondary" onclick="window.resetFormulas()">Restaurar defaults</button><button class="btn-primary" onclick="window.guardarFormulas()">Guardar fórmulas</button></div>`}
         </div>
 
         <div class="formulas-block">
@@ -340,9 +345,7 @@ export function renderFormulas() {
             </p>
             ${pushFormsHTML}
             ${cooldownHTML}
-            <div class="formula-actions">
-                <button class="btn-primary" onclick="window.guardarPushConfig()">Guardar fórmulas push</button>
-            </div>
+            ${!estadoUI.esAdmin ? '' : `<div class="formula-actions"><button class="btn-primary" onclick="window.guardarPushConfig()">Guardar fórmulas push</button></div>`}
         </div>
 
         <div class="formulas-block">
@@ -353,9 +356,7 @@ export function renderFormulas() {
             </p>
             ${_umbralesHtml('vex', 'VEX')}
             ${_umbralesHtml('guarda', 'Guarda Dorada')}
-            <div class="formula-actions">
-                <button class="btn-primary" onclick="window.guardarPushUmbrales()">Guardar umbrales</button>
-            </div>
+            ${!estadoUI.esAdmin ? '' : `<div class="formula-actions"><button class="btn-primary" onclick="window.guardarPushUmbrales()">Guardar umbrales</button></div>`}
         </div>
 
         <div class="formulas-block">
