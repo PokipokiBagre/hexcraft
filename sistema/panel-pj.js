@@ -1585,9 +1585,10 @@ async function _tabHechizos(nombre, body) {
                     <button class="ppj-cat-btn ppj-cat-deasign" style="margin-left:auto;" onclick="window._ppjDeasignarHzNombre('${safe}','${safeNombre}')">✕</button>
                 </div>`;
             } else {
-                // Hechizo oficial: solo deasignar
+                // Hechizo oficial: deasignar + opción de marcar como temporal
                 adminBtns = `<div class="ppj-cat-actions">
-                    <button class="ppj-cat-btn ppj-cat-deasign" onclick="window._ppjDeasignarHzNombre('${safe}','${safeNombre}')">✕ Deasignar</button>
+                    <button class="ppj-cat-btn ppj-cat-temp" onclick="window._ppjMarcarComoTemporal('${safe}','${safeNombre}')">⏳ Temporal</button>
+                    <button class="ppj-cat-btn ppj-cat-deasign" style="margin-left:auto;" onclick="window._ppjDeasignarHzNombre('${safe}','${safeNombre}')">✕ Deasignar</button>
                 </div>`;
             }
         }
@@ -3347,6 +3348,19 @@ window._ppjDeasignarHzNombre = async (nombrePJ, hechizNombre) => {
         .eq('hechizo_nombre', hechizNombre);
     if (error) { window.mostrarToast?.('Error: ' + error.message, true); return; }
     window.mostrarToast?.(`✅ "${hechizNombre}" deasignado de ${nombrePJ}`);
+    const body = document.getElementById('ppj-body');
+    if (body) _tabHechizos(nombrePJ, body);
+};
+
+// ── Marcar un hechizo oficial como temporal ───────────────────
+window._ppjMarcarComoTemporal = async (nombrePJ, hechizNombre) => {
+    if (!estadoUI.esAdmin) return;
+    const { error } = await supabase.from('hechizos_inventario')
+        .update({ es_temporal: true, tipo: 'temporal', origen: 'Temporal' })
+        .eq('personaje_nombre', nombrePJ)
+        .eq('hechizo_nombre', hechizNombre);
+    if (error) { window.mostrarToast?.('Error: ' + error.message, true); return; }
+    window.mostrarToast?.(`⏳ "${hechizNombre}" marcado como temporal`);
     const body = document.getElementById('ppj-body');
     if (body) _tabHechizos(nombrePJ, body);
 };
