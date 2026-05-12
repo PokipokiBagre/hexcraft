@@ -499,7 +499,7 @@ function _montarPanelIzq(nombre) {
 
     // Pool: todos los personajes activos para drag & drop (solo admin)
     const todosLosPjs = Object.entries(personajes)
-        .filter(([, p]) => p.isActive !== false)
+        .filter(([, p]) => p.isActive !== false && p.isPlayer)
         .sort(([a], [b]) => a.localeCompare(b));
     const pjsEnMision = new Set();
     _s.misiones.forEach(m => {
@@ -622,31 +622,56 @@ function _renderDerecho(body, nombre) {
     const esAdmin = estadoUI.esAdmin;
     let html = '';
 
-    // Si hay misión seleccionada → mostrar su detalle
-    if (_s.misionSelec) {
-        const m = _s.misiones.find(x => x.titulo === _s.misionSelec);
-        if (m) {
-            html += `<div class="pmis-section">
-                <div class="pmis-section-title">Detalle de misión</div>
-                ${_renderDetalle(m, nombre, esAdmin)}
-            </div>`;
-        }
+    // Misiones en las que participa este PJ
+    const misionesDelPj = _s.misiones.filter(m => {
+        const j = Array.isArray(m.jugadores) ? m.jugadores : [];
+        return j.includes(nombre);
+    });
+
+    if (misionesDelPj.length > 0) {
+        html += `<div class="pmis-section">
+            <div class="pmis-section-title">Misiones de ${nombre} <span>${misionesDelPj.length}</span></div>
+            ${misionesDelPj.map(m => `
+                <div style="margin-bottom:12px;" id="pmis-det-${_norm(m.titulo)}">
+                    ${_renderDetalle(m, nombre, esAdmin)}
+                </div>`).join('')}
+        </div>`;
     } else {
         html += `<div class="pmis-section">
-            <div class="pmis-empty"><div class="pmis-empty-icon">📋</div>Selecciona una misión del catálogo</div>
+            <div class="pmis-empty"><div class="pmis-empty-icon">📋</div>
+            ${nombre} no participa en ninguna misión aún</div>
         </div>`;
+    }
+
+    // Si se seleccionó una misión del catálogo en la que NO participa, mostrarla aparte
+    if (_s.misionSelec) {
+        const m = _s.misiones.find(x => x.titulo === _s.misionSelec);
+        const yaEnLista = misionesDelPj.some(x => x.titulo === _s.misionSelec);
+        if (m && !yaEnLista) {
+            html += `<div class="pmis-section">
+                <div class="pmis-section-title">Misión seleccionada</div>
+                <div>${_renderDetalle(m, nombre, esAdmin)}</div>
+            </div>`;
+        }
     }
 
     // Botón crear
     html += `<div class="pmis-section">
         <button class="pmis-btn-nueva"
-            onclick="window._pmisAbrirFormulario('${nombre.replace(/'/g,"\\'")}',null)">
+            onclick="window._pmisAbrirFormulario('${nombre.replace(/'/g,"\'")}',null)">
             ✦ Crear misión personalizada
         </button>
     </div>`;
 
     body.innerHTML = html;
-}
+
+    // Scroll suave a la misión seleccionada
+    if (_s.misionSelec) {
+        setTimeout(() => {
+            const el = document.getElementById('pmis-det-' + _norm(_s.misionSelec));
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 80);
+    }
 
 // ── Detalle de misión (panel derecho, solo Unirse/Salir) ───────
 function _renderDetalle(m, nombrePJ, esAdmin) {
