@@ -463,19 +463,32 @@ async function _tabHex(nombre, body, forceRefresh = false) {
     const safe = nombre.replace(/'/g, "\\'");
     const canEdit = estadoUI.esAdmin || !p.isPlayer;
 
-    // ── Fast path: si el body ya está renderizado, solo actualizar número y partículas ──
-    // Evita recrear el canvas y reiniciar las partículas en cada cambio de HEX
+    // ── Fast path: si el body ya está renderizado, actualizar valores sin re-renderizar ──
+    // Evita recrear el canvas y hacer queries a DB en cada click de +/-
     const existingCanvas = body.querySelector('.htab-particle-canvas');
     const existingAmt    = body.querySelector('.htab-hex-amount');
     if (!forceRefresh && existingCanvas && existingAmt) {
+        // Actualizar HEX
         existingAmt.textContent = (p.hex || 0).toLocaleString();
-        // Actualizar velocidad de partículas sin reiniciarlas
         const canvasId = existingCanvas.id;
         const inst = window._ppjParticleInstances?.[canvasId];
         if (inst && inst.alive) {
             inst.hexVal    = p.hex || 0;
             inst.baseSpeed = _hexSpeedFactor(p.hex || 0);
         }
+        // Actualizar VEX y su barra
+        const s2 = calcularStats(p);
+        const vexNum  = body.querySelector('.htab-vex-number');
+        const vexMax  = body.querySelector('.htab-vex-max');
+        const vexFill = body.querySelector('.htab-vex-bar-fill');
+        const vexShine= body.querySelector('.htab-vex-bar-shine');
+        const vexPct  = body.querySelector('.htab-vex-pct');
+        if (vexNum)  vexNum.textContent  = Math.floor(p.vex_actual || 0);
+        if (vexMax)  vexMax.textContent  = s2.vex_max;
+        const pct2 = s2.vex_max > 0 ? Math.min(100, Math.round((p.vex_actual||0) / s2.vex_max * 100)) : 0;
+        if (vexFill)  vexFill.style.width  = pct2 + '%';
+        if (vexShine) vexShine.style.width = pct2 + '%';
+        if (vexPct)   vexPct.textContent   = pct2 + '%';
         return;
     }
 
@@ -3199,7 +3212,7 @@ export function refreshPanelPJ() {
     const tab = _tabActivo[nombre] || 'stats';
     if (tab === 'stats') {
         const hexBody = document.getElementById('ppj-hex-body');
-        if (hexBody) { hexBody.innerHTML = ""; _tabHex(nombre, hexBody); }
+        if (hexBody) _tabHex(nombre, hexBody);
         const statsBody = document.getElementById('ppj-stats-body');
         if (statsBody) { const _sy = statsBody.scrollTop; statsBody.innerHTML = _tabStats(nombre); if (_sy > 0) statsBody.scrollTop = _sy; }
     }
