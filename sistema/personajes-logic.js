@@ -11,7 +11,7 @@ import { AFINIDADES, formulas, pushFormulas, pushUmbrales, pushCooldown, persona
 export function buildContext(p) {
     // Soporta tanto nuevo schema (afin_base/afin_extra/afin_alter) como legacy
     const af = p.afin_base  || p.afinidadesBase || {};
-    const hz = {};  // Hz afin ya no existe como columna separada
+    const hz = p.afin_hcz   || p.afinidadesHz   || {};   // afinidades de hechizos (JSONB calculado por trigger)
     const ef = p.afin_alter || p.afinidadesEf   || {};
     const bf = p.afin_extra || p.afinidadesBf   || {};
 
@@ -216,7 +216,9 @@ export function mapPersonaje(row) {
         : { fisica: row.ef_fisica||0, energetica: row.ef_energetica||0, espiritual: row.ef_espiritual||0,
             mando: row.ef_mando||0, psiquica: row.ef_psiquica||0, oscura: row.ef_oscura||0 };
 
-    // ── Bonos de stats (schema nuevo) ────────────────────────────
+    // afin_hcz = afinidades de hechizos (calculado por trigger desde el inventario)
+    const afinHz = row.afin_hcz && typeof row.afin_hcz === 'object' ? row.afin_hcz
+        : { fisica:0, energetica:0, espiritual:0, mando:0, psiquica:0, oscura:0 };
     const bonos = row.bonos_stats && typeof row.bonos_stats === 'object' ? row.bonos_stats
         : { vida_roja:0, vida_azul:0, guarda:0, dano_rojo:0, dano_azul:0 };
 
@@ -248,9 +250,10 @@ export function mapPersonaje(row) {
         afin_base:  { ..._afin0, ...afinBase  },
         afin_extra: { ..._afin0, ...afinExtra },
         afin_alter: { ..._afin0, ...afinAlter },
+        afin_hcz:   { ..._afin0, ...afinHz   },   // hechizos — calculado por trigger
         // Alias legacy para compatibilidad con buildContext y renderCatalogo
         afinidadesBase: { ..._afin0, ...afinBase  },
-        afinidadesHz:   { ..._afin0 },   // Hz afin ya no existe como columna separada
+        afinidadesHz:   { ..._afin0, ...afinHz   },   // ahora sí se lee de afin_hcz
         afinidadesEf:   { ..._afin0, ...afinAlter },
         afinidadesBf:   { ..._afin0, ...afinExtra },
         // Bonos de stats calculados (del trigger o manual)
