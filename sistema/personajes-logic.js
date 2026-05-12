@@ -11,7 +11,7 @@ import { AFINIDADES, formulas, pushFormulas, pushUmbrales, pushCooldown, persona
 export function buildContext(p) {
     // Soporta tanto nuevo schema (afin_base/afin_extra/afin_alter) como legacy
     const af = p.afin_base  || p.afinidadesBase || {};
-    const hz = p.afin_hcz  || {};  // afinidades calculadas desde hechizos del inventario (solo lectura)
+    const hz = {};  // Hz afin ya no existe como columna separada
     const ef = p.afin_alter || p.afinidadesEf   || {};
     const bf = p.afin_extra || p.afinidadesBf   || {};
 
@@ -141,7 +141,8 @@ export function calcularPushDisponibles(p, s, recurso) {
     const pct_vida_roja = s.vida_roja_max > 0
         ? Math.round(vidaRojaActual / s.vida_roja_max * 100)
         : 0;
-    const vida_azul = s.vida_azul_max || 0; // vida azul calculada (máx, no hay "actual" separada)
+    // s.vida_azul_total es el valor real (base + mod); vida_azul_max no existe en calcularStats
+    const vida_azul = s.vida_azul_total ?? s.vida_azul_base ?? 0;
 
     const umbrales = pushUmbrales[recurso] || [];
     let total = 0;
@@ -188,30 +189,10 @@ export function calcularCooldownPush(p, recurso) {
 export function getMayorAfinidad(p) {
     let max = -1, mayor = null;
     AFINIDADES.forEach(a => {
-        const v = (p.afinidadesBase?.[a.key]||0)+(p.afin_hcz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0);
+        const v = (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0);
         if (v > max) { max = v; mayor = a; }
     });
     return max > 0 ? mayor : null;
-}
-
-// Normaliza las keys del JSONB afin_hcz que vienen en formato label ("Física")
-// al formato interno snake_case ("fisica") usado en el resto del sistema
-function _normalizarAfinHcz(raw) {
-    if (!raw || typeof raw !== 'object') return {};
-    const MAP = {
-        'física':     'fisica',    'fisica':     'fisica',
-        'energética': 'energetica','energetica': 'energetica',
-        'espiritual': 'espiritual',
-        'mando':      'mando',
-        'psíquica':   'psiquica',  'psiquica':   'psiquica',
-        'oscura':     'oscura'
-    };
-    const result = {};
-    for (const [k, v] of Object.entries(raw)) {
-        const norm = MAP[k.toLowerCase()];
-        if (norm) result[norm] = (result[norm] || 0) + (Number(v) || 0);
-    }
-    return result;
 }
 
 // Mapea un registro crudo de Supabase al formato interno
@@ -269,11 +250,9 @@ export function mapPersonaje(row) {
         afin_alter: { ..._afin0, ...afinAlter },
         // Alias legacy para compatibilidad con buildContext y renderCatalogo
         afinidadesBase: { ..._afin0, ...afinBase  },
-        afinidadesHz:   { ..._afin0, ..._normalizarAfinHcz(row.afin_hcz) },
+        afinidadesHz:   { ..._afin0 },   // Hz afin ya no existe como columna separada
         afinidadesEf:   { ..._afin0, ...afinAlter },
         afinidadesBf:   { ..._afin0, ...afinExtra },
-        // afin_hcz: afinidades calculadas desde inventario de hechizos (solo lectura, calculado por DB)
-        afin_hcz: { ..._afin0, ..._normalizarAfinHcz(row.afin_hcz) },
         // Bonos de stats calculados (del trigger o manual)
         bonos_stats: bonos,
         bono_vida_roja: bonos.vida_roja || 0,
