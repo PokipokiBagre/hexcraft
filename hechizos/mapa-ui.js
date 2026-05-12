@@ -1868,6 +1868,51 @@ window._hmModalAsignarPJ = () => {
             </div>
         `;
         document.body.appendChild(wrap);
+
+        // ── Navegación de teclado dentro de la tabla ─────────
+        // Flechas ↑↓ mueven entre filas en la misma columna
+        // Flechas ←→ mueven entre columnas en la misma fila
+        // Enter confirma y baja
+        // Tab ya mueve entre inputs por defecto del browser
+        document.getElementById('hz-tablas-wrap').addEventListener('keydown', e => {
+            const el = document.activeElement;
+            if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'SELECT' && el.tagName !== 'TEXTAREA')) return;
+            if (e.key === 'Escape') { el.blur(); return; }
+
+            const ARROWS = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter'];
+            if (!ARROWS.includes(e.key)) return;
+
+            const td = el.closest('td');
+            const tr = td?.closest('tr');
+            const tbody = tr?.closest('tbody');
+            if (!td || !tr || !tbody) return;
+
+            const rows = [...tbody.querySelectorAll('tr')];
+            const cols = [...tr.querySelectorAll('td')];
+            const ri   = rows.indexOf(tr);
+            const ci   = cols.indexOf(td);
+
+            const _focusCell = (r, c) => {
+                const targetTd = rows[r]?.querySelectorAll('td')[c];
+                if (!targetTd) return;
+                const inp = targetTd.querySelector('input,select');
+                if (inp) {
+                    e.preventDefault();
+                    el.blur();
+                    inp.focus();
+                    if (inp.select) inp.select();
+                } else if (targetTd.classList.contains('hz-cell-text-view')) {
+                    e.preventDefault();
+                    el.blur();
+                    targetTd.click();
+                }
+            };
+
+            if (e.key === 'ArrowDown' || e.key === 'Enter') _focusCell(ri + 1, ci);
+            if (e.key === 'ArrowUp')   _focusCell(ri - 1, ci);
+            if (e.key === 'ArrowRight' && el.tagName !== 'INPUT') _focusCell(ri, ci + 1);
+            if (e.key === 'ArrowLeft'  && el.tagName !== 'INPUT') _focusCell(ri, ci - 1);
+        });
     }
 
     // ── Abrir / cerrar ───────────────────────────────────────
@@ -1942,12 +1987,26 @@ window._hmModalAsignarPJ = () => {
 
     function _nSort() {
         const k = TS.nSortCol, d = TS.nSortDir;
+        const col = NCOLS.find(c => c.key === k);
+        const isNum = col && (col.type === 'num' || k === 'id');
+        // hechizo_id tiene forma "Hechizo 1", "Hechizo 12" — extraer número
+        const isHzId = k === 'hechizo_id';
+
         TS.nFilt.sort((a,b) => {
             let av = a[k], bv = b[k];
             if (typeof av === 'boolean') av = av ? 1 : 0;
             if (typeof bv === 'boolean') bv = bv ? 1 : 0;
-            if (av == null) av = '';
-            if (bv == null) bv = '';
+            if (av == null) av = isNum ? 0 : '';
+            if (bv == null) bv = isNum ? 0 : '';
+            if (isNum) {
+                av = parseFloat(av) || 0;
+                bv = parseFloat(bv) || 0;
+            } else if (isHzId) {
+                // extraer número del string "Hechizo N"
+                const na = parseInt(String(av).match(/\d+/)?.[0] || 0);
+                const nb = parseInt(String(bv).match(/\d+/)?.[0] || 0);
+                return (na - nb) * d;
+            }
             return av < bv ? -d : av > bv ? d : 0;
         });
         TS.nPage = 0;

@@ -285,6 +285,8 @@ export function iniciarEventos() {
     document.addEventListener('keydown', e => {
         const tag = document.activeElement?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+        // No interferir cuando el modal de tablas está abierto
+        if (document.getElementById('hz-tablas-overlay')?.classList.contains('visible')) return;
 
         if (e.key === 'Escape') {
             import('./mapa-ui.js').then(m => {
