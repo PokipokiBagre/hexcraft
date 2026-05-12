@@ -81,23 +81,29 @@ export async function cargarDatos() {
 // ── Inventario de un PJ ──────────────────────────────────────
 export async function cargarInventarioPJ(nombre) {
     if (!nombre || nombre === 'Todos') {
-        st.posesiones = new Set();
-        st.rastreo    = new Set();
+        st.posesiones  = new Set();
+        st.temporales  = new Set();
+        st.rastreo     = new Set();
         return;
     }
 
     const { data } = await supabase
         .from('hechizos_inventario')
-        .select('hechizo_nombre')
+        .select('hechizo_nombre, es_temporal')
         .eq('personaje_nombre', nombre);
 
-    const inv = new Set((data || []).map(h => h.hechizo_nombre.toLowerCase().trim()));
+    const inv      = new Map((data || []).map(h => [h.hechizo_nombre.toLowerCase().trim(), !!h.es_temporal]));
 
     st.posesiones = new Set();
+    st.temporales = new Set();
     st.nodos.forEach(n => {
         const nom = (n.nombre || '').toLowerCase().trim();
         const id  = (n.id    || '').toLowerCase().trim();
-        if (inv.has(nom) || inv.has(id)) st.posesiones.add(n);
+        const key = inv.has(nom) ? nom : inv.has(id) ? id : null;
+        if (key !== null) {
+            st.posesiones.add(n);
+            if (inv.get(key)) st.temporales.add(n);
+        }
     });
 
     // Rastreo recursivo de precedentes desde posesiones
@@ -209,7 +215,8 @@ export async function aplicarPropiedades(ids, payload) {
 }
 
 // ── Asignar hechizos a PJ ────────────────────────────────────
-export async function asignarHechizosAPJ(nombresHz, pj) {
+// temporal: true = es_temporal, false = permanente
+export async function asignarHechizosAPJ(nombresHz, pj, temporal = false) {
     const { data: existentes } = await supabase
         .from('hechizos_inventario')
         .select('hechizo_nombre')
@@ -224,10 +231,40 @@ export async function asignarHechizosAPJ(nombresHz, pj) {
         hechizo_nombre:   n,
         hechizo_afinidad: st.nodos.find(nd => nd.nombre === n)?.afinidad || '',
         hechizo_hex:      st.nodos.find(nd => nd.nombre === n)?.hex || 0,
+        es_temporal:      temporal,
     }));
     const { error } = await supabase.from('hechizos_inventario').insert(rows);
     if (error) return { ok: 0, err: error.message };
 
     if (st.jugadorPanel === pj) await cargarInventarioPJ(pj);
     return { ok: nuevos.length, total: nombresHz.length };
+}
+
+// ── Cambiar es_temporal de hechizos ya en inventario ─────────
+// modo: 'temporal' | 'oficial'
+export async function cambiarTemporalidad(nombresHz, pj, modo) {
+    const esTemp = modo === 'temporal';
+    let ok = 0, err = 0;
+    for (const nombre of nombresHz) {
+        const { error } = await supabase
+            .from('hechizos_inventario')
+            .update({ es_temporal: esTemp })
+            .eq('personaje_nombre', pj)
+            .eq('hechizo_nombre', nombre);
+        if (error) err++; else ok++;
+    }
+    if (st.jugadorPanel === pj) await cargarInventarioPJ(pj);
+    return { ok, err };
+}
+
+// ── Quitar hechizos temporales de un PJ ──────────────────────
+export async function quitarTemporalesPJ(pj) {
+    const { error } = await supabase
+        .from('hechizos_inventario')
+        .delete()
+        .eq('personaje_nombre', pj)
+        .eq('es_temporal', true);
+    if (error) return { ok: false, err: error.message };
+    if (st.jugadorPanel === pj) await cargarInventarioPJ(pj);
+    return { ok: true };
 }

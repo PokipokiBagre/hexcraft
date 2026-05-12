@@ -8,6 +8,7 @@ import {
     cargarInventarioPJ, calcSetsGlobales,
     guardarPosiciones, toggleConocido,
     aplicarPropiedades, asignarHechizosAPJ,
+    cambiarTemporalidad, quitarTemporalesPJ,
     recargarDatos,
 } from './mapa-data.js';
 import { centrarCamara, centrarEnNodo, renderInfoBar, renderInfoStats, renderOpPanel } from './mapa-render.js';
@@ -189,6 +190,22 @@ function _renderOpLeft() {
               ? `<button class="op-l-btn op-l-danger" onclick="window._hmEliminarNuevo('${safe}')">🗑 Descartar nodo</button>`
               : `<button class="op-l-btn op-l-danger" onclick="window._hmEliminarHechizo('${safe}')">🗑 Eliminar hechizo</button>`}
         </div>
+        ${esPosesion && st.jugadorPanel !== 'Todos' ? (() => {
+            const esTemp = st.temporales?.has(nodo);
+            return `<div class="op-l-row">
+                <button class="op-l-btn" style="${esTemp ? 'background:rgba(255,200,40,0.12);border-color:rgba(255,200,40,0.4);color:#e8c840;' : 'opacity:0.45;'}"
+                    onclick="window._hmMarcarTemporalidad('${safe}','${st.jugadorPanel.replace(/'/g,"\\'")}','${esTemp ? 'oficial' : 'temporal'}')">
+                    ${esTemp ? '✓ Marcar como oficial' : '⏳ Marcar como temporal'}
+                </button>
+            </div>`;
+        })() : ''}
+        ${st.jugadorPanel !== 'Todos' && (st.temporales?.size || 0) > 0 ? `
+        <div class="op-l-row">
+            <button class="op-l-btn op-l-danger" style="font-size:0.65em;"
+                onclick="window._hmQuitarTodosTemporales('${st.jugadorPanel.replace(/'/g,"\\'")}')">
+                ⏳✕ Quitar todos los temporales de ${st.jugadorPanel}
+            </button>
+        </div>` : ''}
         ` : `<div style="font-size:0.68em;color:#333;padding:4px 0;">Selecciona un hechizo en el mapa</div>`}
 
         <div id="op-l-asignar-sec"></div>
@@ -214,6 +231,13 @@ function _renderOpLeft() {
             <button class="op-l-btn op-l-vex-disp" onclick="window._hmBatchDispersarVex()">✦ Dispersar VEX</button>
             <button class="op-l-btn op-l-danger" onclick="window._hmBatchEliminarVex()">✕ Eliminar VEX</button>
         </div>
+        ${st.jugadorPanel !== 'Todos' ? `
+        <div class="op-l-row">
+            <button class="op-l-btn" style="background:rgba(255,200,40,0.08);border-color:rgba(255,200,40,0.35);color:#e8c840;font-size:0.65em;"
+                onclick="window._hmBatchMarcarTemporalidad('temporal')">⏳ Batch → Temporal</button>
+            <button class="op-l-btn" style="background:rgba(0,200,240,0.08);border-color:rgba(0,200,240,0.35);color:#40c8e0;font-size:0.65em;"
+                onclick="window._hmBatchMarcarTemporalidad('oficial')">✓ Batch → Oficial</button>
+        </div>` : ''}
         ${(() => {
             const todos   = [...st.seleccionados];
 
@@ -358,9 +382,14 @@ window._hmModalAsignarPJLeft = () => {
                 <option value="200">200% — ${hexTotal*2} HEX</option>
             </select>
         </div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:0.7em;color:#888;margin:6px 0;">
-            <input type="checkbox" id="op-asig-pub"> Publicar al asignar
-        </label>
+        <div style="display:flex;gap:10px;margin:6px 0;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.7em;color:#888;">
+                <input type="checkbox" id="op-asig-pub"> Publicar al asignar
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.7em;color:#e8c840;">
+                <input type="checkbox" id="op-asig-temp"> ⏳ Temporal
+            </label>
+        </div>
         <div class="op-l-row">
             <button class="op-l-btn op-l-green" onclick="window._hmConfirmarAsignar('${nodo.id.replace(/'/g,"\\'")}')">✓ Confirmar</button>
             <button class="op-l-btn" onclick="document.getElementById('op-l-asignar-sec').innerHTML=''">✕ Cancelar</button>
@@ -370,12 +399,13 @@ window._hmModalAsignarPJLeft = () => {
 window._hmConfirmarAsignar = async (id) => {
     const nodo = st.nodos.find(n => n.id === id);
     if (!nodo) return;
-    const pj = document.getElementById('op-asig-pj')?.value;
-    const pct = parseInt(document.getElementById('op-asig-hex')?.value||'100');
+    const pj      = document.getElementById('op-asig-pj')?.value;
+    const pct     = parseInt(document.getElementById('op-asig-hex')?.value||'100');
     const publicar = document.getElementById('op-asig-pub')?.checked;
+    const temporal = document.getElementById('op-asig-temp')?.checked || false;
     if (!pj) { toast('Selecciona un personaje'); return; }
 
-    const { ok, total, err } = await asignarHechizosAPJ([nodo.nombre], pj);
+    const { ok, total, err } = await asignarHechizosAPJ([nodo.nombre], pj, temporal);
     if (err) { toast('Error: ' + err); return; }
 
     let hexGastado = 0;
@@ -388,11 +418,11 @@ window._hmConfirmarAsignar = async (id) => {
     if (publicar) await toggleConocido(nodo.id, true);
 
     // Guardar en portapapeles
-    st.clipboard = { pj, hechizos: [nodo.nombre], hexGastado, descubiertos: publicar ? [nodo.nombre] : [] };
+    st.clipboard = { pj, hechizos: [nodo.nombre], hexGastado, descubiertos: publicar ? [nodo.nombre] : [], temporal };
 
     const sec = document.getElementById('op-l-asignar-sec');
     if (sec) sec.innerHTML = '';
-    toast(`✓ ${nodo.nombre} asignado a ${pj}`);
+    toast(`✓ ${nodo.nombre} asignado a ${pj}${temporal ? ' (temporal ⏳)' : ''}`);
     _renderOpLeft();
     if (st.nodoSel) renderSidePanel(st.nodoSel);
 };
@@ -418,9 +448,14 @@ window._hmBatchAsignarLeft = () => {
                 <option value="100" selected>100% — ${hexTotal} HEX</option>
             </select>
         </div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:0.7em;color:#888;margin:6px 0;">
-            <input type="checkbox" id="op-batch-pub"> Publicar al asignar
-        </label>
+        <div style="display:flex;gap:10px;margin:6px 0;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.7em;color:#888;">
+                <input type="checkbox" id="op-batch-pub"> Publicar al asignar
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.7em;color:#e8c840;">
+                <input type="checkbox" id="op-batch-temp"> ⏳ Temporal
+            </label>
+        </div>
         <div class="op-l-row">
             <button class="op-l-btn op-l-green" onclick="window._hmConfirmarBatchAsignar()">✓ Confirmar (${nodos.length})</button>
             <button class="op-l-btn" onclick="document.getElementById('op-l-batch-form').innerHTML=''">✕</button>
@@ -429,9 +464,10 @@ window._hmBatchAsignarLeft = () => {
 
 window._hmConfirmarBatchAsignar = async () => {
     const nodos = [...st.seleccionados];
-    const pj = document.getElementById('op-batch-pj')?.value;
-    const pct = parseInt(document.getElementById('op-batch-hex')?.value || '100');
+    const pj      = document.getElementById('op-batch-pj')?.value;
+    const pct     = parseInt(document.getElementById('op-batch-hex')?.value || '100');
     const publicar = document.getElementById('op-batch-pub')?.checked;
+    const temporal = document.getElementById('op-batch-temp')?.checked || false;
     if (!pj || nodos.length === 0) return;
 
     // ── Calcular costo total antes de asignar ────────────────
@@ -454,7 +490,7 @@ window._hmConfirmarBatchAsignar = async () => {
     }
 
     // ── Asignar hechizos ─────────────────────────────────────
-    const { ok, total, err } = await asignarHechizosAPJ(nodos.map(n => n.nombre), pj);
+    const { ok, total, err } = await asignarHechizosAPJ(nodos.map(n => n.nombre), pj, temporal);
     if (err) { toast('Error: ' + err); return; }
 
     // ── Descontar HEX ────────────────────────────────────────
@@ -468,11 +504,11 @@ window._hmConfirmarBatchAsignar = async () => {
     const descubiertos = [];
     if (publicar) for (const n of nodos) if (!n.esConocido) { await toggleConocido(n.id, true); descubiertos.push(n.nombre); }
 
-    st.clipboard = { pj, hechizos: nodos.map(n => n.nombre), hexGastado, descubiertos, detalles, hexRestante, pct };
+    st.clipboard = { pj, hechizos: nodos.map(n => n.nombre), hexGastado, descubiertos, detalles, hexRestante, pct, temporal };
 
     const bf = document.getElementById('op-l-batch-form');
     if (bf) bf.innerHTML = '';
-    toast(`✓ ${ok}/${total} hechizos asignados a ${pj} · −${hexGastado} HEX · restante: ${hexRestante}`);
+    toast(`✓ ${ok}/${total} hechizos asignados a ${pj}${temporal?' (temporal ⏳)':''} · −${hexGastado} HEX · restante: ${hexRestante}`);
     _renderOpLeft();
 };
 
@@ -863,6 +899,7 @@ export function renderSidePanel(nodo) {
         if (nodo.hex > 0) chips.push(`<span class="sp-chip sp-chip-hex">⬡${nodo.hex} HEX</span>`);
         if (nodo.vex > 0) chips.push(`<span class="sp-chip sp-chip-vex">⬡${nodo.vex} VEX</span>`);
         if (esPosesion)   chips.push(`<span class="sp-chip sp-chip-pos">✓ Aprendido</span>`);
+        if (st.temporales?.has(nodo)) chips.push(`<span class="sp-chip" style="color:#e8c840;border-color:rgba(232,200,64,0.35);background:rgba(232,200,64,0.08);">⏳ Temporal</span>`);
         if (nodo.esEstado)   chips.push(`<span class="sp-chip sp-chip-est">Estado</span>`);
         if (nodo.esPrioridad)chips.push(`<span class="sp-chip sp-chip-pri">↑ Prioridad</span>`);
         if (nodo.afectaUsuario)  chips.push(`<span class="sp-chip" style="color:#7a8a9a;border-color:rgba(120,140,160,0.25)">👤 Usuario</span>`);
@@ -1286,7 +1323,12 @@ export function renderGrimorio(query = '') {
             const esAprendible = st.aprendibles.has(nodo);
 
             let badge = '';
-            if (esPosesion)         badge = '<span class="gr-hz-badge posesion">✓</span>';
+            if (esPosesion) {
+                const esTemp = st.temporales?.has(nodo);
+                badge = esTemp
+                    ? '<span class="gr-hz-badge" style="color:#e8c840;border-color:rgba(232,200,64,0.4);background:rgba(232,200,64,0.1);">⏳ temp</span>'
+                    : '<span class="gr-hz-badge posesion">✓</span>';
+            }
             else if (nodo.esConocido) badge = '<span class="gr-hz-badge conocido">Conocido</span>';
             else if (esAprendible)   badge = '<span class="gr-hz-badge aprendible">Aprendible</span>';
 
@@ -1397,21 +1439,42 @@ window._hmCambiarPJ = async (nombre) => {
 
 window._hmBuscarCentral = (query) => {
     const q = query.trim().toLowerCase();
+    if (!q) { renderGrimorio(''); return; }
+
     const numMatch = q.match(/^(?:hechizo\s*)?(\d+)$/);
     if (numMatch) {
         const num = numMatch[1];
         const nodo = st.nodos.find(n => n.id.match(/\d+/)?.[0] === num);
-        if (nodo) {
-            centrarEnNodo(nodo);
-            st.nodoSel = nodo;
-            renderSidePanel(nodo);
-            renderInfoBar(nodo);
-        }
-        renderGrimorio(q);
+        if (nodo) { _centrarYSeleccionar(nodo); }
     } else {
-        renderGrimorio(q);
+        // Buscar primer nodo cuyo nombre coincida
+        const candidatos = st.nodos.filter(n => {
+            const nombre = (n.esConocido || st.esAdmin) ? n.nombre : '';
+            return nombre.toLowerCase().includes(q) || n.afinidad.toLowerCase().includes(q);
+        });
+        if (candidatos.length === 1) {
+            _centrarYSeleccionar(candidatos[0]);
+        } else if (candidatos.length > 1) {
+            // Centrar en el primero y mostrar todos en grimorio
+            _centrarYSeleccionar(candidatos[0]);
+        }
     }
+    renderGrimorio(q);
 };
+
+function _centrarYSeleccionar(nodo) {
+    if (!nodo) return;
+    st.nodoSel = nodo;
+    renderInfoBar(nodo);
+    if (window._hmNavPush) window._hmNavPush(nodo);
+    // Centrar suave si está disponible, sino directo
+    import('./mapa-ui.js').then(m => {
+        if (typeof m.centrarEnNodoSuave === 'function') m.centrarEnNodoSuave(nodo);
+        else { const { centrarEnNodo } = import('./mapa-render.js').catch(()=>{}); }
+    }).catch(() => {
+        import('./mapa-render.js').then(m => m.centrarEnNodo(nodo)).catch(()=>{});
+    });
+}
 
 window._hmCentrar = centrarCamara;
 
@@ -1606,6 +1669,48 @@ window._hmLimpiarSel = () => {
     st.seleccionados.clear();
     actualizarBadgeSel();
     if (st.esAdmin) _renderOpLeft();
+};
+
+// ── Marcar un hechizo como temporal / oficial (desde panel individual) ──
+window._hmMarcarTemporalidad = async (id, pj, modo) => {
+    const nodo = st.nodos.find(n => n.id === id);
+    if (!nodo || !pj || pj === 'Todos') { toast('Selecciona un PJ primero'); return; }
+    const { ok, err } = await cambiarTemporalidad([nodo.nombre], pj, modo);
+    if (err) { toast('Error al cambiar temporalidad'); return; }
+    calcSetsGlobales();
+    renderSidePanel(nodo);
+    if (st.esAdmin) _renderOpLeft();
+    toast(modo === 'temporal' ? `⏳ ${nodo.nombre} → temporal` : `✓ ${nodo.nombre} → oficial`);
+};
+
+// ── Quitar todos los temporales de un PJ ─────────────────────
+window._hmQuitarTodosTemporales = async (pj) => {
+    if (!pj || pj === 'Todos') { toast('Selecciona un PJ primero'); return; }
+    const cuantos = st.temporales?.size || 0;
+    if (!cuantos) { toast('No hay hechizos temporales'); return; }
+    if (!confirm(`¿Quitar los ${cuantos} hechizos temporales de ${pj}?`)) return;
+    const { ok, err } = await quitarTemporalesPJ(pj);
+    if (!ok) { toast('Error: ' + err); return; }
+    calcSetsGlobales();
+    renderInfoStats();
+    renderGrimorio(document.getElementById('hm-search-central')?.value || '');
+    if (st.nodoSel) renderSidePanel(st.nodoSel);
+    if (st.esAdmin) _renderOpLeft();
+    toast(`⏳✕ ${cuantos} temporales quitados de ${pj}`);
+};
+
+// ── Cambiar temporalidad de la selección batch ────────────────
+window._hmBatchMarcarTemporalidad = async (modo) => {
+    const pj = st.jugadorPanel;
+    if (!pj || pj === 'Todos') { toast('Selecciona un PJ primero'); return; }
+    const nodos = [...st.seleccionados].filter(n => st.posesiones.has(n));
+    if (!nodos.length) { toast('Ninguno de los seleccionados está en el inventario de ' + pj); return; }
+    const { ok, err } = await cambiarTemporalidad(nodos.map(n => n.nombre), pj, modo);
+    calcSetsGlobales();
+    renderGrimorio(document.getElementById('hm-search-central')?.value || '');
+    if (st.nodoSel) renderSidePanel(st.nodoSel);
+    if (st.esAdmin) _renderOpLeft();
+    toast(`${modo === 'temporal' ? '⏳' : '✓'} ${ok} hechizos marcados como ${modo}`);
 };
 
 // ── Auto-ordenar (Fruchterman-Reingold) ──────────────────────

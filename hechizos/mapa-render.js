@@ -151,7 +151,8 @@ export function dibujar() {
 
 // ── Dibujar enlaces ──────────────────────────────────────────
 function _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, enfocado, enfoqPrev, enfoqNext, hayEnfoque, sf, modoEliminarFlecha, enlaceHover) {
-    const esTodos = st.jugadorPanel === 'Todos';
+    const esTodos   = st.jugadorPanel === 'Todos';
+    const temporales = st.temporales || new Set();
     enlaces.forEach(e => {
         const dx = e.target.x-e.source.x, dy = e.target.y-e.source.y;
         const ang = Math.atan2(dy, dx);
@@ -162,13 +163,18 @@ function _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, en
         const sD=descubiertos.has(e.source), tD=descubiertos.has(e.target);
         const tA=aprendibles.has(e.target);
         const sP=posesiones.has(e.source), tP=posesiones.has(e.target);
+        const sT=temporales.has(e.source), tT=temporales.has(e.target);
 
         if (hayEnfoque) {
             const sA=enfoqPrev.has(e.source), tA2=enfoqPrev.has(e.target)||e.target===enfocado;
             if (sA&&tA2)        { color=C.PREV; lw=2/sf; }
             else if (e.source===enfocado&&enfoqNext.has(e.target)) { color=C.NEXT; lw=2/sf; }
             else                { color='rgba(160,155,175,0.18)'; lw=0.5/sf; }
-        } else if (sP&&tP)      { color=C.L_PJ; lw=2/sf; }
+        } else if (sP&&tP) {
+            // Enlace entre dos posesiones: amarillo si ambos son temporales, azul si no
+            if (sT&&tT) { color=C.L_TEMP; lw=2/sf; }
+            else        { color=C.L_PJ;   lw=2/sf; }
+        }
         else if (sP||tP)        { color='rgba(0,200,240,0.3)'; lw=1.2/sf; }
         else if (sD&&tD)        { color=C.L_POS; lw=1.4/sf; }
         else if (sD&&tA)        { color=C.L_APR; lw=1.1/sf; }
@@ -204,11 +210,13 @@ function _dibujarEnlaces(ctx, enlaces, descubiertos, aprendibles, posesiones, en
 function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesiones,
     seleccionados, modoSelMulti, nodoSel, enfocado, enfoqPrev, enfoqNext, enfoqRel, hayEnfoque, camara, sf)
 {
-    const esTodos = st.jugadorPanel === 'Todos';
+    const esTodos  = st.jugadorPanel === 'Todos';
+    const temporales = st.temporales || new Set();
 
     nodos.forEach(nodo => {
         const esDes=descubiertos.has(nodo), esApr=aprendibles.has(nodo), esPar=parciales.has(nodo);
         const esPos=posesiones.has(nodo);
+        const esTemp=temporales.has(nodo);   // ← temporal
         const esSel=nodoSel===nodo || seleccionados.has(nodo);
         const enSelMulti=seleccionados.has(nodo);
         const esNuevo=nodo.esNuevo;
@@ -225,12 +233,18 @@ function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesio
             colorN = esDes ? 'rgba(100,90,130,0.45)' : 'rgba(100,95,70,0.38)';
             colorT = esDes ? 'rgba(130,120,160,0.5)' : 'rgba(120,115,85,0.45)';
         } else if (hayEnfoque) {
-            if (esEnfocado)       { colorN=esDes?C.POS:esApr?C.APR:esPos?C.PJ:'rgba(200,195,220,0.95)'; colorT=colorN; }
+            if (esEnfocado) {
+                // Si el nodo enfocado es temporal → amarillo, si posesión → azul, etc.
+                colorN = esDes ? (esTemp ? C.TEMP : C.POS) : esApr ? C.APR : esPos ? (esTemp ? C.TEMP : C.PJ) : 'rgba(200,195,220,0.95)';
+                colorT = colorN;
+            }
             else if (esPrecedente){ colorN=C.PREV; colorT=C.PREV; }
             else if (esSaliente)  { colorN=C.NEXT; colorT=C.NEXT; }
             else                  { colorN='rgba(90,85,110,0.5)'; colorT='rgba(120,115,140,0.55)'; }
         } else if (esPos&&!esTodos) {
-            colorN=C.PJ; colorT=C.PJ;
+            // Temporal → amarillo, permanente → azul
+            colorN = esTemp ? C.TEMP : C.PJ;
+            colorT = esTemp ? C.TEMP : C.PJ;
         } else if (esTodos) {
             colorN=esDes?C.POS:esApr?C.APR:'rgba(100,95,130,0.7)';
             colorT=esDes?C.POS:esApr?C.APR:'rgba(160,155,175,0.9)';
@@ -269,9 +283,17 @@ function _dibujarNodos(ctx, nodos, descubiertos, aprendibles, parciales, posesio
         }
         if (esPos && !esTodos && !hayEnfoque) {
             forma(8/sf);
-            ctx.shadowBlur=12; ctx.shadowColor='rgba(0,210,255,0.6)';
-            ctx.strokeStyle='rgba(0,210,255,0.7)'; ctx.lineWidth=2.5/sf;
+            const glowColor = esTemp ? 'rgba(255,200,40,0.7)' : 'rgba(0,210,255,0.7)';
+            const shadowColor = esTemp ? 'rgba(255,200,40,0.6)' : 'rgba(0,210,255,0.6)';
+            ctx.shadowBlur=12; ctx.shadowColor=shadowColor;
+            ctx.strokeStyle=glowColor; ctx.lineWidth=2.5/sf;
             ctx.stroke(); ctx.shadowBlur=0;
+            // Para temporales: anillo exterior punteado adicional
+            if (esTemp) {
+                forma(13/sf);
+                ctx.strokeStyle='rgba(255,200,40,0.4)'; ctx.lineWidth=1.5/sf;
+                ctx.setLineDash([4/sf,3/sf]); ctx.stroke(); ctx.setLineDash([]);
+            }
         }
         if (esPrecedente || esSaliente) {
             const hc = esPrecedente ? C.PREV : C.NEXT;

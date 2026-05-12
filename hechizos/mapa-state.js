@@ -9,6 +9,8 @@ export const C = {
     RASTR:  'rgba(120,110,150,0.6)',
     NUEVO:  '#00ffff',
     PJ:     'rgba(0,220,255,0.95)',
+    TEMP:   'rgba(255,210,60,0.95)',    // hechizo temporal
+    L_TEMP: 'rgba(255,200,40,0.55)',    // enlace temporal
     PREV:   'rgba(210,150,80,0.78)',
     NEXT:   'rgba(80,220,130,0.95)',
     FONDO:  '#05000a',
@@ -35,6 +37,7 @@ export const st = {
     aprendibles:  new Set(),
     parciales:    new Set(),
     posesiones:   new Set(),
+    temporales:   new Set(),   // subconjunto de posesiones — es_temporal=true
     rastreo:      new Set(),
 
     // ── Cámara ───────────────────────────────────────────────
