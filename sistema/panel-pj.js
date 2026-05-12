@@ -297,6 +297,11 @@ export function cerrarPanelPJ() {
     cerrarMinimapa();
     _cerrarPanelObjetos();
     cerrarTabMisiones();
+    // Limpiar todos los countdown intervals activos
+    if (window._ppjResetIntervals) {
+        Object.values(window._ppjResetIntervals).forEach(id => clearInterval(id));
+        window._ppjResetIntervals = {};
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -603,12 +608,46 @@ async function _tabHex(nombre, body) {
         <div class="htab-vex-formula">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
     </div>
     <div class="htab-energia-root">
-        <div class="htab-energia-label">Pushes de Energía</div>
+        <div class="htab-energia-header">
+            <div class="htab-energia-label">Pushes de Energía</div>
+            <div class="htab-reset-badge" id="ppj-reset-countdown-${_norm(nombre)}">
+                <span class="htab-reset-icon">↺</span>
+                <span class="htab-reset-txt" id="ppj-reset-txt-${_norm(nombre)}">--:--:--</span>
+            </div>
+        </div>
         ${_push('vex','VEX')}
         ${_push('guarda','Guarda')}
     </div>`:'';
 
-    body.innerHTML = `
+    // ── Countdown hasta 00:00 UTC ──────────────────────────────
+    // Se ejecuta tras insertar el HTML en el DOM
+    const _startResetCountdown = (nombre) => {
+        const normNombre = nombre.toString().trim().toLowerCase()
+            .replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i')
+            .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
+            .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+        const el = document.getElementById('ppj-reset-txt-' + normNombre);
+        const badge = document.getElementById('ppj-reset-countdown-' + normNombre);
+        if (!el) return;
+        const tick = () => {
+            const now = new Date();
+            const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+            const diff = Math.max(0, Math.floor((next - now) / 1000));
+            const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+            const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+            const s = String(diff % 60).padStart(2, '0');
+            el.textContent = `${h}:${m}:${s}`;
+            // Pulsa rojo cuando falta menos de 1h
+            if (diff < 3600) badge.classList.add('htab-reset-urgent');
+            else badge.classList.remove('htab-reset-urgent');
+        };
+        tick();
+        const intervalId = setInterval(tick, 1000);
+        // Limpiar el interval cuando el panel se cierre
+        window._ppjResetIntervals = window._ppjResetIntervals || {};
+        if (window._ppjResetIntervals[nombre]) clearInterval(window._ppjResetIntervals[nombre]);
+        window._ppjResetIntervals[nombre] = intervalId;
+    };    body.innerHTML = `
     <style>
     .htab-root{font-family:'Inter',system-ui,sans-serif;}
 
@@ -753,16 +792,46 @@ async function _tabHex(nombre, body) {
     .htab-vex-pct{font-size:0.6em;color:rgba(154,80,220,0.4);font-weight:700;min-width:32px;text-align:right;font-family:'Cinzel',serif;}
     .htab-vex-formula{font-size:0.5em;color:#2a1a40;font-family:monospace;margin-top:2px;position:relative;}
 
-    /* ── ENERGIA (push blocks inside vex area) ── */
+    /* ── ENERGIA (push blocks + reset countdown) ── */
     .htab-energia-root{
         padding:18px 24px 16px;
         border-bottom:1px solid rgba(255,255,255,0.04);
         background:linear-gradient(180deg,rgba(30,10,60,0.06) 0%,transparent 100%);
     }
+    .htab-energia-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
     .htab-energia-label{
         font-size:0.49em;letter-spacing:2.5px;text-transform:uppercase;
-        color:#2e2e4a;font-weight:700;margin-bottom:12px;
+        color:#2e2e4a;font-weight:700;
     }
+    /* Reset countdown badge */
+    .htab-reset-badge{
+        display:flex;align-items:center;gap:5px;
+        background:rgba(154,80,220,0.06);
+        border:1px solid rgba(154,80,220,0.16);
+        border-radius:20px;padding:3px 10px 3px 7px;
+        transition:all 0.3s;
+    }
+    .htab-reset-badge.htab-reset-urgent{
+        background:rgba(200,60,60,0.08);
+        border-color:rgba(200,60,60,0.25);
+        animation:ppj-pulse-badge 2s ease-in-out infinite;
+    }
+    @keyframes ppj-pulse-badge{
+        0%,100%{box-shadow:0 0 0 0 rgba(200,60,60,0);}
+        50%{box-shadow:0 0 8px 2px rgba(200,60,60,0.18);}
+    }
+    .htab-reset-icon{
+        font-size:0.7em;color:rgba(154,80,220,0.5);
+        display:inline-block;
+    }
+    .htab-reset-badge.htab-reset-urgent .htab-reset-icon{color:rgba(220,80,80,0.7);}
+    .htab-reset-txt{
+        font-family:'Cinzel',serif;font-size:0.6em;font-weight:700;
+        color:rgba(154,80,220,0.45);letter-spacing:1px;
+        font-variant-numeric:tabular-nums;
+    }
+    .htab-reset-badge.htab-reset-urgent .htab-reset-txt{color:rgba(220,100,100,0.8);}
+    .htab-reset-sub{font-size:0.47em;color:#2a1a40;text-transform:uppercase;letter-spacing:1px;margin-top:1px;}
 
     /* ── PUSHES SECTION ── */
     .htab-pushes-section{
@@ -948,6 +1017,11 @@ async function _tabHex(nombre, body) {
     </div>`:''}
 
     </div>`;
+
+    // Iniciar cuenta regresiva si hay sección VEX
+    if (s.vex_max > 0) {
+        requestAnimationFrame(() => _startResetCountdown(nombre));
+    }
 }
 
 
