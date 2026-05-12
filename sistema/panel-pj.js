@@ -492,7 +492,6 @@ async function _tabHex(nombre, body) {
                         onclick="window._ppjEjecutarHexPush('${safe}','contenido',parseInt(document.getElementById('ppj-cv-${_norm(nombre)}')?.value)||500)">OK</button>
                 </div>` : ''}
         </div>`;
-        </div>`;
 
     const _tCls = { asistencia:'hlog-asistencia', turno_extra:'hlog-turno_extra', contenido:'hlog-contenido' };
     const _tLbl = { asistencia:'Asistencia', turno_extra:'Turno extra', contenido:'Contenido' };
