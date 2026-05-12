@@ -577,6 +577,9 @@ async function _tabHex(nombre, body) {
         const cdStatus = cdParts[0];
         const cdFreq = cdParts[1] || '';
         const isAvail = disp && isOp;
+        // Botón cancelar: solo OP, solo si está en espera, y hay un registro que cancelar
+        const ultLog = _ultimoDe(tipo);
+        const puedeCancel = isOp && !disp && ultLog?.id;
         return `
         <div class="hex-pcard ${availClass} ${lockedClass}">
             <div class="hex-pcard-glow"></div>
@@ -598,6 +601,11 @@ async function _tabHex(nombre, body) {
                         ${!isOp ? '🔒 Solo OP' : 'OK'}
                     </button>
                 </div>`}
+            ${puedeCancel ? `
+            <button class="hex-pcard-cancel"
+                    onclick="window._ppjCancelarPush(${ultLog.id},'${safe}','${tipo}')">
+                ↩ Cancelar espera
+            </button>` : ''}
         </div>`;
     };
 
@@ -3063,13 +3071,18 @@ window._ppjDeleteHexLog = async (id, nombre) => {
     if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pjRendered; _tabHex(nombre, hexBody); }
 };
 
-// Cancelar asistencia: borra el registro del día (marca como disponible) sin devolver HEX
+// Cancelar push genérico: borra el registro (resetea el cooldown) sin devolver HEX
 window._ppjCancelarAsistencia = async (id, nombre) => {
+    window._ppjCancelarPush(id, nombre, 'asistencia');
+};
+window._ppjCancelarPush = async (id, nombre, tipo) => {
     if (!estadoUI.esAdmin) return;
-    if (!confirm(`¿Cancelar la asistencia de ${nombre}? El HEX no se descuenta — solo queda disponible para otorgar de nuevo.`)) return;
+    const labels = { asistencia: 'asistencia', turno_extra: 'turno extra', contenido: 'contenido' };
+    const lbl = labels[tipo] || tipo;
+    if (!confirm(`¿Cancelar ${lbl} de ${nombre}?\nEl cooldown se resetea — queda disponible para otorgar de nuevo.\nEl HEX NO se descuenta.`)) return;
     const { error } = await supabase.from('hex_push_log').delete().eq('id', id);
-    if (error) { window.mostrarToast?.('Error al cancelar asistencia', true); return; }
-    window.mostrarToast?.(`↩ Asistencia de ${nombre} cancelada — disponible de nuevo`);
+    if (error) { window.mostrarToast?.('Error al cancelar', true); return; }
+    window.mostrarToast?.(`↩ ${lbl.charAt(0).toUpperCase()+lbl.slice(1)} de ${nombre} cancelada — disponible de nuevo`);
     const hexBody = document.getElementById('ppj-hex-body');
     if (hexBody) { hexBody.innerHTML = ''; delete hexBody.dataset.pjRendered; _tabHex(nombre, hexBody); }
 };
