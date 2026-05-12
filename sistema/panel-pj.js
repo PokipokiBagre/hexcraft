@@ -1785,13 +1785,13 @@ function _renderObjIzq() {
     const _imgObj  = (n) => `${currentConfig.storageUrl}/imgobjetos/${_norm(n)}.png`;
     const _fall    = () => { try{return `${currentConfig.storageUrl}/imginterfaz/no_encontrado.png`;}catch{return '';} };
 
-    const q        = _objState.busqCat.toLowerCase().trim();
+    const q        = _norm(_objState.busqCat);
     const invSet   = new Set(_objState.inventario.map(i=>i.objeto_nombre));
 
     const lista = _objState.catalogo.filter(o => {
         if (_objState.filtroRar  !== 'Todos' && o.rareza !== _objState.filtroRar) return false;
         if (_objState.filtroTipo !== 'Todos' && o.tipo   !== _objState.filtroTipo) return false;
-        if (q && !o.nombre.toLowerCase().includes(q) && !(o.efecto||'').toLowerCase().includes(q)) return false;
+        if (q && !_norm(o.nombre).includes(q) && !_norm(o.efecto||'').includes(q)) return false;
         return true;
     });
 
@@ -2139,6 +2139,7 @@ function _renderObjDer(nombre, body) {
                 <img src="${_imgObj(item.objeto_nombre)}" onerror="this.onerror=null;this.src='${_fall()}'" style="width:32px;height:32px;border-radius:4px;object-fit:cover;background:#111;flex-shrink:0;border:1px solid rgba(255,255,255,0.05);">
                 <span class="ppj-obj-nombre" title="${item.objeto_nombre}">${item.objeto_nombre}
                     ${isEqp?`<span style="font-size:0.6em;background:rgba(212,175,55,0.15);color:#d4af37;border:1px solid rgba(212,175,55,0.3);border-radius:3px;padding:1px 4px;margin-left:4px;">EQP</span>`:''}
+                    ${esContenedor&&hijosSlots.length>0?`<span style="font-size:0.6em;color:#6496ff;background:rgba(100,150,255,0.1);border:1px solid rgba(100,150,255,0.25);border-radius:3px;padding:1px 5px;margin-left:4px;">📦 ${hijosSlots.length}</span>`:''}
                 </span>
                 <span class="ppj-obj-rar" style="background:${rarCol}22;color:${rarCol};border:1px solid ${rarCol}44;">${cat.rareza||'-'}</span>
                 ${ctrlHTML}
@@ -2257,7 +2258,7 @@ window._pobjBusqCat = (v) => {
     // Fast path: si el catálogo ya está renderizado, solo actualizar la lista
     const listaEl = document.getElementById('pobj-cat-lista');
     if (listaEl) {
-        const q      = v.toLowerCase().trim();
+        const q      = _norm(v);
         const invSet = new Set(_objState.inventario.map(i => i.objeto_nombre));
         const esAdmin= estadoUI.esAdmin;
         const RAR_COL= {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
@@ -2266,7 +2267,7 @@ window._pobjBusqCat = (v) => {
         const lista  = _objState.catalogo.filter(o => {
             if (_objState.filtroRar  !== 'Todos' && o.rareza !== _objState.filtroRar)  return false;
             if (_objState.filtroTipo !== 'Todos' && o.tipo   !== _objState.filtroTipo) return false;
-            if (q && !o.nombre.toLowerCase().includes(q) && !(o.efecto||'').toLowerCase().includes(q)) return false;
+            if (q && !_norm(o.nombre).includes(q) && !_norm(o.efecto||'').includes(q)) return false;
             return true;
         });
         if (lista.length === 0) {
