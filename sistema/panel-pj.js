@@ -374,7 +374,7 @@ function _renderTab(nombre, tab) {
         if (colMain)   colMain.style.display = 'flex';
         if (body)      { body.style.display = 'none'; body.innerHTML = ''; }
         if (statsBody) { statsBody.style.display = ''; const _sy = statsBody.scrollTop; statsBody.innerHTML = _tabStats(nombre); if (_sy > 0) statsBody.scrollTop = _sy; }
-        if (hexBody)   _tabHex(nombre, hexBody);
+        if (hexBody)   { hexBody.innerHTML = ""; _tabHex(nombre, hexBody); }
     } else {
         // Ocultar col-main
         if (colMain)   colMain.style.display = 'none';
@@ -3199,7 +3199,7 @@ export function refreshPanelPJ() {
     const tab = _tabActivo[nombre] || 'stats';
     if (tab === 'stats') {
         const hexBody = document.getElementById('ppj-hex-body');
-        if (hexBody) _tabHex(nombre, hexBody);
+        if (hexBody) { hexBody.innerHTML = ""; _tabHex(nombre, hexBody); }
         const statsBody = document.getElementById('ppj-stats-body');
         if (statsBody) { const _sy = statsBody.scrollTop; statsBody.innerHTML = _tabStats(nombre); if (_sy > 0) statsBody.scrollTop = _sy; }
     }
