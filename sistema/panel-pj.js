@@ -517,7 +517,7 @@ async function _tabHex(nombre, body) {
     const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
     const pctVex = s.vex_max>0?Math.min(100,Math.round((p.vex_actual||0)/s.vex_max*100)):0;
 
-    const _push = (recurso, label, emoji) => {
+    const _push = (recurso, label) => {
         const hasMax = recurso==='vex'?s.vex_max>0:s.guarda_max>0; if (!hasMax) return '';
         const disp   = calcularPushDisponibles(p, s, recurso);
         const usados = recurso==='vex'?(p.push_vex_actual||0):(p.push_guarda_actual||0);
@@ -525,336 +525,154 @@ async function _tabHex(nombre, body) {
         const val    = calcularValorPush(p, recurso);
         const cd     = calcularCooldownPush(p, recurso);
         const canPush= rest>0 && cd.disponible;
+        const col    = recurso==='vex' ? '#9a50dc' : '#d4af37';
+        const bg     = recurso==='vex' ? 'rgba(154,80,220,0.07)' : 'rgba(212,175,55,0.05)';
+        const bd     = recurso==='vex' ? 'rgba(154,80,220,0.18)' : 'rgba(212,175,55,0.18)';
         const dots   = Array.from({length:Math.max(disp,1)},(_,i)=>
-            `<span class="ppj-dot ${i<usados?'used':'avail'}"></span>`).join('');
-        const cdTxt  = !cd.disponible
-            ? `<div class="ppj-push-cd">⏳ ${Math.floor(cd.restaSeg/60)}m ${String(cd.restaSeg%60).padStart(2,'0')}s</div>` : '';
-        return `<div class="ppj-push-block">
-            <div class="ppj-push-header"><span class="ppj-push-label">${emoji} ${label}</span><div class="ppj-push-dots">${dots}</div><span style="font-size:0.68em;color:#4a4a68;">${usados}/${disp}</span></div>
-            ${cdTxt}
-            <div class="ppj-push-info"><span class="ppj-push-valor">+${val} por push</span>
-                <button class="btn-push-pj" ${canPush?'':'disabled'} onclick="window.ejecutarPush('${safe}','${recurso}')">
-                    ${!cd.disponible?'Cooldown':(rest>0?`Push ${label}`:'Sin pushes')}</button>
+            `<span style="width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:3px;${i<usados?`background:${col};box-shadow:0 0 5px ${col}50;`:`background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);`}"></span>`).join('');
+        const cdTxt = !cd.disponible
+            ? `<span style="font-size:0.63em;color:#c08030;">Espera: ${Math.floor(cd.restaSeg/60)}m ${String(cd.restaSeg%60).padStart(2,'0')}s</span>` : '';
+        return `
+        <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:${bg};border:1px solid ${bd};border-radius:8px;margin-bottom:6px;">
+            <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span style="font-family:'Cinzel',serif;font-size:0.72em;color:${col};font-weight:600;letter-spacing:0.5px;">${label}</span>
+                    <span>${dots}</span>
+                    <span style="font-size:0.6em;color:#3a3a58;margin-left:2px;">${usados}/${disp}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:0.65em;color:#4a4a68;">+${val} por push</span>
+                    ${cdTxt}
+                </div>
             </div>
-            ${estadoUI.esAdmin?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-                <span style="font-size:0.62em;color:#3a3a58;">Extra OP</span>
-                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',-1)">−</button>
-                <span style="font-size:0.75em;color:#888;">${recurso==='vex'?(p.push_vex_limit||0):(p.push_guarda_limit||0)}</span>
-                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',1)">+</button>
-                <button class="ppj-ctrl-btn" onclick="window.resetPushes('${safe}','${recurso}')" style="margin-left:4px;">↺</button>
-            </div>`:''}
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
+                <button style="background:${canPush?bg:'rgba(255,255,255,0.02)'};border:1px solid ${canPush?col:'rgba(255,255,255,0.07)'};border-radius:6px;color:${canPush?col:'#3a3a58'};font-family:'Cinzel',serif;font-size:0.68em;font-weight:700;padding:6px 16px;cursor:${canPush?'pointer':'default'};letter-spacing:0.5px;min-width:100px;text-align:center;"
+                    ${canPush?'':`disabled`} onclick="window.ejecutarPush('${safe}','${recurso}')">${!cd.disponible?'Cooldown':rest>0?`Push ${label}`:'Sin pushes'}</button>
+                ${estadoUI.esAdmin?`<div style="display:flex;gap:4px;align-items:center;">
+                    <span style="font-size:0.57em;color:#2e2e48;">Extra</span>
+                    <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',-1)">−</button>
+                    <span style="font-size:0.68em;color:#555;">${recurso==='vex'?(p.push_vex_limit||0):(p.push_guarda_limit||0)}</span>
+                    <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',1)">+</button>
+                    <button class="ppj-ctrl-btn" onclick="window.resetPushes('${safe}','${recurso}')" style="margin-left:2px;">↺</button>
+                </div>`:''}
+            </div>
         </div>`;
     };
 
     const vexHtml = s.vex_max>0?`
-    <div class="ppj-section" style="padding:0;">
-        <!-- VEX — mismo peso visual que HEX -->
-        <div style="background:linear-gradient(135deg,rgba(154,80,220,0.08),rgba(80,0,140,0.12));border-bottom:1px solid rgba(154,80,220,0.15);padding:14px 16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                <span style="font-family:'Cinzel',serif;font-size:0.7em;letter-spacing:2px;color:#9a50dc;text-transform:uppercase;">⚡ VEX</span>
-                <div style="display:flex;align-items:center;gap:6px;">
-                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',-50)" style="border-color:rgba(154,80,220,0.3);">−50</button>`:''}
-                    <span style="font-family:'Cinzel',serif;font-size:1.6em;color:#b070e8;letter-spacing:1px;">${Math.floor(p.vex_actual||0)}<span style="font-size:0.45em;color:#6a3a9a;margin-left:4px;">/ ${s.vex_max}</span></span>
-                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',50)" style="border-color:rgba(154,80,220,0.3);">+50</button>`:''}
-                </div>
+    <div style="padding:24px 24px 20px;border-bottom:1px solid rgba(154,80,220,0.12);background:linear-gradient(180deg,rgba(60,20,110,0.08) 0%,transparent 100%);">
+        <div style="font-size:0.52em;letter-spacing:3px;text-transform:uppercase;color:rgba(154,80,220,0.45);margin-bottom:10px;">Vex Actual</div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;">
+            <div style="font-family:'Cinzel',serif;font-size:2.4em;color:#b070e8;line-height:1;text-shadow:0 0 20px rgba(154,80,220,0.3);">
+                ${Math.floor(p.vex_actual||0)}<span style="font-size:0.35em;color:#6a3a9a;margin-left:8px;letter-spacing:1px;">/ ${s.vex_max}</span>
             </div>
-            <div class="ppj-vex-bar" style="height:8px;border-radius:4px;"><div class="ppj-vex-fill" style="width:${pctVex}%;border-radius:4px;"></div></div>
-            <div class="ppj-formula" style="margin-top:5px;">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
+            ${canEdit?`<div style="display:flex;gap:5px;padding-bottom:6px;">
+                <button class="ppj-ctrl-btn" style="border-color:rgba(154,80,220,0.3);color:#9a50dc;" onclick="window.modStat('${safe}','vex_actual',-50)">−50</button>
+                <button class="ppj-ctrl-btn" style="border-color:rgba(154,80,220,0.3);color:#9a50dc;" onclick="window.modStat('${safe}','vex_actual',50)">+50</button>
+            </div>`:''}
         </div>
-        <!-- Pushes VEX/Guarda -->
-        <div style="padding:10px 16px;">
-            <div style="font-size:0.6em;letter-spacing:1.5px;text-transform:uppercase;color:#3a3a58;font-weight:600;margin-bottom:8px;">Pushes</div>
-            ${_push('vex','VEX','⚡')}${_push('guarda','Guarda','🛡')}
-            ${!s.vex_max&&!s.guarda_max?'<div class="ppj-empty" style="padding:8px 0;">Sin pushes disponibles</div>':''}
+        <div style="height:5px;border-radius:3px;background:rgba(154,80,220,0.1);overflow:hidden;">
+            <div style="height:100%;width:${pctVex}%;background:linear-gradient(90deg,#6a20c0,#b070e8);border-radius:3px;box-shadow:0 0 8px rgba(154,80,220,0.45);"></div>
         </div>
+        <div style="font-size:0.52em;color:#3a2a58;margin-top:6px;font-family:monospace;">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
+    </div>
+    <div style="padding:18px 24px;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="font-size:0.52em;letter-spacing:2.5px;text-transform:uppercase;color:#3a3a58;font-weight:700;margin-bottom:12px;">Pushes de Energía</div>
+        ${_push('vex','VEX')}
+        ${_push('guarda','Guarda')}
     </div>`:'';
 
     body.innerHTML = `
     <style>
-        .hex-tab-root { font-family: 'Inter', sans-serif; color: #c8c0d8; }
-        /* ── Header arcano ── */
-        .hex-hero {
-            position: relative; overflow: hidden;
-            background: linear-gradient(180deg, #0d0a1a 0%, #080612 100%);
-            padding: 28px 20px 20px; text-align: center;
-            border-bottom: 1px solid rgba(212,175,55,0.18);
-        }
-        .hex-hero::before {
-            content: ''; position: absolute; inset: 0;
-            background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(212,175,55,0.07) 0%, transparent 70%);
-            pointer-events: none;
-        }
-        /* Hexágono SVG centrado */
-        .hex-svg-wrap { position: relative; display: inline-block; margin-bottom: 10px; }
-        .hex-svg-wrap svg { display: block; }
-        .hex-inner-val {
-            position: absolute; inset: 0;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
-        .hex-label {
-            font-family: 'Cinzel', serif; font-size: 0.52em;
-            letter-spacing: 3px; color: rgba(212,175,55,0.5);
-            text-transform: uppercase; line-height: 1; margin-bottom: 2px;
-        }
-        .hex-amount {
-            font-family: 'Cinzel', serif; font-size: 2em;
-            color: #d4af37; letter-spacing: 2px; line-height: 1;
-            text-shadow: 0 0 24px rgba(212,175,55,0.4);
-        }
-        /* Botones HEX */
-        .hex-btns-wrap { padding: 0 16px 4px; }
-        .hex-btns-row {
-            display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; margin-bottom: 4px;
-        }
-        .hex-btn {
-            background: rgba(212,175,55,0.05); border: 1px solid rgba(212,175,55,0.15);
-            border-radius: 6px; color: #c9953a; font-size: 0.72em; font-weight: 700;
-            padding: 7px 2px; cursor: pointer; transition: all 0.13s; font-family: inherit;
-        }
-        .hex-btn:hover { background: rgba(212,175,55,0.14); border-color: rgba(212,175,55,0.4); color: #d4af37; }
-        .hex-btn.neg { color: #e06060; border-color: rgba(220,80,80,0.2); background: rgba(220,80,80,0.05); }
-        .hex-btn.neg:hover { background: rgba(220,80,80,0.14); border-color: rgba(220,80,80,0.45); }
-
-        /* ── VEX block ── */
-        .vex-block {
-            margin: 0; padding: 16px 20px 14px;
-            background: linear-gradient(135deg, rgba(90,40,160,0.12) 0%, rgba(40,10,80,0.18) 100%);
-            border-bottom: 1px solid rgba(130,60,220,0.18);
-            position: relative;
-        }
-        .vex-block::before {
-            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-            background: linear-gradient(180deg, rgba(154,80,220,0.8), rgba(80,20,140,0.3));
-            border-radius: 0 2px 2px 0;
-        }
-        .vex-header {
-            display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
-        }
-        .vex-title {
-            font-family: 'Cinzel', serif; font-size: 0.65em;
-            letter-spacing: 2px; color: #9a50dc; text-transform: uppercase;
-            display: flex; align-items: center; gap: 5px;
-        }
-        .vex-title::before { content: '⚡'; font-size: 1.1em; }
-        .vex-values {
-            display: flex; align-items: baseline; gap: 4px;
-        }
-        .vex-current {
-            font-family: 'Cinzel', serif; font-size: 1.8em; color: #b070e8; line-height: 1;
-            text-shadow: 0 0 16px rgba(154,80,220,0.5);
-        }
-        .vex-sep { color: rgba(130,60,220,0.35); font-size: 1em; }
-        .vex-max { font-size: 0.75em; color: #6a3a9a; font-family: 'Cinzel', serif; }
-        .vex-ctrls { display: flex; gap: 5px; align-items: center; }
-        .vex-ctrl-btn {
-            background: rgba(154,80,220,0.1); border: 1px solid rgba(154,80,220,0.25);
-            border-radius: 5px; color: #9a50dc; font-size: 0.7em; font-weight: 700;
-            padding: 3px 8px; cursor: pointer; transition: all 0.12s; font-family: inherit;
-        }
-        .vex-ctrl-btn:hover { background: rgba(154,80,220,0.22); }
-        .vex-bar-track {
-            height: 6px; border-radius: 3px;
-            background: rgba(154,80,220,0.1); overflow: hidden;
-        }
-        .vex-bar-fill {
-            height: 100%; border-radius: 3px;
-            background: linear-gradient(90deg, #6a20c0, #b070e8);
-            box-shadow: 0 0 8px rgba(154,80,220,0.5);
-            transition: width 0.4s ease;
-        }
-        .vex-formula { font-size: 0.58em; color: #3a2a58; margin-top: 5px; font-family: monospace; }
-
-        /* ── Pushes VEX/Guarda ── */
-        .pushes-block {
-            padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
-        .pushes-title {
-            font-size: 0.58em; letter-spacing: 2px; text-transform: uppercase;
-            color: #3a3a58; font-weight: 700; margin-bottom: 10px;
-        }
-        .push-card {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 10px 12px; border-radius: 8px; margin-bottom: 6px;
-            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
-            gap: 10px;
-        }
-        .push-card-left { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-        .push-card-name {
-            font-size: 0.75em; font-weight: 600; color: #9090b0;
-            display: flex; align-items: center; gap: 6px;
-        }
-        .push-dots { display: flex; gap: 3px; }
-        .push-dot { width: 7px; height: 7px; border-radius: 50%; }
-        .push-dot.used { background: #d4af37; box-shadow: 0 0 4px rgba(212,175,55,0.5); }
-        .push-dot.avail { background: rgba(212,175,55,0.15); border: 1px solid rgba(212,175,55,0.3); }
-        .push-card-sub { font-size: 0.65em; color: #4a4a68; }
-        .push-card-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-        .push-count { font-size: 0.62em; color: #3a3a58; }
-        .push-cd-txt { font-size: 0.65em; color: #e09040; }
-
-        /* ── Pushes HEX ── */
-        .hex-pushes-block {
-            padding: 16px 20px;
-            background: linear-gradient(180deg, rgba(212,175,55,0.03) 0%, transparent 100%);
-            border-bottom: 1px solid rgba(212,175,55,0.1);
-        }
-        .hex-pushes-title {
-            display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
-        }
-        .hex-pushes-title-line {
-            flex: 1; height: 1px; background: linear-gradient(90deg, rgba(212,175,55,0.3), transparent);
-        }
-        .hex-pushes-title-line.rev {
-            background: linear-gradient(90deg, transparent, rgba(212,175,55,0.3));
-        }
-        .hex-pushes-title-txt {
-            font-family: 'Cinzel', serif; font-size: 0.6em;
-            letter-spacing: 2.5px; color: #d4af37; text-transform: uppercase;
-        }
-        .hex-push-cards {
-            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
-        }
-        .hex-pcard {
-            background: rgba(212,175,55,0.04); border: 1px solid rgba(212,175,55,0.18);
-            border-radius: 10px; padding: 12px 8px; text-align: center;
-            transition: all 0.15s; position: relative; overflow: hidden;
-        }
-        .hex-pcard.avail {
-            border-color: rgba(212,175,55,0.4); background: rgba(212,175,55,0.08);
-        }
-        .hex-pcard.avail::before {
-            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-            background: linear-gradient(90deg, transparent, rgba(212,175,55,0.6), transparent);
-        }
-        .hex-pcard-label {
-            font-size: 0.58em; color: #7a6a30; letter-spacing: 1px;
-            text-transform: uppercase; font-weight: 700; margin-bottom: 6px;
-        }
-        .hex-pcard-amt {
-            font-family: 'Cinzel', serif; font-size: 1.1em; color: #d4af37;
-            font-weight: 700; margin-bottom: 4px;
-            text-shadow: 0 0 12px rgba(212,175,55,0.3);
-        }
-        .hex-pcard-cd { font-size: 0.58em; color: #4a4a58; margin-bottom: 8px; min-height: 13px; }
-        .hex-pcard-btn {
-            width: 100%; background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.3);
-            border-radius: 6px; color: #d4af37; font-size: 0.68em; font-weight: 700;
-            padding: 6px 4px; cursor: pointer; transition: all 0.15s; font-family: 'Cinzel', serif;
-            letter-spacing: 0.5px;
-        }
-        .hex-pcard-btn:hover:not(:disabled) { background: rgba(212,175,55,0.25); border-color: rgba(212,175,55,0.6); }
-        .hex-pcard-btn:disabled { opacity: 0.3; cursor: default; }
-        .hex-pcard-input {
-            width: 52px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 4px; color: #d4af37; font-size: 0.78em; padding: 3px 4px;
-            font-weight: 700; text-align: center; font-family: 'Cinzel', serif; margin-bottom: 5px;
-        }
-
-        /* ── Historial ── */
-        .hlog-block { padding: 14px 20px; }
-        .hlog-title {
-            font-size: 0.58em; letter-spacing: 2px; text-transform: uppercase;
-            color: #3a3a58; font-weight: 700; margin-bottom: 10px;
-        }
-        .hlog-item {
-            display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-            background: rgba(255,255,255,0.02); border-radius: 7px;
-            border: 1px solid rgba(255,255,255,0.04); margin-bottom: 5px;
-        }
-        .hlog-chip {
-            font-size: 0.6em; font-weight: 700; letter-spacing: 0.5px;
-            padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
-        }
-        .hlog-chip.asistencia { background:rgba(62,207,110,0.1);color:#3ecf6e;border:1px solid rgba(62,207,110,0.2); }
-        .hlog-chip.turno_extra { background:rgba(74,179,232,0.1);color:#4ab3e8;border:1px solid rgba(74,179,232,0.2); }
-        .hlog-chip.contenido { background:rgba(212,175,55,0.1);color:#d4af37;border:1px solid rgba(212,175,55,0.2); }
-        .hlog-amt { font-family: 'Cinzel', serif; font-size: 0.9em; color: #d4af37; font-weight: 700; min-width: 44px; }
-        .hlog-time { font-size: 0.64em; color: #3a3a58; flex: 1; }
-        .hlog-nota { font-size: 0.66em; color: #5a5a78; }
-        .hlog-del { background:none;border:none;color:#2e2e48;font-size:0.9em;cursor:pointer;padding:2px 5px;border-radius:3px;transition:color 0.15s; }
-        .hlog-del:hover { color: #c44; }
-
-        /* ── Imagen ── */
-        .img-block { padding: 0 20px 20px; }
+    .htab-root{font-family:'Inter',system-ui,sans-serif;}
+    .htab-hero{padding:36px 24px 24px;text-align:center;background:radial-gradient(ellipse 100% 80% at 50% -5%,rgba(212,175,55,0.08) 0%,transparent 65%),linear-gradient(180deg,#09070f 0%,#060410 100%);border-bottom:1px solid rgba(212,175,55,0.1);}
+    .htab-hero-sub{font-size:0.52em;letter-spacing:4px;text-transform:uppercase;color:rgba(212,175,55,0.35);margin-bottom:20px;}
+    .htab-hex-amount{font-family:'Cinzel',serif;font-size:3.2em;color:#d4af37;letter-spacing:3px;line-height:1;text-shadow:0 0 30px rgba(212,175,55,0.3),0 2px 10px rgba(0,0,0,0.9);margin:12px 0 24px;}
+    .htab-btn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;max-width:460px;margin:0 auto 5px;}
+    .htab-btn{background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.14);border-radius:7px;color:#b8882a;font-size:0.73em;font-weight:700;padding:8px 2px;cursor:pointer;transition:all 0.13s;font-family:inherit;}
+    .htab-btn:hover{background:rgba(212,175,55,0.13);border-color:rgba(212,175,55,0.35);color:#d4af37;}
+    .htab-btn.neg{color:#c05050;border-color:rgba(190,60,60,0.2);background:rgba(190,60,60,0.05);}
+    .htab-btn.neg:hover{background:rgba(190,60,60,0.13);border-color:rgba(190,60,60,0.38);}
+    .htab-push-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+    .htab-pcard{background:rgba(212,175,55,0.04);border:1px solid rgba(212,175,55,0.15);border-radius:10px;padding:16px 10px 12px;text-align:center;transition:all 0.18s;position:relative;overflow:hidden;}
+    .htab-pcard.on{background:rgba(212,175,55,0.08);border-color:rgba(212,175,55,0.38);box-shadow:0 0 18px rgba(212,175,55,0.06);}
+    .htab-pcard.on::after{content:'';position:absolute;top:0;left:15%;right:15%;height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.65),transparent);}
+    .htab-pcard-lbl{font-size:0.57em;letter-spacing:1.5px;text-transform:uppercase;color:rgba(212,175,55,0.4);font-weight:700;margin-bottom:9px;}
+    .htab-pcard-amt{font-family:'Cinzel',serif;font-size:1.3em;color:#d4af37;font-weight:700;line-height:1;margin-bottom:6px;}
+    .htab-pcard-cd{font-size:0.59em;color:#3a3a58;min-height:15px;margin-bottom:10px;}
+    .htab-pcard-btn{width:100%;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.26);border-radius:6px;color:#d4af37;font-family:'Cinzel',serif;font-size:0.68em;font-weight:700;padding:7px 4px;cursor:pointer;transition:all 0.14s;letter-spacing:0.5px;}
+    .htab-pcard-btn:hover:not(:disabled){background:rgba(212,175,55,0.2);border-color:rgba(212,175,55,0.55);}
+    .htab-pcard-btn:disabled{opacity:0.25;cursor:default;}
+    .htab-pcard-input{width:62px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:5px;color:#d4af37;font-size:0.82em;padding:4px 5px;font-family:'Cinzel',serif;font-weight:700;text-align:center;margin-bottom:8px;}
+    .htab-hlog{display:flex;align-items:center;gap:9px;padding:9px 12px;background:rgba(255,255,255,0.018);border-radius:8px;border:1px solid rgba(255,255,255,0.04);margin-bottom:5px;}
+    .htab-chip{font-size:0.59em;font-weight:700;letter-spacing:0.5px;padding:2px 9px;border-radius:10px;flex-shrink:0;white-space:nowrap;}
+    .htab-chip-a{background:rgba(62,207,110,0.1);color:#3ecf6e;border:1px solid rgba(62,207,110,0.22);}
+    .htab-chip-t{background:rgba(74,179,232,0.1);color:#4ab3e8;border:1px solid rgba(74,179,232,0.22);}
+    .htab-chip-c{background:rgba(212,175,55,0.1);color:#d4af37;border:1px solid rgba(212,175,55,0.22);}
+    .htab-hamt{font-family:'Cinzel',serif;font-size:0.88em;color:#d4af37;font-weight:700;min-width:46px;}
+    .htab-htime{font-size:0.62em;color:#3a3a58;flex:1;}
+    .htab-hdel{background:none;border:none;color:#2e2e48;font-size:0.88em;cursor:pointer;padding:2px 5px;border-radius:3px;transition:color 0.13s;}
+    .htab-hdel:hover{color:#c44;}
     </style>
-    <div class="hex-tab-root">
+    <div class="htab-root">
 
-    <!-- ═══ HEX HERO ═══ -->
-    <div class="hex-hero">
-        <div class="hex-svg-wrap">
-            <svg width="160" height="140" viewBox="0 0 120 104" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <polygon points="60,3 112,30 112,74 60,101 8,74 8,30" stroke="rgba(212,175,55,0.25)" stroke-width="1.5"/>
-                <polygon points="60,15 100,37 100,67 60,89 20,67 20,37" stroke="rgba(212,175,55,0.1)" stroke-width="1"/>
-                <polygon points="60,28 88,44 88,60 60,76 32,60 32,44" stroke="rgba(212,175,55,0.06)" stroke-width="1"/>
-                <!-- rayos decorativos en las esquinas -->
-                <line x1="60" y1="3" x2="60" y2="0" stroke="rgba(212,175,55,0.2)" stroke-width="1"/>
-                <line x1="112" y1="30" x2="115" y2="28" stroke="rgba(212,175,55,0.2)" stroke-width="1"/>
-                <line x1="112" y1="74" x2="115" y2="76" stroke="rgba(212,175,55,0.2)" stroke-width="1"/>
-            </svg>
-            <div class="hex-inner-val">
-                <span class="hex-label">Saldo HEX</span>
-                <span class="hex-amount">${(p.hex||0).toLocaleString()}</span>
-            </div>
-        </div>
+    <div class="htab-hero">
+        <div class="htab-hero-sub">Panel de Recursos</div>
+        <svg style="display:block;margin:0 auto" width="100" height="88" viewBox="0 0 100 88" fill="none">
+            <polygon points="50,2 94,25 94,63 50,86 6,63 6,25" stroke="rgba(212,175,55,0.2)" stroke-width="1.2"/>
+            <polygon points="50,13 83,31 83,57 50,75 17,57 17,31" stroke="rgba(212,175,55,0.09)" stroke-width="0.8"/>
+            <line x1="50" y1="2" x2="50" y2="8" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="94" y1="25" x2="89" y2="28" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="94" y1="63" x2="89" y2="60" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="50" y1="86" x2="50" y2="80" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="6" y1="63" x2="11" y2="60" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="6" y1="25" x2="11" y2="28" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <div class="htab-hex-amount">${(p.hex||0).toLocaleString()}</div>
+        ${canEdit?`
+        <div class="htab-btn-grid">${deltas.map(d=>`<button class="htab-btn neg" onclick="window.modStat('${safe}','hex',${-d})">−${d}</button>`).join('')}</div>
+        <div class="htab-btn-grid" style="margin-top:5px;">${deltas.map(d=>`<button class="htab-btn" onclick="window.modStat('${safe}','hex',${d})">+${d}</button>`).join('')}</div>
+        `:''}
     </div>
 
-    <!-- Botones +/- HEX -->
-    ${canEdit?`<div class="hex-btns-wrap" style="padding-top:14px;">
-        <div class="hex-btns-row">
-            ${deltas.map(d=>`<button class="hex-btn neg" onclick="window.modStat('${safe}','hex',${-d})">−${d}</button>`).join('')}
-        </div>
-        <div class="hex-btns-row">
-            ${deltas.map(d=>`<button class="hex-btn" onclick="window.modStat('${safe}','hex',${d})">+${d}</button>`).join('')}
-        </div>
-    </div>`:''}
+    ${vexHtml}
 
-    <!-- ═══ VEX ═══ -->
-    ${s.vex_max>0?`<div class="vex-block">
-        <div class="vex-header">
-            <span class="vex-title">VEX</span>
-            <div style="display:flex;align-items:center;gap:8px;">
-                ${canEdit?`<button class="vex-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',-50)">−50</button>`:''}
-                <div class="vex-values">
-                    <span class="vex-current">${Math.floor(p.vex_actual||0)}</span>
-                    <span class="vex-sep">/</span>
-                    <span class="vex-max">${s.vex_max}</span>
-                </div>
-                ${canEdit?`<button class="vex-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',50)">+50</button>`:''}
-            </div>
+    ${estadoUI.esAdmin?`
+    <div style="padding:22px 24px;border-bottom:1px solid rgba(212,175,55,0.07);">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(212,175,55,0.22),transparent);"></div>
+            <span style="font-family:'Cinzel',serif;font-size:0.58em;letter-spacing:2.5px;color:rgba(212,175,55,0.55);text-transform:uppercase;white-space:nowrap;">Pushes de HEX</span>
+            <div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.22));"></div>
         </div>
-        <div class="vex-bar-track"><div class="vex-bar-fill" style="width:${pctVex}%"></div></div>
-        <div class="vex-formula">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
-    </div>`:''}
-
-    <!-- ═══ PUSHES VEX / GUARDA ═══ -->
-    ${(s.vex_max>0||s.guarda_max>0)?`<div class="pushes-block">
-        <div class="pushes-title">Pushes</div>
-        ${_push('vex','VEX','⚡')}
-        ${_push('guarda','Guarda','🛡')}
-    </div>`:''}
-
-    <!-- ═══ PUSHES DE HEX ═══ -->
-    ${estadoUI.esAdmin?`<div class="hex-pushes-block">
-        <div class="hex-pushes-title">
-            <div class="hex-pushes-title-line"></div>
-            <span class="hex-pushes-title-txt">Pushes de HEX</span>
-            <div class="hex-pushes-title-line rev"></div>
-        </div>
-        <div class="hex-push-cards">
+        <div class="htab-push-grid">
             ${_pushCard('asistencia','Asistencia',300,cdA>=24,_cdRest(cdA,24)+' · diario')}
             ${_pushCard('turno_extra','Turno Extra',500,cdT>=72,_cdRest(cdT,72)+' · c/3 días')}
             ${_pushCard('contenido','Contenido','100–1000',cdC>=72,_cdRest(cdC,72)+' · c/3 días')}
         </div>
     </div>`:''}
 
-    <!-- ═══ HISTORIAL ═══ -->
-    <div class="hlog-block">
-        <div class="hlog-title">Historial de pushes</div>
-        ${histHTML}
+    <div style="padding:22px 24px;">
+        <div style="font-size:0.52em;letter-spacing:2.5px;text-transform:uppercase;color:#3a3a58;font-weight:700;margin-bottom:14px;">Historial de Pushes</div>
+        ${historial.length===0
+            ? `<div style="text-align:center;color:#2a2a48;font-size:0.7em;padding:24px 0;">Sin registros</div>`
+            : historial.map(h=>{
+                const cls={asistencia:'htab-chip-a',turno_extra:'htab-chip-t',contenido:'htab-chip-c'}[h.tipo]||'';
+                const lbl={asistencia:'Asistencia',turno_extra:'Turno extra',contenido:'Contenido'}[h.tipo]||h.tipo;
+                return `<div class="htab-hlog">
+                    <span class="htab-chip ${cls}">${lbl}</span>
+                    <span class="htab-hamt">+${h.cantidad.toLocaleString()}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div class="htab-htime">${_tiempoRelativo(h.created_at)}</div>
+                        ${h.nota?`<div style="font-size:0.63em;color:#5a5a78;">${h.nota}</div>`:''}
+                    </div>
+                    ${estadoUI.esAdmin?`<button class="htab-hdel" onclick="window._ppjDeleteHexLog(${h.id},'${safe}')">✕</button>`:''}
+                </div>`;
+              }).join('')}
     </div>
 
-    <!-- ═══ IMAGEN ═══ -->
-    ${(estadoUI.esAdmin||!p.isPlayer)?`<div class="img-block">
+    ${(estadoUI.esAdmin||!p.isPlayer)?`
+    <div style="padding:0 24px 28px;">
+        <div style="font-size:0.52em;letter-spacing:2.5px;text-transform:uppercase;color:#3a3a58;font-weight:700;margin-bottom:12px;">Imagen del Personaje</div>
         <div class="ppj-img-wrap" onclick="window.abrirSubirImagen('${safe}')">
             <img class="ppj-img-preview" src="${_imgPj(p.iconoOverride||nombre)}"
                  onerror="this.onerror=null;this.src='${_fallback()}'">
