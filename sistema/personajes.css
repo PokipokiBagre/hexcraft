@@ -282,9 +282,17 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .pjc-afin-row { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
 .pjc-afin-lbl { width: 26px; font-size: 0.64em; text-align: right; color: var(--dim); }
 .pjc-afin-mayor { color: var(--gold-dim) !important; }
-.pjc-afin-track { flex: 1; height: 2px; background: var(--bg4); border-radius: 1px; overflow: hidden; }
-.pjc-afin-fill { height: 100%; background: rgba(255,255,255,0.2); border-radius: 1px; }
+.pjc-afin-track { flex: 1; height: 4px; background: var(--bg4); border-radius: 2px; overflow: hidden; }
+.pjc-afin-fill { height: 100%; background: rgba(255,255,255,0.2); border-radius: 2px; }
 .pjc-fill-mayor { background: var(--gold); }
+/* Barra segmentada 4 colores: B · Hz · Ext · Alt */
+.pjc-afin-seg { display: flex; gap: 1px; height: 4px; border-radius: 2px; overflow: hidden; }
+.pjc-seg { height: 100%; transition: width 0.3s; }
+.pjc-seg-b     { background: #6496ff; }
+.pjc-seg-hz    { background: #50c88c; }
+.pjc-seg-ext   { background: #d4af37; }
+.pjc-seg-alt   { background: #e08080; }
+.pjc-seg-empty { background: rgba(255,255,255,0.06); }
 .pjc-afin-val { width: 22px; font-size: 0.64em; text-align: right; color: var(--dim); }
 
 .empty-state { padding: 60px 20px; text-align: center; color: var(--dim); grid-column: 1/-1; }

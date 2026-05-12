@@ -103,20 +103,33 @@ export function renderCatalogo() {
 
         // ── Collapsed detail section ──────────────────────────
         const maxAfin = Math.max(1, ...AFINIDADES.map(a =>
-            (p.afinidadesBase?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0)
+            (p.afin_base?.[a.key]||p.afinidadesBase?.[a.key]||0)
+            +(p.afin_hcz?.[a.key]||0)
+            +(p.afinidadesBf?.[a.key]||0)
+            +(p.afinidadesEf?.[a.key]||0)
         ));
         const afinBars = AFINIDADES.map(a => {
-            const base  = p.afinidadesBase?.[a.key] || 0;
-            const bf    = p.afinidadesBf?.[a.key]   || 0;
-            const ef    = p.afinidadesEf?.[a.key]   || 0;
-            const total = base + bf + ef;
+            const base  = p.afin_base?.[a.key]   || p.afinidadesBase?.[a.key] || 0;
+            const hz    = p.afin_hcz?.[a.key]    || 0;
+            const extra = p.afinidadesBf?.[a.key] || 0;
+            const alter = p.afinidadesEf?.[a.key] || 0;
+            const total = base + hz + extra + alter;
             const esMayor = mayor?.key === a.key;
-            const pct = Math.round(total / maxAfin * 100);
-            return `<div class="pjc-afin-row">
+            const tip = `Total: ${total}  ·  B: ${base}  ·  Hz: ${hz}  ·  Ext: ${extra>=0?'+':''}${extra}  ·  Alt: ${alter>=0?'+':''}${alter}`;
+            const pBase  = total > 0 ? (base  / maxAfin * 100) : 0;
+            const pHz    = total > 0 ? (hz    / maxAfin * 100) : 0;
+            const pExtra = total > 0 ? (extra / maxAfin * 100) : 0;
+            const pAlter = total > 0 ? (alter / maxAfin * 100) : 0;
+            const segBar = `<div class="pjc-afin-track pjc-afin-seg" title="${tip}">`
+                + (pBase  > 0 ? `<div class="pjc-seg pjc-seg-b"   style="width:${pBase.toFixed(1)}%"></div>`  : '')
+                + (pHz    > 0 ? `<div class="pjc-seg pjc-seg-hz"  style="width:${pHz.toFixed(1)}%"></div>`   : '')
+                + (pExtra > 0 ? `<div class="pjc-seg pjc-seg-ext" style="width:${pExtra.toFixed(1)}%"></div>` : '')
+                + (pAlter > 0 ? `<div class="pjc-seg pjc-seg-alt" style="width:${pAlter.toFixed(1)}%"></div>` : '')
+                + (total === 0 ? `<div class="pjc-seg pjc-seg-empty" style="width:100%"></div>` : '')
+                + `</div>`;
+            return `<div class="pjc-afin-row" title="${tip}">
                 <span class="pjc-afin-lbl ${esMayor?'pjc-afin-mayor':''}">${a.abr}</span>
-                <div class="pjc-afin-track">
-                    <div class="pjc-afin-fill ${esMayor?'pjc-fill-mayor':''}" style="width:${pct}%"></div>
-                </div>
+                ${segBar}
                 <span class="pjc-afin-val ${esMayor?'pjc-afin-mayor':''}">${total}</span>
             </div>`;
         }).join('');

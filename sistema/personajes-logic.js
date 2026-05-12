@@ -11,7 +11,7 @@ import { AFINIDADES, formulas, pushFormulas, pushUmbrales, pushCooldown, persona
 export function buildContext(p) {
     // Soporta tanto nuevo schema (afin_base/afin_extra/afin_alter) como legacy
     const af = p.afin_base  || p.afinidadesBase || {};
-    const hz = {};  // Hz afin ya no existe como columna separada
+    const hz = p.afin_hcz  || {};  // afinidades calculadas desde hechizos del inventario (solo lectura)
     const ef = p.afin_alter || p.afinidadesEf   || {};
     const bf = p.afin_extra || p.afinidadesBf   || {};
 
@@ -188,7 +188,7 @@ export function calcularCooldownPush(p, recurso) {
 export function getMayorAfinidad(p) {
     let max = -1, mayor = null;
     AFINIDADES.forEach(a => {
-        const v = (p.afinidadesBase?.[a.key]||0)+(p.afinidadesHz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0);
+        const v = (p.afinidadesBase?.[a.key]||0)+(p.afin_hcz?.[a.key]||0)+(p.afinidadesEf?.[a.key]||0)+(p.afinidadesBf?.[a.key]||0);
         if (v > max) { max = v; mayor = a; }
     });
     return max > 0 ? mayor : null;
@@ -249,9 +249,11 @@ export function mapPersonaje(row) {
         afin_alter: { ..._afin0, ...afinAlter },
         // Alias legacy para compatibilidad con buildContext y renderCatalogo
         afinidadesBase: { ..._afin0, ...afinBase  },
-        afinidadesHz:   { ..._afin0 },   // Hz afin ya no existe como columna separada
+        afinidadesHz:   { ..._afin0, ...(row.afin_hcz && typeof row.afin_hcz === 'object' ? row.afin_hcz : {}) },
         afinidadesEf:   { ..._afin0, ...afinAlter },
         afinidadesBf:   { ..._afin0, ...afinExtra },
+        // afin_hcz: afinidades calculadas desde inventario de hechizos (solo lectura, calculado por DB)
+        afin_hcz: { ..._afin0, ...(row.afin_hcz && typeof row.afin_hcz === 'object' ? row.afin_hcz : {}) },
         // Bonos de stats calculados (del trigger o manual)
         bonos_stats: bonos,
         bono_vida_roja: bonos.vida_roja || 0,
