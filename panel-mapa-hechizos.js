@@ -17,6 +17,8 @@ const COLOR_APR    = 'rgba(236, 213, 154, 0.95)';   // dorado  — aprendible (t
 const COLOR_RASTR  = 'rgba(120, 110, 150, 0.6)';    // gris-vio — descubierto pero precedentes incompletos
 const COLOR_NUEVO  = '#00ffff';                      // celeste — nodo recién creado (OP)
 const COLOR_PJ     = 'rgba(0, 220, 255, 0.95)';     // celeste — hechizo poseído por el PJ activo
+const COLOR_TEMP   = 'rgba(255, 210, 60, 0.95)';    // amarillo — hechizo temporal del PJ
+const COLOR_LINEA_TEMP = 'rgba(255, 200, 40, 0.55)'; // amarillo — enlace entre temporales
 const COLOR_ENFOQ_PREV = 'rgba(210, 150, 80, 0.78)';  // naranja suave — precedentes
 const COLOR_ENFOQ_NEXT = 'rgba(80, 220, 130, 0.95)'; // verde   — salientes del nodo seleccionado
 const COLOR_FONDO  = '#05000a';
@@ -40,6 +42,7 @@ let _estado = {
     parciales:     new Set(),    // esConocido=true pero ≥1 precedente no descubierto
     // Sets del PJ seleccionado (para anillo extra)
     posesiones:    new Set(),
+    temporales:    new Set(),   // subconjunto de posesiones — es_temporal=true
     rastreo:       new Set(),
     camara:        { x: 0, y: 0, zoom: 0.6 },
     drag:          { activo: false, lastX: 0, lastY: 0, nodo: null },
@@ -365,23 +368,29 @@ async function _cargarDatos() {
 async function _cargarInventarioPJ(nombre) {
     if (!nombre || nombre === 'Todos') {
         _estado.posesiones = new Set();
+        _estado.temporales = new Set();
         _estado.rastreo    = new Set();
         return;
     }
 
     const { data } = await supabase
         .from('hechizos_inventario')
-        .select('hechizo_nombre')
+        .select('hechizo_nombre, es_temporal')
         .eq('personaje_nombre', nombre);
 
-    const inv = new Set((data || []).map(h => h.hechizo_nombre.toLowerCase().trim()));
+    const inv     = new Map((data || []).map(h => [h.hechizo_nombre.toLowerCase().trim(), !!h.es_temporal]));
 
-    // posesiones = hechizos que tiene el PJ (para el anillo extra en el mapa)
+    // posesiones = todos los hechizos del PJ
     _estado.posesiones = new Set();
+    _estado.temporales = new Set();
     _estado.nodos.forEach(n => {
         const nom = (n.nombre || '').toLowerCase().trim();
         const id  = (n.id    || '').toLowerCase().trim();
-        if (inv.has(nom) || inv.has(id)) _estado.posesiones.add(n);
+        const key = inv.has(nom) ? nom : inv.has(id) ? id : null;
+        if (key !== null) {
+            _estado.posesiones.add(n);
+            if (inv.get(key)) _estado.temporales.add(n);
+        }
     });
 
     // Rastreo recursivo hacia atrás desde posesiones (para mostrar camino)
@@ -577,6 +586,8 @@ function _dibujar() {
         const tA = aprendibles.has(e.target);
         const sP = posesiones.has(e.source);
         const tP = posesiones.has(e.target);
+        const sT = _estado.temporales.has(e.source);
+        const tT = _estado.temporales.has(e.target);
 
         if (hayEnfoque) {
             // Modo enfoque: resaltar toda la cadena de ancestros y salientes
@@ -591,8 +602,9 @@ function _dibujar() {
                 color = 'rgba(160,155,175,0.25)'; lw = 0.8 / sf;
             }
         } else if (sP && tP) {
-            // Ambos son posesión del PJ → celeste
-            color = COLOR_LINEA_PJ; lw = 2.0 / sf;
+            // Ambos son posesión del PJ
+            if (sT && tT) { color = COLOR_LINEA_TEMP; lw = 2.0 / sf; }  // ambos temporales → amarillo
+            else           { color = COLOR_LINEA_PJ;   lw = 2.0 / sf; }  // al menos uno oficial → celeste
         } else if (sP || tP) {
             // Uno solo del PJ → celeste tenue
             color = 'rgba(0,200,240,0.3)'; lw = 1.2 / sf;
@@ -657,6 +669,7 @@ function _dibujar() {
         const esPar      = parciales.has(nodo);
         // Sets del PJ seleccionado
         const esPosesion = posesiones.has(nodo);
+        const esTemporal = _estado.temporales.has(nodo);   // ← temporal
         const esSeleccionado = nodoSeleccionado === nodo;
         const esNuevo    = nodo.esNuevo;
 
@@ -676,8 +689,8 @@ function _dibujar() {
             colorTexto  = COLOR_NUEVO;
         } else if (hayEnfoque) {
             if (esEnfocado) {
-                // El seleccionado mantiene su color normal pero brillante
-                colorNucleo = esDes ? COLOR_POS : esApr ? COLOR_APR : esPosesion ? COLOR_PJ : 'rgba(200,195,220,0.95)';
+                // El seleccionado mantiene su color normal (temporal → amarillo)
+                colorNucleo = esDes ? COLOR_POS : esApr ? COLOR_APR : esPosesion ? (esTemporal ? COLOR_TEMP : COLOR_PJ) : 'rgba(200,195,220,0.95)';
                 colorTexto  = colorNucleo;
             } else if (esPrecedente) {
                 colorNucleo = COLOR_ENFOQ_PREV;
@@ -691,9 +704,9 @@ function _dibujar() {
                 colorTexto  = 'rgba(130,125,145,0.7)';
             }
         } else if (esPosesion && !esTodos) {
-            // Hechizo del PJ: celeste vibrante
-            colorNucleo = COLOR_PJ;
-            colorTexto  = COLOR_PJ;
+            // Hechizo del PJ: amarillo si temporal, celeste si oficial
+            colorNucleo = esTemporal ? COLOR_TEMP : COLOR_PJ;
+            colorTexto  = esTemporal ? COLOR_TEMP : COLOR_PJ;
         } else if (esTodos) {
             colorNucleo = esDes ? COLOR_POS : esApr ? COLOR_APR : 'rgba(100,95,130,0.7)';
             colorTexto  = esDes ? COLOR_POS : esApr ? COLOR_APR : 'rgba(160,155,175,0.9)';
@@ -754,15 +767,26 @@ function _dibujar() {
             ctx.shadowBlur = 0;
         }
 
-        // Halo celeste de posesión PJ (solo cuando no hay enfoque)
+        // Halo de posesión PJ (solo cuando no hay enfoque)
         if (esPosesion && !esTodos && !hayEnfoque) {
+            const glowColor   = esTemporal ? 'rgba(255,200,40,0.7)'  : 'rgba(0,210,255,0.7)';
+            const shadowColor = esTemporal ? 'rgba(255,200,40,0.6)'  : 'rgba(0,210,255,0.6)';
             _forma(8/sf);
             ctx.shadowBlur = 12;
-            ctx.shadowColor = 'rgba(0,210,255,0.6)';
-            ctx.strokeStyle = 'rgba(0,210,255,0.7)';
+            ctx.shadowColor = shadowColor;
+            ctx.strokeStyle = glowColor;
             ctx.lineWidth = 2.5/sf;
             ctx.stroke();
             ctx.shadowBlur = 0;
+            // Anillo punteado extra para temporales
+            if (esTemporal) {
+                _forma(13/sf);
+                ctx.strokeStyle = 'rgba(255,200,40,0.35)';
+                ctx.lineWidth = 1.5/sf;
+                ctx.setLineDash([4/sf, 3/sf]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
         }
 
         // Halos de enfoque (precedentes / salientes)
