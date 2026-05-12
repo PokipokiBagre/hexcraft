@@ -302,11 +302,8 @@ export function cerrarPanelPJ() {
         Object.values(window._ppjResetIntervals).forEach(id => clearInterval(id));
         window._ppjResetIntervals = {};
     }
-    // Limpiar partículas HEX
-    if (window._ppjParticleRAF) {
-        cancelAnimationFrame(window._ppjParticleRAF);
-        window._ppjParticleRAF = null;
-    }
+    // Las instancias de partículas se auto-detienen cuando su canvas
+    // sale del DOM (comprueban canvas.isConnected en cada frame)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1045,67 +1042,72 @@ async function _tabHex(nombre, body) {
 // Puntos y brillos que suben — algunos son hexágonos diminutos.
 // Velocidad escala con el valor de HEX del personaje.
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// PARTÍCULAS ANIMADAS EN EL HERO HEX
+// Una instancia por personaje. Si el canvas ya tiene loop activo
+// solo actualiza la velocidad — no reinicia las partículas.
+// ─────────────────────────────────────────────────────────────
+window._ppjParticleInstances = window._ppjParticleInstances || {};
+
 function _startHexParticles(normNombre, hexVal) {
-    const canvas = document.getElementById('ppj-hex-particles-' + normNombre);
+    const canvasId = 'ppj-hex-particles-' + normNombre;
+    const canvas   = document.getElementById(canvasId);
     if (!canvas) return;
 
-    // Limpiar loop anterior si existe
-    if (window._ppjParticleRAF) cancelAnimationFrame(window._ppjParticleRAF);
+    // Si ya hay una instancia viva para este ID, solo actualizamos hexVal
+    // y devolvemos — las partículas siguen corriendo sin reiniciarse
+    const existing = window._ppjParticleInstances[canvasId];
+    if (existing && existing.alive) {
+        existing.hexVal = hexVal;
+        existing.baseSpeed = _hexSpeedFactor(hexVal);
+        return;
+    }
 
     const ctx = canvas.getContext('2d');
 
     // Ajustar tamaño del canvas al contenedor
-    const resize = () => {
-        const rect = canvas.parentElement.getBoundingClientRect();
-        canvas.width  = rect.width  || 400;
-        canvas.height = rect.height || 280;
+    const hero = canvas.parentElement;
+    const setSize = () => {
+        const rect = hero.getBoundingClientRect();
+        canvas.width  = rect.width  || 440;
+        canvas.height = rect.height || 300;
     };
-    resize();
+    setSize();
 
     const W = () => canvas.width;
     const H = () => canvas.height;
 
-    // ── Velocidad según HEX ──────────────────────────────────
-    // 0–1000: muy lenta, 2000–3000: normal, 5000+: rápida, 10000+: ultra
-    const speedFactor = (hv) => {
-        if (hv <= 0)      return 0.12;
-        if (hv <= 1000)   return 0.15 + (hv / 1000) * 0.2;
-        if (hv <= 3000)   return 0.35 + ((hv - 1000) / 2000) * 0.4;
-        if (hv <= 5000)   return 0.75 + ((hv - 3000) / 2000) * 0.55;
-        if (hv <= 10000)  return 1.3  + ((hv - 5000) / 5000) * 1.2;
-        return 2.5 + Math.min((hv - 10000) / 5000, 1) * 1.5;
-    };
-    const BASE_SPEED = speedFactor(hexVal);
-
-    // Cantidad de partículas también escala (más HEX = más brillos)
     const COUNT = Math.max(18, Math.min(60, Math.floor(18 + hexVal / 300)));
 
-    // ── Tipos de partícula ────────────────────────────────────
-    // 85% puntos/glow, 15% hexágonos diminutos (casi imperceptibles)
+    const inst = {
+        alive:     true,
+        hexVal,
+        baseSpeed: _hexSpeedFactor(hexVal),
+        raf:       null,
+    };
+    window._ppjParticleInstances[canvasId] = inst;
+
     const makeParticle = () => {
         const isHex = Math.random() < 0.15;
         return {
-            x:      Math.random() * (W() || 400),
-            y:      (H() || 280) + Math.random() * 40,   // empieza bajo el canvas
-            size:   isHex
-                        ? (1.5 + Math.random() * 2.5)    // hexágono: 1.5–4px radio
-                        : (0.8 + Math.random() * 2),     // punto: 0.8–2.8px
-            speed:  BASE_SPEED * (0.4 + Math.random() * 1.2),
-            drift:  (Math.random() - 0.5) * 0.25,        // deriva lateral suave
-            alpha:  0.1 + Math.random() * 0.45,
-            alphaT: 0,                                    // phase para pulso
+            x:        Math.random() * (W() || 440),
+            y:        (H() || 300) + Math.random() * 40,
+            size:     isHex ? (1.5 + Math.random() * 2.5) : (0.8 + Math.random() * 2),
+            speedMul: 0.4 + Math.random() * 1.2,
+            drift:    (Math.random() - 0.5) * 0.25,
+            alpha:    0.1 + Math.random() * 0.45,
+            alphaT:   Math.random() * Math.PI * 2,
             alphaSpd: 0.01 + Math.random() * 0.025,
-            rot:    Math.random() * Math.PI * 2,          // solo hexágonos usan esto
-            rotSpd: (Math.random() - 0.5) * 0.012,
+            rot:      Math.random() * Math.PI * 2,
+            rotSpd:   (Math.random() - 0.5) * 0.012,
             isHex,
         };
     };
 
-    let particles = Array.from({ length: COUNT }, makeParticle);
-    // Distribuirlas verticalmente al inicio
-    particles.forEach(p => { p.y = Math.random() * (H() || 280); });
+    const particles = Array.from({ length: COUNT }, makeParticle);
+    // Distribuir verticalmente al inicio
+    particles.forEach(p => { p.y = Math.random() * (H() || 300); });
 
-    // ── Dibujar hexágono diminuto ─────────────────────────────
     const drawTinyHex = (x, y, r, rot, alpha) => {
         ctx.save();
         ctx.translate(x, y);
@@ -1113,42 +1115,43 @@ function _startHexParticles(normNombre, hexVal) {
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
             const a = (Math.PI / 3) * i;
-            const px = r * Math.cos(a), py = r * Math.sin(a);
-            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            i === 0 ? ctx.moveTo(r * Math.cos(a), r * Math.sin(a))
+                    : ctx.lineTo(r * Math.cos(a), r * Math.sin(a));
         }
         ctx.closePath();
         ctx.strokeStyle = `rgba(212,175,55,${alpha * 0.9})`;
         ctx.lineWidth = 0.6;
         ctx.stroke();
-        // leve fill interior
         ctx.fillStyle = `rgba(212,175,55,${alpha * 0.08})`;
         ctx.fill();
         ctx.restore();
     };
 
-    // ── Loop de animación ─────────────────────────────────────
     const loop = () => {
+        // Si el canvas ya no está en el DOM, parar definitivamente
+        if (!canvas.isConnected) {
+            inst.alive = false;
+            delete window._ppjParticleInstances[canvasId];
+            return;
+        }
+
         ctx.clearRect(0, 0, W(), H());
+        const bs = inst.baseSpeed; // leer cada frame para captar cambios de HEX
 
         particles.forEach(pt => {
-            // Movimiento
-            pt.y    -= pt.speed;
-            pt.x    += pt.drift;
-            pt.rot  += pt.rotSpd;
+            pt.y      -= pt.speedMul * bs;
+            pt.x      += pt.drift;
+            pt.rot    += pt.rotSpd;
             pt.alphaT += pt.alphaSpd;
 
-            // Alpha pulsante
-            const pulse = Math.sin(pt.alphaT) * 0.18;
-            const a = Math.max(0, Math.min(1, pt.alpha + pulse));
-
-            // Fade-out al acercarse a la cima
-            const fadeTop = Math.min(1, pt.y / 40);
-            const finalA = a * fadeTop;
+            const pulse  = Math.sin(pt.alphaT) * 0.18;
+            const a      = Math.max(0, Math.min(1, pt.alpha + pulse));
+            const fadeT  = Math.min(1, pt.y / 40);
+            const finalA = a * fadeT;
 
             if (pt.isHex) {
                 drawTinyHex(pt.x, pt.y, pt.size, pt.rot, finalA);
             } else {
-                // Punto con glow suave
                 const grd = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, pt.size * 2.5);
                 grd.addColorStop(0,   `rgba(240,210,100,${finalA})`);
                 grd.addColorStop(0.4, `rgba(212,175,55,${finalA * 0.55})`);
@@ -1157,24 +1160,31 @@ function _startHexParticles(normNombre, hexVal) {
                 ctx.arc(pt.x, pt.y, pt.size * 2.5, 0, Math.PI * 2);
                 ctx.fillStyle = grd;
                 ctx.fill();
-                // núcleo duro brillante
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, pt.size * 0.5, 0, Math.PI * 2);
                 ctx.fillStyle = `rgba(255,240,160,${finalA * 0.9})`;
                 ctx.fill();
             }
 
-            // Reciclar cuando sale por arriba o por los lados
             if (pt.y < -10 || pt.x < -20 || pt.x > W() + 20) {
                 Object.assign(pt, makeParticle());
                 pt.y = H() + 5;
             }
         });
 
-        window._ppjParticleRAF = requestAnimationFrame(loop);
+        inst.raf = requestAnimationFrame(loop);
     };
 
     loop();
+}
+
+function _hexSpeedFactor(hv) {
+    if (hv <= 0)      return 0.12;
+    if (hv <= 1000)   return 0.15 + (hv / 1000) * 0.2;
+    if (hv <= 3000)   return 0.35 + ((hv - 1000) / 2000) * 0.4;
+    if (hv <= 5000)   return 0.75 + ((hv - 3000) / 2000) * 0.55;
+    if (hv <= 10000)  return 1.3  + ((hv - 5000) / 5000) * 1.2;
+    return 2.5 + Math.min((hv - 10000) / 5000, 1) * 1.5;
 }
 // ─────────────────────────────────────────────────────────────
 function _tabStats(nombre) {
