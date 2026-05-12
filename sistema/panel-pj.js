@@ -458,7 +458,7 @@ function _barraSegs(actual, max, tipo, maxCells = 26) {
 // ─────────────────────────────────────────────────────────────
 // TAB: HEX
 // ─────────────────────────────────────────────────────────────
-async function _tabHex(nombre, body) {
+async function _tabHex(nombre, body, forceRefresh = false) {
     const p = personajes[nombre]; if (!p) { body.innerHTML = ''; return; }
     const safe = nombre.replace(/'/g, "\\'");
     const canEdit = estadoUI.esAdmin || !p.isPlayer;
@@ -467,7 +467,7 @@ async function _tabHex(nombre, body) {
     // Evita recrear el canvas y reiniciar las partículas en cada cambio de HEX
     const existingCanvas = body.querySelector('.htab-particle-canvas');
     const existingAmt    = body.querySelector('.htab-hex-amount');
-    if (existingCanvas && existingAmt) {
+    if (!forceRefresh && existingCanvas && existingAmt) {
         existingAmt.textContent = (p.hex || 0).toLocaleString();
         // Actualizar velocidad de partículas sin reiniciarlas
         const canvasId = existingCanvas.id;
@@ -2974,7 +2974,7 @@ window._ppjEjecutarHexPush = async (nombre, tipo, cantidad) => {
     window.renderCatalogo?.();
     window.mostrarToast?.(`✨ +${cantidad} HEX (${tipo.replace('_',' ')}) → ${nombre}`);
     const body = document.getElementById('ppj-body');
-    if (body) _tabHex(nombre, body);
+    if (body) _tabHex(nombre, body, true);
 };
 
 window._ppjDeleteHexLog = async (id, nombre) => {
@@ -2982,7 +2982,7 @@ window._ppjDeleteHexLog = async (id, nombre) => {
     if (!confirm('¿Eliminar este registro?')) return;
     await supabase.from('hex_push_log').delete().eq('id', id);
     const body = document.getElementById('ppj-body');
-    if (body) _tabHex(nombre, body);
+    if (body) _tabHex(nombre, body, true);
 };
 
 window._ppjToggleEquipar = async (personaje, objeto, equipar) => {
