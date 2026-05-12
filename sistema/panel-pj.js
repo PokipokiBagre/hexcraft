@@ -511,12 +511,66 @@ async function _tabHex(nombre, body) {
     const btnsN = deltas.map(d=>canEdit?`<button class="ppj-hex-btn neg" onclick="window.modStat('${safe}','hex',${-d})">−${d}</button>`:'').join('');
     const btnsP = deltas.map(d=>canEdit?`<button class="ppj-hex-btn" onclick="window.modStat('${safe}','hex',${d})">+${d}</button>`:'').join('');
 
+    // ── VEX + Pushes (van en la col-main junto con HEX) ──────────
+    const s = calcularStats(p);
+    const esJugador = p.isPlayer || p.npc_tipo === 'jugador';
+    const pctVex = s.vex_max>0?Math.min(100,Math.round((p.vex_actual||0)/s.vex_max*100)):0;
+
+    const _push = (recurso, label, emoji) => {
+        const hasMax = recurso==='vex'?s.vex_max>0:s.guarda_max>0; if (!hasMax) return '';
+        const disp   = calcularPushDisponibles(p, s, recurso);
+        const usados = recurso==='vex'?(p.push_vex_actual||0):(p.push_guarda_actual||0);
+        const rest   = Math.max(0, disp-usados);
+        const val    = calcularValorPush(p, recurso);
+        const cd     = calcularCooldownPush(p, recurso);
+        const canPush= rest>0 && cd.disponible;
+        const dots   = Array.from({length:Math.max(disp,1)},(_,i)=>
+            `<span class="ppj-dot ${i<usados?'used':'avail'}"></span>`).join('');
+        const cdTxt  = !cd.disponible
+            ? `<div class="ppj-push-cd">⏳ ${Math.floor(cd.restaSeg/60)}m ${String(cd.restaSeg%60).padStart(2,'0')}s</div>` : '';
+        return `<div class="ppj-push-block">
+            <div class="ppj-push-header"><span class="ppj-push-label">${emoji} ${label}</span><div class="ppj-push-dots">${dots}</div><span style="font-size:0.68em;color:#4a4a68;">${usados}/${disp}</span></div>
+            ${cdTxt}
+            <div class="ppj-push-info"><span class="ppj-push-valor">+${val} por push</span>
+                <button class="btn-push-pj" ${canPush?'':'disabled'} onclick="window.ejecutarPush('${safe}','${recurso}')">
+                    ${!cd.disponible?'Cooldown':(rest>0?`Push ${label}`:'Sin pushes')}</button>
+            </div>
+            ${estadoUI.esAdmin?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+                <span style="font-size:0.62em;color:#3a3a58;">Extra OP</span>
+                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',-1)">−</button>
+                <span style="font-size:0.75em;color:#888;">${recurso==='vex'?(p.push_vex_limit||0):(p.push_guarda_limit||0)}</span>
+                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',1)">+</button>
+                <button class="ppj-ctrl-btn" onclick="window.resetPushes('${safe}','${recurso}')" style="margin-left:4px;">↺</button>
+            </div>`:''}
+        </div>`;
+    };
+
+    const vexHtml = s.vex_max>0?`
+    <div class="ppj-section">
+        <div class="ppj-section-title">VEX</div>
+        <div class="ppj-vida-block">
+            <div class="ppj-vida-header"><span class="ppj-vida-label" style="color:#9a50dc;">VEX</span>
+                <div class="ppj-vida-ctrl">
+                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',-50)">−50</button>`:''}
+                    <span class="ppj-vida-xy"><span class="actual" style="color:#9a50dc;">${Math.floor(p.vex_actual||0)}</span><span class="sep">/</span><span class="maximo">${s.vex_max}</span></span>
+                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',50)">+50</button>`:''}
+                </div>
+            </div><div class="ppj-vex-bar"><div class="ppj-vex-fill" style="width:${pctVex}%"></div></div>
+        </div>
+        <div class="ppj-formula">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>
+    </div>
+    <div class="ppj-section"><div class="ppj-section-title">Pushes</div>
+        ${_push('vex','VEX','⚡')}${_push('guarda','Guarda','🛡')}
+        ${!s.vex_max&&!s.guarda_max?'<div class="ppj-empty" style="padding:8px 0;">Sin pushes disponibles</div>':''}
+    </div>`:'';
+
     body.innerHTML = `
     <div class="ppj-section">
         <div class="ppj-section-title">Saldo HEX</div>
         <div class="ppj-hex-val">${(p.hex||0).toLocaleString()}</div>
         ${canEdit?`<div class="ppj-hex-grid">${btnsN}</div><div class="ppj-hex-grid" style="margin-top:5px;">${btnsP}</div>`:''}
     </div>
+    ${vexHtml}
     ${estadoUI.esAdmin?`<div class="ppj-section">
         <div class="ppj-section-title">Pushes de HEX</div>
         <div class="ppj-hpush-grid">
@@ -575,34 +629,7 @@ function _tabStats(nombre) {
         </div>`;
     };
 
-    const _push = (recurso, label, emoji) => {
-        const hasMax = recurso==='vex'?s.vex_max>0:s.guarda_max>0; if (!hasMax) return '';
-        const disp = calcularPushDisponibles(p, s, recurso);
-        const usados = recurso==='vex'?(p.push_vex_actual||0):(p.push_guarda_actual||0);
-        const rest = Math.max(0, disp-usados);
-        const val = calcularValorPush(p, recurso);
-        const cd = calcularCooldownPush(p, recurso);
-        const canPush = rest>0 && cd.disponible;
-        const dots = Array.from({length:Math.max(disp,1)},(_,i)=>
-            `<span class="ppj-dot ${i<usados?'used':'avail'}"></span>`).join('');
-        const cdTxt = !cd.disponible
-            ? `<div class="ppj-push-cd">⏳ ${Math.floor(cd.restaSeg/60)}m ${String(cd.restaSeg%60).padStart(2,'0')}s</div>` : '';
-        return `<div class="ppj-push-block">
-            <div class="ppj-push-header"><span class="ppj-push-label">${emoji} ${label}</span><div class="ppj-push-dots">${dots}</div><span style="font-size:0.68em;color:#4a4a68;">${usados}/${disp}</span></div>
-            ${cdTxt}
-            <div class="ppj-push-info"><span class="ppj-push-valor">+${val} por push</span>
-                <button class="btn-push-pj" ${canPush?'':'disabled'} onclick="window.ejecutarPush('${safe}','${recurso}')">
-                    ${!cd.disponible?'Cooldown':(rest>0?`Push ${label}`:'Sin pushes')}</button>
-            </div>
-            ${estadoUI.esAdmin?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-                <span style="font-size:0.62em;color:#3a3a58;">Extra OP</span>
-                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',-1)">−</button>
-                <span style="font-size:0.75em;color:#888;">${recurso==='vex'?(p.push_vex_limit||0):(p.push_guarda_limit||0)}</span>
-                <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',1)">+</button>
-                <button class="ppj-ctrl-btn" onclick="window.resetPushes('${safe}','${recurso}')" style="margin-left:4px;">↺</button>
-            </div>`:''}
-        </div>`;
-    };
+    const _push = (_recurso, _label, _emoji) => ''; // movido a _tabHex
 
     const AFINS = [
         {key:'fisica',label:'Física'},{key:'energetica',label:'Energética'},
@@ -647,7 +674,6 @@ function _tabStats(nombre) {
         </div>`;
     }).join('');
 
-    const pctVex = s.vex_max>0?Math.min(100,Math.round((p.vex_actual||0)/s.vex_max*100)):0;
 
     return `
     <div class="ppj-section">
@@ -681,19 +707,6 @@ function _tabStats(nombre) {
         <div class="ppj-formula">${formulas.guarda_max?.expr||''} ${s.guarda_max_override!==0?`<span style="color:#888;">+ ${s.guarda_max_override} manual</span>`:''}</div>
         ` : ''}
 
-        ${s.vex_max>0?`<div class="ppj-vida-block">
-            <div class="ppj-vida-header"><span class="ppj-vida-label" style="color:#9a50dc;">VEX</span>
-                <div class="ppj-vida-ctrl">
-                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',-50)">−50</button>`:''}
-                    <span class="ppj-vida-xy"><span class="actual" style="color:#9a50dc;">${Math.floor(p.vex_actual||0)}</span><span class="sep">/</span><span class="maximo">${s.vex_max}</span></span>
-                    ${canEdit?`<button class="ppj-ctrl-btn" onclick="window.modStat('${safe}','vex_actual',50)">+50</button>`:''}
-                </div>
-            </div><div class="ppj-vex-bar"><div class="ppj-vex-fill" style="width:${pctVex}%"></div></div>
-        </div><div class="ppj-formula">${esJugador?(formulas.vex_max?.expr||''):'Fijo (NPC sistema)'}</div>`:''}
-    </div>
-    <div class="ppj-section"><div class="ppj-section-title">Pushes</div>
-        ${_push('vex','VEX','⚡')}${_push('guarda','Guarda','🛡')}
-        ${!s.vex_max&&!s.guarda_max?'<div class="ppj-empty" style="padding:8px 0;">Sin pushes disponibles</div>':''}
     </div>
     <div class="ppj-section"><div class="ppj-section-title">Afinidades</div>${afinRows}</div>`;
 }
