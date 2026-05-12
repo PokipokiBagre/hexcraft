@@ -362,7 +362,7 @@ async function _renderStats(p, s, pOrig) {
   ).join('');
 
   // Hz (solo lectura) + fila de totales
-  const hczData = pOrig?.afin_hcz || {};
+  const hczData = (pOrig || p)?.afin_hcz || {};
   const hzHtml = `<div style="margin-top:8px;">
     <div class="hxev-stat-label" style="color:#50c88c;">Hz <span style="font-size:0.75em;color:#2e6a4a;font-family:'Inter',sans-serif;font-weight:400;letter-spacing:0;text-transform:none;">auto · calculado desde inventario</span></div>
     ${AFINS.map(k => {
