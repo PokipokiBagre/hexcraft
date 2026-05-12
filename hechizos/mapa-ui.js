@@ -186,6 +186,47 @@ function _renderOpLeft() {
             <button class="op-l-btn op-l-vex-disp" onclick="window._hmBatchDispersarVex()">✦ Dispersar VEX</button>
             <button class="op-l-btn op-l-danger" onclick="window._hmBatchEliminarVex()">✕ Eliminar VEX</button>
         </div>
+        ${(() => {
+            const todos   = [...st.seleccionados];
+            const conVex  = todos.filter(n => n.vex > 0);
+            const sinVex  = todos.filter(n => !n.vex);
+            const totalV  = conVex.reduce((s, n) => s + n.vex, 0);
+            const mediaV  = conVex.length ? Math.round(totalV / conVex.length) : 0;
+            const pctCon  = Math.round(conVex.length / todos.length * 100);
+            // Distribución por rangos
+            const rangos  = [[1,99],[100,199],[200,299],[300,399],[400,499],[500,699],[700,999],[1000,Infinity]];
+            const dist    = rangos.map(([lo,hi]) => {
+                const cnt = conVex.filter(n => n.vex >= lo && n.vex <= hi).length;
+                return cnt > 0 ? `<span style="color:#888;">${lo === 1000 ? '≥1000' : lo+'–'+hi}:</span> <strong style="color:#c090f0;">${cnt}</strong>` : '';
+            }).filter(Boolean).join(' &nbsp;');
+            return `
+            <div class="op-vex-stats">
+                <div class="op-vex-stats-title">Lectura VEX — selección</div>
+                <div class="op-vex-stats-grid">
+                    <div class="op-vex-stat">
+                        <div class="op-vex-stat-val" style="color:#c090f0;">${conVex.length}</div>
+                        <div class="op-vex-stat-lbl">con VEX</div>
+                    </div>
+                    <div class="op-vex-stat">
+                        <div class="op-vex-stat-val" style="color:#555;">${sinVex.length}</div>
+                        <div class="op-vex-stat-lbl">sin VEX</div>
+                    </div>
+                    <div class="op-vex-stat">
+                        <div class="op-vex-stat-val" style="color:#a0c8f0;">${mediaV}</div>
+                        <div class="op-vex-stat-lbl">media</div>
+                    </div>
+                    <div class="op-vex-stat">
+                        <div class="op-vex-stat-val" style="color:#d4af37;">${totalV.toLocaleString()}</div>
+                        <div class="op-vex-stat-lbl">total</div>
+                    </div>
+                </div>
+                <div class="op-vex-bar-wrap">
+                    <div class="op-vex-bar-fill" style="width:${pctCon}%;"></div>
+                </div>
+                <div style="font-size:0.58em;color:#444;margin-top:2px;text-align:center;">${pctCon}% tienen VEX</div>
+                ${dist ? `<div class="op-vex-dist">${dist}</div>` : ''}
+            </div>`;
+        })()}
         <div id="op-l-batch-form"></div>
         ` : `<div style="font-size:0.68em;color:#333;padding:4px 0;">Activa multi-sel y selecciona nodos</div>`}
     `;
