@@ -1868,99 +1868,88 @@ window._hmModalAsignarPJ = () => {
             </div>
         `;
         document.body.appendChild(wrap);
-
-        // ── Navegación de teclado dentro de la tabla ─────────
-        document.getElementById('hz-tablas-wrap').addEventListener('keydown', e => {
-            const el = document.activeElement;
-            if (!el) return;
-            const isInput    = el.tagName === 'INPUT' && el.type === 'number';
-            const isCheckbox = el.tagName === 'INPUT' && el.type === 'checkbox';
-            const isSelect   = el.tagName === 'SELECT';
-            const isTextarea = el.tagName === 'TEXTAREA';
-            const isText     = el.tagName === 'INPUT' && el.type === 'text';
-            if (!isInput && !isCheckbox && !isSelect && !isTextarea && !isText) return;
-
-            const td    = el.closest('td');
-            const tr    = td?.closest('tr');
-            const tbody = tr?.closest('tbody');
-            if (!td || !tr || !tbody) return;
-
-            const rows  = [...tbody.querySelectorAll('tr')];
-            const ri    = rows.indexOf(tr);
-            const colKey = el.dataset.colkey || td.dataset.colkey;
-
-            // Foco inteligente: va a la celda con el mismo data-colkey en otra fila
-            const _focusRow = (targetRi) => {
-                const targetTr = rows[targetRi];
-                if (!targetTr) return false;
-                // Buscar celda por colkey
-                let targetEl = targetTr.querySelector(`[data-colkey="${colKey}"]`);
-                if (!targetEl) {
-                    // Fallback: mismo índice de columna
-                    const cols = [...tr.querySelectorAll('td')];
-                    const ci   = cols.indexOf(td);
-                    const targetTd = targetTr.querySelectorAll('td')[ci];
-                    targetEl = targetTd?.querySelector('input,select');
-                    if (!targetEl && targetTd?.classList.contains('hz-cell-text-view')) {
-                        e.preventDefault(); el.blur(); targetTd.click(); return true;
-                    }
-                }
-                if (!targetEl) return false;
-                e.preventDefault();
-                if (isInput) { el.blur(); } // guarda onblur
-                targetEl.focus();
-                if (targetEl.select) targetEl.select();
-                return true;
-            };
-
-            // Foco lateral: siguiente/anterior celda con input en la misma fila
-            const _focusCol = (dir) => {
-                const tds = [...tr.querySelectorAll('td')];
-                const ci  = tds.indexOf(td);
-                for (let i = ci + dir; i >= 0 && i < tds.length; i += dir) {
-                    const inp = tds[i].querySelector('input,select');
-                    if (inp) { e.preventDefault(); if (isInput) el.blur(); inp.focus(); if (inp.select) inp.select(); return; }
-                    if (tds[i].classList.contains('hz-cell-text-view')) { e.preventDefault(); if (isInput) el.blur(); tds[i].click(); return; }
-                }
-            };
-
-            if (e.key === 'Escape') { el.blur(); return; }
-
-            // ── Checkbox: Space o Enter marca/desmarca, flechas navegan ──
-            if (isCheckbox) {
-                if (e.key === ' ' || e.key === 'Enter') {
-                    e.preventDefault();
-                    el.checked = !el.checked;
-                    el.dispatchEvent(new Event('change'));
-                    return;
-                }
-                if (e.key === 'ArrowDown' || e.key === 'Enter') { e.preventDefault(); _focusRow(ri + 1); return; }
-                if (e.key === 'ArrowUp')                         { e.preventDefault(); _focusRow(ri - 1); return; }
-                if (e.key === 'ArrowRight')                      { _focusCol(1); return; }
-                if (e.key === 'ArrowLeft')                       { _focusCol(-1); return; }
-            }
-
-            // ── Número: ↑↓ navegan filas, Enter baja, ←→ no interfieren (mueven cursor) ──
-            if (isInput) {
-                if (e.key === 'ArrowDown' || e.key === 'Enter') { _focusRow(ri + 1); return; }
-                if (e.key === 'ArrowUp')                         { _focusRow(ri - 1); return; }
-                // ←→ se dejan pasar — mueven el cursor dentro del número
-                return;
-            }
-
-            // ── Select: ↑↓ navegan filas ──
-            if (isSelect) {
-                if (e.key === 'ArrowDown' && !e.altKey) { _focusRow(ri + 1); return; }
-                if (e.key === 'ArrowUp'   && !e.altKey) { _focusRow(ri - 1); return; }
-                if (e.key === 'Tab') return; // dejar al browser
-            }
-
-            // ── Texto/Textarea: solo Enter baja ──
-            if (isText || isTextarea) {
-                if (e.key === 'Enter' && !e.shiftKey) { _focusRow(ri + 1); return; }
-            }
-        });
     }
+
+    // ── Navegación de teclado dentro de la tabla ─────────────
+    // Registrado UNA VEZ a nivel de document, activo solo cuando el wrap está visible
+    document.addEventListener('keydown', (e) => {
+        const wrap = document.getElementById('hz-tablas-wrap');
+        if (!wrap?.classList.contains('visible')) return;
+
+        const el = document.activeElement;
+        if (!el) return;
+        const isNum      = el.tagName === 'INPUT' && el.type === 'number';
+        const isCheckbox = el.tagName === 'INPUT' && el.type === 'checkbox';
+        const isSelect   = el.tagName === 'SELECT';
+        const isTextarea = el.tagName === 'TEXTAREA';
+        const isText     = el.tagName === 'INPUT' && el.type === 'text';
+        if (!isNum && !isCheckbox && !isSelect && !isTextarea && !isText) return;
+
+        const td    = el.closest('td');
+        const tr    = td?.closest('tr');
+        const tbody = tr?.closest('tbody');
+        if (!td || !tr || !tbody) return;
+
+        const rows   = [...tbody.querySelectorAll('tr')];
+        const ri     = rows.indexOf(tr);
+        const colKey = el.dataset.colkey || td.dataset.colkey;
+
+        const _focusRow = (targetRi) => {
+            const targetTr = rows[targetRi];
+            if (!targetTr) return false;
+            let targetEl = colKey ? targetTr.querySelector(`[data-colkey="${colKey}"]`) : null;
+            if (!targetEl) {
+                const cols = [...tr.querySelectorAll('td')];
+                const ci   = cols.indexOf(td);
+                const targetTd = [...targetTr.querySelectorAll('td')][ci];
+                targetEl = targetTd?.querySelector('input,select');
+                if (!targetEl && targetTd?.classList.contains('hz-cell-text-view')) {
+                    e.preventDefault(); if (isNum) el.blur(); targetTd.click(); return true;
+                }
+            }
+            if (!targetEl) return false;
+            e.preventDefault();
+            if (isNum) el.blur();
+            targetEl.focus();
+            if (targetEl.select && targetEl.type !== 'checkbox') targetEl.select();
+            return true;
+        };
+
+        const _focusCol = (dir) => {
+            const tds = [...tr.querySelectorAll('td')];
+            const ci  = tds.indexOf(td);
+            for (let i = ci + dir; i >= 0 && i < tds.length; i += dir) {
+                const inp = tds[i].querySelector('input,select');
+                if (inp) { e.preventDefault(); if (isNum) el.blur(); inp.focus(); if (inp.select && inp.type !== 'checkbox') inp.select(); return; }
+                if (tds[i].classList.contains('hz-cell-text-view')) { e.preventDefault(); if (isNum) el.blur(); tds[i].click(); return; }
+            }
+        };
+
+        if (e.key === 'Escape') { el.blur(); return; }
+
+        if (isCheckbox) {
+            if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); el.checked = !el.checked; el.dispatchEvent(new Event('change')); return; }
+            if (e.key === 'ArrowDown')  { e.preventDefault(); _focusRow(ri + 1); return; }
+            if (e.key === 'ArrowUp')    { e.preventDefault(); _focusRow(ri - 1); return; }
+            if (e.key === 'ArrowRight') { _focusCol(1);  return; }
+            if (e.key === 'ArrowLeft')  { _focusCol(-1); return; }
+        }
+
+        if (isNum) {
+            if (e.key === 'ArrowDown' || e.key === 'Enter') { _focusRow(ri + 1); return; }
+            if (e.key === 'ArrowUp')                         { _focusRow(ri - 1); return; }
+            // ←→ se dejan pasar — mueven cursor dentro del número
+        }
+
+        if (isSelect) {
+            if (e.key === 'ArrowDown' && !e.altKey) { _focusRow(ri + 1); return; }
+            if (e.key === 'ArrowUp'   && !e.altKey) { _focusRow(ri - 1); return; }
+        }
+
+        if (isText || isTextarea) {
+            if (e.key === 'Enter' && !e.shiftKey) { _focusRow(ri + 1); return; }
+        }
+    });
 
     // ── Abrir / cerrar ───────────────────────────────────────
     async function _open() {
