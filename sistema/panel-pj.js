@@ -1782,7 +1782,7 @@ function _renderObjIzq() {
     const TIPOS_FILTRO = [...TIPOS_FIJO, ...tiposExtra];
     const RAREZAS  = ['Todos','Común','Raro','Legendario'];
     const RAR_COL  = {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
-    const _imgObj  = (n) => { try{return `${currentConfig.storageUrl}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
+    const _imgObj  = (n) => `${currentConfig.storageUrl}/imgobjetos/${_norm(n)}.png`;
     const _fall    = () => { try{return `${currentConfig.storageUrl}/imginterfaz/no_encontrado.png`;}catch{return '';} };
 
     const q        = _objState.busqCat.toLowerCase().trim();
@@ -2092,7 +2092,7 @@ function _renderObjDer(nombre, body) {
     const safe     = nombre.replace(/'/g,"\\'");
     const EQUIPABLES = ['Equipamiento','Accesorio','Vehículo','Vehiculo'];
     const RAR_COL  = {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
-    const _imgObj  = (n) => { try{return `${currentConfig.storageUrl}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
+    const _imgObj  = (n) => `${currentConfig.storageUrl}/imgobjetos/${_norm(n)}.png`;
     const _fall    = () => { try{return `${currentConfig.storageUrl}/imginterfaz/no_encontrado.png`;}catch{return '';} };
 
     const sorted = [..._objState.inventario].sort((a,b)=>{
@@ -2261,7 +2261,7 @@ window._pobjBusqCat = (v) => {
         const invSet = new Set(_objState.inventario.map(i => i.objeto_nombre));
         const esAdmin= estadoUI.esAdmin;
         const RAR_COL= {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
-        const _imgObj= (n) => { try{return `${currentConfig.storageUrl}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,"a").replace(/[éèëê]/g,"e").replace(/[íìïî]/g,"i").replace(/[óòöô]/g,"o").replace(/[úùüû]/g,"u").replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"")}.png`;}catch{return "";} };
+        const _imgObj= (n) => `${currentConfig.storageUrl}/imgobjetos/${_norm(n)}.png`;
         const _fall  = () => { try{return `${currentConfig.storageUrl}/imginterfaz/no_encontrado.png`;}catch{return "";} };
         const lista  = _objState.catalogo.filter(o => {
             if (_objState.filtroRar  !== 'Todos' && o.rareza !== _objState.filtroRar)  return false;
@@ -2626,7 +2626,7 @@ function _renderTransferDer(nombre) {
     const esAdmin = estadoUI.esAdmin;
     const safe    = nombre.replace(/'/g,"\'");
     const RAR_COL = {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
-    const _imgObj2 = (n) => { try{return `${currentConfig.storageUrl}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,'a').replace(/[éèëê]/g,'e').replace(/[íìïî]/g,'i').replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'')}.png`;}catch{return '';} };
+    const _imgObj2 = (n) => `${currentConfig.storageUrl}/imgobjetos/${_norm(n)}.png`;
     const _fall2   = () => { try{return `${currentConfig.storageUrl}/imginterfaz/no_encontrado.png`;}catch{return '';} };
 
     const sorted = [..._objState.inventario].sort((a,b) => {
