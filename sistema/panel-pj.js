@@ -2986,16 +2986,16 @@ window._ppjEjecutarHexPush = async (nombre, tipo, cantidad) => {
     window.actualizarBtnSync?.();
     window.renderCatalogo?.();
     window.mostrarToast?.(`✨ +${cantidad} HEX (${tipo.replace('_',' ')}) → ${nombre}`);
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHex(nombre, body, true);
+    const hexBody = document.getElementById('ppj-hex-body');
+    if (hexBody) { hexBody.innerHTML = ''; _tabHex(nombre, hexBody, true); }
 };
 
 window._ppjDeleteHexLog = async (id, nombre) => {
     if (!estadoUI.esAdmin) return;
     if (!confirm('¿Eliminar este registro?')) return;
     await supabase.from('hex_push_log').delete().eq('id', id);
-    const body = document.getElementById('ppj-body');
-    if (body) _tabHex(nombre, body, true);
+    const hexBody = document.getElementById('ppj-hex-body');
+    if (hexBody) { hexBody.innerHTML = ''; _tabHex(nombre, hexBody, true); }
 };
 
 window._ppjToggleEquipar = async (personaje, objeto, equipar) => {
