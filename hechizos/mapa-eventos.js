@@ -213,6 +213,136 @@ export function iniciarEventos() {
         }
         lastTouchDist = d;
     }, { passive: true });
+
+    // ── TECLADO — navegación por flechas entre nodos ─────────
+    // ← → navegan entre vecinos del nodo seleccionado (salientes primero, luego entrantes)
+    // ↑ ↓ navegan el historial de selección (atrás / adelante)
+    // Escape cierra el side panel
+    // No actúa si el foco está en un input/textarea
+
+    const _navHistorial = [];  // pila de nodos visitados
+    let   _navIdx       = -1;  // posición actual en la pila
+
+    const _irA = (nodo, empujarHistorial = true) => {
+        if (!nodo || nodo === st.nodoSel) return;
+        if (empujarHistorial) {
+            // Truncar el futuro si navegamos desde un punto intermedio
+            if (_navIdx < _navHistorial.length - 1)
+                _navHistorial.splice(_navIdx + 1);
+            _navHistorial.push(nodo);
+            _navIdx = _navHistorial.length - 1;
+        }
+        st.nodoSel = nodo;
+        renderInfoBar(nodo);
+        import('./mapa-ui.js').then(m => {
+            m.abrirOpPanel(nodo);
+            // Centrar cámara suavemente en el nodo destino
+            if (typeof m.centrarEnNodoSuave === 'function') {
+                m.centrarEnNodoSuave(nodo);
+            } else {
+                // Fallback: centrado directo
+                import('./mapa-render.js').then(r => {
+                    if (r.centrarEnNodo) r.centrarEnNodo(nodo);
+                });
+            }
+        }).catch(() => {});
+    };
+
+    // Vecinos del nodo actual: salientes primero, luego entrantes
+    const _vecinos = (nodo) => {
+        const salientes = st.enlaces
+            .filter(e => e.source === nodo)
+            .map(e => e.target);
+        const entrantes = st.enlaces
+            .filter(e => e.target === nodo)
+            .map(e => e.source);
+        // Dedup preservando orden
+        const vistos = new Set();
+        return [...salientes, ...entrantes].filter(n => {
+            if (vistos.has(n)) return false;
+            vistos.add(n); return true;
+        });
+    };
+
+    // Índice de vecino actual (para ← →)
+    let _vecinoIdx = 0;
+
+    document.addEventListener('keydown', e => {
+        // Ignorar si el foco está en un input, textarea o elemento editable
+        const tag = document.activeElement?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+
+        // Necesitamos un nodo seleccionado para navegar (excepto Escape)
+        const actual = st.nodoSel;
+
+        if (e.key === 'Escape') {
+            import('./mapa-ui.js').then(m => {
+                if (m._hmCerrarSidePanel) m._hmCerrarSidePanel();
+            }).catch(() => {});
+            return;
+        }
+
+        if (!actual) return;
+
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            const vecinos = _vecinos(actual);
+            if (vecinos.length === 0) {
+                import('./mapa-ui.js').then(m => { if (m.toast) m.toast('Sin conexiones'); }).catch(() => {});
+                return;
+            }
+            // Resetear índice si cambiamos de nodo desde fuera
+            if (!vecinos[_vecinoIdx]) _vecinoIdx = 0;
+            if (e.key === 'ArrowRight') {
+                _vecinoIdx = (_vecinoIdx + 1) % vecinos.length;
+            } else {
+                _vecinoIdx = (_vecinoIdx - 1 + vecinos.length) % vecinos.length;
+            }
+            _irA(vecinos[_vecinoIdx]);
+        }
+
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            // Retroceder en historial
+            if (_navIdx > 0) {
+                _navIdx--;
+                const destino = _navHistorial[_navIdx];
+                _irA(destino, false);
+            }
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            // Avanzar en historial
+            if (_navIdx < _navHistorial.length - 1) {
+                _navIdx++;
+                const destino = _navHistorial[_navIdx];
+                _irA(destino, false);
+            }
+        }
+
+        // Tab también salta al siguiente vecino (más cómodo en teclado)
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const vecinos = _vecinos(actual);
+            if (vecinos.length === 0) return;
+            _vecinoIdx = e.shiftKey
+                ? (_vecinoIdx - 1 + vecinos.length) % vecinos.length
+                : (_vecinoIdx + 1) % vecinos.length;
+            _irA(vecinos[_vecinoIdx]);
+        }
+    });
+
+    // Cuando el usuario hace clic en un nodo directamente, actualizar historial
+    // (lo hacemos exponiendo un helper que _seleccionarNodo puede llamar)
+    window._hmNavPush = (nodo) => {
+        if (_navHistorial[_navIdx] === nodo) return;
+        if (_navIdx < _navHistorial.length - 1)
+            _navHistorial.splice(_navIdx + 1);
+        _navHistorial.push(nodo);
+        _navIdx = _navHistorial.length - 1;
+        _vecinoIdx = 0; // resetear índice de vecino al cambiar de nodo manualmente
+    };
 }
 
 // ── Seleccionar nodo ─────────────────────────────────────────
@@ -224,6 +354,8 @@ function _seleccionarNodo(nodo) {
     }
     st.nodoSel = nodo;
     renderInfoBar(nodo);
+    // Registrar en historial de navegación por teclado
+    if (window._hmNavPush) window._hmNavPush(nodo);
     import('./mapa-ui.js').then(m => {
         m.abrirOpPanel(nodo);
     }).catch(()=>{});

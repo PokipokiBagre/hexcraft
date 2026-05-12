@@ -23,6 +23,34 @@ const _sb = () => {
 const _imgPj = (nombre) => `${_sb()}/imgpersonajes/${_norm(nombre)}icon.png`;
 const _fall  = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 
+// ── Centrado suave en nodo (interpolación para navegación por teclado) ──
+export function centrarEnNodoSuave(nodo) {
+    if (!nodo || !st.canvas) return;
+    const W  = st.canvas.width;
+    const H  = st.canvas.height;
+    const tz = Math.max(st.camara.zoom, 0.5);
+    const tx = W / 2 - nodo.x * tz;
+    const ty = H / 2 - nodo.y * tz;
+
+    if (window._hmCenterRAF) cancelAnimationFrame(window._hmCenterRAF);
+
+    const DURACION = 300;
+    const t0 = performance.now();
+    const x0 = st.camara.x, y0 = st.camara.y, z0 = st.camara.zoom;
+    const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+    const step = (now) => {
+        const prog = Math.min(1, (now - t0) / DURACION);
+        const e    = easeOut(prog);
+        st.camara.x    = x0 + (tx - x0) * e;
+        st.camara.y    = y0 + (ty - y0) * e;
+        st.camara.zoom = z0 + (tz - z0) * e;
+        if (prog < 1) window._hmCenterRAF = requestAnimationFrame(step);
+        else window._hmCenterRAF = null;
+    };
+    window._hmCenterRAF = requestAnimationFrame(step);
+}
+
 // ── Toast ────────────────────────────────────────────────────
 export function toast(msg, dur=2300) {
     const t = document.getElementById('hm-toast');
