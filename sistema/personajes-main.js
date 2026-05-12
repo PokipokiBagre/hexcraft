@@ -83,7 +83,7 @@ window.mostrarVista = function(vista) {
         document.querySelectorAll('.filtro-rol').forEach(b => {
             const val = b.textContent.trim();
             const map = { 'Todos':'Todos', 'Jugadores':'Jugador', 'NPCs':'NPC' };
-            b.classList.toggle('active', map[val] === estadoUI.filtroRol || (val === 'Todos' && estadoUI.filtroRol === 'Todos'));
+            b.classList.toggle('active', map[val] === estadoUI.filtroRol);
         });
         document.querySelectorAll('.filtro-act').forEach(b => {
             const val = b.textContent.trim();
