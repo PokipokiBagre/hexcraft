@@ -64,6 +64,7 @@ function _inyectarEstilos() {
 #ppj-col-main{position:fixed;top:0;right:25vw;width:50vw;height:100vh;background:#08080f;border-left:1px solid rgba(212,175,55,0.18);display:flex;flex-direction:column;overflow:hidden;box-shadow:-8px 0 40px rgba(0,0,0,0.6);}
 /* Col STATS: pegada al borde derecho de la pantalla, width:25vw */
 #ppj-col-stats{position:fixed;top:0;right:0;width:25vw;min-width:280px;height:100vh;background:#070710;border-left:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;overflow:hidden;}
+#ppj-col-stats .ppj-header{border-bottom:1px solid rgba(255,255,255,0.06);background:#070710;}
 /* Tabs van en col-stats */
 #ppj-col-stats .ppj-tabs{flex-shrink:0;background:#0a0a14;}
 #ppj-col-stats .ppj-body{padding-bottom:20px;}
@@ -265,14 +266,14 @@ function _crearEstructura() {
     // Col-stats (25vw): siempre Stats+Afinidades cuando tab=stats, vacío/oculto en otras tabs
     root.innerHTML = `
         <div id="ppj-col-main">
-            <div class="ppj-header" id="ppj-header"></div>
             <div class="ppj-body"   id="ppj-hex-body"></div>
-            <div class="ppj-footer" id="ppj-footer"></div>
         </div>
         <div id="ppj-col-stats">
+            <div class="ppj-header" id="ppj-header"></div>
             <div class="ppj-tabs"   id="ppj-tabs"></div>
             <div class="ppj-body"   id="ppj-body"></div>
             <div class="ppj-body"   id="ppj-stats-body" style="display:none;"></div>
+            <div class="ppj-footer" id="ppj-footer"></div>
         </div>`;
     document.body.appendChild(root);
 }
@@ -360,20 +361,21 @@ function _renderTab(nombre, tab) {
         b.classList.toggle('active', b.getAttribute('onclick')?.includes(`'${tab}'`))
     );
     const hexBody   = document.getElementById('ppj-hex-body');
+    const colMain   = document.getElementById('ppj-col-main');
     const body      = document.getElementById('ppj-body');
     const statsBody = document.getElementById('ppj-stats-body');
 
-    // Col-stats: stats-body visible solo en tab Stats, ppj-body visible en el resto
     if (tab === 'stats') {
+        // Mostrar col-main con contenido HEX
+        if (colMain)   colMain.style.display = '';
         if (body)      { body.style.display = 'none'; body.innerHTML = ''; }
         if (statsBody) { statsBody.style.display = ''; const _sy = statsBody.scrollTop; statsBody.innerHTML = _tabStats(nombre); if (_sy > 0) statsBody.scrollTop = _sy; }
-        // Col-main: contenido HEX
-        if (hexBody)   { _tabHex(nombre, hexBody); }
+        if (hexBody)   _tabHex(nombre, hexBody);
     } else {
+        // Ocultar col-main — no se necesita el panel HEX
+        if (colMain)   colMain.style.display = 'none';
         if (statsBody) { statsBody.style.display = 'none'; }
         if (body)      { body.style.display = ''; body.innerHTML = `<div class="ppj-loader">Cargando…</div>`; }
-        // Col-main en tabs no-stats: limpia el hex-body (no se usa)
-        if (hexBody)   { hexBody.innerHTML = ''; }
     }
 
     if (tab !== 'hechizos') {
