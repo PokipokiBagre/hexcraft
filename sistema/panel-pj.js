@@ -2068,7 +2068,7 @@ function _renderObjIzq() {
             ondrop="window._pobjDropEnCatalogo(event);this.style.borderColor='rgba(220,60,60,0.3)';this.style.color='#7a3a3a';this.style.background='';">
             🗑 Arrastrar objeto del inventario aquí para quitarlo
         </div>` : ''}
-        ${listaHTML}`;
+        <div id="pobj-cat-lista">${listaHTML}</div>`;
     }
 
     izq.innerHTML = `
@@ -2252,7 +2252,52 @@ window._pobjAbrirTransfer = () => { _objState.modoTransfer=true; _objState.modoC
 window._pobjAbrirImagenes = () => { _objState.modoImagenes=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoForja=false; _objState.imgSelObj=null; _renderObjIzq(); };
 window._pobjAbrirForja    = () => { _objState.modoForja=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.forjaN=4; _renderObjIzq(); };
 window._pobjForjaSetN     = (n) => { _objState.forjaN=n; _renderObjIzq(); };
-window._pobjBusqCat       = (v) => { _objState.busqCat=v; _renderObjIzq(); };
+window._pobjBusqCat = (v) => {
+    _objState.busqCat = v;
+    // Fast path: si el catálogo ya está renderizado, solo actualizar la lista
+    const listaEl = document.getElementById('pobj-cat-lista');
+    if (listaEl) {
+        const q      = v.toLowerCase().trim();
+        const invSet = new Set(_objState.inventario.map(i => i.objeto_nombre));
+        const esAdmin= estadoUI.esAdmin;
+        const RAR_COL= {'Legendario':'#d4af37','Raro':'#9a50dc','Común':'#5a5a88','-':'#3a3a58'};
+        const _imgObj= (n) => { try{return `${currentConfig.storageUrl}/imgobjetos/${n.trim().toLowerCase().replace(/[áàäâ]/g,"a").replace(/[éèëê]/g,"e").replace(/[íìïî]/g,"i").replace(/[óòöô]/g,"o").replace(/[úùüû]/g,"u").replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"")}.png`;}catch{return "";} };
+        const _fall  = () => { try{return `${currentConfig.storageUrl}/imginterfaz/no_encontrado.png`;}catch{return "";} };
+        const lista  = _objState.catalogo.filter(o => {
+            if (_objState.filtroRar  !== 'Todos' && o.rareza !== _objState.filtroRar)  return false;
+            if (_objState.filtroTipo !== 'Todos' && o.tipo   !== _objState.filtroTipo) return false;
+            if (q && !o.nombre.toLowerCase().includes(q) && !(o.efecto||'').toLowerCase().includes(q)) return false;
+            return true;
+        });
+        if (lista.length === 0) {
+            listaEl.innerHTML = '<div class="ppj-empty" style="padding:20px 0;font-size:0.72em;">Sin resultados</div>';
+        } else {
+            listaEl.innerHTML = lista.map(o => {
+                const enInv  = invSet.has(o.nombre);
+                const oSafe  = o.nombre.replace(/'/g,"\\'");
+                const rc     = RAR_COL[o.rareza]||'#888';
+                const hijos  = (_objState.contenidores[o.nombre]||[]).length;
+                const addBtn = esAdmin ? `<button class="pobj-btn-gold" style="padding:2px 7px;font-size:0.6em;flex-shrink:0;" onclick="window._pobjDarAlPJ('${oSafe}',1)">${enInv?'+1':'Dar'}</button>` : '';
+                const editBtn= esAdmin ? `<button class="pobj-fbtn" style="padding:2px 6px;" onclick="window._pobjAbrirEditar('${oSafe}')">✏️</button>` : '';
+                return `<div class="pobj-cat-card ${enInv?'en-inv':''}"
+                    draggable="${esAdmin?'true':'false'}"
+                    ondragstart="window._pobjDragStart(event,'${oSafe}')"
+                    ondragend="event.target.style.opacity=''">
+                    <img class="pobj-cat-img" src="${_imgObj(o.nombre)}" onerror="this.onerror=null;this.src='${_fall()}'" loading="lazy">
+                    <div class="pobj-cat-info">
+                        <div class="pobj-cat-nombre">${o.nombre}${hijos>0?`<span style="color:#6496ff;font-size:0.7em;margin-left:4px;">📦${hijos}</span>`:''}</div>
+                        <div class="pobj-cat-sub">${o.tipo||'-'} · ${o.material||'-'} · <span style="color:${rc}">${o.rareza||'-'}</span></div>
+                        <div class="pobj-cat-eff">${o.efecto||''}</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end;">${addBtn}${editBtn}</div>
+                </div>`;
+            }).join('');
+        }
+        return;
+    }
+    // Sin fast path: render completo
+    _renderObjIzq();
+};
 window._pobjFiltroRar     = (v) => { _objState.filtroRar=v; _renderObjIzq(); };
 window._pobjFiltroTipo    = (v) => { _objState.filtroTipo=v; _renderObjIzq(); };
 window._pobjToggleCont    = (n) => { if(_objState.expandedConts.has(n))_objState.expandedConts.delete(n); else _objState.expandedConts.add(n); _renderObjDer(_objState.nombrePJ); };
@@ -2436,7 +2481,7 @@ window._pobjGuardarObjeto = async (nombreExistente) => {
     const va      = parseInt(document.getElementById('pobj-f-va')?.value)||0;
     const cont    = document.getElementById('pobj-f-cont')?.value||null;
     if (!nombre) { alert('El nombre es obligatorio.'); return; }
-    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,es_propuesta:false};
+    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,contenedor_padre:cont||null,es_propuesta:false};
     let error;
     if (esNuevo) { ({error}=await supabase.from('objetos').insert(payload)); }
     else         { ({error}=await supabase.from('objetos').update(payload).eq('nombre',nombreExistente)); }
@@ -2670,7 +2715,7 @@ window._pobjAbrirTransfer = () => { _objState.modoTransfer=true; _objState.modoC
 window._pobjAbrirImagenes = () => { _objState.modoImagenes=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoForja=false; _objState.imgSelObj=null; _renderObjIzq(); };
 window._pobjAbrirForja    = () => { _objState.modoForja=true; _objState.modoCrear=false; _objState.objEditando=null; _objState.modoTransfer=false; _objState.modoImagenes=false; _objState.forjaN=4; _renderObjIzq(); };
 window._pobjForjaSetN     = (n) => { _objState.forjaN=n; _renderObjIzq(); };
-window._pobjBusqCat       = (v) => { _objState.busqCat=v; _renderObjIzq(); };
+window._pobjBusqCat = window._pobjBusqCat;
 window._pobjFiltroRar     = (v) => { _objState.filtroRar=v; _renderObjIzq(); };
 window._pobjFiltroTipo    = (v) => { _objState.filtroTipo=v; _renderObjIzq(); };
 window._pobjToggleCont    = (n) => { if(_objState.expandedConts.has(n))_objState.expandedConts.delete(n); else _objState.expandedConts.add(n); _renderObjDer(_objState.nombrePJ); };
@@ -2805,7 +2850,7 @@ window._pobjGuardarObjeto = async (nombreExistente) => {
     const va      = parseInt(document.getElementById('pobj-f-va')?.value)||0;
     const cont    = document.getElementById('pobj-f-cont')?.value||null;
     if (!nombre) { alert('El nombre es obligatorio.'); return; }
-    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,es_propuesta:false};
+    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,contenedor_padre:cont||null,es_propuesta:false};
     let error;
     if (esNuevo) { ({error}=await supabase.from('objetos').insert(payload)); }
     else         { ({error}=await supabase.from('objetos').update(payload).eq('nombre',nombreExistente)); }
