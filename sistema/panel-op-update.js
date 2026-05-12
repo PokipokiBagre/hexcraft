@@ -4,7 +4,7 @@
 // Solo visible para esAdmin. Importar desde personajes-main.js
 // ============================================================
 
-import { supabase }             from '../hex-auth.js';
+import { supabase, currentConfig } from '../hex-auth.js';
 import { personajes, estadoUI } from './personajes-state.js';
 import { calcularStats }        from './personajes-logic.js';
 import { persistirCampos }      from './personajes-data.js';
@@ -52,7 +52,7 @@ function _css() {
 /* ── Drawer ── */
 #op-drawer {
     position: fixed; left: 0; right: 0; bottom: 0;
-    height: 56vh;
+    height: 68vh; min-height: 420px;
     background: #09081a;
     border-top: 1px solid rgba(124,77,170,0.3);
     border-radius: 14px 14px 0 0;
@@ -93,7 +93,7 @@ function _css() {
 .op-body {
     flex: 1; overflow: hidden;
     display: grid;
-    grid-template-columns: 240px 1fr 300px;
+    grid-template-columns: 260px 1fr 340px;
     min-height: 0;
 }
 .op-col {
@@ -118,12 +118,13 @@ function _css() {
     align-content: flex-start;
 }
 .op-pj-chip {
-    display: flex; align-items: center; gap: 5px;
-    padding: 3px 8px; border-radius: 20px;
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 6px; border-radius: 20px;
     border: 1px solid rgba(255,255,255,0.1);
     background: rgba(255,255,255,0.03);
     cursor: pointer; transition: all 0.12s;
-    font-size: 0.68em; color: #aaa; user-select: none;
+    font-size: 0.72em; color: #aaa; user-select: none;
+    min-height: 30px;
 }
 .op-pj-chip:hover { border-color: rgba(124,77,170,0.4); color: #ccc; }
 .op-pj-chip.sel {
@@ -132,8 +133,9 @@ function _css() {
     color: #c8a0f0;
 }
 .op-pj-chip img {
-    width: 18px; height: 18px; border-radius: 50%;
+    width: 22px; height: 22px; border-radius: 50%;
     object-fit: cover; object-position: top; background: #222;
+    flex-shrink: 0; display: block;
 }
 .op-sel-all {
     font-size: 0.55em; color: rgba(124,77,170,0.6);
@@ -236,7 +238,7 @@ function _norm(s) {
         .replace(/[óòöô]/g,'o').replace(/[úùüû]/g,'u').replace(/[ñ]/g,'n')
         .replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') : '';
 }
-function _sb() { try { return window.currentConfig?.storageUrl || ''; } catch { return ''; } }
+function _sb() { return currentConfig?.storageUrl || window.currentConfig?.storageUrl || ''; }
 function _imgPj(p, nombre) {
     const icono = p?.iconoOverride || nombre;
     return `${_sb()}/imgpersonajes/${_norm(icono)}icon.png`;
@@ -492,9 +494,17 @@ async function _undo() {
 }
 
 function _copiarLog() {
-    const txt = opState.log.map(e =>
-        `[${e.ts}] ${e.texto.replace(/<br>/g, '\n        ').replace(/<[^>]+>/g, '')}`
-    ).join('\n');
+    // Copiar solo el contenido limpio, sin timestamp ni indentación
+    const txt = opState.log.map(e => {
+        const raw = e.texto
+            .replace(/<br\s*\/?>/gi, '\n')   // <br> → salto de línea
+            .replace(/<[^>]+>/g, '')          // quitar tags HTML
+            .split('\n')
+            .map(l => l.trim())              // quitar espacios/indentación por línea
+            .filter(l => l.length > 0)
+            .join('\n');
+        return raw;
+    }).join('\n');
     navigator.clipboard.writeText(txt).then(() => _toast('Log copiado'));
 }
 

@@ -498,9 +498,32 @@ async function _tabHex(nombre, body) {
 
     const historial = logs || [];
     const _ultimoDe = (tipo) => historial.find(h => h.tipo === tipo);
-    const _horasPasadas = (h) => h ? (Date.now() - new Date(h.created_at).getTime()) / 3600000 : Infinity;
 
-    const cdA = _horasPasadas(_ultimoDe('asistencia'));
+    // ── Cooldown de asistencia: disponible al día calendario siguiente (medianoche local)
+    // Ejemplo: marcas lunes 23:00 → disponible martes 00:00 (1h después, no 24h).
+    // Cooldown de turno_extra y contenido: 72h fijas desde el último push.
+    const _dispAsistencia = () => {
+        const ult = _ultimoDe('asistencia');
+        if (!ult) return true;
+        const ultimaFecha = new Date(ult.created_at);
+        const hoy = new Date();
+        // Comparar solo fecha (día/mes/año) en hora local
+        const diaUltima = new Date(ultimaFecha.getFullYear(), ultimaFecha.getMonth(), ultimaFecha.getDate());
+        const diaHoy    = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+        return diaHoy > diaUltima;
+    };
+    const _restAsistencia = () => {
+        const ult = _ultimoDe('asistencia');
+        if (!ult) return '✓ Disponible';
+        if (_dispAsistencia()) return '✓ Disponible';
+        // Segundos hasta medianoche local
+        const ahora = new Date();
+        const medianoche = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1, 0, 0, 0);
+        const seg = Math.ceil((medianoche - ahora) / 1000);
+        return `${Math.floor(seg/3600)}h ${Math.floor((seg%3600)/60)}m`;
+    };
+
+    const _horasPasadas = (h) => h ? (Date.now() - new Date(h.created_at).getTime()) / 3600000 : Infinity;
     const cdT = _horasPasadas(_ultimoDe('turno_extra'));
     const cdC = _horasPasadas(_ultimoDe('contenido'));
 
@@ -1017,7 +1040,7 @@ async function _tabHex(nombre, body) {
             <div class="htab-divider-line htab-divider-rev"></div>
         </div>
         <div class="htab-push-grid">
-            ${_pushCard('asistencia','Asistencia',300,cdA>=24,_cdRest(cdA,24)+' · diario')}
+            ${_pushCard('asistencia','Asistencia',300,_dispAsistencia(),_restAsistencia()+' · diario')}
             ${_pushCard('turno_extra','Turno Extra',500,cdT>=72,_cdRest(cdT,72)+' · c/3 días')}
             ${_pushCard('contenido','Contenido','100–1000',cdC>=72,_cdRest(cdC,72)+' · c/3 días')}
         </div>
