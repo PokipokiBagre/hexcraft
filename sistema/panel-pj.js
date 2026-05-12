@@ -28,7 +28,6 @@ const _fallback = () => `${_sb()}/imginterfaz/no_encontrado.png`;
 // Lee afinidades del schema nuevo (afin_base) O del viejo (afinidadesBase)
 const _getAfin = (p) => ({
     base:  p.afin_base  || p.afinidadesBase || {},
-    hz:    p.afin_hcz   || {},  // calculado por DB — solo lectura
     extra: p.afin_extra || p.afinidadesBf   || {},
     alter: p.afin_alter || p.afinidadesEf   || {}
 });
@@ -143,7 +142,7 @@ function _inyectarEstilos() {
 .ppj-afin-total{font-size:1em;color:#d4af37;font-weight:700;}
 .ppj-afin-row{display:flex;align-items:center;gap:6px;margin-top:4px;}
 .ppj-afin-src-lbl{font-size:0.6em;font-weight:700;letter-spacing:0.5px;padding:1px 5px;border-radius:3px;width:28px;text-align:center;}
-.src-b{background:rgba(100,150,255,0.12);color:#6496ff;}.src-hz{background:rgba(80,200,140,0.12);color:#50c88c;}.src-ext{background:rgba(212,175,55,0.1);color:#d4af37;}.src-alt{background:rgba(220,100,100,0.1);color:#e08080;}.ppj-afin-row-hz{opacity:0.85;}.ppj-afin-val-hz{color:#50c88c;}.ppj-hz-readonly-tag{font-size:0.55em;color:#3a6a50;background:rgba(80,200,140,0.06);border:1px solid rgba(80,200,140,0.15);border-radius:8px;padding:1px 5px;margin-left:4px;letter-spacing:0.4px;align-self:center;}
+.src-b{background:rgba(100,150,255,0.12);color:#6496ff;}.src-ext{background:rgba(212,175,55,0.1);color:#d4af37;}.src-alt{background:rgba(220,100,100,0.1);color:#e08080;}
 .ppj-afin-val{font-size:0.82em;color:#ccc;min-width:24px;text-align:center;font-weight:600;}
 .ppj-cd-row{display:flex;align-items:center;gap:6px;margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,0.04);}
 .ppj-cd-label{font-size:0.62em;color:#4a4a68;flex:1;}
@@ -491,15 +490,52 @@ async function _tabHex(nombre, body) {
     const _ultimoDe = (tipo) => historial.find(h => h.tipo === tipo);
     const _horasPasadas = (h) => h ? (Date.now() - new Date(h.created_at).getTime()) / 3600000 : Infinity;
 
-    const cdA = _horasPasadas(_ultimoDe('asistencia'));
-    const cdT = _horasPasadas(_ultimoDe('turno_extra'));
-    const cdC = _horasPasadas(_ultimoDe('contenido'));
-
-    const _cdRest = (pasadas, limite) => {
-        if (pasadas >= limite) return '✓ Disponible';
-        const s = Math.ceil((limite - pasadas) * 3600);
-        return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+    // Convierte un timestamp ISO a número de día UTC (días desde epoch)
+    const _diaUTC = (isoStr) => {
+        if (!isoStr) return -Infinity;
+        return Math.floor(new Date(isoStr).getTime() / 86400000);
     };
+    const _hoyUTC = () => Math.floor(Date.now() / 86400000);
+
+    // Asistencia: disponible si el último push fue en un día UTC distinto al de hoy
+    const _dispAsistencia = () => {
+        const u = _ultimoDe('asistencia');
+        return !u || _diaUTC(u.created_at) < _hoyUTC();
+    };
+
+    // Turno extra / Contenido: disponible si han pasado al menos 2 días calendario UTC
+    // (ej: push lunes → disponible desde miércoles)
+    const _dispC3Dias = (tipo) => {
+        const u = _ultimoDe(tipo);
+        return !u || (_hoyUTC() - _diaUTC(u.created_at)) >= 2;
+    };
+
+    // Texto de countdown hasta próxima medianoche UTC (para asistencia)
+    const _cdRestDiario = (tipo) => {
+        const u = _ultimoDe(tipo);
+        if (!u || _diaUTC(u.created_at) < _hoyUTC()) return '✓ Disponible';
+        const mañanaUTC = (_hoyUTC() + 1) * 86400000;
+        const restMs = mañanaUTC - Date.now();
+        const h = Math.floor(restMs / 3600000);
+        const m = Math.floor((restMs % 3600000) / 60000);
+        return `${h}h ${m}m`;
+    };
+
+    // Texto de countdown hasta que pasen 2 días calendario
+    const _cdRestC3 = (tipo) => {
+        const u = _ultimoDe(tipo);
+        if (!u || (_hoyUTC() - _diaUTC(u.created_at)) >= 2) return '✓ Disponible';
+        const diasFalta = 2 - (_hoyUTC() - _diaUTC(u.created_at));
+        const targetUTC = (_diaUTC(u.created_at) + 2) * 86400000;
+        const restMs = targetUTC - Date.now();
+        const h = Math.floor(restMs / 3600000);
+        const m = Math.floor((restMs % 3600000) / 60000);
+        return `${h}h ${m}m`;
+    };
+
+    const cdA = _dispAsistencia();
+    const cdT = _dispC3Dias('turno_extra');
+    const cdC = _dispC3Dias('contenido');
 
     const _pushCard = (tipo, label, monto, disp, cdTxt) => {
         const isOp = estadoUI.esAdmin;
@@ -1008,9 +1044,9 @@ async function _tabHex(nombre, body) {
             <div class="htab-divider-line htab-divider-rev"></div>
         </div>
         <div class="htab-push-grid">
-            ${_pushCard('asistencia','Asistencia',300,cdA>=24,_cdRest(cdA,24)+' · diario')}
-            ${_pushCard('turno_extra','Turno Extra',500,cdT>=72,_cdRest(cdT,72)+' · c/3 días')}
-            ${_pushCard('contenido','Contenido','100–1000',cdC>=72,_cdRest(cdC,72)+' · c/3 días')}
+            ${_pushCard('asistencia','Asistencia',300,cdA,_cdRestDiario('asistencia')+' · diario')}
+            ${_pushCard('turno_extra','Turno Extra',500,cdT,_cdRestC3('turno_extra')+' · c/2 días')}
+            ${_pushCard('contenido','Contenido','100–1000',cdC,_cdRestC3('contenido')+' · c/2 días')}
         </div>
     </div>
 
@@ -1247,10 +1283,9 @@ function _tabStats(nombre) {
 
     const afinRows = AFINS.map(a => {
         const base  = af.base?.[a.key]  || 0;
-        const hz    = af.hz?.[a.key]    || 0;  // calculado por DB — solo lectura
         const extra = af.extra?.[a.key] || 0;
         const alter = af.alter?.[a.key] || 0;
-        const total = base + hz + extra + alter;
+        const total = base + extra + alter;
         const cdVal = p[`cd_${a.key}`] ?? 0.5;
         return `<div class="ppj-afin-block">
             <div class="ppj-afin-header"><span class="ppj-afin-name">${a.label}</span><span class="ppj-afin-total">${total}</span></div>
@@ -1260,11 +1295,6 @@ function _tabStats(nombre) {
                 <span class="ppj-afin-val">${base}</span>
                 ${estadoUI.esAdmin?`<button class="ppj-ctrl-btn" onclick="window.modAfin('${safe}','${a.key}',1)">+</button>`:''}
             </div>
-            ${hz > 0 ? `<div class="ppj-afin-row ppj-afin-row-hz" title="Calculado desde hechizos del inventario — solo lectura">
-                <span class="ppj-afin-src-lbl src-hz">Hz</span>
-                <span class="ppj-afin-val ppj-afin-val-hz">+${hz}</span>
-                <span class="ppj-hz-readonly-tag">auto</span>
-            </div>` : ''}
             <div class="ppj-afin-row">
                 <span class="ppj-afin-src-lbl src-ext">Ext</span>
                 ${estadoUI.esAdmin?`<button class="ppj-ctrl-btn" onclick="window.modAfinExtra('${safe}','${a.key}',-1)">−</button>`:''}
