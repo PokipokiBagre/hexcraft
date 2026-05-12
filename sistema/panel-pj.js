@@ -591,7 +591,7 @@ async function _tabHex(nombre, body) {
         <div class="ppj-section-title">Imagen del personaje</div>
         <div class="ppj-img-wrap" onclick="window.abrirSubirImagen('${safe}')">
             <img class="ppj-img-preview" src="${_imgPj(p.iconoOverride||nombre)}"
-                 onerror="this.style.display='none'">
+                 onerror="this.onerror=null;this.src='${_fallback()}'">
             <div class="ppj-img-overlay">📷 Cambiar imagen</div>
         </div>
     </div>`:''}`;
