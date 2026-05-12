@@ -477,21 +477,38 @@ async function _tabHex(nombre, body) {
         return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
     };
 
-    const _pushCard = (tipo, label, monto, disp, cdTxt) => `
-        <div class="hex-pcard ${disp?'avail':''}">
+    const _pushCard = (tipo, label, monto, disp, cdTxt) => {
+        const isOp = estadoUI.esAdmin;
+        const availClass = disp ? 'avail' : '';
+        const lockedClass = !isOp ? 'locked' : '';
+        const amtStr = typeof monto==='string' ? monto : ('+'+monto.toLocaleString());
+        const cdParts = cdTxt.split(' · ');
+        const cdStatus = cdParts[0];
+        const cdFreq = cdParts[1] || '';
+        const isAvail = disp && isOp;
+        return `
+        <div class="hex-pcard ${availClass} ${lockedClass}">
+            <div class="hex-pcard-glow"></div>
             <div class="hex-pcard-label">${label}</div>
-            <div class="hex-pcard-amt">${typeof monto==='string'?monto:('+'+monto.toLocaleString())}</div>
-            <div class="hex-pcard-cd">${cdTxt}</div>
-            ${estadoUI.esAdmin && tipo!=='contenido' ? `
-                <button class="hex-pcard-btn" ${disp?'':'disabled'}
-                    onclick="window._ppjEjecutarHexPush('${safe}','${tipo}',${monto})">Otorgar</button>` : ''}
-            ${estadoUI.esAdmin && tipo==='contenido' ? `
-                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-                    <input class="hex-pcard-input" id="ppj-cv-${_norm(nombre)}" type="number" value="500" min="100" max="1000" step="100">
-                    <button class="hex-pcard-btn" ${disp?'':'disabled'}
-                        onclick="window._ppjEjecutarHexPush('${safe}','contenido',parseInt(document.getElementById('ppj-cv-${_norm(nombre)}')?.value)||500)">OK</button>
-                </div>` : ''}
+            <div class="hex-pcard-amt">${amtStr}</div>
+            <div class="hex-pcard-cd">
+                ${disp ? `<span class="hex-pcard-cd-avail">✓ ${cdStatus}</span>` : `<span class="hex-pcard-cd-wait">${cdStatus}</span>`}
+                ${cdFreq ? `<span class="hex-pcard-cd-freq">${cdFreq}</span>` : ''}
+            </div>
+            ${tipo !== 'contenido' ? `
+                <button class="hex-pcard-btn ${!isOp?'hex-pcard-btn-locked':''}" ${isAvail?'':'disabled'}
+                    onclick="${isOp?`window._ppjEjecutarHexPush('${safe}','${tipo}',${monto})`:''}">
+                    ${!isOp ? '🔒 Solo OP' : 'Otorgar'}
+                </button>` : `
+                <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+                    <input class="hex-pcard-input ${!isOp?'hex-pcard-input-locked':''}" id="ppj-cv-${_norm(nombre)}" type="number" value="500" min="100" max="1000" step="100" ${!isOp?'disabled':''}>
+                    <button class="hex-pcard-btn ${!isOp?'hex-pcard-btn-locked':''}" ${isAvail?'':'disabled'}
+                        onclick="${isOp?`window._ppjEjecutarHexPush('${safe}','contenido',parseInt(document.getElementById('ppj-cv-${_norm(nombre)}')?.value)||500)`:''}">
+                        ${!isOp ? '🔒 Solo OP' : 'OK'}
+                    </button>
+                </div>`}
         </div>`;
+    };
 
     const _tCls = { asistencia:'hlog-asistencia', turno_extra:'hlog-turno_extra', contenido:'hlog-contenido' };
     const _tLbl = { asistencia:'Asistencia', turno_extra:'Turno extra', contenido:'Contenido' };
@@ -585,26 +602,163 @@ async function _tabHex(nombre, body) {
     body.innerHTML = `
     <style>
     .htab-root{font-family:'Inter',system-ui,sans-serif;}
-    .htab-hero{padding:36px 24px 24px;text-align:center;background:radial-gradient(ellipse 100% 80% at 50% -5%,rgba(212,175,55,0.08) 0%,transparent 65%),linear-gradient(180deg,#09070f 0%,#060410 100%);border-bottom:1px solid rgba(212,175,55,0.1);}
-    .htab-hero-sub{font-size:0.52em;letter-spacing:4px;text-transform:uppercase;color:rgba(212,175,55,0.35);margin-bottom:20px;}
-    .htab-hex-amount{font-family:'Cinzel',serif;font-size:3.2em;color:#d4af37;letter-spacing:3px;line-height:1;text-shadow:0 0 30px rgba(212,175,55,0.3),0 2px 10px rgba(0,0,0,0.9);margin:12px 0 24px;}
+
+    /* ── HERO ── */
+    .htab-hero{
+        padding:32px 24px 28px;text-align:center;position:relative;overflow:hidden;
+        background:
+            radial-gradient(ellipse 140% 90% at 50% -10%, rgba(212,175,55,0.11) 0%, transparent 60%),
+            linear-gradient(180deg,#0a0810 0%,#07050e 100%);
+        border-bottom:1px solid rgba(212,175,55,0.14);
+    }
+    .htab-hero::before{
+        content:'';position:absolute;inset:0;pointer-events:none;
+        background:
+            repeating-linear-gradient(0deg,transparent,transparent 28px,rgba(212,175,55,0.018) 29px),
+            repeating-linear-gradient(90deg,transparent,transparent 28px,rgba(212,175,55,0.018) 29px);
+    }
+    .htab-hero::after{
+        content:'';position:absolute;bottom:0;left:10%;right:10%;height:1px;
+        background:linear-gradient(90deg,transparent,rgba(212,175,55,0.45),transparent);
+    }
+    .htab-hero-sub{
+        font-size:0.5em;letter-spacing:5px;text-transform:uppercase;
+        color:rgba(212,175,55,0.3);margin-bottom:16px;position:relative;
+    }
+    .htab-hex-amount{
+        font-family:'Cinzel',serif;font-size:3.4em;color:#d4af37;letter-spacing:4px;
+        line-height:1;position:relative;
+        text-shadow:0 0 40px rgba(212,175,55,0.4),0 0 80px rgba(212,175,55,0.15),0 3px 12px rgba(0,0,0,0.9);
+        margin:14px 0 8px;
+    }
+    .htab-hex-amount-wrap{position:relative;display:inline-block;}
+    .htab-hex-amount-wrap::before,
+    .htab-hex-amount-wrap::after{
+        content:'◆';font-size:0.18em;color:rgba(212,175,55,0.25);
+        position:absolute;top:50%;transform:translateY(-50%);letter-spacing:0;
+    }
+    .htab-hex-amount-wrap::before{right:calc(100% + 10px);}
+    .htab-hex-amount-wrap::after{left:calc(100% + 10px);}
+    .htab-currency-label{
+        font-size:0.55em;letter-spacing:3px;color:rgba(212,175,55,0.38);
+        text-transform:uppercase;margin-bottom:18px;font-family:'Cinzel',serif;
+    }
+
+    /* hex icon svg */
+    .htab-hex-icon{display:block;margin:0 auto 4px;opacity:0.9;filter:drop-shadow(0 0 8px rgba(212,175,55,0.3));}
+
+    /* ── ADJUST BUTTONS ── */
+    .htab-btn-section{padding:14px 20px 4px;position:relative;}
+    .htab-btn-section-label{font-size:0.5em;letter-spacing:2px;color:#2e2e40;text-transform:uppercase;font-weight:700;text-align:center;margin-bottom:8px;}
     .htab-btn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;max-width:460px;margin:0 auto 5px;}
-    .htab-btn{background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.14);border-radius:7px;color:#b8882a;font-size:0.73em;font-weight:700;padding:8px 2px;cursor:pointer;transition:all 0.13s;font-family:inherit;}
-    .htab-btn:hover{background:rgba(212,175,55,0.13);border-color:rgba(212,175,55,0.35);color:#d4af37;}
-    .htab-btn.neg{color:#c05050;border-color:rgba(190,60,60,0.2);background:rgba(190,60,60,0.05);}
-    .htab-btn.neg:hover{background:rgba(190,60,60,0.13);border-color:rgba(190,60,60,0.38);}
+    .htab-btn{
+        background:rgba(212,175,55,0.04);border:1px solid rgba(212,175,55,0.12);
+        border-radius:6px;color:#8a6820;font-size:0.7em;font-weight:700;padding:8px 2px;
+        cursor:pointer;transition:all 0.13s;font-family:inherit;position:relative;overflow:hidden;
+    }
+    .htab-btn:hover{background:rgba(212,175,55,0.12);border-color:rgba(212,175,55,0.32);color:#d4af37;box-shadow:0 0 10px rgba(212,175,55,0.07);}
+    .htab-btn.neg{color:#7a3030;border-color:rgba(180,50,50,0.18);background:rgba(180,50,50,0.04);}
+    .htab-btn.neg:hover{background:rgba(180,50,50,0.11);border-color:rgba(180,50,50,0.35);color:#e07070;}
+
+    /* ── PUSHES SECTION ── */
+    .htab-pushes-section{
+        padding:22px 20px 20px;
+        border-top:1px solid rgba(212,175,55,0.08);
+        border-bottom:1px solid rgba(212,175,55,0.08);
+        background:linear-gradient(180deg,rgba(212,175,55,0.025) 0%,transparent 60%);
+        position:relative;
+    }
+    .htab-pushes-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+    .htab-divider-line{flex:1;height:1px;background:linear-gradient(90deg,rgba(212,175,55,0.2),transparent);}
+    .htab-divider-rev{background:linear-gradient(90deg,transparent,rgba(212,175,55,0.2));}
+    .htab-pushes-title{
+        font-family:'Cinzel',serif;font-size:0.58em;letter-spacing:2.5px;
+        color:rgba(212,175,55,0.6);text-transform:uppercase;white-space:nowrap;
+    }
+
+    /* ── PUSH CARDS ── */
     .htab-push-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
-    .htab-pcard{background:rgba(212,175,55,0.04);border:1px solid rgba(212,175,55,0.15);border-radius:10px;padding:16px 10px 12px;text-align:center;transition:all 0.18s;position:relative;overflow:hidden;}
-    .htab-pcard.on{background:rgba(212,175,55,0.08);border-color:rgba(212,175,55,0.38);box-shadow:0 0 18px rgba(212,175,55,0.06);}
-    .htab-pcard.on::after{content:'';position:absolute;top:0;left:15%;right:15%;height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.65),transparent);}
-    .htab-pcard-lbl{font-size:0.57em;letter-spacing:1.5px;text-transform:uppercase;color:rgba(212,175,55,0.4);font-weight:700;margin-bottom:9px;}
-    .htab-pcard-amt{font-family:'Cinzel',serif;font-size:1.3em;color:#d4af37;font-weight:700;line-height:1;margin-bottom:6px;}
-    .htab-pcard-cd{font-size:0.59em;color:#3a3a58;min-height:15px;margin-bottom:10px;}
-    .htab-pcard-btn{width:100%;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.26);border-radius:6px;color:#d4af37;font-family:'Cinzel',serif;font-size:0.68em;font-weight:700;padding:7px 4px;cursor:pointer;transition:all 0.14s;letter-spacing:0.5px;}
-    .htab-pcard-btn:hover:not(:disabled){background:rgba(212,175,55,0.2);border-color:rgba(212,175,55,0.55);}
-    .htab-pcard-btn:disabled{opacity:0.25;cursor:default;}
-    .htab-pcard-input{width:62px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:5px;color:#d4af37;font-size:0.82em;padding:4px 5px;font-family:'Cinzel',serif;font-weight:700;text-align:center;margin-bottom:8px;}
-    .htab-hlog{display:flex;align-items:center;gap:9px;padding:9px 12px;background:rgba(255,255,255,0.018);border-radius:8px;border:1px solid rgba(255,255,255,0.04);margin-bottom:5px;}
+    .hex-pcard{
+        position:relative;overflow:hidden;
+        background:
+            linear-gradient(145deg,rgba(212,175,55,0.04) 0%,rgba(212,175,55,0.01) 100%);
+        border:1px solid rgba(212,175,55,0.14);
+        border-radius:11px;padding:14px 10px 12px;text-align:center;
+        transition:all 0.2s;
+        box-shadow:inset 0 1px 0 rgba(212,175,55,0.06),inset 0 -1px 0 rgba(0,0,0,0.2);
+    }
+    .hex-pcard::before{
+        content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
+        background:linear-gradient(90deg,transparent,rgba(212,175,55,0.18),transparent);
+    }
+    .hex-pcard.avail{
+        background:linear-gradient(145deg,rgba(212,175,55,0.09) 0%,rgba(212,175,55,0.04) 100%);
+        border-color:rgba(212,175,55,0.38);
+        box-shadow:0 4px 20px rgba(212,175,55,0.07),inset 0 1px 0 rgba(212,175,55,0.12),0 1px 3px rgba(0,0,0,0.4);
+    }
+    .hex-pcard.avail::before{background:linear-gradient(90deg,transparent,rgba(212,175,55,0.55),transparent);}
+    .hex-pcard.avail .hex-pcard-glow{
+        position:absolute;top:-20px;left:50%;transform:translateX(-50%);
+        width:60px;height:40px;
+        background:radial-gradient(ellipse,rgba(212,175,55,0.2) 0%,transparent 70%);
+        pointer-events:none;
+    }
+    .hex-pcard.locked{opacity:0.85;}
+    .hex-pcard-glow{display:none;}
+    .hex-pcard.avail .hex-pcard-glow{display:block;}
+    .hex-pcard-label{
+        font-size:0.55em;letter-spacing:1.8px;text-transform:uppercase;
+        color:rgba(212,175,55,0.45);font-weight:700;margin-bottom:8px;
+    }
+    .hex-pcard-amt{
+        font-family:'Cinzel',serif;font-size:1.25em;color:#d4af37;font-weight:700;
+        line-height:1;margin-bottom:7px;
+        text-shadow:0 0 12px rgba(212,175,55,0.25);
+    }
+    .hex-pcard-cd{
+        font-size:0.56em;min-height:28px;margin-bottom:9px;
+        display:flex;flex-direction:column;gap:2px;align-items:center;
+    }
+    .hex-pcard-cd-avail{color:#4a7a54;font-weight:600;}
+    .hex-pcard-cd-wait{color:#5a4a28;}
+    .hex-pcard-cd-freq{color:#3a3a58;margin-top:1px;}
+    .hex-pcard-btn{
+        width:100%;
+        background:linear-gradient(180deg,rgba(212,175,55,0.1) 0%,rgba(212,175,55,0.05) 100%);
+        border:1px solid rgba(212,175,55,0.28);
+        border-radius:7px;color:#d4af37;font-family:'Cinzel',serif;font-size:0.66em;
+        font-weight:700;padding:7px 4px;cursor:pointer;transition:all 0.14s;letter-spacing:0.5px;
+        box-shadow:inset 0 1px 0 rgba(212,175,55,0.08);
+    }
+    .hex-pcard-btn:hover:not(:disabled){
+        background:linear-gradient(180deg,rgba(212,175,55,0.22) 0%,rgba(212,175,55,0.12) 100%);
+        border-color:rgba(212,175,55,0.6);
+        box-shadow:0 0 12px rgba(212,175,55,0.12),inset 0 1px 0 rgba(212,175,55,0.15);
+    }
+    .hex-pcard-btn:disabled{opacity:0.22;cursor:default;}
+    .hex-pcard-btn-locked{
+        background:rgba(255,255,255,0.02)!important;
+        border-color:rgba(255,255,255,0.06)!important;
+        color:#3a3a58!important;font-size:0.6em!important;
+        letter-spacing:0!important;
+    }
+    .hex-pcard-input{
+        width:62px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+        border-radius:5px;color:#d4af37;font-size:0.82em;padding:4px 5px;
+        font-family:'Cinzel',serif;font-weight:700;text-align:center;margin-bottom:7px;
+    }
+    .hex-pcard-input-locked{opacity:0.3;}
+
+    /* ── HISTORIAL ── */
+    .htab-hlog-section{padding:20px 20px 6px;}
+    .htab-hlog-title{font-size:0.5em;letter-spacing:2.5px;text-transform:uppercase;color:#3a3a58;font-weight:700;margin-bottom:12px;}
+    .htab-hlog{
+        display:flex;align-items:center;gap:9px;padding:9px 12px;
+        background:rgba(255,255,255,0.016);border-radius:8px;
+        border:1px solid rgba(255,255,255,0.04);margin-bottom:5px;
+        transition:background 0.15s;
+    }
+    .htab-hlog:hover{background:rgba(255,255,255,0.028);}
     .htab-chip{font-size:0.59em;font-weight:700;letter-spacing:0.5px;padding:2px 9px;border-radius:10px;flex-shrink:0;white-space:nowrap;}
     .htab-chip-a{background:rgba(62,207,110,0.1);color:#3ecf6e;border:1px solid rgba(62,207,110,0.22);}
     .htab-chip-t{background:rgba(74,179,232,0.1);color:#4ab3e8;border:1px solid rgba(74,179,232,0.22);}
@@ -618,41 +772,48 @@ async function _tabHex(nombre, body) {
 
     <div class="htab-hero">
         <div class="htab-hero-sub">Panel de Recursos</div>
-        <svg style="display:block;margin:0 auto" width="100" height="88" viewBox="0 0 100 88" fill="none">
-            <polygon points="50,2 94,25 94,63 50,86 6,63 6,25" stroke="rgba(212,175,55,0.2)" stroke-width="1.2"/>
-            <polygon points="50,13 83,31 83,57 50,75 17,57 17,31" stroke="rgba(212,175,55,0.09)" stroke-width="0.8"/>
-            <line x1="50" y1="2" x2="50" y2="8" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="94" y1="25" x2="89" y2="28" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="94" y1="63" x2="89" y2="60" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="50" y1="86" x2="50" y2="80" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="6" y1="63" x2="11" y2="60" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="6" y1="25" x2="11" y2="28" stroke="rgba(212,175,55,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+        <svg class="htab-hex-icon" width="80" height="70" viewBox="0 0 100 88" fill="none">
+            <polygon points="50,2 94,25 94,63 50,86 6,63 6,25" stroke="rgba(212,175,55,0.28)" stroke-width="1.2"/>
+            <polygon points="50,13 83,31 83,57 50,75 17,57 17,31" stroke="rgba(212,175,55,0.1)" stroke-width="0.8"/>
+            <polygon points="50,24 72,37 72,51 50,64 28,51 28,37" stroke="rgba(212,175,55,0.06)" stroke-width="0.6"/>
+            <line x1="50" y1="2" x2="50" y2="8" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="94" y1="25" x2="89" y2="28" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="94" y1="63" x2="89" y2="60" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="50" y1="86" x2="50" y2="80" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="6" y1="63" x2="11" y2="60" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="6" y1="25" x2="11" y2="28" stroke="rgba(212,175,55,0.7)" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="50" cy="44" r="3" fill="rgba(212,175,55,0.35)"/>
         </svg>
-        <div class="htab-hex-amount">${(p.hex||0).toLocaleString()}</div>
+        <div class="htab-currency-label">HEX</div>
+        <div class="htab-hex-amount-wrap">
+            <div class="htab-hex-amount">${(p.hex||0).toLocaleString()}</div>
+        </div>
         ${canEdit?`
-        <div class="htab-btn-grid">${deltas.map(d=>`<button class="htab-btn neg" onclick="window.modStat('${safe}','hex',${-d})">−${d}</button>`).join('')}</div>
-        <div class="htab-btn-grid" style="margin-top:5px;">${deltas.map(d=>`<button class="htab-btn" onclick="window.modStat('${safe}','hex',${d})">+${d}</button>`).join('')}</div>
+        <div class="htab-btn-section">
+            <div class="htab-btn-section-label">Ajustar</div>
+            <div class="htab-btn-grid">${deltas.map(d=>`<button class="htab-btn neg" onclick="window.modStat('${safe}','hex',${-d})">−${d}</button>`).join('')}</div>
+            <div class="htab-btn-grid" style="margin-top:5px;">${deltas.map(d=>`<button class="htab-btn" onclick="window.modStat('${safe}','hex',${d})">+${d}</button>`).join('')}</div>
+        </div>
         `:''}
     </div>
 
     ${vexHtml}
 
-    ${estadoUI.esAdmin?`
-    <div style="padding:22px 24px;border-bottom:1px solid rgba(212,175,55,0.07);">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(212,175,55,0.22),transparent);"></div>
-            <span style="font-family:'Cinzel',serif;font-size:0.58em;letter-spacing:2.5px;color:rgba(212,175,55,0.55);text-transform:uppercase;white-space:nowrap;">Pushes de HEX</span>
-            <div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.22));"></div>
+    <div class="htab-pushes-section">
+        <div class="htab-pushes-header">
+            <div class="htab-divider-line"></div>
+            <span class="htab-pushes-title">Pushes de HEX</span>
+            <div class="htab-divider-line htab-divider-rev"></div>
         </div>
         <div class="htab-push-grid">
             ${_pushCard('asistencia','Asistencia',300,cdA>=24,_cdRest(cdA,24)+' · diario')}
             ${_pushCard('turno_extra','Turno Extra',500,cdT>=72,_cdRest(cdT,72)+' · c/3 días')}
             ${_pushCard('contenido','Contenido','100–1000',cdC>=72,_cdRest(cdC,72)+' · c/3 días')}
         </div>
-    </div>`:''}
+    </div>
 
-    <div style="padding:22px 24px;">
-        <div style="font-size:0.52em;letter-spacing:2.5px;text-transform:uppercase;color:#3a3a58;font-weight:700;margin-bottom:14px;">Historial de Pushes</div>
+    <div class="htab-hlog-section">
+        <div class="htab-hlog-title">Historial de Pushes</div>
         ${historial.length===0
             ? `<div style="text-align:center;color:#2a2a48;font-size:0.7em;padding:24px 0;">Sin registros</div>`
             : historial.map(h=>{
