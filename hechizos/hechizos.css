@@ -759,6 +759,8 @@ body.drawer-open #hm-op-panel {
 .op-l-danger      { background: rgba(180,50,50,0.09); border-color: rgba(180,70,70,0.35); color: #c97070; }
 .op-l-danger:hover{ background: rgba(180,50,50,0.18); }
 .op-l-active      { background: rgba(0,210,255,0.1); border-color: rgba(0,210,255,0.4); color: #00d2ff; }
+.op-l-vex-disp        { background: rgba(154,80,220,0.1); border-color: rgba(154,80,220,0.35); color: #c090f0; }
+.op-l-vex-disp:hover  { background: rgba(154,80,220,0.22); border-color: rgba(154,80,220,0.6); color: #d8b0ff; }
 
 /* Formulario de edición */
 .op-l-edit-form { display: flex; flex-direction: column; gap: 6px; }

@@ -182,6 +182,10 @@ function _renderOpLeft() {
             <button class="op-l-btn op-l-green" onclick="window._hmBatchAsignarLeft()">👤 Asignar batch (${nSel})</button>
             <button class="op-l-btn" onclick="window._hmBatchPropsLeft()">⚙ Props batch</button>
         </div>
+        <div class="op-l-row">
+            <button class="op-l-btn op-l-vex-disp" onclick="window._hmBatchDispersarVex()">✦ Dispersar VEX</button>
+            <button class="op-l-btn op-l-danger" onclick="window._hmBatchEliminarVex()">✕ Eliminar VEX</button>
+        </div>
         <div id="op-l-batch-form"></div>
         ` : `<div style="font-size:0.68em;color:#333;padding:4px 0;">Activa multi-sel y selecciona nodos</div>`}
     `;
@@ -419,6 +423,263 @@ window._hmConfirmarBatchProps = async () => {
     calcSetsGlobales();
     _renderOpLeft();
     if (st.nodoSel) renderSidePanel(st.nodoSel);
+};
+
+// ══════════════════════════════════════════════════════════════
+//  DISPERSAR VEX — asigna VEX aleatorio con probabilidad
+// ══════════════════════════════════════════════════════════════
+
+window._hmBatchDispersarVex = () => {
+    const nodos = [...st.seleccionados];
+    if (nodos.length === 0) return;
+    const bf = document.getElementById('op-l-batch-form');
+    if (!bf) return;
+
+    bf.innerHTML = `
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title" style="color:#b070e8;">✦ DISPERSAR VEX (${nodos.length} hechizos)</div>
+
+        <div class="op-l-field-row">
+            <label>Probabilidad de VEX</label>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <input id="dv-prob" type="range" min="5" max="100" step="5" value="50"
+                    style="flex:1;" oninput="document.getElementById('dv-prob-lbl').textContent=this.value+'%'">
+                <span id="dv-prob-lbl" style="min-width:36px;text-align:right;color:#c080f0;font-weight:700;font-family:'Cinzel',serif;">50%</span>
+            </div>
+        </div>
+
+        <div class="op-l-field-row-2" style="margin-top:6px;">
+            <div>
+                <label>VEX mínimo</label>
+                <select id="dv-min">
+                    ${[50,100,150,200,250,300,350,400,450,500].map(v=>`<option value="${v}"${v===50?' selected':''}>${v}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label>VEX máximo</label>
+                <select id="dv-max">
+                    ${[50,100,150,200,250,300,350,400,450,500,600,700,800,900,1000].map(v=>`<option value="${v}"${v===500?' selected':''}>${v}</option>`).join('')}
+                </select>
+            </div>
+        </div>
+
+        <div style="margin:8px 0 4px;padding:8px 10px;background:rgba(154,80,220,0.07);border:1px solid rgba(154,80,220,0.2);border-radius:6px;font-size:0.65em;color:#a070d0;line-height:1.5;">
+            <strong style="color:#c090f0;">Cómo funciona:</strong> A cada hechizo se le lanza una moneda
+            con la probabilidad configurada. Si sale cara, recibe un VEX aleatorio en pasos de 50
+            entre mínimo y máximo. Los que no "ganen" quedan con VEX = 0.
+        </div>
+
+        <div style="font-size:0.62em;color:#555;margin-bottom:8px;" id="dv-preview-wrap">
+            <span id="dv-preview"></span>
+        </div>
+
+        <div class="op-l-row" style="margin-top:4px;">
+            <button class="op-l-btn" style="background:rgba(154,80,220,0.12);border-color:rgba(154,80,220,0.35);color:#c090f0;"
+                onclick="window._hmPreviewDispersarVex()">👁 Previsualizar</button>
+            <button class="op-l-btn op-l-vex-disp"
+                onclick="window._hmConfirmarDispersarVex()">✦ Aplicar</button>
+            <button class="op-l-btn" onclick="document.getElementById('op-l-batch-form').innerHTML=''">✕</button>
+        </div>`;
+};
+
+// Preview dispersión sin guardar
+window._hmPreviewDispersarVex = () => {
+    const prob = parseInt(document.getElementById('dv-prob')?.value || '50') / 100;
+    const min  = parseInt(document.getElementById('dv-min')?.value  || '50');
+    const max  = parseInt(document.getElementById('dv-max')?.value  || '500');
+    if (min > max) { toast('El mínimo no puede ser mayor que el máximo'); return; }
+
+    const nodos  = [...st.seleccionados];
+    const pasos  = Math.floor((max - min) / 50) + 1;
+    const valores = Array.from({length: pasos}, (_, i) => min + i * 50);
+
+    let conVex = 0, sinVex = 0, totalVex = 0;
+    const muestra = [];
+    nodos.forEach(n => {
+        const toca = Math.random() < prob;
+        if (toca) {
+            const v = valores[Math.floor(Math.random() * valores.length)];
+            conVex++; totalVex += v;
+            if (muestra.length < 5) muestra.push(`${n.nombre}: +${v} VEX`);
+        } else {
+            sinVex++;
+        }
+    });
+
+    const pv = document.getElementById('dv-preview');
+    if (pv) pv.innerHTML = `
+        <strong style="color:#c090f0;">Vista previa (simulación):</strong><br>
+        ~${conVex} con VEX · ~${sinVex} sin VEX · total: ~${totalVex} VEX<br>
+        <span style="opacity:0.7;">${muestra.join(' · ')}${conVex > 5 ? ' …' : ''}</span>`;
+};
+
+// Aplicar dispersión a la DB
+window._hmConfirmarDispersarVex = async () => {
+    const prob = parseInt(document.getElementById('dv-prob')?.value || '50') / 100;
+    const min  = parseInt(document.getElementById('dv-min')?.value  || '50');
+    const max  = parseInt(document.getElementById('dv-max')?.value  || '500');
+    if (min > max) { toast('El mínimo no puede ser mayor que el máximo'); return; }
+
+    const nodos  = [...st.seleccionados];
+    const pasos  = Math.floor((max - min) / 50) + 1;
+    const valores = Array.from({length: pasos}, (_, i) => min + i * 50);
+
+    const { supabase } = await import('../hex-auth.js');
+    let ok = 0, err = 0, conVex = 0;
+
+    for (const n of nodos) {
+        const toca = Math.random() < prob;
+        const nuevoVex = toca ? valores[Math.floor(Math.random() * valores.length)] : 0;
+        if (toca) conVex++;
+        const { error } = await supabase
+            .from('hechizos_nodos')
+            .update({ valor_vex: nuevoVex })
+            .eq('hechizo_id', n.id);
+        if (error) { err++; continue; }
+        n.vex = nuevoVex;
+        ok++;
+    }
+
+    const bf = document.getElementById('op-l-batch-form');
+    if (bf) bf.innerHTML = '';
+    toast(`✦ VEX dispersado: ${conVex}/${ok} recibieron VEX${err ? ` · ${err} errores` : ''}`);
+    _renderOpLeft();
+};
+
+// ══════════════════════════════════════════════════════════════
+//  ELIMINAR VEX — quita VEX a los seleccionados con filtros
+// ══════════════════════════════════════════════════════════════
+
+window._hmBatchEliminarVex = () => {
+    const nodos = [...st.seleccionados];
+    if (nodos.length === 0) return;
+    const bf = document.getElementById('op-l-batch-form');
+    if (!bf) return;
+
+    // Afinidades presentes en la selección
+    const afinidades = [...new Set(nodos.map(n => n.afinidad).filter(Boolean))].sort();
+    const afinOpts = ['(todas)', ...afinidades].map(a =>
+        `<option value="${a}">${a}</option>`).join('');
+
+    // Rango de VEX en la selección
+    const vexValues = nodos.filter(n => n.vex > 0).map(n => n.vex);
+    const vexMax = vexValues.length ? Math.max(...vexValues) : 500;
+    const vexMin = vexValues.length ? Math.min(...vexValues) : 0;
+
+    bf.innerHTML = `
+        <div class="op-l-sep"></div>
+        <div class="op-l-section-title" style="color:#e06060;">✕ ELIMINAR VEX (${nodos.length} hechizos)</div>
+
+        <div style="margin-bottom:8px;font-size:0.65em;color:#888;">
+            En la selección: <strong style="color:#ccc;">${vexValues.length}</strong> con VEX
+            (rango: ${vexMin}–${vexMax})
+        </div>
+
+        <div class="op-l-field-row">
+            <label>Modo de eliminación</label>
+            <select id="ev-modo" onchange="window._hmEvModoChange()">
+                <option value="todo">Todo el VEX → poner en 0</option>
+                <option value="encima">VEX por encima de un valor</option>
+                <option value="exacto">VEX de valor exacto</option>
+                <option value="afinidad">VEX de afinidad específica</option>
+            </select>
+        </div>
+
+        <div id="ev-extra" style="margin-top:4px;"></div>
+
+        <div class="op-l-row" style="margin-top:8px;">
+            <button class="op-l-btn" style="background:rgba(220,80,80,0.1);border-color:rgba(220,80,80,0.3);color:#e08080;"
+                onclick="window._hmPreviewEliminarVex()">👁 Previsualizar</button>
+            <button class="op-l-btn op-l-danger"
+                onclick="window._hmConfirmarEliminarVex()">✕ Aplicar</button>
+            <button class="op-l-btn" onclick="document.getElementById('op-l-batch-form').innerHTML=''">Cancel</button>
+        </div>
+        <div style="font-size:0.62em;color:#555;margin-top:6px;" id="ev-preview"></div>`;
+
+    // Guardar opciones de afinidad para el modo afinidad
+    window._hmEvAfinOpts = afinOpts;
+    window._hmEvModoChange();
+};
+
+window._hmEvModoChange = () => {
+    const modo  = document.getElementById('ev-modo')?.value;
+    const extra = document.getElementById('ev-extra');
+    if (!extra) return;
+    if (modo === 'encima') {
+        extra.innerHTML = `
+            <div class="op-l-field-row">
+                <label>Eliminar VEX ≥ (encima de)</label>
+                <input id="ev-umbral" type="number" value="500" min="50" step="50"
+                    style="width:90px;" placeholder="ej: 500">
+            </div>`;
+    } else if (modo === 'exacto') {
+        extra.innerHTML = `
+            <div class="op-l-field-row">
+                <label>Eliminar exactamente este VEX</label>
+                <input id="ev-exacto" type="number" value="350" min="50" step="50"
+                    style="width:90px;" placeholder="ej: 350">
+            </div>`;
+    } else if (modo === 'afinidad') {
+        extra.innerHTML = `
+            <div class="op-l-field-row">
+                <label>Afinidad a limpiar</label>
+                <select id="ev-afin">${window._hmEvAfinOpts || ''}</select>
+            </div>`;
+    } else {
+        extra.innerHTML = '';
+    }
+};
+
+window._hmPreviewEliminarVex = () => {
+    const afectados = _hmEvFiltrarAfectados();
+    const pv = document.getElementById('ev-preview');
+    if (!pv) return;
+    if (!afectados) { pv.innerHTML = ''; return; }
+    const muestra = afectados.slice(0, 6).map(n => `${n.nombre} (${n.vex} VEX)`).join(' · ');
+    pv.innerHTML = `<strong style="color:#e08080;">Afectados:</strong> ${afectados.length} hechizos<br>
+        <span style="opacity:0.7;">${muestra}${afectados.length > 6 ? ' …' : ''}</span>`;
+};
+
+// Retorna los nodos que serán afectados por el modo actual
+function _hmEvFiltrarAfectados() {
+    const modo   = document.getElementById('ev-modo')?.value || 'todo';
+    const nodos  = [...st.seleccionados];
+    if (modo === 'todo')     return nodos.filter(n => n.vex > 0);
+    if (modo === 'encima') {
+        const umbral = parseInt(document.getElementById('ev-umbral')?.value || '500');
+        return nodos.filter(n => n.vex >= umbral);
+    }
+    if (modo === 'exacto') {
+        const exacto = parseInt(document.getElementById('ev-exacto')?.value || '350');
+        return nodos.filter(n => n.vex === exacto);
+    }
+    if (modo === 'afinidad') {
+        const afin = document.getElementById('ev-afin')?.value;
+        if (!afin || afin === '(todas)') return nodos.filter(n => n.vex > 0);
+        return nodos.filter(n => n.vex > 0 && n.afinidad === afin);
+    }
+    return [];
+}
+
+window._hmConfirmarEliminarVex = async () => {
+    const afectados = _hmEvFiltrarAfectados();
+    if (!afectados || afectados.length === 0) { toast('Ningún hechizo coincide con el filtro'); return; }
+
+    const { supabase } = await import('../hex-auth.js');
+    let ok = 0, err = 0;
+    for (const n of afectados) {
+        const { error } = await supabase
+            .from('hechizos_nodos')
+            .update({ valor_vex: 0 })
+            .eq('hechizo_id', n.id);
+        if (error) { err++; continue; }
+        n.vex = 0;
+        ok++;
+    }
+    const bf = document.getElementById('op-l-batch-form');
+    if (bf) bf.innerHTML = '';
+    toast(`✕ VEX eliminado de ${ok} hechizo${ok!==1?'s':''}${err ? ` · ${err} errores` : ''}`);
+    _renderOpLeft();
 };
 
 // ══════════════════════════════════════════════════════════════
