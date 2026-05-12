@@ -361,6 +361,36 @@ async function _renderStats(p, s) {
     </div>`
   ).join('');
 
+  // Hz (solo lectura) + fila de totales
+  const hczData = pOrig?.afin_hcz || {};
+  const hzHtml = `<div style="margin-top:8px;">
+    <div class="hxev-stat-label" style="color:#50c88c;">Hz <span style="font-size:0.75em;color:#2e6a4a;font-family:'Inter',sans-serif;font-weight:400;letter-spacing:0;text-transform:none;">auto · calculado desde inventario</span></div>
+    ${AFINS.map(k => {
+      const val = hczData[k] || 0;
+      return `<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">
+        <span style="font-size:0.62em;color:#aaa;width:26px;">${AFIN_LABELS[k]}</span>
+        <span style="font-size:0.68em;color:${val > 0 ? '#50c88c' : '#444'};min-width:22px;text-align:right;">${val > 0 ? '+' : ''}${val}</span>
+        ${val > 0 ? '' : '<span style="font-size:0.5em;color:#333;">—</span>'}
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  const totalHtml = `<div style="margin-top:8px;padding:6px 8px;background:rgba(255,255,255,0.03);border-radius:5px;border:1px solid rgba(255,255,255,0.06);">
+    <div class="hxev-stat-label" style="color:#fff;margin-bottom:5px;">Total</div>
+    ${AFINS.map(k => {
+      const base  = (p.afin_base  || {})[k] || 0;
+      const hz    = hczData[k] || 0;
+      const extra = (p.afin_extra || {})[k] || 0;
+      const alter = (p.afin_alter || {})[k] || 0;
+      const total = base + hz + extra + alter;
+      return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;">
+        <span style="font-size:0.62em;color:#aaa;width:26px;">${AFIN_LABELS[k]}</span>
+        <span style="font-size:0.78em;font-weight:700;color:#e8e8e8;font-family:'Cinzel',serif;min-width:24px;text-align:right;">${total}</span>
+        <span style="font-size:0.5em;color:#3a3a55;">(${base}+${hz}+${extra >= 0 ? extra : extra}+${alter >= 0 ? alter : alter})</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+
   // ── Sección CD por afinidad ──────────────────────────────────
   const { hxState: hxS } = await import('./hexcast-state.js').catch(() => ({ hxState: null }));
   const cdPj = hxS?.cdPorPj?.[evState.pjNombre] || {};
@@ -386,7 +416,7 @@ async function _renderStats(p, s) {
 
   return `<div class="hxev-panel">
     <div class="hxev-panel-title">Stats</div>
-    <div class="hxev-stats-body">${statsHtml}<hr class="hxev-stat-divider">${afinsHtml}<hr class="hxev-stat-divider">${cdHtml}</div>
+    <div class="hxev-stats-body">${statsHtml}<hr class="hxev-stat-divider">${afinsHtml}${hzHtml}${totalHtml}<hr class="hxev-stat-divider">${cdHtml}</div>
   </div>`;
 }
 
