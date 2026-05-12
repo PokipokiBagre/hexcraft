@@ -1,19 +1,19 @@
 // ============================================================
 // panel-op-update.js — Panel de actualización masiva para OP
-// Se monta como barra superior flotante sobre el nav.
-// Importar desde personajes-main.js (solo visible si esAdmin)
+// Botón flotante al lado de HexCast, drawer modal al abrirse.
+// Solo visible para esAdmin. Importar desde personajes-main.js
 // ============================================================
 
-import { supabase }           from '../hex-auth.js';
+import { supabase }             from '../hex-auth.js';
 import { personajes, estadoUI } from './personajes-state.js';
-import { calcularStats }       from './personajes-logic.js';
-import { persistirCampos }     from './personajes-data.js';
+import { calcularStats }        from './personajes-logic.js';
+import { persistirCampos }      from './personajes-data.js';
 
 // ── Estado local ─────────────────────────────────────────────
 const opState = {
-    seleccionados: new Set(),   // nombres de PJ seleccionados
-    log: [],                    // [ { ts, texto } ]
-    historial: [],              // [ { entradas: [{nombre, campo, viejo, nuevo}] } ] para undo
+    seleccionados: new Set(),
+    log: [],
+    historial: [],
 };
 
 // ── CSS ───────────────────────────────────────────────────────
@@ -22,46 +22,99 @@ function _css() {
     const st = document.createElement('style');
     st.id = 'op-update-styles';
     st.textContent = `
-#op-update-bar {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 1500;
-    background: #09081a;
-    border-bottom: 1px solid rgba(124,77,170,0.4);
+/* ── Botón disparador ── */
+#op-trigger {
+    position: fixed; bottom: 20px; left: calc(50% + 130px);
+    background: rgba(10,6,24,0.96);
+    border: 1px solid rgba(124,77,170,0.45);
+    border-radius: 24px; color: #c8a0f0;
     font-family: 'Inter', system-ui, sans-serif;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.6);
-    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    font-size: 0.72em; letter-spacing: 1.2px; padding: 10px 22px;
+    cursor: pointer; z-index: 1100;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    transition: background 0.15s, box-shadow 0.15s;
+    white-space: nowrap; user-select: none; font-weight: 600;
 }
-#op-update-bar.collapsed { transform: translateY(calc(-100% + 36px)); }
-#op-bar-toggle {
-    position: absolute; bottom: -1px; left: 50%;
-    transform: translateX(-50%);
-    background: #09081a; border: 1px solid rgba(124,77,170,0.4);
-    border-top: none; color: rgba(124,77,170,0.8);
-    font-size: 0.6em; letter-spacing: 1.5px; text-transform: uppercase;
-    padding: 2px 14px 3px; border-radius: 0 0 6px 6px;
-    cursor: pointer; transition: color 0.15s;
+#op-trigger:hover {
+    background: rgba(124,77,170,0.15);
+    box-shadow: 0 4px 28px rgba(124,77,170,0.22);
 }
-#op-bar-toggle:hover { color: #b080e0; }
-.op-bar-inner {
+
+/* ── Overlay ── */
+#op-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 1200; opacity: 0; pointer-events: none;
+    transition: opacity 0.28s;
+}
+#op-overlay.open { opacity: 1; pointer-events: all; }
+
+/* ── Drawer ── */
+#op-drawer {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    height: 56vh;
+    background: #09081a;
+    border-top: 1px solid rgba(124,77,170,0.3);
+    border-radius: 14px 14px 0 0;
+    z-index: 1201;
+    display: flex; flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    font-family: 'Inter', system-ui, sans-serif;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.7);
+}
+#op-drawer.open { transform: translateY(0); }
+
+.op-handle {
+    width: 36px; height: 4px;
+    background: rgba(255,255,255,0.1); border-radius: 2px;
+    margin: 8px auto 0; flex-shrink: 0;
+}
+
+/* ── Header ── */
+.op-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    flex-shrink: 0;
+}
+.op-header-title {
+    font-size: 0.7em; letter-spacing: 2px; text-transform: uppercase;
+    color: rgba(124,77,170,0.9); font-weight: 700; flex: 1;
+}
+.op-btn-close {
+    background: none; border: none; color: #444;
+    font-size: 1.4em; cursor: pointer; padding: 2px 6px; line-height: 1;
+    transition: color 0.15s;
+}
+.op-btn-close:hover { color: #ccc; }
+
+/* ── Body 3 columnas ── */
+.op-body {
+    flex: 1; overflow: hidden;
     display: grid;
-    grid-template-columns: 220px 1fr 320px;
-    gap: 0;
+    grid-template-columns: 240px 1fr 300px;
     min-height: 0;
 }
 .op-col {
     padding: 10px 14px;
     border-right: 1px solid rgba(255,255,255,0.05);
+    display: flex; flex-direction: column;
+    overflow: hidden; min-height: 0;
 }
 .op-col:last-child { border-right: none; }
 .op-col-title {
     font-size: 0.5em; letter-spacing: 2px; text-transform: uppercase;
     color: rgba(124,77,170,0.7); font-weight: 700; margin-bottom: 7px;
+    flex-shrink: 0;
 }
 
-/* ── Selección de PJs ── */
+/* ── Chips PJs ── */
 .op-pj-grid {
     display: flex; flex-wrap: wrap; gap: 5px;
-    max-height: 90px; overflow-y: auto;
-    scrollbar-width: thin; scrollbar-color: rgba(124,77,170,0.3) transparent;
+    overflow-y: auto; flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(124,77,170,0.3) transparent;
+    align-content: flex-start;
 }
 .op-pj-chip {
     display: flex; align-items: center; gap: 5px;
@@ -69,8 +122,7 @@ function _css() {
     border: 1px solid rgba(255,255,255,0.1);
     background: rgba(255,255,255,0.03);
     cursor: pointer; transition: all 0.12s;
-    font-size: 0.68em; color: #aaa;
-    user-select: none;
+    font-size: 0.68em; color: #aaa; user-select: none;
 }
 .op-pj-chip:hover { border-color: rgba(124,77,170,0.4); color: #ccc; }
 .op-pj-chip.sel {
@@ -80,21 +132,20 @@ function _css() {
 }
 .op-pj-chip img {
     width: 18px; height: 18px; border-radius: 50%;
-    object-fit: cover; object-position: top;
-    background: #222;
+    object-fit: cover; object-position: top; background: #222;
 }
 .op-sel-all {
     font-size: 0.55em; color: rgba(124,77,170,0.6);
     cursor: pointer; text-decoration: underline;
-    margin-bottom: 4px; display: inline-block;
+    margin-bottom: 5px; display: inline-block; flex-shrink: 0;
 }
 .op-sel-all:hover { color: #b080e0; }
 
 /* ── Acciones ── */
+.op-actions-scroll { flex: 1; overflow-y: auto; scrollbar-width: thin; }
 .op-actions-grid {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
 }
-.op-action-block { }
 .op-action-label {
     font-size: 0.5em; letter-spacing: 1.5px; text-transform: uppercase;
     color: #555; font-weight: 700; margin-bottom: 4px;
@@ -105,21 +156,21 @@ function _css() {
     cursor: pointer; font-weight: 700; border: 1px solid;
     transition: background 0.12s; font-family: inherit;
 }
-.op-btn-pos  { background: rgba(62,207,110,0.1); border-color: rgba(62,207,110,0.35); color: #3ecf6e; }
+.op-btn-pos  { background: rgba(62,207,110,0.1);  border-color: rgba(62,207,110,0.35);  color: #3ecf6e; }
 .op-btn-pos:hover  { background: rgba(62,207,110,0.22); }
-.op-btn-neg  { background: rgba(220,80,80,0.1);  border-color: rgba(220,80,80,0.35);  color: #e06060; }
+.op-btn-neg  { background: rgba(220,80,80,0.1);   border-color: rgba(220,80,80,0.35);   color: #e06060; }
 .op-btn-neg:hover  { background: rgba(220,80,80,0.22); }
-.op-btn-hex  { background: rgba(212,175,55,0.1); border-color: rgba(212,175,55,0.35); color: #d4af37; }
+.op-btn-hex  { background: rgba(212,175,55,0.1);  border-color: rgba(212,175,55,0.35);  color: #d4af37; }
 .op-btn-hex:hover  { background: rgba(212,175,55,0.22); }
-.op-btn-vex  { background: rgba(160,80,220,0.1); border-color: rgba(160,80,220,0.35); color: #b060e8; }
+.op-btn-vex  { background: rgba(160,80,220,0.1);  border-color: rgba(160,80,220,0.35);  color: #b060e8; }
 .op-btn-vex:hover  { background: rgba(160,80,220,0.22); }
-.op-btn-gda  { background: rgba(212,175,55,0.08);border-color: rgba(212,175,55,0.25); color: #c8953a; }
+.op-btn-gda  { background: rgba(212,175,55,0.08); border-color: rgba(212,175,55,0.25);  color: #c8953a; }
 .op-btn-gda:hover  { background: rgba(212,175,55,0.18); }
-.op-btn-push { background: rgba(124,77,170,0.12);border-color: rgba(124,77,170,0.4);  color: #c8a0f0; }
+.op-btn-push { background: rgba(124,77,170,0.12); border-color: rgba(124,77,170,0.4);   color: #c8a0f0; }
 .op-btn-push:hover { background: rgba(124,77,170,0.24); }
-.op-btn-undo { background: rgba(220,120,40,0.1); border-color: rgba(220,120,40,0.35); color: #e88040; }
+.op-btn-undo { background: rgba(220,120,40,0.1);  border-color: rgba(220,120,40,0.35);  color: #e88040; }
 .op-btn-undo:hover { background: rgba(220,120,40,0.22); }
-.op-custom-row { display: flex; gap: 3px; margin-top: 3px; }
+.op-custom-row { display: flex; gap: 3px; margin-top: 4px; }
 .op-custom-input {
     width: 60px; background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.12); border-radius: 4px;
@@ -130,29 +181,28 @@ function _css() {
 .op-custom-input:focus { border-color: rgba(124,77,170,0.5); }
 
 /* ── Log ── */
-.op-log-wrap {
-    display: flex; flex-direction: column; height: 100%;
-}
+.op-log-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .op-log-area {
-    flex: 1; overflow-y: auto; background: rgba(0,0,0,0.3);
+    flex: 1; overflow-y: auto;
+    background: rgba(0,0,0,0.3);
     border-radius: 5px; border: 1px solid rgba(255,255,255,0.06);
-    padding: 5px 8px; font-size: 0.62em; color: #888;
-    font-family: 'Inter', monospace; line-height: 1.6;
-    min-height: 60px; max-height: 90px;
-    scrollbar-width: thin;
+    padding: 6px 8px; font-size: 0.62em; color: #888;
+    font-family: 'Inter', monospace; line-height: 1.7;
+    scrollbar-width: thin; min-height: 0;
 }
-.op-log-entry { border-bottom: 1px solid rgba(255,255,255,0.04); padding: 1px 0; }
+.op-log-entry {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding: 3px 0;
+}
 .op-log-entry:last-child { border-bottom: none; }
 .op-log-name { color: #c8a0f0; font-weight: 600; }
 .op-log-stat { color: #d4af37; }
+.op-log-vex  { color: #b060e8; }
 .op-log-ts   { color: #333; margin-right: 4px; }
-.op-log-actions {
-    display: flex; gap: 5px; margin-top: 5px;
-}
+.op-log-actions { display: flex; gap: 5px; margin-top: 5px; flex-shrink: 0; }
 .op-log-btn {
     font-size: 0.55em; padding: 2px 9px; border-radius: 4px;
-    cursor: pointer; border: 1px solid; font-family: inherit;
-    font-weight: 600; letter-spacing: 0.5px;
+    cursor: pointer; border: 1px solid; font-family: inherit; font-weight: 600;
 }
 `;
     document.head.appendChild(st);
@@ -194,8 +244,8 @@ function _renderChips() {
         .sort(([a], [b]) => a.localeCompare(b));
     grid.innerHTML = jugadores.map(([nombre, p]) => {
         const sel = opState.seleccionados.has(nombre);
-        return `<div class="op-pj-chip ${sel ? 'sel' : ''}" onclick="window._opTogglePJ('${nombre.replace(/'/g,"\\'")}')">
-            <img src="${_imgPj(p, nombre)}" onerror="this.style.display='none'" >
+        return `<div class="op-pj-chip ${sel ? 'sel' : ''}" onclick="window._opTogglePJ('${nombre.replace(/'/g,"\\'")}')" >
+            <img src="${_imgPj(p, nombre)}" onerror="this.style.display='none'">
             ${nombre}
         </div>`;
     }).join('');
@@ -209,7 +259,7 @@ function _renderLog() {
         return;
     }
     el.innerHTML = opState.log.map(e =>
-        `<div class="op-log-entry"><span class="op-log-ts">${e.ts}</span>${e.texto}</div>`
+        `<div class="op-log-entry"><span class="op-log-ts">[${e.ts}]</span>${e.texto}</div>`
     ).join('');
 }
 
@@ -218,19 +268,19 @@ async function _aplicarCambio(campo, delta, label, colorClass) {
     const pjs = _pjsSeleccionados();
     if (!pjs.length) { _toast('Selecciona al menos un personaje'); return; }
 
-    const lote = [];
+    const lote  = [];
     const snaps = [];
 
     for (const nombre of pjs) {
-        const p = personajes[nombre];
-        const s = calcularStats(p);
+        const p  = personajes[nombre];
+        const s  = calcularStats(p);
         const viejo = p[campo] ?? 0;
-        const caps = { vex_actual: s.vex_max, guarda_actual: s.guarda_max, vida_roja_actual: s.vida_roja_max };
-        const max = caps[campo] ?? Infinity;
+        const caps  = { vex_actual: s.vex_max, guarda_actual: s.guarda_max, vida_roja_actual: s.vida_roja_max };
+        const max   = caps[campo] ?? Infinity;
         const nuevo = campo === 'vida_azul_actual'
             ? viejo + delta
             : Math.max(0, Math.min(max, viejo + delta));
-        snaps.push({ nombre, campo, viejo, nuevo });
+        snaps.push({ nombre, campo, viejo, nuevo, max });
         p[campo] = nuevo;
         lote.push(persistirCampos(nombre, { [campo]: nuevo }));
     }
@@ -238,11 +288,15 @@ async function _aplicarCambio(campo, delta, label, colorClass) {
     await Promise.all(lote);
     opState.historial.push(snaps);
 
-    const linea = pjs.map(n => {
-        const s = snaps.find(x => x.nombre === n);
-        return `<span class="op-log-name">${n}</span> <span class="${colorClass}">${delta > 0 ? '+' : ''}${delta} ${label}</span> → <span class="op-log-stat">${s.nuevo}</span>`;
-    }).join(' · ');
-    _addLog(linea);
+    // Una entrada de log separada por <br> por personaje
+    const signo = delta >= 0 ? `+${delta}` : `${delta}`;
+    const lineas = snaps.map(s => {
+        const valorMostrado = isFinite(s.max) ? `${s.nuevo}/${s.max}` : `${s.nuevo}`;
+        return `<span class="op-log-name">${s.nombre}</span> `
+             + `<span class="${colorClass}">${label} ${signo}</span>`
+             + ` → <span class="op-log-stat">${valorMostrado}</span>`;
+    }).join('<br>');
+    _addLog(lineas);
 
     window.renderCatalogo?.();
     window.refreshPanelPJ?.();
@@ -252,11 +306,11 @@ async function _darHexPush(tipo, monto) {
     const pjs = _pjsSeleccionados();
     if (!pjs.length) { _toast('Selecciona al menos un personaje'); return; }
 
-    const lote = [];
+    const lote  = [];
     const snaps = [];
 
     for (const nombre of pjs) {
-        const p = personajes[nombre];
+        const p    = personajes[nombre];
         const viejo = p.hex ?? 0;
         const nuevo = viejo + monto;
         snaps.push({ nombre, campo: 'hex', viejo, nuevo });
@@ -273,11 +327,13 @@ async function _darHexPush(tipo, monto) {
     await Promise.all(lote.flat());
     opState.historial.push(snaps);
 
-    const linea = pjs.map(n => {
-        const s = snaps.find(x => x.nombre === n);
-        return `<span class="op-log-name">${n}</span> <span class="op-log-stat">+${monto} HEX (${tipo.replace('_',' ')})</span> → <span class="op-log-stat">${s.nuevo}</span>`;
-    }).join(' · ');
-    _addLog(linea);
+    const tipoLabel = tipo.replace('_', ' ');
+    const lineas = snaps.map(s =>
+        `<span class="op-log-name">${s.nombre}</span> `
+      + `<span class="op-log-stat">HEX +${monto} (${tipoLabel})</span>`
+      + ` → <span class="op-log-stat">${s.nuevo}</span>`
+    ).join('<br>');
+    _addLog(lineas);
 
     window.renderCatalogo?.();
     window.refreshPanelPJ?.();
@@ -287,29 +343,29 @@ async function _darPushVexGuarda(recurso) {
     const pjs = _pjsSeleccionados();
     if (!pjs.length) { _toast('Selecciona al menos un personaje'); return; }
 
-    const campo     = recurso === 'vex' ? 'vex_actual' : 'guarda_actual';
-    const tsKey     = recurso === 'vex' ? 'push_vex_ts' : 'push_guarda_ts';
-    const actKey    = recurso === 'vex' ? 'push_vex_actual' : 'push_guarda_actual';
-    const label     = recurso === 'vex' ? 'VEX' : 'Guarda';
-    const lote      = [];
-    const snaps     = [];
+    const campo  = recurso === 'vex' ? 'vex_actual'      : 'guarda_actual';
+    const tsKey  = recurso === 'vex' ? 'push_vex_ts'     : 'push_guarda_ts';
+    const actKey = recurso === 'vex' ? 'push_vex_actual'  : 'push_guarda_actual';
+    const label  = recurso === 'vex' ? 'VEX'             : 'Guarda';
+    const lote   = [];
+    const snaps  = [];
 
     for (const nombre of pjs) {
         const p = personajes[nombre];
         const s = calcularStats(p);
         const { calcularValorPush, calcularPushDisponibles } = await import('./personajes-logic.js');
-        const valor  = calcularValorPush(p, recurso);
-        const disp   = calcularPushDisponibles(p, s, recurso);
-        const usado  = p[actKey] || 0;
-        if (usado >= disp) continue;  // sin pushes disponibles
+        const valor = calcularValorPush(p, recurso);
+        const disp  = calcularPushDisponibles(p, s, recurso);
+        const usado = p[actKey] || 0;
+        if (usado >= disp) continue;
 
-        const max    = recurso === 'vex' ? s.vex_max : s.guarda_max;
-        const viejo  = p[campo] ?? 0;
-        const nuevo  = Math.min(max, viejo + valor);
+        const max      = recurso === 'vex' ? s.vex_max : s.guarda_max;
+        const viejo    = p[campo] ?? 0;
+        const nuevo    = Math.min(max, viejo + valor);
         const nuevoAct = usado + 1;
         const ts       = new Date().toISOString();
 
-        snaps.push({ nombre, campo, viejo, nuevo });
+        snaps.push({ nombre, campo, viejo, nuevo, max });
         p[campo]  = nuevo;
         p[actKey] = nuevoAct;
         p[tsKey]  = ts;
@@ -325,10 +381,14 @@ async function _darPushVexGuarda(recurso) {
     await Promise.all(lote);
     opState.historial.push(snaps);
 
-    const linea = snaps.map(s =>
-        `<span class="op-log-name">${s.nombre}</span> Push ${label} +${s.nuevo - s.viejo} → <span class="op-log-stat">${s.nuevo}</span>`
-    ).join(' · ');
-    _addLog(linea);
+    const lineas = snaps.map(s => {
+        const ganado = s.nuevo - s.viejo;
+        const signo  = ganado >= 0 ? `+${ganado}` : `${ganado}`;
+        return `<span class="op-log-name">${s.nombre}</span> `
+             + `Push ${label} ${signo}`
+             + ` → <span class="op-log-stat">${s.nuevo}/${s.max}</span>`;
+    }).join('<br>');
+    _addLog(lineas);
 
     window.renderCatalogo?.();
     window.refreshPanelPJ?.();
@@ -347,16 +407,21 @@ async function _undo() {
     }
 
     await Promise.all(lote);
-    const linea = `<span style="color:#e88040;">↺ Deshecho:</span> ` +
-        snaps.map(s => `<span class="op-log-name">${s.nombre}</span> ${s.campo} ${s.nuevo} → <span class="op-log-stat">${s.viejo}</span>`).join(' · ');
-    _addLog(linea);
+    const lineas = `<span style="color:#e88040;">↺ Deshecho:</span> `
+        + snaps.map(s =>
+            `<span class="op-log-name">${s.nombre}</span> `
+          + `${s.campo} ${s.nuevo} → <span class="op-log-stat">${s.viejo}</span>`
+          ).join('<br>');
+    _addLog(lineas);
 
     window.renderCatalogo?.();
     window.refreshPanelPJ?.();
 }
 
 function _copiarLog() {
-    const txt = opState.log.map(e => `[${e.ts}] ${e.texto.replace(/<[^>]+>/g, '')}`).join('\n');
+    const txt = opState.log.map(e =>
+        `[${e.ts}] ${e.texto.replace(/<br>/g, '\n        ').replace(/<[^>]+>/g, '')}`
+    ).join('\n');
     navigator.clipboard.writeText(txt).then(() => _toast('Log copiado'));
 }
 
@@ -365,151 +430,164 @@ function _toast(msg) {
     if (!el) {
         el = document.createElement('div');
         el.id = 'op-toast';
-        el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2a;border:1px solid rgba(124,77,170,0.5);color:#c8a0f0;font-size:0.75em;padding:7px 16px;border-radius:6px;z-index:9999;font-family:Inter,sans-serif;';
+        el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'
+            + 'background:#1a1a2a;border:1px solid rgba(124,77,170,0.5);color:#c8a0f0;'
+            + 'font-size:0.75em;padding:7px 16px;border-radius:6px;z-index:9999;font-family:Inter,sans-serif;';
         document.body.appendChild(el);
     }
     el.textContent = msg;
     el.style.opacity = '1';
     clearTimeout(el._t);
-    el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
+    el._t = setTimeout(() => { el.style.opacity = '0'; }, 2200);
+}
+
+// ── Abrir / cerrar ────────────────────────────────────────────
+function _open() {
+    document.getElementById('op-overlay')?.classList.add('open');
+    document.getElementById('op-drawer')?.classList.add('open');
+    _renderChips();
+}
+function _close() {
+    document.getElementById('op-overlay')?.classList.remove('open');
+    document.getElementById('op-drawer')?.classList.remove('open');
 }
 
 // ── Montaje ───────────────────────────────────────────────────
 function _montar() {
-    if (document.getElementById('op-update-bar')) return;
+    if (document.getElementById('op-trigger')) return;
     _css();
 
-    const bar = document.createElement('div');
-    bar.id = 'op-update-bar';
-    bar.classList.add('collapsed');
+    // Botón disparador (al lado derecho del botón HexCast)
+    const btn = document.createElement('button');
+    btn.id = 'op-trigger';
+    btn.textContent = '⚙ OP Panel';
+    btn.onclick = _open;
+    document.body.appendChild(btn);
 
-    bar.innerHTML = `
-    <div class="op-bar-inner">
+    // Overlay semitransparente
+    const overlay = document.createElement('div');
+    overlay.id = 'op-overlay';
+    overlay.onclick = _close;
+    document.body.appendChild(overlay);
 
-        <!-- COL 1: Selección PJs -->
-        <div class="op-col">
-            <div class="op-col-title">Personajes</div>
-            <span class="op-sel-all" onclick="window._opSelAll()">Seleccionar todos · <span id="op-sel-count">0</span></span>
-            <div class="op-pj-grid" id="op-pj-grid"></div>
+    // Drawer
+    const drawer = document.createElement('div');
+    drawer.id = 'op-drawer';
+    drawer.innerHTML = `
+        <div class="op-handle"></div>
+        <div class="op-header">
+            <span class="op-header-title">⚙ OP Panel</span>
+            <button class="op-btn-close" onclick="window._opClose()">✕</button>
         </div>
+        <div class="op-body">
 
-        <!-- COL 2: Acciones -->
-        <div class="op-col">
-            <div class="op-col-title">Actualizar</div>
-            <div class="op-actions-grid">
-
-                <!-- HEX -->
-                <div class="op-action-block">
-                    <div class="op-action-label">HEX</div>
-                    <div class="op-btns">
-                        <button class="op-btn op-btn-pos" onclick="window._opHex(100)">+100</button>
-                        <button class="op-btn op-btn-pos" onclick="window._opHex(300)">+300</button>
-                        <button class="op-btn op-btn-pos" onclick="window._opHex(500)">+500</button>
-                        <button class="op-btn op-btn-pos" onclick="window._opHex(1000)">+1k</button>
-                        <button class="op-btn op-btn-neg" onclick="window._opHex(-100)">−100</button>
-                        <button class="op-btn op-btn-neg" onclick="window._opHex(-500)">−500</button>
-                    </div>
-                    <div class="op-custom-row">
-                        <input class="op-custom-input" id="op-hex-custom" type="number" placeholder="±HEX" onclick="event.stopPropagation()">
-                        <button class="op-btn op-btn-hex" onclick="window._opHexCustom()">ok</button>
-                    </div>
-                    <div class="op-btns" style="margin-top:4px;">
-                        <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opHexPush('turno_extra',500)">Turno +500</button>
-                        <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opHexPushCustom()">Contenido</button>
-                    </div>
-                    <div class="op-custom-row" style="margin-top:2px;">
-                        <input class="op-custom-input" id="op-contenido-custom" type="number" placeholder="100-1000" value="500" onclick="event.stopPropagation()">
-                    </div>
-                </div>
-
-                <!-- VEX -->
-                <div class="op-action-block">
-                    <div class="op-action-label">VEX</div>
-                    <div class="op-btns">
-                        <button class="op-btn op-btn-pos" onclick="window._opVex(50)">+50</button>
-                        <button class="op-btn op-btn-pos" onclick="window._opVex(100)">+100</button>
-                        <button class="op-btn op-btn-pos" onclick="window._opVex(200)">+200</button>
-                        <button class="op-btn op-btn-neg" onclick="window._opVex(-50)">−50</button>
-                        <button class="op-btn op-btn-neg" onclick="window._opVex(-100)">−100</button>
-                    </div>
-                    <div class="op-custom-row">
-                        <input class="op-custom-input" id="op-vex-custom" type="number" placeholder="±VEX" onclick="event.stopPropagation()">
-                        <button class="op-btn op-btn-vex" onclick="window._opVexCustom()">ok</button>
-                    </div>
-                    <div class="op-btns" style="margin-top:4px;">
-                        <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opPushVex()">⚡ Push VEX</button>
-                    </div>
-                </div>
-
-                <!-- GUARDA -->
-                <div class="op-action-block">
-                    <div class="op-action-label">Guarda dorada</div>
-                    <div class="op-btns">
-                        <button class="op-btn op-btn-pos" onclick="window._opGuarda(1)">+1</button>
-                        <button class="op-btn op-btn-pos" onclick="window._opGuarda(3)">+3</button>
-                        <button class="op-btn op-btn-pos" onclick="window._opGuarda(5)">+5</button>
-                        <button class="op-btn op-btn-neg" onclick="window._opGuarda(-1)">−1</button>
-                        <button class="op-btn op-btn-neg" onclick="window._opGuarda(-3)">−3</button>
-                        <button class="op-btn op-btn-neg" onclick="window._opGuarda(-5)">−5</button>
-                    </div>
-                    <div class="op-custom-row">
-                        <input class="op-custom-input" id="op-gda-custom" type="number" placeholder="±Gda" onclick="event.stopPropagation()">
-                        <button class="op-btn op-btn-gda" onclick="window._opGuardaCustom()">ok</button>
-                    </div>
-                    <div class="op-btns" style="margin-top:4px;">
-                        <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opPushGuarda()">🛡 Push Guarda</button>
-                    </div>
-                </div>
-
+            <!-- COL 1: Selección PJs -->
+            <div class="op-col">
+                <div class="op-col-title">Personajes</div>
+                <span class="op-sel-all" onclick="window._opSelAll()">
+                    Seleccionar todos · <span id="op-sel-count">0</span>
+                </span>
+                <div class="op-pj-grid" id="op-pj-grid"></div>
             </div>
+
+            <!-- COL 2: Acciones -->
+            <div class="op-col">
+                <div class="op-col-title">Actualizar</div>
+                <div class="op-actions-scroll">
+                    <div class="op-actions-grid">
+
+                        <!-- HEX -->
+                        <div class="op-action-block">
+                            <div class="op-action-label">HEX</div>
+                            <div class="op-btns">
+                                <button class="op-btn op-btn-pos" onclick="window._opHex(100)">+100</button>
+                                <button class="op-btn op-btn-pos" onclick="window._opHex(300)">+300</button>
+                                <button class="op-btn op-btn-pos" onclick="window._opHex(500)">+500</button>
+                                <button class="op-btn op-btn-pos" onclick="window._opHex(1000)">+1k</button>
+                                <button class="op-btn op-btn-neg" onclick="window._opHex(-100)">−100</button>
+                                <button class="op-btn op-btn-neg" onclick="window._opHex(-500)">−500</button>
+                            </div>
+                            <div class="op-custom-row">
+                                <input class="op-custom-input" id="op-hex-custom" type="number" placeholder="±HEX">
+                                <button class="op-btn op-btn-hex" onclick="window._opHexCustom()">ok</button>
+                            </div>
+                            <div class="op-btns" style="margin-top:6px;">
+                                <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opHexPush('turno_extra',500)">Turno +500</button>
+                                <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opHexPushCustom()">Contenido</button>
+                            </div>
+                            <div class="op-custom-row">
+                                <input class="op-custom-input" id="op-contenido-custom" type="number" placeholder="100-1000" value="500">
+                            </div>
+                        </div>
+
+                        <!-- VEX -->
+                        <div class="op-action-block">
+                            <div class="op-action-label">VEX</div>
+                            <div class="op-btns">
+                                <button class="op-btn op-btn-pos" onclick="window._opVex(50)">+50</button>
+                                <button class="op-btn op-btn-pos" onclick="window._opVex(100)">+100</button>
+                                <button class="op-btn op-btn-pos" onclick="window._opVex(200)">+200</button>
+                                <button class="op-btn op-btn-neg" onclick="window._opVex(-50)">−50</button>
+                                <button class="op-btn op-btn-neg" onclick="window._opVex(-100)">−100</button>
+                            </div>
+                            <div class="op-custom-row">
+                                <input class="op-custom-input" id="op-vex-custom" type="number" placeholder="±VEX">
+                                <button class="op-btn op-btn-vex" onclick="window._opVexCustom()">ok</button>
+                            </div>
+                            <div class="op-btns" style="margin-top:6px;">
+                                <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opPushVex()">⚡ Push VEX</button>
+                            </div>
+                        </div>
+
+                        <!-- GUARDA -->
+                        <div class="op-action-block">
+                            <div class="op-action-label">Guarda dorada</div>
+                            <div class="op-btns">
+                                <button class="op-btn op-btn-pos" onclick="window._opGuarda(1)">+1</button>
+                                <button class="op-btn op-btn-pos" onclick="window._opGuarda(3)">+3</button>
+                                <button class="op-btn op-btn-pos" onclick="window._opGuarda(5)">+5</button>
+                                <button class="op-btn op-btn-neg" onclick="window._opGuarda(-1)">−1</button>
+                                <button class="op-btn op-btn-neg" onclick="window._opGuarda(-3)">−3</button>
+                                <button class="op-btn op-btn-neg" onclick="window._opGuarda(-5)">−5</button>
+                            </div>
+                            <div class="op-custom-row">
+                                <input class="op-custom-input" id="op-gda-custom" type="number" placeholder="±Gda">
+                                <button class="op-btn op-btn-gda" onclick="window._opGuardaCustom()">ok</button>
+                            </div>
+                            <div class="op-btns" style="margin-top:6px;">
+                                <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opPushGuarda()">🛡 Push Guarda</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- COL 3: Log -->
+            <div class="op-col">
+                <div class="op-col-title" style="display:flex;justify-content:space-between;align-items:center;">
+                    Log de cambios
+                    <button class="op-btn op-btn-undo" onclick="window._opUndo()" style="font-size:0.55em;padding:2px 8px;">↺ Deshacer</button>
+                </div>
+                <div class="op-log-wrap">
+                    <div class="op-log-area" id="op-log-area">
+                        <span style="color:#333;font-style:italic;">Sin cambios aún…</span>
+                    </div>
+                    <div class="op-log-actions">
+                        <button class="op-log-btn op-btn" style="background:rgba(212,175,55,0.08);border-color:rgba(212,175,55,0.25);color:#d4af37;" onclick="window._opCopiarLog()">📋 Copiar log</button>
+                        <button class="op-log-btn op-btn" style="background:rgba(220,80,80,0.08);border-color:rgba(220,80,80,0.25);color:#e06060;" onclick="window._opLimpiarLog()">🗑 Limpiar</button>
+                    </div>
+                </div>
+            </div>
+
         </div>
-
-        <!-- COL 3: Log + Undo -->
-        <div class="op-col">
-            <div class="op-col-title" style="display:flex;justify-content:space-between;align-items:center;">
-                Log de cambios
-                <button class="op-btn op-btn-undo" onclick="window._opUndo()" style="font-size:0.55em;padding:2px 8px;">↺ Deshacer</button>
-            </div>
-            <div class="op-log-wrap">
-                <div class="op-log-area" id="op-log-area">
-                    <span style="color:#333;font-style:italic;">Sin cambios aún…</span>
-                </div>
-                <div class="op-log-actions">
-                    <button class="op-log-btn op-btn" style="background:rgba(212,175,55,0.08);border-color:rgba(212,175,55,0.25);color:#d4af37;" onclick="window._opCopiarLog()">📋 Copiar log</button>
-                    <button class="op-log-btn op-btn" style="background:rgba(220,80,80,0.08);border-color:rgba(220,80,80,0.25);color:#e06060;" onclick="window._opLimpiarLog()">🗑 Limpiar</button>
-                </div>
-            </div>
-        </div>
-
-    </div>
-    <button id="op-bar-toggle" onclick="window._opToggleBar()">▲ OP Panel</button>`;
-
-    document.body.prepend(bar);
-
-    // Compensar el nav para que no quede debajo
-    _ajustarNav(false);
-    _renderChips();
-}
-
-function _ajustarNav(expanded) {
-    const nav = document.querySelector('.nav');
-    if (!nav) return;
-    const barH = document.getElementById('op-update-bar')?.offsetHeight || 0;
-    nav.style.top = expanded ? barH - 36 + 'px' : '0px';
-    nav.style.position = 'fixed';
-    nav.style.left = '0'; nav.style.right = '0';
-    nav.style.zIndex = '1400';
+    `;
+    document.body.appendChild(drawer);
 }
 
 // ── Handlers globales ─────────────────────────────────────────
-window._opToggleBar = () => {
-    const bar = document.getElementById('op-update-bar');
-    if (!bar) return;
-    const collapsed = bar.classList.toggle('collapsed');
-    document.getElementById('op-bar-toggle').textContent = collapsed ? '▲ OP Panel' : '▼ OP Panel';
-    // Ajustar nav después de transición
-    setTimeout(() => _ajustarNav(!collapsed), 300);
-};
+window._opClose      = _close;
+window._opOpen       = _open;
 
 window._opTogglePJ = (nombre) => {
     if (opState.seleccionados.has(nombre)) opState.seleccionados.delete(nombre);
@@ -520,29 +598,26 @@ window._opTogglePJ = (nombre) => {
 
 window._opSelAll = () => {
     const pjs = Object.keys(personajes).filter(n => personajes[n].isActive);
-    if (opState.seleccionados.size === pjs.length) {
-        opState.seleccionados.clear();
-    } else {
-        pjs.forEach(n => opState.seleccionados.add(n));
-    }
+    if (opState.seleccionados.size === pjs.length) opState.seleccionados.clear();
+    else pjs.forEach(n => opState.seleccionados.add(n));
     document.getElementById('op-sel-count').textContent = opState.seleccionados.size;
     _renderChips();
 };
 
-window._opHex        = (d) => _aplicarCambio('hex', d, 'HEX', 'op-log-stat');
-window._opVex        = (d) => _aplicarCambio('vex_actual', d, 'VEX', 'op-log-vex');
-window._opGuarda     = (d) => _aplicarCambio('guarda_actual', d, 'Guarda', 'op-log-stat');
+window._opHex    = (d) => _aplicarCambio('hex',         d, 'HEX',    'op-log-stat');
+window._opVex    = (d) => _aplicarCambio('vex_actual',  d, 'VEX',    'op-log-vex');
+window._opGuarda = (d) => _aplicarCambio('guarda_actual', d, 'Guarda', 'op-log-stat');
 
-window._opHexCustom  = () => {
+window._opHexCustom = () => {
     const v = parseInt(document.getElementById('op-hex-custom')?.value);
     if (!v || isNaN(v)) return;
     _aplicarCambio('hex', v, 'HEX', 'op-log-stat');
     document.getElementById('op-hex-custom').value = '';
 };
-window._opVexCustom  = () => {
+window._opVexCustom = () => {
     const v = parseInt(document.getElementById('op-vex-custom')?.value);
     if (!v || isNaN(v)) return;
-    _aplicarCambio('vex_actual', v, 'VEX', 'op-log-stat');
+    _aplicarCambio('vex_actual', v, 'VEX', 'op-log-vex');
     document.getElementById('op-vex-custom').value = '';
 };
 window._opGuardaCustom = () => {
@@ -564,13 +639,12 @@ window._opUndo       = () => _undo();
 window._opCopiarLog  = () => _copiarLog();
 window._opLimpiarLog = () => { opState.log = []; _renderLog(); };
 
-// ── Exportar función de montaje ───────────────────────────────
+// ── Exportar ──────────────────────────────────────────────────
 export function montarOpPanel() {
     if (!estadoUI.esAdmin) return;
     _montar();
 }
 
-// ── Refrescar chips cuando cambian los personajes ─────────────
 export function refrescarOpPanel() {
-    if (document.getElementById('op-update-bar')) _renderChips();
+    if (document.getElementById('op-pj-grid')) _renderChips();
 }
