@@ -374,7 +374,7 @@ function _renderTab(nombre, tab) {
         if (colMain)   colMain.style.display = 'flex';
         if (body)      { body.style.display = 'none'; body.innerHTML = ''; }
         if (statsBody) { statsBody.style.display = ''; const _sy = statsBody.scrollTop; statsBody.innerHTML = _tabStats(nombre); if (_sy > 0) statsBody.scrollTop = _sy; }
-        if (hexBody)   { hexBody.innerHTML = ""; _tabHex(nombre, hexBody); }
+        if (hexBody)   _tabHex(nombre, hexBody);
     } else {
         // Ocultar col-main
         if (colMain)   colMain.style.display = 'none';
@@ -458,37 +458,24 @@ function _barraSegs(actual, max, tipo, maxCells = 26) {
 // ─────────────────────────────────────────────────────────────
 // TAB: HEX
 // ─────────────────────────────────────────────────────────────
-async function _tabHex(nombre, body, forceRefresh = false) {
+async function _tabHex(nombre, body) {
     const p = personajes[nombre]; if (!p) { body.innerHTML = ''; return; }
     const safe = nombre.replace(/'/g, "\\'");
     const canEdit = estadoUI.esAdmin || !p.isPlayer;
 
-    // ── Fast path: si el body ya está renderizado, actualizar valores sin re-renderizar ──
-    // Evita recrear el canvas y hacer queries a DB en cada click de +/-
+    // ── Fast path: si el body ya está renderizado, solo actualizar número y partículas ──
+    // Evita recrear el canvas y reiniciar las partículas en cada cambio de HEX
     const existingCanvas = body.querySelector('.htab-particle-canvas');
     const existingAmt    = body.querySelector('.htab-hex-amount');
-    if (!forceRefresh && existingCanvas && existingAmt) {
-        // Actualizar HEX
+    if (existingCanvas && existingAmt) {
         existingAmt.textContent = (p.hex || 0).toLocaleString();
+        // Actualizar velocidad de partículas sin reiniciarlas
         const canvasId = existingCanvas.id;
         const inst = window._ppjParticleInstances?.[canvasId];
         if (inst && inst.alive) {
             inst.hexVal    = p.hex || 0;
             inst.baseSpeed = _hexSpeedFactor(p.hex || 0);
         }
-        // Actualizar VEX y su barra
-        const s2 = calcularStats(p);
-        const vexNum  = body.querySelector('.htab-vex-number');
-        const vexMax  = body.querySelector('.htab-vex-max');
-        const vexFill = body.querySelector('.htab-vex-bar-fill');
-        const vexShine= body.querySelector('.htab-vex-bar-shine');
-        const vexPct  = body.querySelector('.htab-vex-pct');
-        if (vexNum)  vexNum.textContent  = Math.floor(p.vex_actual || 0);
-        if (vexMax)  vexMax.textContent  = s2.vex_max;
-        const pct2 = s2.vex_max > 0 ? Math.min(100, Math.round((p.vex_actual||0) / s2.vex_max * 100)) : 0;
-        if (vexFill)  vexFill.style.width  = pct2 + '%';
-        if (vexShine) vexShine.style.width = pct2 + '%';
-        if (vexPct)   vexPct.textContent   = pct2 + '%';
         return;
     }
 
@@ -503,52 +490,15 @@ async function _tabHex(nombre, body, forceRefresh = false) {
     const _ultimoDe = (tipo) => historial.find(h => h.tipo === tipo);
     const _horasPasadas = (h) => h ? (Date.now() - new Date(h.created_at).getTime()) / 3600000 : Infinity;
 
-    // Convierte un timestamp ISO a número de día UTC (días desde epoch)
-    const _diaUTC = (isoStr) => {
-        if (!isoStr) return -Infinity;
-        return Math.floor(new Date(isoStr).getTime() / 86400000);
-    };
-    const _hoyUTC = () => Math.floor(Date.now() / 86400000);
+    const cdA = _horasPasadas(_ultimoDe('asistencia'));
+    const cdT = _horasPasadas(_ultimoDe('turno_extra'));
+    const cdC = _horasPasadas(_ultimoDe('contenido'));
 
-    // Asistencia: disponible si el último push fue en un día UTC distinto al de hoy
-    const _dispAsistencia = () => {
-        const u = _ultimoDe('asistencia');
-        return !u || _diaUTC(u.created_at) < _hoyUTC();
+    const _cdRest = (pasadas, limite) => {
+        if (pasadas >= limite) return '✓ Disponible';
+        const s = Math.ceil((limite - pasadas) * 3600);
+        return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
     };
-
-    // Turno extra / Contenido: disponible si han pasado al menos 2 días calendario UTC
-    // (ej: push lunes → disponible desde miércoles)
-    const _dispC3Dias = (tipo) => {
-        const u = _ultimoDe(tipo);
-        return !u || (_hoyUTC() - _diaUTC(u.created_at)) >= 2;
-    };
-
-    // Texto de countdown hasta próxima medianoche UTC (para asistencia)
-    const _cdRestDiario = (tipo) => {
-        const u = _ultimoDe(tipo);
-        if (!u || _diaUTC(u.created_at) < _hoyUTC()) return '✓ Disponible';
-        const mañanaUTC = (_hoyUTC() + 1) * 86400000;
-        const restMs = mañanaUTC - Date.now();
-        const h = Math.floor(restMs / 3600000);
-        const m = Math.floor((restMs % 3600000) / 60000);
-        return `${h}h ${m}m`;
-    };
-
-    // Texto de countdown hasta que pasen 2 días calendario
-    const _cdRestC3 = (tipo) => {
-        const u = _ultimoDe(tipo);
-        if (!u || (_hoyUTC() - _diaUTC(u.created_at)) >= 2) return '✓ Disponible';
-        const diasFalta = 2 - (_hoyUTC() - _diaUTC(u.created_at));
-        const targetUTC = (_diaUTC(u.created_at) + 2) * 86400000;
-        const restMs = targetUTC - Date.now();
-        const h = Math.floor(restMs / 3600000);
-        const m = Math.floor((restMs % 3600000) / 60000);
-        return `${h}h ${m}m`;
-    };
-
-    const cdA = _dispAsistencia();
-    const cdT = _dispC3Dias('turno_extra');
-    const cdC = _dispC3Dias('contenido');
 
     const _pushCard = (tipo, label, monto, disp, cdTxt) => {
         const isOp = estadoUI.esAdmin;
@@ -1057,9 +1007,9 @@ async function _tabHex(nombre, body, forceRefresh = false) {
             <div class="htab-divider-line htab-divider-rev"></div>
         </div>
         <div class="htab-push-grid">
-            ${_pushCard('asistencia','Asistencia',300,cdA,_cdRestDiario('asistencia')+' · diario')}
-            ${_pushCard('turno_extra','Turno Extra',500,cdT,_cdRestC3('turno_extra')+' · c/2 días')}
-            ${_pushCard('contenido','Contenido','100–1000',cdC,_cdRestC3('contenido')+' · c/2 días')}
+            ${_pushCard('asistencia','Asistencia',300,cdA>=24,_cdRest(cdA,24)+' · diario')}
+            ${_pushCard('turno_extra','Turno Extra',500,cdT>=72,_cdRest(cdT,72)+' · c/3 días')}
+            ${_pushCard('contenido','Contenido','100–1000',cdC>=72,_cdRest(cdC,72)+' · c/3 días')}
         </div>
     </div>
 
@@ -2486,7 +2436,7 @@ window._pobjGuardarObjeto = async (nombreExistente) => {
     const va      = parseInt(document.getElementById('pobj-f-va')?.value)||0;
     const cont    = document.getElementById('pobj-f-cont')?.value||null;
     if (!nombre) { alert('El nombre es obligatorio.'); return; }
-    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,contenedor_padre:cont||null,es_propuesta:false};
+    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,es_propuesta:false};
     let error;
     if (esNuevo) { ({error}=await supabase.from('objetos').insert(payload)); }
     else         { ({error}=await supabase.from('objetos').update(payload).eq('nombre',nombreExistente)); }
@@ -2855,7 +2805,7 @@ window._pobjGuardarObjeto = async (nombreExistente) => {
     const va      = parseInt(document.getElementById('pobj-f-va')?.value)||0;
     const cont    = document.getElementById('pobj-f-cont')?.value||null;
     if (!nombre) { alert('El nombre es obligatorio.'); return; }
-    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,contenedor_padre:cont||null,es_propuesta:false};
+    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,es_propuesta:false};
     let error;
     if (esNuevo) { ({error}=await supabase.from('objetos').insert(payload)); }
     else         { ({error}=await supabase.from('objetos').update(payload).eq('nombre',nombreExistente)); }
@@ -2986,16 +2936,16 @@ window._ppjEjecutarHexPush = async (nombre, tipo, cantidad) => {
     window.actualizarBtnSync?.();
     window.renderCatalogo?.();
     window.mostrarToast?.(`✨ +${cantidad} HEX (${tipo.replace('_',' ')}) → ${nombre}`);
-    const hexBody = document.getElementById('ppj-hex-body');
-    if (hexBody) { hexBody.innerHTML = ''; _tabHex(nombre, hexBody, true); }
+    const body = document.getElementById('ppj-body');
+    if (body) _tabHex(nombre, body);
 };
 
 window._ppjDeleteHexLog = async (id, nombre) => {
     if (!estadoUI.esAdmin) return;
     if (!confirm('¿Eliminar este registro?')) return;
     await supabase.from('hex_push_log').delete().eq('id', id);
-    const hexBody = document.getElementById('ppj-hex-body');
-    if (hexBody) { hexBody.innerHTML = ''; _tabHex(nombre, hexBody, true); }
+    const body = document.getElementById('ppj-body');
+    if (body) _tabHex(nombre, body);
 };
 
 window._ppjToggleEquipar = async (personaje, objeto, equipar) => {
