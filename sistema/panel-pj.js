@@ -471,24 +471,35 @@ async function _tabHex(nombre, body) {
     const safe = nombre.replace(/'/g, "\\'");
     const canEdit = estadoUI.esAdmin || !p.isPlayer;
 
-    // ── Fast path: solo si el body ya está renderizado PARA ESTE MISMO PJ ──
-    // Evita recrear el canvas y reiniciar las partículas en cada cambio de HEX.
-    // Si cambió el personaje (body.dataset.pj !== nombre), forzar re-render completo
-    // para recargar los logs de DB correctos y mostrar cooldowns del PJ nuevo.
+    // ── Fast path: actualizar número y VEX inline sin re-renderizar el canvas ──
+    // Solo aplica si el body ya pertenece a ESTE mismo PJ.
     const existingCanvas = body.querySelector('.htab-particle-canvas');
     const existingAmt    = body.querySelector('.htab-hex-amount');
     if (existingCanvas && existingAmt && body.dataset.pj === nombre) {
+        // Actualizar número HEX
         existingAmt.textContent = (p.hex || 0).toLocaleString();
-        // Actualizar velocidad de partículas sin reiniciarlas
+        // Actualizar partículas
         const canvasId = existingCanvas.id;
         const inst = window._ppjParticleInstances?.[canvasId];
         if (inst && inst.alive) {
             inst.hexVal    = p.hex || 0;
             inst.baseSpeed = _hexSpeedFactor(p.hex || 0);
         }
+        // Actualizar barra VEX y valores numéricos inline
+        const s = calcularStats(p);
+        const vexAct = p.vex_actual || 0;
+        const vexMax = s.vex_max || 0;
+        const pct = vexMax > 0 ? Math.min(100, Math.round(vexAct / vexMax * 100)) : 0;
+        const barFill = body.querySelector('.htab-vex-bar-fill');
+        if (barFill) barFill.style.width = pct + '%';
+        const vexNum = body.querySelector('.htab-vex-number');
+        if (vexNum) vexNum.textContent = Math.floor(vexAct).toLocaleString();
+        const vexMaxEl = body.querySelector('.htab-vex-max');
+        if (vexMaxEl) vexMaxEl.textContent = vexMax;
+        const vexPctEl = body.querySelector('.htab-vex-pct');
+        if (vexPctEl) vexPctEl.textContent = pct + '%';
         return;
     }
-    // Marcar el body con el PJ actual para que el fast path funcione en próximas llamadas
     body.dataset.pj = nombre;
 
     const { data: logs } = await supabase

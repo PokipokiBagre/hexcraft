@@ -114,21 +114,26 @@ window.cerrarDetalle = cerrarPanelPJ;
 // ─────────────────────────────────────────────────────────────
 // MODIFICAR STATS (actual)
 // ─────────────────────────────────────────────────────────────
-window.modStat = function(nombre, campo, delta) {
+window.modStat = async function(nombre, campo, delta) {
     const p = personajes[nombre]; if (!p) return;
     const s = calcularStats(p);
 
     if (campo === 'vida_azul_actual') {
-        // vida_azul_actual es el modificador acumulado (base+mod = total, sin techo)
         p.vida_azul_actual = (p.vida_azul_actual ?? 0) + delta;
-        // no hay Math.max(0) — puede quedar negativo si el OP lo desea
-        persistirCampos(nombre, { vida_azul_actual: p.vida_azul_actual });
+        encolarCambio(nombre, 'vida_azul_actual', p.vida_azul_actual);
+        await persistirCampos(nombre, { vida_azul_actual: p.vida_azul_actual });
     } else {
         const caps = { vex_actual: s.vex_max, guarda_actual: s.guarda_max, vida_roja_actual: s.vida_roja_max };
         const max = caps[campo] ?? Infinity;
-        p[campo] = Math.max(0, Math.min(max, (p[campo] || 0) + delta));
-        persistirCampos(nombre, { [campo]: p[campo] });
+        const nuevoVal = campo === 'hex'
+            ? Math.max(0, (p[campo] || 0) + delta)          // HEX no tiene techo
+            : Math.max(0, Math.min(max, (p[campo] || 0) + delta));
+        p[campo] = nuevoVal;
+        encolarCambio(nombre, campo, nuevoVal);
+        const ok = await persistirCampos(nombre, { [campo]: nuevoVal });
+        if (!ok) { mostrarToast('Error al guardar ' + campo, true); return; }
     }
+    actualizarBtnSync?.();
     renderCatalogo();
     refreshPanelPJ();
 };
