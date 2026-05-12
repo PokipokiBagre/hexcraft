@@ -303,6 +303,15 @@ function _css() {
 .hxc-hz-cast-chip { font-size: 0.58em; padding: 1px 5px; border-radius: 3px; font-weight: 800; font-family: 'Cinzel', serif; border: 1px solid; min-width: 18px; text-align: center; }
 .hxc-hz-cast-chip.back { background: rgba(100,160,230,0.12); color: #70a8e8; border-color: rgba(100,160,230,0.35); }
 .hxc-hz-cast-chip.next { background: rgba(230,100,60,0.12); color: #e87840; border-color: rgba(230,100,60,0.35); }
+/* Temporal en lateral de inventario */
+.hxc-lat-hz-temp { border-color: rgba(232,200,64,0.2) !important; background: rgba(232,200,64,0.04) !important; }
+.hxc-lat-hz-ofi-btn { font-size: 0.52em; padding: 2px 5px; border-radius: 3px; cursor: pointer; border: 1px solid; background: rgba(255,255,255,0.03); transition: all 0.1s; white-space: nowrap; font-family: inherit; }
+.hxc-lat-hz-ofi-btn.gratis  { border-color: rgba(62,207,110,0.35);  color: #3ecf6e; }
+.hxc-lat-hz-ofi-btn.gratis:hover  { background: rgba(62,207,110,0.12); }
+.hxc-lat-hz-ofi-btn.mitad   { border-color: rgba(212,175,55,0.35);  color: #d4af37; }
+.hxc-lat-hz-ofi-btn.mitad:hover   { background: rgba(212,175,55,0.12); }
+.hxc-lat-hz-ofi-btn.completo { border-color: rgba(232,100,60,0.35); color: #e8643c; }
+.hxc-lat-hz-ofi-btn.completo:hover { background: rgba(232,100,60,0.12); }
 `;
   document.head.appendChild(st);
 }
@@ -566,6 +575,7 @@ function _renderLateralPanel() {
           const esEstado = h.es_conocido || h.esConocido;   // solo mostrar badge si visible
           const puedeVer = _puedeVerHz(h);
           const nombreVis = _nombreHz(h);
+          const esTemp = !!h._inv?.es_temporal;
           // Solo guardar datos en el tooltip si el usuario puede verlos
           _hzTooltipMap[hzKey] = puedeVer ? {
             nombre: h.nombre, afinidad: h.afinidad||'', hex_cost: h.hex_cost||0,
@@ -576,13 +586,27 @@ function _renderLateralPanel() {
             clase: '', efecto: '', overcast: '', undercast: '', especial: ''
           };
           const hzEstadoBadge = h.es_estado && puedeVer ? `<span class="hxc-lat-hz-badge">estado</span>` : '';
-          return `<div class="hxc-lat-hz ${h.es_estado&&puedeVer?'es-estado':''}"
+          const tempBadge = esTemp ? `<span class="hxc-lat-hz-badge" style="color:#c8a820;border-color:rgba(232,200,64,0.4);background:rgba(232,200,64,0.08);">⏳temp</span>` : '';
+
+          // Botones de oficializar (solo admin, solo si temporal)
+          const hexCostOfi = h.hex_cost || 0;
+          const halfOfi = Math.round(hexCostOfi * 0.5);
+          const safeHzNombre = (h.nombre||'').replace(/'/g,"\\'");
+          const safePjNombre = (pj.nombre||'').replace(/'/g,"\\'");
+          const oficializarRow = (esTemp && _esAdmin()) ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:3px;">
+            <button class="hxc-lat-hz-ofi-btn gratis" onclick="event.stopPropagation();window._hxcOficializarInvHz('${safePjNombre}','${safeHzNombre}','gratis')">✅ Gratis</button>
+            ${hexCostOfi > 0 ? `<button class="hxc-lat-hz-ofi-btn mitad" onclick="event.stopPropagation();window._hxcOficializarInvHz('${safePjNombre}','${safeHzNombre}','50')">🔵−${halfOfi}</button>
+            <button class="hxc-lat-hz-ofi-btn completo" onclick="event.stopPropagation();window._hxcOficializarInvHz('${safePjNombre}','${safeHzNombre}','100')">🟡−${hexCostOfi}</button>` : ''}
+          </div>` : '';
+
+          return `<div class="hxc-lat-hz ${h.es_estado&&puedeVer?'es-estado':''} ${esTemp?'hxc-lat-hz-temp':''}"
             onclick="window._hxcAgregarHz('${p.grupo}',${p.idx},'${hzKey}')"
             onmouseenter="window._hxcShowHzTooltip(event,'${hzKey}')"
             onmouseleave="window._hxcHideHzTooltip()">
             <div style="flex:1;min-width:0;">
-              <div class="hxc-lat-hz-nombre">${nombreVis}${hzEstadoBadge}</div>
+              <div class="hxc-lat-hz-nombre">${nombreVis}${hzEstadoBadge}${tempBadge}</div>
               <div class="hxc-lat-hz-afin">${puedeVer ? (h.afinidad||'—') : '—'}</div>
+              ${oficializarRow}
             </div>
             <span class="hxc-lat-hz-cost">${puedeVer ? (h.hex_cost||0) : '?'}</span>
           </div>`;
@@ -972,6 +996,40 @@ function _montar() {
   drawer.id = 'hxc-drawer'; drawer.innerHTML = '<div class="hxc-handle"></div>';
   document.body.appendChild(drawer);
 }
+
+// ── Oficializar hechizo temporal desde el panel lateral de inventario ──
+window._hxcOficializarInvHz = async (pjNombre, hzNombre, modo) => {
+  if (!_esAdmin()) return;
+  const p = personajes[pjNombre];
+  // Buscar hex_cost en el catálogo
+  const cat = hxState.catalogoDB.find(h => h.nombre === hzNombre || h.hechizo_id === hzNombre);
+  const hexCost = cat?.hex_cost || 0;
+  let cobro = 0;
+  if (modo === '50')  cobro = Math.round(hexCost * 0.5);
+  if (modo === '100') cobro = hexCost;
+
+  if (cobro > 0 && p && (p.hex || 0) < cobro) {
+    _toast(`HEX insuficiente (tiene ${p.hex||0}, necesita ${cobro})`, true); return;
+  }
+
+  const { error } = await supabase.from('hechizos_inventario')
+    .update({ es_temporal: false, tipo: 'aprendido', origen: cobro > 0 ? 'Compra' : 'OP' })
+    .eq('personaje_nombre', pjNombre)
+    .eq('hechizo_nombre', hzNombre);
+  if (error) { _toast('Error: ' + error.message, true); return; }
+
+  if (cobro > 0 && p) {
+    p.hex = Math.max(0, (p.hex||0) - cobro);
+    await supabase.from('personajes').update({ hex: p.hex }).eq('nombre', pjNombre);
+  }
+
+  // Invalidar caché del inventario para que recargue
+  delete hxState.inventarioPJ[pjNombre];
+  await cargarInventarioPJ(pjNombre);
+
+  _toast(`✓ "${hzNombre}" oficializado${cobro > 0 ? ` (−${cobro} HEX)` : ''}`);
+  _render();
+};
 
 export async function abrirHexCast(sesionIdForzado, turnoNumForzado) {
   _montar();

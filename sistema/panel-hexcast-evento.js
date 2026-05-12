@@ -16,11 +16,14 @@ const evState = {
   pjNombre: null,
   grupo: 'A', idx: 0,
   busqueda: '',
-  cambios: [],          // [{ tipo, ...datos }]  — seleccionados antes de guardar
+  cambios: [],          // [{ tipo, ...datos }]  — cambios del PJ ACTUALMENTE visible
+  cambiosPorPj: {},     // { nombrePJ: [cambios] } — todos los cambios de todos los PJs
   catalogoHechizos: [],
   inventarioHz: [],
   catalogoObjetos: [],
   inventarioObj: [],
+  // Lista de PJs disponibles en el turno (para el selector del header)
+  pjsDisponibles: [],
 };
 
 // ── CSS ───────────────────────────────────────────────────────
@@ -39,6 +42,20 @@ function _css() {
 .hxev-header-pj { font-size:0.78em; color:#fff; font-weight:600; flex:1; }
 .hxev-close { background:none; border:none; color:#555; font-size:1.4em; cursor:pointer; padding:2px 7px; transition:color 0.15s; }
 .hxev-close:hover { color:#ccc; }
+.hxev-pj-selector { background:rgba(140,90,220,0.1); border:1px solid rgba(140,90,220,0.35); color:#c8a0f0; font-size:0.72em; padding:4px 8px; border-radius:5px; font-family:inherit; cursor:pointer; outline:none; transition:all 0.12s; }
+.hxev-pj-selector:hover { background:rgba(140,90,220,0.18); }
+.hxev-pj-selector option { background:#0d0c1a; color:#eee; }
+.hxev-hz-opt.temporal { border-color:rgba(232,200,64,0.4); color:#d4a820; }
+.hxev-hz-opt.temporal:hover { background:rgba(232,200,64,0.15); }
+.hxev-inv-temp-badge { font-size:0.46em; padding:1px 5px; border-radius:3px; background:rgba(232,200,64,0.1); color:#c8a820; border:1px solid rgba(232,200,64,0.3); margin-left:3px; }
+.hxev-inv-oficializar { display:flex; gap:3px; flex-wrap:wrap; margin-top:3px; }
+.hxev-inv-ofi-btn { font-size:0.54em; padding:2px 6px; border-radius:3px; cursor:pointer; border:1px solid; background:rgba(255,255,255,0.03); transition:all 0.1s; white-space:nowrap; }
+.hxev-inv-ofi-btn.gratis  { border-color:rgba(62,207,110,0.35);  color:#3ecf6e; }
+.hxev-inv-ofi-btn.gratis:hover  { background:rgba(62,207,110,0.12); }
+.hxev-inv-ofi-btn.mitad   { border-color:rgba(212,175,55,0.35);  color:#d4af37; }
+.hxev-inv-ofi-btn.mitad:hover   { background:rgba(212,175,55,0.12); }
+.hxev-inv-ofi-btn.completo { border-color:rgba(232,100,60,0.35); color:#e8643c; }
+.hxev-inv-ofi-btn.completo:hover { background:rgba(232,100,60,0.12); }
 
 .hxev-body { flex:1; display:grid; grid-template-columns:1fr 1fr 1fr; overflow:hidden; }
 .hxev-panel { display:flex; flex-direction:column; border-right:1px solid rgba(255,255,255,0.05); overflow:hidden; }
@@ -210,18 +227,38 @@ async function _render() {
   const inputNombreActual = document.getElementById('hxev-nombre-evento')?.value;
   if (inputNombreActual !== undefined) evState._inputNombre = inputNombreActual;
 
+  // Sincronizar: guardar cambios actuales del PJ visible antes de redibujar
+  if (evState.pjNombre) {
+    evState.cambiosPorPj[evState.pjNombre] = [...evState.cambios];
+  }
+
   const pOrig = personajes[evState.pjNombre];
   const p = _previewStats(pOrig);
   const s = p ? calcularStats(p) : null;
 
+  // Conteo total de cambios en todos los PJs
+  const totalCambios = Object.values(evState.cambiosPorPj).reduce((s, arr) => s + arr.length, 0);
+
+  // Chips solo del PJ activo
   const chips = evState.cambios.map((c, i) =>
     `<span class="hxev-chip">${_cambioLabel(c)}<span class="hxev-chip-del" onclick="window._hxevQuitarCambio(${i})">x</span></span>`
   ).join('');
 
+  // Selector de PJ (si hay más de uno disponible)
+  let pjSelectorHtml = `<span class="hxev-header-pj">${evState.pjNombre || '—'}</span>`;
+  if (evState.pjsDisponibles.length > 1) {
+    const opts = evState.pjsDisponibles.map(nombre => {
+      const pendientes = (evState.cambiosPorPj[nombre] || []).length;
+      const label = pendientes > 0 ? `${nombre} (${pendientes})` : nombre;
+      return `<option value="${nombre.replace(/"/g,'&quot;')}" ${nombre === evState.pjNombre ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+    pjSelectorHtml = `<select class="hxev-pj-selector" onchange="window._hxevCambiarPJ(this.value)" onclick="event.stopPropagation()">${opts}</select>`;
+  }
+
   root.innerHTML = `
     <div class="hxev-header">
       <span class="hxev-header-title">✦ Evento</span>
-      <span class="hxev-header-pj">${evState.pjNombre || '—'}</span>
+      ${pjSelectorHtml}
       <button class="hxev-close" onclick="window._hxevCerrar()">×</button>
     </div>
     <div class="hxev-body">
@@ -232,11 +269,11 @@ async function _render() {
     <div class="hxev-footer">
       ${evState.cambios.length > 0 ? `<div class="hxev-chips">${chips}</div>` : ''}
       <div class="hxev-footer-row">
-        <span class="hxev-cambios-count">${evState.cambios.length > 0
-          ? `<span>${evState.cambios.length}</span> cambio(s) seleccionados`
+        <span class="hxev-cambios-count">${totalCambios > 0
+          ? `<span>${totalCambios}</span> cambio(s) seleccionados${evState.pjsDisponibles.length > 1 ? ` (${Object.entries(evState.cambiosPorPj).filter(([,v])=>v.length>0).map(([k,v])=>`${k}:${v.length}`).join(', ')})` : ''}`
           : 'Sin cambios seleccionados'}</span>
-        ${evState.cambios.length > 0
-          ? `<button class="hxev-btn-limpiar" onclick="window._hxevLimpiar()">✕ Limpiar</button>` : ''}
+        ${totalCambios > 0
+          ? `<button class="hxev-btn-limpiar" onclick="window._hxevLimpiarTodo()">✕ Limpiar todo</button>` : ''}
       </div>
       <div class="hxev-footer-row">
         <input class="hxev-nombre-input" id="hxev-nombre-evento"
@@ -430,14 +467,33 @@ function _renderHechizos() {
   const safe = evState.pjNombre?.replace(/'/g, "\\'");
 
   const invRows = inv.length > 0
-    ? inv.map(h => `<div class="hxev-list-item" ${h._pendiente ? 'style="opacity:0.7;border-color:rgba(62,207,110,0.25);"' : ''}>
+    ? inv.map(h => {
+        const esTemp = !!h.es_temporal;
+        const hexCost = h.hechizo_hex || 0;
+        const halfOfi = Math.round(hexCost * 0.5);
+        const safePj  = (evState.pjNombre||'').replace(/'/g,"\\'");
+        const safeHzN = (h.hechizo_nombre||'').replace(/'/g,"\\'");
+
+        const oficializarBtns = esTemp ? `<div class="hxev-inv-oficializar">
+          <span style="font-size:0.5em;color:#6a5a20;text-transform:uppercase;letter-spacing:0.5px;align-self:center;">Oficializar:</span>
+          <button class="hxev-inv-ofi-btn gratis"   onclick="window._hxevOficializarHz('${safePj}','${safeHzN}','gratis')">✅ Gratis</button>
+          ${hexCost > 0 ? `<button class="hxev-inv-ofi-btn mitad"   onclick="window._hxevOficializarHz('${safePj}','${safeHzN}','50')">🔵 −${halfOfi}</button>
+          <button class="hxev-inv-ofi-btn completo" onclick="window._hxevOficializarHz('${safePj}','${safeHzN}','100')">🟡 −${hexCost}</button>` : ''}
+        </div>` : '';
+
+        return `<div class="hxev-list-item" style="${h._pendiente ? 'opacity:0.7;border-color:rgba(62,207,110,0.25);' : esTemp ? 'border-color:rgba(232,200,64,0.2);background:rgba(232,200,64,0.03);' : ''}">
         <div style="flex:1;min-width:0;">
-          <div class="hxev-list-item-nombre">${h.hechizo_nombre}${h._pendiente ? ' <span style="font-size:0.55em;color:#3ecf6e;padding:1px 5px;border-radius:3px;background:rgba(62,207,110,0.1);border:1px solid rgba(62,207,110,0.3);">pendiente</span>' : ''}</div>
+          <div class="hxev-list-item-nombre">${h.hechizo_nombre}
+            ${h._pendiente ? '<span style="font-size:0.55em;color:#3ecf6e;padding:1px 5px;border-radius:3px;background:rgba(62,207,110,0.1);border:1px solid rgba(62,207,110,0.3);">pendiente</span>' : ''}
+            ${esTemp ? '<span class="hxev-inv-temp-badge">⏳ temp</span>' : ''}
+          </div>
           <div class="hxev-list-item-sub">${h.hechizo_afinidad||'—'}</div>
+          ${oficializarBtns}
         </div>
         ${!h._pendiente ? `<button class="hxev-obj-btn-rem"
           onclick="window._hxevAddHzRem('${(evState.pjNombre||'').replace(/'/g,"\\'")}','${(h.hechizo_nombre||'').replace(/'/g,"\\'")}')">−</button>` : ''}
-      </div>`).join('')
+      </div>`;
+      }).join('')
     : `<div class="hxev-list-empty">Sin hechizos</div>`;
 
   const catRows = cat.length > 0
@@ -453,17 +509,19 @@ function _renderHechizos() {
         const opts = !yaTiene
           ? `<div class="hxev-hz-opts">
               <button class="hxev-hz-opt gratis"
-                onclick="window._hxevAddHzAdd('${safe}','${sn}','${si}','${sa}',0)">Gratis</button>
+                onclick="window._hxevAddHzAdd('${safe}','${sn}','${si}','${sa}',0,false)">Gratis</button>
               ${costo > 0 ? `
               <button class="hxev-hz-opt mitad"
-                onclick="window._hxevAddHzAdd('${safe}','${sn}','${si}','${sa}',${Math.floor(costo/2)})">
+                onclick="window._hxevAddHzAdd('${safe}','${sn}','${si}','${sa}',${Math.floor(costo/2)},false)">
                 -${Math.floor(costo/2)} HEX (50%)</button>
               <button class="hxev-hz-opt completo"
-                onclick="window._hxevAddHzAdd('${safe}','${sn}','${si}','${sa}',${costo})">
+                onclick="window._hxevAddHzAdd('${safe}','${sn}','${si}','${sa}',${costo},false)">
                 -${costo} HEX</button>
               <button class="hxev-hz-opt doble"
-                onclick="window._hxevAddHzAdd('${safe}','${sn}','${si}','${sa}',${costo*2})">
+                onclick="window._hxevAddHzAdd('${safe}','${sn}','${si}','${sa}',${costo*2},false)">
                 -${costo*2} HEX (x2)</button>` : ''}
+              <button class="hxev-hz-opt temporal"
+                onclick="window._hxevAddHzAdd('${safe}','${sn}','${si}','${sa}',0,true)">⏳ Temporal</button>
             </div>`
           : `<span style="font-size:0.58em;color:#3a3a55;">Ya en inventario</span>`;
 
@@ -554,7 +612,21 @@ function _renderObjetos() {
 // ── Handlers ─────────────────────────────────────────────────
 window._hxevQuitarCambio = (idx) => { evState.cambios.splice(idx, 1); _render(); };
 window._hxevLimpiar      = ()    => { evState.cambios = []; _render(); };
+window._hxevLimpiarTodo  = ()    => { evState.cambios = []; evState.cambiosPorPj = {}; _render(); };
 window._hxevBuscar       = (val) => { evState.busqueda = val; _render(); };
+
+// Cambiar PJ activo en el panel de evento (guarda los cambios del PJ anterior)
+window._hxevCambiarPJ = async (nuevoPj) => {
+  if (!nuevoPj || nuevoPj === evState.pjNombre) return;
+  // Guardar cambios del PJ saliente
+  evState.cambiosPorPj[evState.pjNombre] = [...evState.cambios];
+  // Cargar datos del nuevo PJ
+  evState.pjNombre = nuevoPj;
+  // Restaurar cambios del nuevo PJ si los había
+  evState.cambios = evState.cambiosPorPj[nuevoPj] || [];
+  await _cargarDatos(nuevoPj);
+  _render();
+};
 
 window._hxevAddStat = (nombre, campo, delta, label) => {
   evState.cambios.push({ tipo:'stat', pjNombre:nombre, campo, delta, label });
@@ -577,13 +649,47 @@ window._hxevAddAfin = (nombre, layer, key, delta) => {
     afinLabel:`${layerLabel[layer]} ${labels[key]} ${delta > 0 ? '+' : ''}${delta}` });
   _render();
 };
-window._hxevAddHzAdd = (nombre, hzNombre, hzId, afinidad, costeHex) => {
+window._hxevAddHzAdd = (nombre, hzNombre, hzId, afinidad, costeHex, esTemp = false) => {
   evState.cambios.push({ tipo:'hz_add', pjNombre:nombre, hzNombre, hzId, afinidad,
-    costeHex: costeHex || 0 });
+    costeHex: costeHex || 0, esTemp: !!esTemp });
   _render();
 };
 window._hxevAddHzRem = (nombre, hzNombre) => {
   evState.cambios.push({ tipo:'hz_rem', pjNombre:nombre, hzNombre });
+  _render();
+};
+
+// ── Oficializar un hechizo temporal desde el panel de evento ──
+window._hxevOficializarHz = async (pjNombre, hzNombre, modo) => {
+  const { supabase: sb } = await import('../hex-auth.js').catch(() => ({ supabase }));
+  const p = personajes[pjNombre];
+
+  // Obtener hex_cost para el cobro
+  const cat = evState.catalogoHechizos.find(h => h.nombre === hzNombre || h.hechizo_id === hzNombre);
+  const hexCost = cat?.hex_cost || 0;
+  let cobro = 0;
+  if (modo === '50')  cobro = Math.round(hexCost * 0.5);
+  if (modo === '100') cobro = hexCost;
+
+  if (cobro > 0 && p && (p.hex || 0) < cobro) {
+    _toast(`HEX insuficiente (tiene ${p.hex||0}, necesita ${cobro})`, true); return;
+  }
+
+  const { error } = await sb.from('hechizos_inventario')
+    .update({ es_temporal: false, tipo: 'aprendido', origen: cobro > 0 ? 'Compra' : 'OP' })
+    .eq('personaje_nombre', pjNombre)
+    .eq('hechizo_nombre', hzNombre);
+  if (error) { _toast('Error: ' + error.message, true); return; }
+
+  if (cobro > 0 && p) {
+    p.hex = Math.max(0, (p.hex||0) - cobro);
+    const { persistirCampos: pc } = await import('./personajes-data.js').catch(()=>({ persistirCampos: null }));
+    if (pc) await pc(pjNombre, { hex: p.hex });
+  }
+
+  _toast(`✓ "${hzNombre}" oficializado${cobro > 0 ? ` (−${cobro} HEX)` : ''}`);
+  // Recargar inventario del PJ activo
+  await _cargarDatos(pjNombre);
   _render();
 };
 window._hxevAddObjAdd = (nombre, objNombre, efecto, qtyId) => {
@@ -614,56 +720,68 @@ window._hxevCdStep = async (nombre, afKey, deltaPct) => {
 
 // ── Guardar → bloque en el stack ─────────────────────────────
 window._hxevGuardar = () => {
-  if (!evState.cambios.length) { _toast('No hay cambios seleccionados', true); return; }
+  // Sincronizar cambios del PJ visible al mapa global
+  if (evState.pjNombre) {
+    evState.cambiosPorPj[evState.pjNombre] = [...evState.cambios];
+  }
+
+  // Consolidar todos los cambios de todos los PJs
+  const todosCambios = [];
+  for (const arr of Object.values(evState.cambiosPorPj)) todosCambios.push(...arr);
+
+  if (!todosCambios.length) { _toast('No hay cambios seleccionados', true); return; }
   const nombre = document.getElementById('hxev-nombre-evento')?.value.trim() || 'Evento';
   const color  = SLOT_COLORS[evState.grupo]?.[evState.idx] || SLOT_COLORS.A[0];
-  const pj     = evState.pjNombre;
 
-  // Agrupar por tipo para el resumen
-  const porTipo = {};
-  for (const c of evState.cambios) {
-    if (!porTipo[c.tipo]) porTipo[c.tipo] = [];
-    porTipo[c.tipo].push(c);
-  }
+  // Agrupar por PJ, luego por tipo — para el texto del evento
   const lineas = [];
-
-  if (porTipo.stat || porTipo.afin) {
-    const items = [...(porTipo.stat||[]), ...(porTipo.afin||[])];
-    lineas.push(`Stats (${pj}) : ${items.map(c => c.label || c.afinLabel).join(' · ')}`);
-  }
-  if (porTipo.hz_add) {
-    const hzs = porTipo.hz_add.map(c =>
-      `${c.hzNombre}${c.costeHex > 0 ? ` (-${c.costeHex} HEX)` : ' (gratis)'}`);
-    lineas.push(`Hechizos aprendidos (${pj}) : ${hzs.join(' | ')}`);
-  }
-  if (porTipo.hz_rem) {
-    lineas.push(`Hechizos olvidados (${pj}) : ${porTipo.hz_rem.map(c => c.hzNombre).join(' | ')}`);
-  }
-  if (porTipo.obj_add) {
-    const mapa = {};
-    for (const c of porTipo.obj_add) {
-      if (!mapa[c.objNombre]) mapa[c.objNombre] = { efecto: c.efecto, cantidad: 0 };
-      mapa[c.objNombre].cantidad += c.cantidad;
+  const pjsConCambios = [...new Set(todosCambios.map(c => c.pjNombre))];
+  for (const pjN of pjsConCambios) {
+    const cambiosPj = todosCambios.filter(c => c.pjNombre === pjN);
+    const porTipo = {};
+    for (const c of cambiosPj) {
+      if (!porTipo[c.tipo]) porTipo[c.tipo] = [];
+      porTipo[c.tipo].push(c);
     }
-    const objLineas = Object.entries(mapa).map(([n, v]) =>
-      `${n} x${v.cantidad}${v.efecto ? ' | ' + v.efecto : ''}`);
-    lineas.push(`Objetos obtenidos (${pj}) :\n${objLineas.join('\n')}`);
-  }
-  if (porTipo.obj_rem) {
-    lineas.push(`Objetos retirados (${pj}) : ${porTipo.obj_rem.map(c => `${c.objNombre} x${c.cantidad}`).join(' · ')}`);
+    // Líneas de este PJ
+    if (porTipo.stat || porTipo.afin) {
+      const items = [...(porTipo.stat||[]), ...(porTipo.afin||[])];
+      lineas.push(`Stats (${pjN}) : ${items.map(c => c.label || c.afinLabel).join(' · ')}`);
+    }
+    if (porTipo.hz_add) {
+      const hzs = porTipo.hz_add.map(c =>
+        `${c.hzNombre}${c.esTemp ? ' ⏳' : ''}${c.costeHex > 0 ? ` (-${c.costeHex} HEX)` : ' (gratis)'}`);
+      lineas.push(`Hechizos (${pjN}) : ${hzs.join(' | ')}`);
+    }
+    if (porTipo.hz_rem) {
+      lineas.push(`-Hechizos (${pjN}) : ${porTipo.hz_rem.map(c => c.hzNombre).join(' | ')}`);
+    }
+    if (porTipo.obj_add) {
+      const mapa = {};
+      for (const c of porTipo.obj_add) {
+        if (!mapa[c.objNombre]) mapa[c.objNombre] = { efecto: c.efecto, cantidad: 0 };
+        mapa[c.objNombre].cantidad += c.cantidad;
+      }
+      const objLineas = Object.entries(mapa).map(([n, v]) =>
+        `${n} x${v.cantidad}${v.efecto ? ' | ' + v.efecto : ''}`);
+      lineas.push(`Objetos (${pjN}) :\n${objLineas.join('\n')}`);
+    }
+    if (porTipo.obj_rem) {
+      lineas.push(`-Objetos (${pjN}) : ${porTipo.obj_rem.map(c => `${c.objNombre} x${c.cantidad}`).join(' · ')}`);
+    }
   }
 
   const nuevoItem = {
     id:           'ev_' + Date.now(),
     tipoItem:     'evento',
-    pjNombre:     pj,
+    pjNombre:     evState.pjNombre,   // PJ "autor" principal (el que abrió)
     grupo:        evState.grupo,
     slotIdx:      evState.idx,
     color,
     eventoNombre: nombre,
     eventoDesc:   lineas.join('\n'),
     abierto:      false,
-    _payload:     [...evState.cambios],
+    _payload:     todosCambios,
     _aplicado:    false,
   };
 
@@ -679,9 +797,10 @@ window._hxevGuardar = () => {
     _toast(`✦ Evento "${nombre}" guardado en el turno`);
   }
 
-  evState.cambios = [];
-  evState._stackIdx = null;
-  evState._editNombre = '';
+  evState.cambios      = [];
+  evState.cambiosPorPj = {};
+  evState._stackIdx    = null;
+  evState._editNombre  = '';
   cerrarEventoPanel();
   if (typeof window._hxcRender === 'function') window._hxcRender();
 };
@@ -690,7 +809,7 @@ window._hxevGuardar = () => {
 async function _cargarDatos(nombre) {
   const [hzCat, hzInv, objCat, objInv] = await Promise.all([
     supabase.from('hechizos_nodos').select('hechizo_id,nombre,afinidad,hex_cost,es_estado,efecto').order('nombre'),
-    supabase.from('hechizos_inventario').select('hechizo_nombre,hechizo_afinidad,hechizo_hex').eq('personaje_nombre', nombre),
+    supabase.from('hechizos_inventario').select('hechizo_nombre,hechizo_afinidad,hechizo_hex,es_temporal').eq('personaje_nombre', nombre),
     supabase.from('objetos').select('nombre,tipo,rareza,efecto').eq('es_propuesta', false).order('nombre'),
     supabase.from('inventario_objetos').select('id,objeto_nombre,cantidad,equipado').eq('personaje_nombre', nombre).gt('cantidad', 0),
   ]);
@@ -703,20 +822,41 @@ async function _cargarDatos(nombre) {
 // ── Apertura / cierre ─────────────────────────────────────────
 export async function abrirEventoPanel(pjNombre, grupo, idx, editContext = null) {
   _montar();
+
+  // Construir lista de PJs disponibles desde los slots del estado HexCast
+  const pjsEnSlots = [];
+  const { hxState: hxS } = await import('./hexcast-state.js').catch(()=>({ hxState: null }));
+  if (hxS) {
+    [...(hxS.grupoA||[]), ...(hxS.grupoB||[])].forEach(pj => {
+      if (pj?.nombre && !pjsEnSlots.includes(pj.nombre)) pjsEnSlots.push(pj.nombre);
+    });
+  }
+  // Siempre incluir el PJ que abrió el panel (por si no está en slots)
+  if (pjNombre && !pjsEnSlots.includes(pjNombre)) pjsEnSlots.unshift(pjNombre);
+  evState.pjsDisponibles = pjsEnSlots.length > 0 ? pjsEnSlots : [pjNombre];
+
   evState.pjNombre = pjNombre;
   evState.grupo    = grupo || 'A';
   evState.idx      = idx  ?? 0;
   evState.busqueda = '';
   // Si es edición: precargar cambios y nombre; guardar índice en stack
   if (editContext) {
-    evState.cambios   = editContext.cambios || [];
+    // Reconstruir cambiosPorPj desde el payload del evento editado
+    evState.cambiosPorPj = {};
+    for (const c of (editContext.cambios || [])) {
+      const pj = c.pjNombre || pjNombre;
+      if (!evState.cambiosPorPj[pj]) evState.cambiosPorPj[pj] = [];
+      evState.cambiosPorPj[pj].push(c);
+    }
+    evState.cambios   = evState.cambiosPorPj[pjNombre] || [];
     evState._stackIdx = editContext.stackIdx ?? null;
     evState._editNombre = editContext.nombre || '';
     evState._inputNombre = editContext.nombre || '';
   } else {
-    evState.cambios   = [];
-    evState._stackIdx = null;
-    evState._editNombre = '';
+    evState.cambios      = [];
+    evState.cambiosPorPj = {};
+    evState._stackIdx    = null;
+    evState._editNombre  = '';
     evState._inputNombre = '';
   }
   await _cargarDatos(pjNombre);
@@ -782,7 +922,9 @@ export async function aplicarPayload(payload, invertir = false) {
         await supabase.from('hechizos_inventario').insert({
           personaje_nombre: c.pjNombre, hechizo_nombre: c.hzNombre,
           hechizo_afinidad: c.afinidad || '', hechizo_hex: 0,
-          tipo: 'Normal', origen: 'HexCast Evento'
+          tipo: c.esTemp ? 'temporal' : 'Normal',
+          origen: c.esTemp ? 'Temporal' : 'HexCast Evento',
+          es_temporal: !!c.esTemp,
         });
         if (c.costeHex > 0) {
           const p = personajes[c.pjNombre];

@@ -109,7 +109,7 @@ export async function cargarInventarioPJ(pjNombre) {
   if (hxState.inventarioPJ[pjNombre]) return;
   const { data } = await supabase
     .from('hechizos_inventario')
-    .select('hechizo_nombre, hechizo_afinidad, hechizo_hex')
+    .select('hechizo_nombre, hechizo_afinidad, hechizo_hex, es_temporal')
     .eq('personaje_nombre', pjNombre);
   const inv = (data || []).map(row => {
     const cat = hxState.catalogoDB.find(h =>
@@ -121,7 +121,7 @@ export async function cargarInventarioPJ(pjNombre) {
       nombre: row.hechizo_nombre,
       afinidad: row.hechizo_afinidad || '',
       hex_cost: row.hechizo_hex || 0,
-      es_conocido: false,   // sin cat no sabemos si es conocido → tratar como oculto
+      es_conocido: false,
       _inv: row
     };
   });
