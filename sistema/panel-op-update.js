@@ -193,6 +193,8 @@ function _css() {
 .op-btn-push:hover { background: rgba(124,77,170,0.24); }
 .op-btn-undo { background: rgba(220,120,40,0.1);  border-color: rgba(220,120,40,0.35);  color: #e88040; }
 .op-btn-undo:hover { background: rgba(220,120,40,0.22); }
+.op-btn-cancel { background: rgba(180,60,60,0.08); border-color: rgba(180,60,60,0.28); color: #c06060; }
+.op-btn-cancel:hover { background: rgba(180,60,60,0.18); }
 .op-custom-row { display: flex; gap: 3px; margin-top: 4px; }
 .op-custom-input {
     width: 60px; background: rgba(255,255,255,0.06);
@@ -602,6 +604,11 @@ function _montar() {
                                 <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opHexPush('turno_extra',500)">Turno +500</button>
                                 <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opHexPushCustom()">Contenido</button>
                             </div>
+                            <div class="op-btns" style="margin-top:4px;">
+                                <button class="op-btn op-btn-cancel" style="font-size:0.52em;" onclick="window._opCancelarPush('asistencia')">↩ Reporte</button>
+                                <button class="op-btn op-btn-cancel" style="font-size:0.52em;" onclick="window._opCancelarPush('turno_extra')">↩ Turno</button>
+                                <button class="op-btn op-btn-cancel" style="font-size:0.52em;" onclick="window._opCancelarPush('contenido')">↩ Contenido</button>
+                            </div>
                             <div class="op-custom-row">
                                 <input class="op-custom-input" id="op-contenido-custom" type="number" placeholder="100-1000" value="500">
                             </div>
@@ -720,11 +727,52 @@ window._opHexPushCustom = () => {
     _darHexPush('contenido', Math.max(100, Math.min(1000, v)));
 };
 
+window._opCancelarPush = (tipo) => _cancelarPush(tipo);
 window._opPushVex    = () => _darPushVexGuarda('vex');
 window._opPushGuarda = () => _darPushVexGuarda('guarda');
 window._opUndo       = () => _undo();
 window._opCopiarLog  = () => _copiarLog();
 window._opLimpiarLog = () => { opState.log = []; _renderLog(); };
+
+async function _cancelarPush(tipo) {
+    const pjs = _pjsSeleccionados();
+    if (!pjs.length) { _toast('Selecciona al menos un personaje'); return; }
+
+    const labels = { asistencia: 'Reporte', turno_extra: 'Turno extra', contenido: 'Contenido' };
+    const lbl = labels[tipo] || tipo;
+
+    // Para cada PJ, buscar el registro más reciente del tipo en hex_push_log y borrarlo
+    const resultados = [];
+    for (const nombre of pjs) {
+        const { data } = await supabase
+            .from('hex_push_log')
+            .select('id, created_at')
+            .eq('personaje', nombre)
+            .eq('tipo', tipo)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        if (data?.id) {
+            const { error } = await supabase.from('hex_push_log').delete().eq('id', data.id);
+            if (!error) resultados.push(nombre);
+        }
+    }
+
+    if (!resultados.length) {
+        _toast(`Sin registros de ${lbl} para cancelar`);
+        return;
+    }
+
+    const lineas = resultados.map(n =>
+        `<span class="op-log-name">${n}</span> `
+      + `<span style="color:#c06060;">↩ ${lbl} cancelado</span>`
+    ).join('<br>');
+    _addLog(lineas);
+    _toast(`${lbl} cancelado para ${resultados.length} personaje${resultados.length > 1 ? 's' : ''}`);
+
+    window.renderCatalogo?.();
+    window.refreshPanelPJ?.();
+}
 
 window._opSetFiltro = (f) => {
     opState.filtro = f;
