@@ -60,8 +60,23 @@ window.onload = async () => {
 
     const urlParams = new URLSearchParams(window.location.search);
     const pjParam   = urlParams.get('pj');
-    if (pjParam && personajes[pjParam]) {
-        setTimeout(() => window.abrirDetalle(pjParam), 150);
+    const secParam  = (urlParams.get('sec') || '').toLowerCase();
+    if (pjParam) {
+        // Match case-insensitive: "postrimeria" debe encontrar "Postrimeria"
+        const pjReal = Object.keys(personajes).find(
+            n => n.toLowerCase() === pjParam.toLowerCase()
+        );
+        if (pjReal) {
+            const SECS_VALIDAS = ['stats', 'hechizos', 'objetos', 'misiones'];
+            const tabInicial   = SECS_VALIDAS.includes(secParam) ? secParam : 'stats';
+            setTimeout(() => {
+                window.abrirDetalle(pjReal);
+                // _ppjCambiarTab respeta tabs no disponibles (ej. misiones en NPC) sin romper
+                if (tabInicial !== 'stats' && typeof window._ppjCambiarTab === 'function') {
+                    window._ppjCambiarTab(pjReal, tabInicial);
+                }
+            }, 150);
+        }
     }
 };
 
@@ -257,7 +272,7 @@ window.ejecutarPush = async function(nombre, recurso) {
     const cd = calcularCooldownPush(p, recurso);
     if (!cd.disponible) {
         const min = Math.ceil(cd.restaSeg / 60);
-        mostrarToast(`⏳ Cooldown: faltan ${min} min para el siguiente relleno`, true);
+        mostrarToast(`⏳ Cooldown: faltan ${min} min para el siguiente push`, true);
         return;
     }
 
@@ -266,7 +281,7 @@ window.ejecutarPush = async function(nombre, recurso) {
     const usados       = p[actualKey] || 0;
 
     if (usados >= disponibles) {
-        mostrarToast(`Sin rellenos de ${recurso === 'vex' ? 'VEX' : 'Guarda'} disponibles`, true);
+        mostrarToast(`Sin pushes de ${recurso === 'vex' ? 'VEX' : 'Guarda'} disponibles`, true);
         return;
     }
 
@@ -281,8 +296,8 @@ window.ejecutarPush = async function(nombre, recurso) {
 
     const ok = await persistirPush(nombre, p);
     mostrarToast(ok
-        ? `✨ Relleno ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`
-        : 'Error al guardar relleno', !ok);
+        ? `✨ Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`
+        : 'Error al guardar push', !ok);
 
     renderCatalogo();
     refreshPanelPJ();
@@ -294,7 +309,7 @@ window.resetPushes = async function(nombre, recurso) {
     if (recurso === 'vex'    || recurso === 'ambos') { p.push_vex_actual    = 0; p.push_vex_ts    = null; }
     if (recurso === 'guarda' || recurso === 'ambos') { p.push_guarda_actual = 0; p.push_guarda_ts = null; }
     await persistirPush(nombre, p);
-    mostrarToast('Rellenos reiniciados');
+    mostrarToast('Pushes reiniciados');
     refreshPanelPJ();
 };
 
@@ -580,7 +595,7 @@ window.guardarPushConfig = async function() {
     if (cdVex)    pushCooldown.vex    = parseFloat(cdVex.value)    || 60;
     if (cdGuarda) pushCooldown.guarda = parseFloat(cdGuarda.value) || 30;
     const ok = await guardarPushFormulasBD();
-    mostrarToast(ok ? 'Config de relleno guardada' : 'Error al guardar', !ok);
+    mostrarToast(ok ? 'Config de push guardada' : 'Error al guardar', !ok);
 };
 
 window.guardarPushUmbrales = async function() {
