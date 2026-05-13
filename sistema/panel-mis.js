@@ -140,6 +140,7 @@ function _inyectarEstilos() {
 .pmis-cat-desc {
     font-size: 0.68em; color: #909090; line-height: 1.45; margin-bottom: 5px;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    white-space: pre-wrap;
 }
 .pmis-cat-footer {
     display: flex; align-items: center; justify-content: space-between;
@@ -162,6 +163,7 @@ function _inyectarEstilos() {
     background: rgba(30,10,50,0.5); border-left: 2px solid rgba(140,80,200,0.3);
     padding: 3px 7px; font-size: 0.63em; margin: 4px 0;
     color: #9a8ab0; border-radius: 0 4px 4px 0;
+    white-space: pre-wrap;
 }
 .pmis-nota-op strong { color: #a080c0; }
 
@@ -252,7 +254,7 @@ function _inyectarEstilos() {
 }
 .pmis-det-titulo { font-family: 'Cinzel', serif; font-size: 1.05em; color: #f0f0f0; margin-bottom: 7px; line-height: 1.35; }
 .pmis-det-meta   { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.pmis-det-desc   { font-size: 0.78em; color: #b0b0c0; line-height: 1.6; margin-bottom: 10px; }
+.pmis-det-desc   { font-size: 0.78em; color: #b0b0c0; line-height: 1.6; margin-bottom: 10px; white-space: pre-wrap; }
 .pmis-det-avs    { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 .pmis-det-cupos  { font-size: 0.65em; color: #888; margin-left: 4px; }
 
@@ -628,6 +630,18 @@ function _renderDerecho(body, nombre) {
         return j.includes(nombre);
     });
 
+    // Si hay una misión seleccionada del catálogo en la que NO participa, mostrarla ARRIBA
+    if (_s.misionSelec) {
+        const m = _s.misiones.find(x => x.titulo === _s.misionSelec);
+        const yaEnLista = misionesDelPj.some(x => x.titulo === _s.misionSelec);
+        if (m && !yaEnLista) {
+            html += `<div class="pmis-section">
+                <div class="pmis-section-title">Misión seleccionada</div>
+                <div id="pmis-det-${_norm(m.titulo)}">${_renderDetalle(m, nombre, esAdmin)}</div>
+            </div>`;
+        }
+    }
+
     if (misionesDelPj.length > 0) {
         html += `<div class="pmis-section">
             <div class="pmis-section-title">Misiones de ${nombre} <span>${misionesDelPj.length}</span></div>
@@ -643,18 +657,6 @@ function _renderDerecho(body, nombre) {
         </div>`;
     }
 
-    // Si se seleccionó una misión del catálogo en la que NO participa, mostrarla aparte
-    if (_s.misionSelec) {
-        const m = _s.misiones.find(x => x.titulo === _s.misionSelec);
-        const yaEnLista = misionesDelPj.some(x => x.titulo === _s.misionSelec);
-        if (m && !yaEnLista) {
-            html += `<div class="pmis-section">
-                <div class="pmis-section-title">Misión seleccionada</div>
-                <div>${_renderDetalle(m, nombre, esAdmin)}</div>
-            </div>`;
-        }
-    }
-
     // Botón crear
     html += `<div class="pmis-section">
         <button class="pmis-btn-nueva"
@@ -663,15 +665,10 @@ function _renderDerecho(body, nombre) {
         </button>
     </div>`;
 
+    // Preservar la posición de scroll del body durante el re-render
+    const _scrollPrev = body.scrollTop;
     body.innerHTML = html;
-
-    // Scroll suave a la misión seleccionada
-    if (_s.misionSelec) {
-        setTimeout(() => {
-            const el = document.getElementById('pmis-det-' + _norm(_s.misionSelec));
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 80);
-    }
+    body.scrollTop = _scrollPrev;
 }
 // ── Detalle de misión (panel derecho, solo Unirse/Salir) ───────
 function _renderDetalle(m, nombrePJ, esAdmin) {
