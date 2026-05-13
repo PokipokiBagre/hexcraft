@@ -85,8 +85,8 @@ export function renderCatalogo() {
 
         const pushHtml = (s.vex_max > 0 || s.guarda_max > 0) ? `
             <div class="pjc-pushes">
-                ${s.vex_max > 0 ? `<span class="pjc-push pjc-push-vex" title="Push VEX">⚡ ${pushVexUsados}/${pushVexDisp}</span>` : ''}
-                ${s.guarda_max > 0 ? `<span class="pjc-push pjc-push-gua" title="Push Guarda">🛡 ${pushGuardaUsados}/${pushGuardaDisp}</span>` : ''}
+                ${s.vex_max > 0 ? `<span class="pjc-push pjc-push-vex" title="Relleno VEX">⚡ ${pushVexUsados}/${pushVexDisp}</span>` : ''}
+                ${s.guarda_max > 0 ? `<span class="pjc-push pjc-push-gua" title="Relleno Guarda">🛡 ${pushGuardaUsados}/${pushGuardaDisp}</span>` : ''}
             </div>` : '';
 
         // ── VEX bar ───────────────────────────────────────────
@@ -276,7 +276,7 @@ export function renderFormulas() {
     const cooldownHTML = `
         <div class="formula-item">
             <div class="formula-item-header">
-                <span class="formula-item-label">Cooldowns entre pushes</span>
+                <span class="formula-item-label">Cooldowns entre rellenos</span>
             </div>
             <div class="push-cooldown-grid">
                 <div class="push-cd-field">
@@ -309,7 +309,7 @@ ${!_ro ? `<button class="btn-ghost btn-ghost-xs" onclick="window.agregarUmbral('
                         <input class="formula-input umbral-cond${_ro?' formula-input-ro':''}" data-campo="condicion"
                             value="${u.condicion}" placeholder="condición JS" ${_ro?'readonly tabindex="-1"':''}>
                         <input type="number" class="formula-input umbral-pushes${_ro?' formula-input-ro':''}" data-campo="pushes"
-                            value="${u.pushes}" min="1" style="width:56px;" title="Pushes otorgados" ${_ro?'readonly tabindex="-1"':''}>
+                            value="${u.pushes}" min="1" style="width:56px;" title="Rellenos otorgados" ${_ro?'readonly tabindex="-1"':''}>
 ${!_ro ? `<button class="ctrl-btn ctrl-btn-xs icon-btn-danger"
                             onclick="window.eliminarUmbral('${recurso}',${idx})">✕</button>` : ''}
                     </div>
@@ -337,22 +337,22 @@ ${!_ro ? `<button class="ctrl-btn ctrl-btn-xs icon-btn-danger"
         </div>
 
         <div class="formulas-block">
-            <div class="formulas-block-title">Sistema Push — Recuperación activa</div>
+            <div class="formulas-block-title">Sistema Relleno — Recuperación activa</div>
             <p class="formulas-help">
-                Los pushes permiten recuperar VEX o Guarda al instante, con cooldown entre cada uno.
-                El número de pushes disponibles depende del estado de vida del personaje (umbrales configurables abajo).
-                El OP puede además asignar pushes extra individuales desde el panel del personaje.
+                Los rellenos permiten recuperar VEX o Guarda al instante, con cooldown entre cada uno.
+                El número de rellenos disponibles depende del estado de vida del personaje (umbrales configurables abajo).
+                El OP puede además asignar rellenos extra individuales desde el panel del personaje.
             </p>
             ${pushFormsHTML}
             ${cooldownHTML}
-            ${!estadoUI.esAdmin ? '' : `<div class="formula-actions"><button class="btn-primary" onclick="window.guardarPushConfig()">Guardar fórmulas push</button></div>`}
+            ${!estadoUI.esAdmin ? '' : `<div class="formula-actions"><button class="btn-primary" onclick="window.guardarPushConfig()">Guardar fórmulas relleno</button></div>`}
         </div>
 
         <div class="formulas-block">
-            <div class="formulas-block-title">Umbrales de pushes disponibles</div>
+            <div class="formulas-block-title">Umbrales de rellenos disponibles</div>
             <p class="formulas-help">
-                Cada umbral otorga N pushes adicionales cuando la condición se cumple.
-                Se evalúan todos y se suman. Un personaje con vida alta obtiene más pushes que uno malherido.
+                Cada umbral otorga N rellenos adicionales cuando la condición se cumple.
+                Se evalúan todos y se suman. Un personaje con vida alta obtiene más rellenos que uno malherido.
             </p>
             ${_umbralesHtml('vex', 'VEX')}
             ${_umbralesHtml('guarda', 'Guarda Dorada')}
@@ -403,11 +403,11 @@ export function renderPreviewCompleto(nombrePJ) {
         `<div class="prev-separator"></div>`,
         ...Object.entries(pushFormulas).map(([k, f]) => {
             const v = evalExpr(f.expr, ctx);
-            return `<div class="prev-line"><span class="prev-label">${f.label}</span><span class="prev-val">+${v} / push</span><code class="prev-expr">${f.expr}</code></div>`;
+            return `<div class="prev-line"><span class="prev-label">${f.label}</span><span class="prev-val">+${v} / relleno</span><code class="prev-expr">${f.expr}</code></div>`;
         }),
         `<div class="prev-separator"></div>`,
-        `<div class="prev-line"><span class="prev-label">Pushes VEX disponibles</span><span class="prev-val">${calcularPushDisponibles(pj, s, 'vex')}</span></div>`,
-        `<div class="prev-line"><span class="prev-label">Pushes Guarda disponibles</span><span class="prev-val">${calcularPushDisponibles(pj, s, 'guarda')}</span></div>`
+        `<div class="prev-line"><span class="prev-label">Rellenos VEX disponibles</span><span class="prev-val">${calcularPushDisponibles(pj, s, 'vex')}</span></div>`,
+        `<div class="prev-line"><span class="prev-label">Rellenos Guarda disponibles</span><span class="prev-val">${calcularPushDisponibles(pj, s, 'guarda')}</span></div>`
     ];
 
     el.innerHTML = lineas.join('');

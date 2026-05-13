@@ -257,7 +257,7 @@ window.ejecutarPush = async function(nombre, recurso) {
     const cd = calcularCooldownPush(p, recurso);
     if (!cd.disponible) {
         const min = Math.ceil(cd.restaSeg / 60);
-        mostrarToast(`⏳ Cooldown: faltan ${min} min para el siguiente push`, true);
+        mostrarToast(`⏳ Cooldown: faltan ${min} min para el siguiente relleno`, true);
         return;
     }
 
@@ -266,7 +266,7 @@ window.ejecutarPush = async function(nombre, recurso) {
     const usados       = p[actualKey] || 0;
 
     if (usados >= disponibles) {
-        mostrarToast(`Sin pushes de ${recurso === 'vex' ? 'VEX' : 'Guarda'} disponibles`, true);
+        mostrarToast(`Sin rellenos de ${recurso === 'vex' ? 'VEX' : 'Guarda'} disponibles`, true);
         return;
     }
 
@@ -281,8 +281,8 @@ window.ejecutarPush = async function(nombre, recurso) {
 
     const ok = await persistirPush(nombre, p);
     mostrarToast(ok
-        ? `✨ Push ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`
-        : 'Error al guardar push', !ok);
+        ? `✨ Relleno ${recurso === 'vex' ? 'VEX' : 'Guarda'}: +${valor} (${usados + 1}/${disponibles})`
+        : 'Error al guardar relleno', !ok);
 
     renderCatalogo();
     refreshPanelPJ();
@@ -294,7 +294,7 @@ window.resetPushes = async function(nombre, recurso) {
     if (recurso === 'vex'    || recurso === 'ambos') { p.push_vex_actual    = 0; p.push_vex_ts    = null; }
     if (recurso === 'guarda' || recurso === 'ambos') { p.push_guarda_actual = 0; p.push_guarda_ts = null; }
     await persistirPush(nombre, p);
-    mostrarToast('Pushes reiniciados');
+    mostrarToast('Rellenos reiniciados');
     refreshPanelPJ();
 };
 
@@ -580,7 +580,7 @@ window.guardarPushConfig = async function() {
     if (cdVex)    pushCooldown.vex    = parseFloat(cdVex.value)    || 60;
     if (cdGuarda) pushCooldown.guarda = parseFloat(cdGuarda.value) || 30;
     const ok = await guardarPushFormulasBD();
-    mostrarToast(ok ? 'Config de push guardada' : 'Error al guardar', !ok);
+    mostrarToast(ok ? 'Config de relleno guardada' : 'Error al guardar', !ok);
 };
 
 window.guardarPushUmbrales = async function() {

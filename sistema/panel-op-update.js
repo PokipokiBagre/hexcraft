@@ -454,7 +454,7 @@ async function _darPushVexGuarda(recurso) {
         }));
     }
 
-    if (!snaps.length) { _toast(`Sin pushes de ${label} disponibles`); return; }
+    if (!snaps.length) { _toast(`Sin rellenos de ${label} disponibles`); return; }
     await Promise.all(lote);
     opState.historial.push(snaps);
 
@@ -462,7 +462,7 @@ async function _darPushVexGuarda(recurso) {
         const ganado = s.nuevo - s.viejo;
         const signo  = ganado >= 0 ? `+${ganado}` : `${ganado}`;
         return `<span class="op-log-name">${s.nombre}</span> `
-             + `Push ${label} ${signo}`
+             + `Relleno ${label} ${signo}`
              + ` → <span class="op-log-stat">${s.nuevo}/${s.max}</span>`;
     }).join('<br>');
     _addLog(lineas);
@@ -629,7 +629,7 @@ function _montar() {
                                 <button class="op-btn op-btn-vex" onclick="window._opVexCustom()">ok</button>
                             </div>
                             <div class="op-btns" style="margin-top:6px;">
-                                <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opPushVex()">⚡ Push VEX</button>
+                                <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opPushVex()">⚡ Relleno VEX</button>
                             </div>
                         </div>
 
@@ -649,7 +649,7 @@ function _montar() {
                                 <button class="op-btn op-btn-gda" onclick="window._opGuardaCustom()">ok</button>
                             </div>
                             <div class="op-btns" style="margin-top:6px;">
-                                <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opPushGuarda()">🛡 Push Guarda</button>
+                                <button class="op-btn op-btn-push" style="font-size:0.55em;" onclick="window._opPushGuarda()">🛡 Relleno Guarda</button>
                             </div>
                         </div>
 

@@ -668,13 +668,13 @@ async function _tabHex(nombre, body) {
                     <span style="font-size:0.6em;color:#3a3a58;margin-left:2px;">${usados}/${disp}</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:0.65em;color:#4a4a68;">+${val} por push</span>
+                    <span style="font-size:0.65em;color:#4a4a68;">+${val} por relleno</span>
                     ${cdTxt}
                 </div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
                 <button style="background:${canPush?bg:'rgba(255,255,255,0.02)'};border:1px solid ${canPush?col:'rgba(255,255,255,0.07)'};border-radius:6px;color:${canPush?col:'#3a3a58'};font-family:'Cinzel',serif;font-size:0.68em;font-weight:700;padding:6px 16px;cursor:${canPush?'pointer':'default'};letter-spacing:0.5px;min-width:100px;text-align:center;"
-                    ${canPush?'':`disabled`} onclick="window.ejecutarPush('${safe}','${recurso}')">${!cd.disponible?'Cooldown':rest>0?`Push ${label}`:'Sin pushes'}</button>
+                    ${canPush?'':`disabled`} onclick="window.ejecutarPush('${safe}','${recurso}')">${!cd.disponible?'Cooldown':rest>0?`Relleno ${label}`:'Sin rellenos'}</button>
                 ${estadoUI.esAdmin?`<div style="display:flex;gap:4px;align-items:center;">
                     <span style="font-size:0.57em;color:#2e2e48;">Extra</span>
                     <button class="ppj-ctrl-btn" onclick="window.modPushExtra('${safe}','${recurso}',-1)">−</button>
@@ -714,7 +714,7 @@ async function _tabHex(nombre, body) {
     </div>
     <div class="htab-energia-root">
         <div class="htab-energia-header">
-            <div class="htab-energia-label">Pushes de Energía</div>
+            <div class="htab-energia-label">Rellenos de Energía</div>
             <div class="htab-reset-badge" id="ppj-reset-countdown-${_norm(nombre)}">
                 <span class="htab-reset-icon">↺</span>
                 <span class="htab-reset-txt" id="ppj-reset-txt-${_norm(nombre)}">--:--:--</span>
@@ -1090,7 +1090,7 @@ async function _tabHex(nombre, body) {
     <div class="htab-pushes-section">
         <div class="htab-pushes-header">
             <div class="htab-divider-line"></div>
-            <span class="htab-pushes-title">Pushes de HEX</span>
+            <span class="htab-pushes-title">Rellenos de HEX</span>
             <div class="htab-divider-line htab-divider-rev"></div>
         </div>
         <div class="htab-push-grid">
@@ -1101,7 +1101,7 @@ async function _tabHex(nombre, body) {
     </div>
 
     <div class="htab-hlog-section">
-        <div class="htab-hlog-title">Historial de Pushes</div>
+        <div class="htab-hlog-title">Historial de Rellenos</div>
         ${historial.length===0
             ? `<div style="text-align:center;color:#2a2a48;font-size:0.7em;padding:24px 0;">Sin registros</div>`
             : historial.map(h=>{
@@ -3068,7 +3068,7 @@ window._ppjEjecutarHexPush = async (nombre, tipo, cantidad) => {
     if (!estadoUI.esAdmin) return;
     const p = personajes[nombre]; if (!p) return;
     const { error } = await supabase.from('hex_push_log').insert({ personaje:nombre, tipo, cantidad, nota:'', otorgado_por:'OP' });
-    if (error) { window.mostrarToast?.('Error al registrar push', true); return; }
+    if (error) { window.mostrarToast?.('Error al registrar relleno', true); return; }
     p.hex = (p.hex||0) + cantidad;
     encolarCambio(nombre, 'hex', p.hex);
     window.actualizarBtnSync?.();
