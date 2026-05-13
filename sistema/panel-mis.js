@@ -925,8 +925,14 @@ function _renderForm(nombrePJ) {
 function _reRender() {
     const body = document.getElementById('ppj-body');
     if (!body || !_s.nombrePJ) return;
+    // Preservar scroll de la lista del panel izquierdo antes de re-montarlo
+    const _izqListPrev = document.querySelector('#ppj-mis-panel-izq .pmis-izq-list');
+    const _scrollIzq   = _izqListPrev ? _izqListPrev.scrollTop : 0;
     document.getElementById('ppj-mis-panel-izq')?.remove();
     _montarPanelIzq(_s.nombrePJ);
+    // Restaurar scroll en la nueva lista
+    const _izqListNew = document.querySelector('#ppj-mis-panel-izq .pmis-izq-list');
+    if (_izqListNew) _izqListNew.scrollTop = _scrollIzq;
     _renderDerecho(body, _s.nombrePJ);
 }
 
