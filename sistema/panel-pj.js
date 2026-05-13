@@ -279,6 +279,24 @@ function _crearEstructura() {
 // ─────────────────────────────────────────────────────────────
 // ABRIR / CERRAR
 // ─────────────────────────────────────────────────────────────
+
+// Sincroniza la URL con el estado del panel sin recargar.
+// pj=null limpia ambos params (panel cerrado). sec=null deja solo ?pj=.
+function _syncUrl(pj, sec) {
+    try {
+        const url = new URL(window.location.href);
+        if (pj) {
+            url.searchParams.set('pj', pj);
+            if (sec) url.searchParams.set('sec', sec);
+            else     url.searchParams.delete('sec');
+        } else {
+            url.searchParams.delete('pj');
+            url.searchParams.delete('sec');
+        }
+        history.replaceState(null, '', url.toString());
+    } catch(e) { /* navegador antiguo: ignorar */ }
+}
+
 export function abrirPanelPJ(nombre) {
     _crearEstructura();
     // Si cambia de PJ, limpiar el hexBody para que _tabHex recargue logs y cooldowns frescos
@@ -294,7 +312,9 @@ export function abrirPanelPJ(nombre) {
     document.getElementById('panel-pj-overlay').classList.add('open');
     _renderHeader(nombre);
     _renderTabs(nombre);
-    _renderTab(nombre, _tabActivo[nombre] || 'stats');
+    const tabInicial = _tabActivo[nombre] || 'stats';
+    _renderTab(nombre, tabInicial);
+    _syncUrl(nombre, tabInicial);
 }
 
 export function cerrarPanelPJ() {
@@ -310,6 +330,7 @@ export function cerrarPanelPJ() {
         Object.values(window._ppjResetIntervals).forEach(id => clearInterval(id));
         window._ppjResetIntervals = {};
     }
+    _syncUrl(null, null);
     // Las instancias de partículas se auto-detienen cuando su canvas
     // sale del DOM (comprueban canvas.isConnected en cada frame)
 }
@@ -3053,6 +3074,7 @@ window._ppjCambiarTab = (nombre, tab) => {
     document.querySelectorAll('.ppj-tab').forEach(b =>
         b.classList.toggle('active', b.getAttribute('onclick')?.includes(`'${tab}'`)));
     _renderTab(nombre, tab);
+    _syncUrl(nombre, tab);
 };
 
 window._ppjAbrirImgGrande = (nombre) => {
