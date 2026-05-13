@@ -665,7 +665,7 @@ function renderParty(formulas) {
         const portada= `${db.storage.urlBase}/imgpersonajes/${iconoKey}.png`;
         const fb     = `${db.storage.urlBase}/imginterfaz/no_encontrado.png`;
 
-        const pjLink = `personajes/index.html?pj=${encodeURIComponent(nombre)}`;
+        const pjLink = `sistema/index.html?pj=${encodeURIComponent(nombre)}&sec=stats`;
         return `<a href="${pjLink}" class="pj-card" id="pjcard-${norm(nombre)}" style="text-decoration:none;">
             <div class="pj-card-img-wrap">
                 <img src="${portada}" onerror="this.onerror=null;this.src='${icon}';this.onerror=()=>{this.src='${fb}'}"
