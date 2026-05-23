@@ -283,21 +283,8 @@ export async function confirmarTurno() {
   const rows = [];
   for (const item of hxState.stack) {
     const dado = parseInt(item.dado) || null;
-    // HEX cobrado = costoBase (sin multiplicar por CD). Solo si éxito/infalible.
-    const hexGastado = (item.resultado === 'exito' || item.resultado === 'infalible') && item.cobrarHex
-      ? item.costoBase : 0;
-    item.hexGastado = hexGastado;
-
-    if (hexGastado > 0) {
-      const p = personajes[item.pjNombre];
-      if (p) {
-        const nuevoHex = Math.max(0, (p.hex || 0) - hexGastado);
-        p.hex = nuevoHex;
-        await supabase.from('personajes')
-          .update({ hex: nuevoHex })
-          .eq('nombre', item.pjNombre);
-      }
-    }
+    // hex_gastado se inicializa en 0 — el cobro es un paso posterior separado (OP lo aplica)
+    item.hexGastado = 0;
 
     rows.push({
       turno_id:           hxState.turnoActivo.id,
@@ -314,11 +301,11 @@ export async function confirmarTurno() {
       cobrar_hex:         item.cobrarHex,
       es_prioridad:       item.esPrioridad,
       nc:                 item.ncCalc,
-      costo_efectivo:     item.ncNecesario,   // guardamos el NC umbral (no el HEX)
+      costo_efectivo:     item.ncNecesario,
       multiplicador_cd:   item.mult,
       cd_override:        item.cdOverride ?? null,
       resultado:          item.resultado,
-      hex_gastado:        hexGastado,
+      hex_gastado:        0,   // se cobra después con _hxcCobrarHex
       orden:              hxState.stack.indexOf(item)
     });
   }
@@ -339,7 +326,6 @@ export async function confirmarTurno() {
   const nuevoTurno = await crearTurno(hxState.sesionActiva.id, nuevoNum);
   hxState.turnoActivo = nuevoTurno;
   hxState.stack = [];
-  // El nuevo turno no tiene previos propios, pero el historial se actualiza
   await cargarHistorialSesion(hxState.sesionActiva.id, nuevoTurno.numero);
   return { ok: true };
 }
