@@ -2595,7 +2595,7 @@ window._pobjGuardarObjeto = async (nombreExistente) => {
     const va      = parseInt(document.getElementById('pobj-f-va')?.value)||0;
     const cont    = document.getElementById('pobj-f-cont')?.value||null;
     if (!nombre) { alert('El nombre es obligatorio.'); return; }
-    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,contenedor_padre:cont||null,es_propuesta:false};
+    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va};
     let error;
     if (esNuevo) { ({error}=await supabase.from('objetos').insert(payload)); }
     else         { ({error}=await supabase.from('objetos').update(payload).eq('nombre',nombreExistente)); }
@@ -2617,6 +2617,8 @@ window._pobjEliminarObjeto = async (nombre) => {
     _objState.objEditando=null;
     await _recargarObjetos();
 };
+
+
 
 // Imágenes
 window._pobjImgSeleccionar = (n) => { _objState.imgSelObj=n; _renderObjIzq(); };
@@ -2964,7 +2966,7 @@ window._pobjGuardarObjeto = async (nombreExistente) => {
     const va      = parseInt(document.getElementById('pobj-f-va')?.value)||0;
     const cont    = document.getElementById('pobj-f-cont')?.value||null;
     if (!nombre) { alert('El nombre es obligatorio.'); return; }
-    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va,contenedor_padre:cont||null,es_propuesta:false};
+    const payload = {nombre,tipo,material:mat,rareza:rar,efecto:eff,vida_roja:vr,vida_azul:va};
     let error;
     if (esNuevo) { ({error}=await supabase.from('objetos').insert(payload)); }
     else         { ({error}=await supabase.from('objetos').update(payload).eq('nombre',nombreExistente)); }
@@ -2988,6 +2990,22 @@ window._pobjEliminarObjeto = async (nombre) => {
 };
 
 // Imágenes
+
+window._pobjEjecutarForja = async () => {
+    const N    = _objState.forjaN || 4;
+    const dest = document.getElementById("pm-dest")?.value || "";
+    let creados = 0, errores = [];
+    for (let i = 0; i < N; i++) {
+        const nombre = (document.getElementById("pm-nombre-"+i)?.value || "").trim();
+        if (!nombre) continue;
+        const tipo = document.getElementById("pm-tipo-"+i)?.value || "Consumible";
+        const rar  = document.getElementById("pm-rar-"+i)?.value  || "Comun";
+        const eff  = (document.getElementById("pm-eff-"+i)?.value || "").trim();
+        const vr   = parseInt(document.getElementById("pm-vr-"+i)?.value)  || 0;
+        const va   = parseInt(document.getElementById("pm-va-"+i)?.value)  || 0;
+        const cant = parseInt(document.getElementById("pm-cant-"+i)?.value) || 0;
+        const { error } = await supabase.from("objetos").insert({ nombre, tipo, rareza: rar, efecto: eff, vida_roja: vr, vida_azul: va });
+        if (error) { errores.push('+nombre+':
 window._pobjImgSeleccionar = (n) => { _objState.imgSelObj=n; _renderObjIzq(); };
 window._pobjImgBuscar = (v) => { _objState.imgBusq=v; _renderObjIzq(); };
 // ── TRANSFER EN VIVO ─────────────────────────────────────────
