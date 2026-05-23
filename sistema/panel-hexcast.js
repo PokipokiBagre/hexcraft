@@ -499,6 +499,22 @@ function _renderSlot(pj, grupo, idx) {
     const hex = p?.hex ?? '?';
     const vex = p?.vex_actual ?? 0;
     const estados = hxState.estadosPorPj[pj.nombre] || [];
+
+    // Vidas: usar snapshot histórico si existe, si no el estado actual
+    const snap = hxState._statsSnapshot?.[pj.nombre];
+    const vidaRojaAct = snap ? snap.vida_roja_actual : (p?.vida_roja_actual ?? 0);
+    const vidaRojaMax = snap ? snap.vida_roja_max    : (p?.vida_roja_max    ?? 0);
+    const vidaAzulAct = snap ? snap.vida_azul_actual : (p?.vida_azul_actual ?? 0);
+    const guardaAct   = snap ? snap.guarda_actual    : (p?.guarda_actual    ?? 0);
+    const guardaMax   = snap ? snap.guarda_max       : (p?.guarda_max       ?? 0);
+
+    const vidasHtml = snap ? `
+      <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-top:2px;">
+        <span style="font-size:0.48em;color:#e06060;" title="Vida Roja">❤️ ${vidaRojaAct}/${vidaRojaMax}</span>
+        ${(vidaAzulAct !== 0) ? `<span style="font-size:0.48em;color:#4ab3e8;" title="Vida Azul">💙 ${vidaAzulAct}</span>` : ''}
+        ${guardaMax > 0 ? `<span style="font-size:0.48em;color:#d4af37;" title="Guarda">🛡 ${guardaAct}/${guardaMax}</span>` : ''}
+      </div>` : '';
+
     quit = `<button class="hxc-slot-quit" onclick="event.stopPropagation();window._hxcQuitarPJ('${grupo}',${idx})">×</button>`;
 
     const estadosHtml = estados.length > 0
@@ -516,6 +532,7 @@ function _renderSlot(pj, grupo, idx) {
       <span class="hxc-slot-nombre">${pj.nombre}</span>
       <span class="hxc-slot-hex">${(hex||0).toLocaleString()} HEX</span>
       ${vex > 0 ? `<span class="hxc-slot-vex">${vex.toLocaleString()} VEX</span>` : ''}
+      ${vidasHtml}
       <div class="hxc-slot-actions">${btnHz}${btnEst}${btnEv}</div>
     </div>`;
   }
@@ -697,7 +714,7 @@ function _renderCenter() {
   const botonesOp = esAdmin ? `
     <button class="hxc-btn-op hxc-btn-cobrar" onclick="window._hxcCobrarHex()" title="Cobra VEX primero, luego HEX">⚡ Cobrar hechizos</button>
     <button class="hxc-btn-op hxc-btn-devolver" onclick="window._hxcDevolverHex()">↩ Devolver</button>
-    <button class="hxc-btn-op hxc-btn-del-turno" onclick="window._hxcEliminarTurno()">🗑 Turno</button>
+    <button class="hxc-btn-op hxc-btn-del-turno" onclick="window._hxcModalGestionarTurnos()">🗑 Turnos</button>
   ` : '';
 
   const btnGuardarHistorico = (esHistorico && esAdmin) ? `
@@ -1362,7 +1379,10 @@ window._hxcIrTurno = async (idxRaw) => {
         cdOverride: row.cd_override ?? undefined,
         costoBase: row.hechizo_hex_cost,
         ncNecesario: row.costo_efectivo,
-        abierto: false, resultado: row.resultado, ncCalc: row.nc, hexGastado: row.hex_gastado
+        abierto: false, resultado: row.resultado, ncCalc: row.nc,
+        hexGastado:  row.hex_gastado  || 0,
+        _vexGastado: row.vex_gastado  || 0,
+        _hexGastado: (row.hex_gastado || 0) - (row.vex_gastado || 0),
       };
     });
 
@@ -1400,22 +1420,135 @@ window._hxcIrTurno = async (idxRaw) => {
   // Cargar estados del turno (chips en slots)
   hxState.estadosPorPj = {};
   await _cargarTodosEstadosTurno();
+  // Cargar snapshot de stats (vidas históricas en slots)
+  if (!esUltimo) {
+    await _cargarStatsSnapshot(turno.id);
+  } else {
+    hxState._statsSnapshot = {};
+  }
   // Cargar flechas del turno
   await cargarFlechasTurno(turno.id, hxState.sesionActiva?.id);
   _render();
 };
 
 // Eliminar turno completo
+// ── GESTIONAR TURNOS — modal con lista y eliminación múltiple ──
+window._hxcModalGestionarTurnos = async () => {
+  if (!_esAdmin()) return;
+
+  // Cargar conteo de lanzamientos por turno desde DB
+  const turnoIds = hxState.turnos.map(t => t.id);
+  const { data: counts } = await supabase
+    .from('hexcast_lanzamientos')
+    .select('turno_id')
+    .in('turno_id', turnoIds);
+
+  const contPorTurno = {};
+  (counts || []).forEach(r => {
+    contPorTurno[r.turno_id] = (contPorTurno[r.turno_id] || 0) + 1;
+  });
+
+  const turnoActualId = hxState.turnoActivo?.id;
+
+  const filas = hxState.turnos.map(t => {
+    const n = contPorTurno[t.id] || 0;
+    const esActual = t.id === turnoActualId;
+    const vacio = n === 0;
+    const nombre = 'T' + t.numero + (t.nombre ? ' — ' + t.nombre : '');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,0.05);">
+      <input type="checkbox" id="hxc-del-t-${t.id}" value="${t.id}"
+        ${esActual ? 'disabled title="Turno activo — navega a otro antes de eliminar"' : ''}
+        style="width:15px;height:15px;accent-color:#e06060;cursor:${esActual?'not-allowed':'pointer'};">
+      <label for="hxc-del-t-${t.id}" style="flex:1;font-size:0.78em;color:${esActual?'#d4af37':'#ccc'};cursor:${esActual?'default':'pointer'};">
+        ${nombre}
+        ${esActual ? '<span style="font-size:0.75em;color:#d4af37;margin-left:4px;">● activo</span>' : ''}
+      </label>
+      <span style="font-size:0.65em;color:${vacio?'#444':'#888'};min-width:60px;text-align:right;">
+        ${vacio ? 'vacío' : n + ' lanzamiento' + (n!==1?'s':'')}
+      </span>
+    </div>`;
+  }).join('');
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'hxc-modal-backdrop';
+  backdrop.innerHTML = `<div class="hxc-modal" onclick="event.stopPropagation()" style="width:420px;max-height:70vh;display:flex;flex-direction:column;">
+    <div class="hxc-modal-title" style="display:flex;align-items:center;gap:8px;">
+      🗑 Gestionar turnos
+      <span style="font-size:0.65em;color:#666;font-family:Inter,sans-serif;font-weight:400;margin-left:4px;">${hxState.turnos.length} turnos</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;">
+      <button onclick="document.querySelectorAll('[id^=hxc-del-t-]:not(:disabled)').forEach(c=>c.checked=true)"
+        style="font-size:0.65em;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#888;cursor:pointer;">
+        Seleccionar vacíos
+      </button>
+      <button onclick="document.querySelectorAll('[id^=hxc-del-t-]:not(:disabled)').forEach(c=>c.checked=false)"
+        style="font-size:0.65em;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#888;cursor:pointer;">
+        Deseleccionar
+      </button>
+    </div>
+    <div style="flex:1;overflow-y:auto;max-height:340px;scrollbar-width:thin;padding-right:4px;">
+      ${filas}
+    </div>
+    <div id="hxc-del-turnos-aviso" style="min-height:20px;font-size:0.65em;color:#e06060;margin-top:6px;"></div>
+    <div class="hxc-modal-footer">
+      <button class="hxc-btn-cancel-modal" onclick="this.closest('.hxc-modal-backdrop').remove()">Cancelar</button>
+      <button class="hxc-btn-ok-modal" style="background:rgba(200,60,60,0.12);border-color:rgba(200,60,60,0.4);color:#e06060;"
+        onclick="window._hxcEliminarTurnosSeleccionados()">Eliminar seleccionados</button>
+    </div>
+  </div>`;
+  backdrop.onclick = () => backdrop.remove();
+  document.body.appendChild(backdrop);
+
+  // Auto-marcar vacíos
+  hxState.turnos.forEach(t => {
+    if ((contPorTurno[t.id] || 0) === 0 && t.id !== turnoActualId) {
+      const cb = document.getElementById('hxc-del-t-' + t.id);
+      if (cb) cb.checked = true;
+    }
+  });
+};
+
+window._hxcEliminarTurnosSeleccionados = async () => {
+  const checkboxes = document.querySelectorAll('[id^=hxc-del-t-]:checked');
+  const ids = [...checkboxes].map(c => parseInt(c.value)).filter(Boolean);
+  if (!ids.length) {
+    document.getElementById('hxc-del-turnos-aviso').textContent = 'Selecciona al menos un turno.';
+    return;
+  }
+
+  const turnoActualId = hxState.turnoActivo?.id;
+  if (ids.includes(turnoActualId)) {
+    document.getElementById('hxc-del-turnos-aviso').textContent = 'No puedes eliminar el turno activo.';
+    return;
+  }
+
+  const nombres = ids.map(id => {
+    const t = hxState.turnos.find(t => t.id === id);
+    return t ? 'T' + t.numero : id;
+  }).join(', ');
+
+  if (!confirm(`¿Eliminar los turnos: ${nombres}?\nEsta acción no se puede deshacer.`)) return;
+
+  const errores = [];
+  for (const id of ids) {
+    const { error } = await supabase.from('hexcast_turnos').delete().eq('id', id);
+    if (error) errores.push(id);
+  }
+
+  hxState.turnos = hxState.turnos.filter(t => !ids.includes(t.id));
+  document.querySelector('.hxc-modal-backdrop')?.remove();
+
+  if (errores.length) {
+    _toast('Error eliminando algunos turnos', true);
+  } else {
+    _toast(`✦ ${ids.length} turno${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}`);
+  }
+  _render();
+};
+
 window._hxcEliminarTurno = async () => {
-  const turno = hxState.turnoActivo;
-  if (!turno) return;
-  if (hxState.turnos.length <= 1) { _toast('No puedes eliminar el único turno', true); return; }
-  if (!confirm(`¿Eliminar Turno ${turno.numero} y todos sus lanzamientos?`)) return;
-  const { error } = await supabase.from('hexcast_turnos').delete().eq('id', turno.id);
-  if (error) { _toast('Error: ' + error.message, true); return; }
-  hxState.turnos = hxState.turnos.filter(t => t.id !== turno.id);
-  await window._hxcIrTurno(hxState.turnos.length - 1);
-  _toast('Turno eliminado');
+  // Mantener para compatibilidad — abre el modal
+  window._hxcModalGestionarTurnos();
 };
 
 // ── COBRAR HEX (solo OP) — VEX primero, luego HEX ────────────
@@ -1464,11 +1597,15 @@ window._hxcCobrarHex = async () => {
     const { error } = await supabase.from('personajes').update({ vex_actual: b2.vex, hex: b2.hex }).eq('nombre', nombre);
     if (error) errores.push(nombre);
   }
-  // Persistir resultados y hex_gastado en DB
+  // Persistir resultados y hex_gastado/vex_gastado en DB
   for (const item of stack) {
     if (item.id && typeof item.id === 'number') {
       await supabase.from('hexcast_lanzamientos')
-        .update({ resultado: item.resultado, hex_gastado: item.hexGastado || 0 })
+        .update({
+          resultado:    item.resultado,
+          hex_gastado:  item.hexGastado || 0,
+          vex_gastado:  item._vexGastado || 0,
+        })
         .eq('id', item.id);
     }
   }
@@ -1558,6 +1695,8 @@ window._hxcAplicarEvento = async (stackIdx) => {
     if (item.id && typeof item.id === 'number') {
       await supabase.from('hexcast_lanzamientos').update({ evento_aplicado: true }).eq('id', item.id);
     }
+    // Actualizar snapshot de stats del turno activo (refleja los cambios del evento)
+    if (hxState.turnoActivo?.id) await _guardarStatsSnapshot(hxState.turnoActivo.id);
     if (errores.length) _toast('Errores: ' + errores.join(', '), true);
     else _toast('✦ Evento aplicado');
   } catch(e) { _toast('Error aplicando evento', true); }
@@ -1994,6 +2133,9 @@ window._hxcGuardarHistorico = async () => {
   };
   await supabase.from('hexcast_turnos').update({ slots_json: slotsJson }).eq('id', turno.id);
 
+  // Guardar snapshot de stats de cada PJ visible en este turno
+  await _guardarStatsSnapshot(turno.id);
+
   // Evaluar todos los items antes de guardar
   hxState.stack.forEach(item => evaluarItem(item));
 
@@ -2145,6 +2287,9 @@ window._hxcConfirmar = async () => {
   const res = await confirmarTurno();
   if (!res.ok) { _toast('Error: ' + res.msg, true); return; }
 
+  // Guardar snapshot de stats del turno que se acaba de confirmar
+  if (turnoAnteriorId) await _guardarStatsSnapshot(turnoAnteriorId);
+
   // Persistir bloques evento con el turno anterior
   if (eventosAnteriores.length > 0 && turnoAnteriorId) {
     await _persistirEventos(eventosAnteriores, turnoAnteriorId);
@@ -2185,6 +2330,43 @@ async function _persistirEventos(eventos, turnoId) {
 }
 
 // Copia los estados activos del turno anterior al turno nuevo (carry-forward)
+// ── Snapshots de stats por turno ──────────────────────────────
+// Guarda vida_roja, vida_azul, guarda de todos los PJs visibles en el turno
+async function _guardarStatsSnapshot(turnoId) {
+  const sesionId = hxState.sesionActiva?.id;
+  if (!turnoId || !sesionId) return;
+  const pjs = [...hxState.grupoA, ...hxState.grupoB].filter(Boolean);
+  if (!pjs.length) return;
+  const rows = pjs.map(slot => {
+    const p = personajes[slot.nombre];
+    if (!p) return null;
+    return {
+      turno_id:         turnoId,
+      sesion_id:        sesionId,
+      pj_nombre:        slot.nombre,
+      vida_roja_actual: p.vida_roja_actual ?? 0,
+      vida_roja_max:    p.vida_roja_max    ?? 0,
+      vida_azul_actual: p.vida_azul_actual ?? 0,
+      guarda_actual:    p.guarda_actual    ?? 0,
+      guarda_max:       p.guarda_max       ?? 0,
+    };
+  }).filter(Boolean);
+  if (!rows.length) return;
+  await supabase.from('hexcast_stats_snapshot')
+    .upsert(rows, { onConflict: 'turno_id,pj_nombre' });
+}
+
+// Carga snapshots del turno activo para mostrar vidas históricas en slots
+async function _cargarStatsSnapshot(turnoId) {
+  if (!turnoId) { hxState._statsSnapshot = {}; return; }
+  const { data } = await supabase.from('hexcast_stats_snapshot')
+    .select('*').eq('turno_id', turnoId);
+  hxState._statsSnapshot = {};
+  (data || []).forEach(row => {
+    hxState._statsSnapshot[row.pj_nombre] = row;
+  });
+}
+
 async function _carryForwardEstados(turnoAnteriorId, nuevoTurnoId, sesionId) {
   if (!turnoAnteriorId || !nuevoTurnoId) return;
   const { data } = await supabase.from('pj_estados')
