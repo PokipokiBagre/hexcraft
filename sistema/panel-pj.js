@@ -2618,8 +2618,6 @@ window._pobjEliminarObjeto = async (nombre) => {
     await _recargarObjetos();
 };
 
-
-
 // Imágenes
 window._pobjImgSeleccionar = (n) => { _objState.imgSelObj=n; _renderObjIzq(); };
 window._pobjImgBuscar = (v) => { _objState.imgBusq=v; _renderObjIzq(); };
@@ -2989,23 +2987,40 @@ window._pobjEliminarObjeto = async (nombre) => {
     await _recargarObjetos();
 };
 
-// Imágenes
 
 window._pobjEjecutarForja = async () => {
     const N    = _objState.forjaN || 4;
-    const dest = document.getElementById("pm-dest")?.value || "";
+    const dest = document.getElementById('pm-dest')?.value || '';
     let creados = 0, errores = [];
     for (let i = 0; i < N; i++) {
-        const nombre = (document.getElementById("pm-nombre-"+i)?.value || "").trim();
+        const nombre = (document.getElementById('pm-nombre-' + i)?.value || '').trim();
         if (!nombre) continue;
-        const tipo = document.getElementById("pm-tipo-"+i)?.value || "Consumible";
-        const rar  = document.getElementById("pm-rar-"+i)?.value  || "Comun";
-        const eff  = (document.getElementById("pm-eff-"+i)?.value || "").trim();
-        const vr   = parseInt(document.getElementById("pm-vr-"+i)?.value)  || 0;
-        const va   = parseInt(document.getElementById("pm-va-"+i)?.value)  || 0;
-        const cant = parseInt(document.getElementById("pm-cant-"+i)?.value) || 0;
-        const { error } = await supabase.from("objetos").insert({ nombre, tipo, rareza: rar, efecto: eff, vida_roja: vr, vida_azul: va });
-        if (error) { errores.push('+nombre+':
+        const tipo = document.getElementById('pm-tipo-' + i)?.value || 'Consumible';
+        const rar  = document.getElementById('pm-rar-'  + i)?.value || 'Com\u00fan';
+        const eff  = (document.getElementById('pm-eff-' + i)?.value || '').trim();
+        const vr   = parseInt(document.getElementById('pm-vr-'   + i)?.value) || 0;
+        const va   = parseInt(document.getElementById('pm-va-'   + i)?.value) || 0;
+        const cant = parseInt(document.getElementById('pm-cant-' + i)?.value) || 0;
+        const { error } = await supabase.from('objetos').insert(
+            { nombre, tipo, rareza: rar, efecto: eff, vida_roja: vr, vida_azul: va }
+        );
+        if (error) { errores.push('"' + nombre + '": ' + error.message); continue; }
+        creados++;
+        const pjDest = dest || _objState.nombrePJ;
+        if (cant > 0 && pjDest) {
+            await supabase.from('inventario_objetos').upsert(
+                { personaje_nombre: pjDest, objeto_nombre: nombre, cantidad: cant, equipado: false },
+                { onConflict: 'personaje_nombre,objeto_nombre' }
+            );
+        }
+    }
+    if (errores.length) alert('Errores:\n' + errores.join('\n'));
+    if (creados > 0) window.mostrarToast?.('\u2692\ufe0f ' + creados + ' objeto' + (creados !== 1 ? 's' : '') + ' creado' + (creados !== 1 ? 's' : ''));
+    _objState.modoForja = false;
+    await _recargarObjetos();
+};
+
+// Imágenes
 window._pobjImgSeleccionar = (n) => { _objState.imgSelObj=n; _renderObjIzq(); };
 window._pobjImgBuscar = (v) => { _objState.imgBusq=v; _renderObjIzq(); };
 // ── TRANSFER EN VIVO ─────────────────────────────────────────
