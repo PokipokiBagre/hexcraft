@@ -341,15 +341,7 @@ export function serializarPersonaje(nombre, p) {
         vida_roja_max_op: p.vida_roja_max_override || 0,
         vida_azul_max_op: p.vida_azul_max_override || 0,
         guarda_max_op:    p.guarda_max_override    || 0,
-        // Cooldowns — escribe cd_afin (JSONB) y también columnas individuales por retrocompat
-        cd_afin: {
-            fisica:     p.cd_fisica     ?? 0.5,
-            energetica: p.cd_energetica ?? 0.5,
-            espiritual: p.cd_espiritual ?? 0.5,
-            mando:      p.cd_mando      ?? 0.5,
-            psiquica:   p.cd_psiquica   ?? 0.5,
-            oscura:     p.cd_oscura     ?? 0.5,
-        },
+        // Cooldowns — solo columnas individuales (cd_afin JSONB no existe en el schema)
         cd_fisica:     p.cd_fisica     ?? 0.5,
         cd_energetica: p.cd_energetica ?? 0.5,
         cd_espiritual: p.cd_espiritual ?? 0.5,
