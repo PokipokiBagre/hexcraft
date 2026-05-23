@@ -775,38 +775,61 @@ function _renderGastoHex(item, stackUpTo) {
 function _renderBalance() {
   const pjNames = [...new Set(hxState.stack.map(i => i.pjNombre))];
   if (!pjNames.length) return '';
+
+  // Para el turno activo (no histórico): calcular en tiempo real con VEX/HEX actual
+  // Para turnos históricos: leer hex_gastado guardado en DB (campo en el item)
+  const turnoIdx = hxState.turnos.findIndex(t => t.id === hxState.turnoActivo?.id);
+  const esHistorico = turnoIdx < hxState.turnos.length - 1;
+
   const rows = pjNames.map(nombre => {
-    const p = personajes[nombre];
-    if (!p) return '';
-    let vexDisp = p.vex_actual || 0;
-    let hexDisp = p.hex || 0;
-    let totalGasto = 0;
-    let totalVex = 0;
-    let totalHex = 0;
-    for (const item of hxState.stack) {
-      if (item.pjNombre !== nombre) continue;
-      if (!item.cobrarHex) continue;
-      if (item.resultado !== 'exito' && item.resultado !== 'infalible') continue;
-      const costo = item.costoBase; // HEX = costoBase
-      const vexG = Math.min(vexDisp, costo);
-      const hexG = costo - vexG;
-      vexDisp -= vexG;
-      hexDisp -= hexG;
-      totalVex += vexG;
-      totalHex += hexG;
-      totalGasto += costo;
-    }
     const color = hxState.stack.find(i => i.pjNombre === nombre)?.color;
     const vars = color ? _colorVars(color) : '';
+
+    let totalVex = 0, totalHex = 0, cobrado = false;
+
+    if (esHistorico) {
+      // Histórico: leer hex_gastado de DB. Si el item tiene _vexGastado/_hexGastado en memoria, usar eso.
+      for (const item of hxState.stack) {
+        if (item.pjNombre !== nombre) continue;
+        if (item.tipoItem === 'evento') continue;
+        if ((item.hexGastado || 0) > 0) {
+          // Usar desglose si está en memoria (cobro reciente), si no mostrar total como HEX
+          totalVex += item._vexGastado || 0;
+          totalHex += item._hexGastado !== undefined ? item._hexGastado : item.hexGastado;
+          cobrado = true;
+        }
+      }
+    } else {
+      // Turno activo: calcular en tiempo real (VEX primero, luego HEX)
+      const p = personajes[nombre];
+      if (!p) return '';
+      let vexDisp = p.vex_actual || 0;
+      let hexDisp = p.hex || 0;
+      for (const item of hxState.stack) {
+        if (item.pjNombre !== nombre) continue;
+        if (!item.cobrarHex) continue;
+        if (item.resultado !== 'exito' && item.resultado !== 'infalible') continue;
+        const costo = item.costoBase;
+        const vexG = Math.min(vexDisp, costo);
+        const hexG = costo - vexG;
+        vexDisp -= vexG;
+        hexDisp -= hexG;
+        totalVex += vexG;
+        totalHex += hexG;
+      }
+    }
+
+    const totalGasto = totalVex + totalHex;
     return `<div class="hxc-bal-row" style="${vars}">
       <span class="hxc-bal-pj">${nombre}</span>
       <span class="hxc-bal-vals">
         ${totalVex > 0 ? `<span class="hxc-gasto-vex">-${totalVex.toLocaleString()} VEX</span>` : ''}
         ${totalHex > 0 ? `<span class="hxc-gasto-hex">-${totalHex.toLocaleString()} HEX</span>` : ''}
-        ${totalGasto === 0 ? `<span style="color:#444;">sin gasto</span>` : ''}
+        ${totalGasto === 0 ? `<span style="color:#444;">${esHistorico ? 'sin cobro' : 'sin gasto'}</span>` : ''}
       </span>
     </div>`;
   }).join('');
+
   return `<div class="hxc-balance-panel"><div class="hxc-balance-title">Balance del turno</div>${rows}</div>`;
 }
 
@@ -1413,20 +1436,21 @@ window._hxcCobrarHex = async () => {
     const item = stack[i];
     if (!item.cobrarHex) continue;
     if (item.resultado !== 'exito' && item.resultado !== 'infalible') continue;
-    const costo = item.costoBase; if (costo <= 0) continue; // HEX cobrado = costoBase
+    const costo = item.costoBase; if (costo <= 0) continue;
     const b = bal[item.pjNombre]; if (!b) continue;
 
     const vexGasto = Math.min(b.vex, costo);
     const hexGasto = costo - vexGasto;
 
     if (hexGasto > b.hex) {
-      // No hay HEX suficiente → fallo_hex
       item.resultado = 'fallo_hex';
       continue;
     }
 
     b.vex -= vexGasto; b.hex -= hexGasto;
-    item.hexGastado = costo;
+    item.hexGastado = costo;        // total cobrado (para balance histórico)
+    item._vexGastado = vexGasto;    // desglose VEX (en memoria, para render inmediato)
+    item._hexGastado = hexGasto;    // desglose HEX puro
     algoCobrado = true;
   }
 
@@ -2070,30 +2094,54 @@ window._hxcCrearTurnoSolo = async () => {
   _render(); // actualiza el select y contador
 };
 
-// Siguiente: navega si existe, crea+navega si es el último
+// Siguiente: navega si existe, crea+navega si es el último Y el turno actual está vacío
 window._hxcNavSiguiente = async (turnoIdx, totalTurnos) => {
   if (turnoIdx < totalTurnos - 1) {
-    // Existe siguiente → navegar
+    // Existe siguiente → solo navegar
     await window._hxcIrTurno(turnoIdx + 1);
   } else {
-    // Es el último → crear y navegar
+    // Es el último → solo crear si el turno actual no tiene lanzamientos en DB
     if (!hxState.sesionActiva) return;
-    const turnoAnteriorId = hxState.turnoActivo?.id;
-    const nuevoTurno = await crearTurno(hxState.sesionActiva.id, hxState.turnos.length + 1);
-    hxState.turnoActivo = nuevoTurno;
-    hxState.stack = [];
-    await _carryForwardEstados(turnoAnteriorId, nuevoTurno.id, hxState.sesionActiva.id);
-    await _cargarTodosEstadosTurno();
-    _toast('✦ Turno ' + nuevoTurno.numero + ' creado');
-    _render();
+    const turnoActual = hxState.turnos[turnoIdx];
+    // Verificar si ya tiene lanzamientos guardados (fue confirmado)
+    const { data: existing } = await supabase.from('hexcast_lanzamientos')
+      .select('id').eq('turno_id', turnoActual.id).limit(1);
+    if (existing && existing.length > 0) {
+      // El turno ya fue confirmado y tiene lanzamientos — solo crear nuevo turno vacío
+      const turnoAnteriorId = turnoActual.id;
+      const nuevoTurno = await crearTurno(hxState.sesionActiva.id, hxState.turnos.length + 1);
+      hxState.turnoActivo = nuevoTurno;
+      hxState.stack = [];
+      await _carryForwardEstados(turnoAnteriorId, nuevoTurno.id, hxState.sesionActiva.id);
+      await _cargarTodosEstadosTurno();
+      _toast('✦ Turno ' + nuevoTurno.numero + ' creado');
+      _render();
+    } else {
+      // Turno actual vacío → simplemente crear nuevo
+      const turnoAnteriorId = turnoActual?.id;
+      const nuevoTurno = await crearTurno(hxState.sesionActiva.id, hxState.turnos.length + 1);
+      hxState.turnoActivo = nuevoTurno;
+      hxState.stack = [];
+      await _carryForwardEstados(turnoAnteriorId, nuevoTurno.id, hxState.sesionActiva.id);
+      await _cargarTodosEstadosTurno();
+      _toast('✦ Turno ' + nuevoTurno.numero + ' creado');
+      _render();
+    }
   }
 };
 
 window._hxcConfirmar = async () => {
-  if (!hxState.stack.length) { _toast('Stack vacío', true); return; }
+  if (!hxState.stack.filter(i => i.tipoItem !== 'evento').length &&
+      !hxState.stack.filter(i => i.tipoItem === 'evento').length) {
+    _toast('Stack vacío', true); return;
+  }
   const turnoAnteriorId = hxState.turnoActivo?.id;
   // Capturar eventos ANTES de que confirmarTurno vacíe el stack
   const eventosAnteriores = hxState.stack.filter(i => i.tipoItem === 'evento');
+  // Filtrar solo hechizos para confirmarTurno (que ya no cobra HEX)
+  const stackSinEventos = hxState.stack.filter(i => i.tipoItem !== 'evento');
+  hxState.stack = stackSinEventos;
+
   const res = await confirmarTurno();
   if (!res.ok) { _toast('Error: ' + res.msg, true); return; }
 
@@ -2105,7 +2153,8 @@ window._hxcConfirmar = async () => {
   const nuevoTurno = hxState.turnoActivo;
   await _carryForwardEstados(turnoAnteriorId, nuevoTurno.id, hxState.sesionActiva.id);
   await _cargarTodosEstadosTurno();
-  _toast('✦ Turno ' + (nuevoTurno?.numero??'') + ' confirmado');
+  _syncUrl();
+  _toast('✦ Turno guardado · Usa ⚡ Cobrar hechizos para descontar HEX/VEX');
   _render();
 };
 
