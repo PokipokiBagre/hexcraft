@@ -352,9 +352,13 @@ function resetFormulario() {
     fIsJugador = true; fIsActivo = true;
     document.getElementById('form-titulo').textContent = 'Crear personaje';
     document.getElementById('f-nombre').value     = '';
-    document.getElementById('f-icono').value      = '';
+    // icono es siempre el nombre normalizado — oculto/auto, no editable
+    const fIcono = document.getElementById('f-icono');
+    if (fIcono) { fIcono.value = ''; fIcono.closest?.('.field')?.style?.setProperty('display','none'); }
     document.getElementById('f-hex').value        = '1000';
-    document.getElementById('f-asistencia').value = '1';
+    // f-asistencia ya no existe en el schema — ocultarlo si aún está en el HTML
+    const fAs = document.getElementById('f-asistencia');
+    if (fAs) { fAs.value = '1'; fAs.closest?.('.field')?.style?.setProperty('display','none'); }
     document.getElementById('f-vex-actual').value = '0';
     document.getElementById('f-vex-max').value    = '0';
     document.getElementById('f-vida-roja').value  = '10';
@@ -375,9 +379,12 @@ function rellenarFormulario(nombre) {
     const p = personajes[nombre]; if (!p) return;
     document.getElementById('form-titulo').textContent = `Editando: ${nombre}`;
     document.getElementById('f-nombre').value     = nombre;
-    document.getElementById('f-icono').value      = p.iconoOverride || '';
+    // icono siempre es el nombre normalizado — campo oculto
+    const fIcono = document.getElementById('f-icono');
+    if (fIcono) { fIcono.value = p.iconoOverride || nombre; fIcono.closest?.('.field')?.style?.setProperty('display','none'); }
     document.getElementById('f-hex').value        = p.hex || 0;
-    document.getElementById('f-asistencia').value = p.asistencia || 1;
+    const fAs = document.getElementById('f-asistencia');
+    if (fAs) { fAs.value = p.asistencia || 1; fAs.closest?.('.field')?.style?.setProperty('display','none'); }
     document.getElementById('f-vex-actual').value = p.vex_actual || 0;
     document.getElementById('f-vex-max').value    = p.vex_max || 0;
     document.getElementById('f-vida-roja').value  = p.vida_roja_actual || 10;
@@ -406,6 +413,22 @@ function setToggleJugador(val) {
     if (vexRow) vexRow.style.display = val ? 'none' : 'flex';
     const lbl = document.getElementById('lbl-jugador');
     if (lbl) lbl.textContent = val ? 'Jugador (PC)' : 'NPC';
+    _actualizarAfinVisibilidad();
+    actualizarPreviewFormulario();
+}
+
+function _actualizarAfinVisibilidad() {
+    // Para NPC sistema las afinidades no se usan — atenuar la sección visualmente
+    const npcTipo = document.getElementById('f-npc-tipo')?.value || 'sistema';
+    const esSistema = !fIsJugador && npcTipo === 'sistema';
+    const afinSection = document.querySelector('.form-section .afin-grid');
+    if (afinSection) {
+        afinSection.style.opacity = esSistema ? '0.35' : '';
+        afinSection.style.pointerEvents = esSistema ? 'none' : '';
+    }
+    // También atenuar el título de la sección de afinidades
+    const afinTitle = [...document.querySelectorAll('.form-section-title')].find(el => el.textContent.includes('Afinidades'));
+    if (afinTitle) afinTitle.style.opacity = esSistema ? '0.35' : '';
 }
 
 function setToggleActivo(val) {
@@ -417,7 +440,23 @@ function setToggleActivo(val) {
 window.toggleJugador = function() { setToggleJugador(!fIsJugador); };
 window.toggleActivo  = function() { setToggleActivo(!fIsActivo); };
 
+// Cuando cambia el tipo de NPC, refrescar aviso de afinidades y preview
+window.onNpcTipoChange = function() {
+    _actualizarAfinVisibilidad();
+    actualizarPreviewFormulario();
+};
+
 window.actualizarPreviewFormulario = function() {
+    const prev = document.getElementById('afin-preview');
+    if (!prev) return;
+
+    // NPC sistema: afinidades no afectan stats — mostrar aviso en vez de cálculo
+    const npcTipo = document.getElementById('f-npc-tipo')?.value || 'sistema';
+    if (!fIsJugador && npcTipo === 'sistema') {
+        prev.innerHTML = `<span style="color:#5a5a78;font-style:italic;">NPC sistema — los stats son fijos (controlados por el trigger de DB, no por fórmulas)</span>`;
+        return;
+    }
+
     const vals = {};
     ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
         vals[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
@@ -429,8 +468,6 @@ window.actualizarPreviewFormulario = function() {
         ManB: vals.mando,  PsiB: vals.psiquica,   OscB: vals.oscura,
         Hz1:0, Hz2:0, Hz3:0, Hz4:0, Hz5:0
     };
-    const prev = document.getElementById('afin-preview');
-    if (!prev) return;
     const v_vida  = evalExpr(formulas.vida_roja_max.expr, ctx);
     const v_azul  = evalExpr(formulas.vida_azul_max.expr, ctx);
     const v_guard = evalExpr(formulas.guarda_max.expr, ctx);
@@ -438,26 +475,39 @@ window.actualizarPreviewFormulario = function() {
     prev.innerHTML = `Vida Roja: <strong>${v_vida}</strong> &nbsp;·&nbsp; Vida Azul: <strong>${v_azul}</strong> &nbsp;·&nbsp; Guarda: <strong>${v_guard}</strong> &nbsp;·&nbsp; VEX máx: <strong>${v_vex}</strong>`;
 };
 
-window.guardarPersonaje = function() {
+window.guardarPersonaje = async function() {
     const nombre = document.getElementById('f-nombre').value.trim();
     if (!nombre) return mostrarToast('El nombre es obligatorio', true);
     if (!estadoUI.esAdmin && fIsJugador) {
         mostrarToast('Solo el OP puede crear personajes jugadores', true);
         return;
     }
-    const afinBase = {};
-    ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
-        afinBase[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
-    });
+
+    const npcTipo = fIsJugador ? 'jugador' : (document.getElementById('f-npc-tipo')?.value || 'sistema');
+
+    // Para NPC sistema las afinidades base están fijas en DB y no se editan desde el formulario.
+    // Si el usuario pone valores, los ignoramos para no disparar el trigger de recálculo de stats.
+    const esSistema = !fIsJugador && npcTipo === 'sistema';
+    const _afin0 = { fisica:0, energetica:0, espiritual:0, mando:0, psiquica:0, oscura:0 };
+    const afinBase = esSistema ? { ..._afin0 } : (() => {
+        const ab = {};
+        ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
+            ab[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
+        });
+        return ab;
+    })();
+
+    // Ícono = nombre normalizado (sin acentos, sin espacios)
+    const iconoNorm = _normImg(nombre);
+
     const viejo = personajes[nombre] || {};
-    const _afin0 = { fisica:0,energetica:0,espiritual:0,mando:0,psiquica:0,oscura:0 };
     personajes[nombre] = {
         isPlayer:  fIsJugador,
         isActive:  fIsActivo,
-        npc_tipo:  fIsJugador ? 'jugador' : (document.getElementById('f-npc-tipo')?.value || 'sistema'),
-        iconoOverride: document.getElementById('f-icono').value.trim() || nombre,
+        npc_tipo:  npcTipo,
+        iconoOverride: iconoNorm,
         hex:       parseInt(document.getElementById('f-hex').value)||0,
-        asistencia: parseInt(document.getElementById('f-asistencia').value)||1,
+        asistencia: 1,   // campo legado, ya no se edita
         vex_actual: parseInt(document.getElementById('f-vex-actual').value)||0,
         vex_max:    parseInt(document.getElementById('f-vex-max').value)||0,
         vida_roja_actual: parseInt(document.getElementById('f-vida-roja').value)||10,
@@ -494,12 +544,26 @@ window.guardarPersonaje = function() {
         push_guarda_extra:  viejo.push_guarda_extra  || 0,
         push_guarda_ts:     viejo.push_guarda_ts     || null,
     };
+
     encolarCambio(nombre, '__full__', true);
-    actualizarBtnSync();
-    mostrarToast(`Personaje "${nombre}" ${estadoUI.formMode === 'crear' ? 'creado' : 'actualizado'}`);
-    estadoUI.formMode = 'crear';
-    estadoUI.pjEditando = null;
-    window.mostrarVista('catalogo');
+
+    // Guardar inmediatamente — no depender del botón de sync manual
+    const btn = document.getElementById('btn-sync');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+    const res = await sincronizarCola();
+    if (btn) { btn.disabled = false; }
+
+    if (res.ok) {
+        actualizarBtnSync();
+        mostrarToast(`Personaje "${nombre}" ${estadoUI.formMode === 'crear' ? 'creado' : 'actualizado'}`);
+        estadoUI.formMode = 'crear';
+        estadoUI.pjEditando = null;
+        window.mostrarVista('catalogo');
+    } else {
+        // Dejar la cola visible para que el usuario reintente
+        actualizarBtnSync();
+        mostrarToast('Error al guardar: ' + (res.errores || []).join(', '), true);
+    }
 };
 
 window.cancelarFormulario = function() {
