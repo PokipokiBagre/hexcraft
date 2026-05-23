@@ -418,17 +418,8 @@ function setToggleJugador(val) {
 }
 
 function _actualizarAfinVisibilidad() {
-    // Para NPC sistema las afinidades no se usan — atenuar la sección visualmente
-    const npcTipo = document.getElementById('f-npc-tipo')?.value || 'sistema';
-    const esSistema = !fIsJugador && npcTipo === 'sistema';
-    const afinSection = document.querySelector('.form-section .afin-grid');
-    if (afinSection) {
-        afinSection.style.opacity = esSistema ? '0.35' : '';
-        afinSection.style.pointerEvents = esSistema ? 'none' : '';
-    }
-    // También atenuar el título de la sección de afinidades
-    const afinTitle = [...document.querySelectorAll('.form-section-title')].find(el => el.textContent.includes('Afinidades'));
-    if (afinTitle) afinTitle.style.opacity = esSistema ? '0.35' : '';
+    // Las afinidades siempre son editables — solo refrescar el preview
+    actualizarPreviewFormulario();
 }
 
 function setToggleActivo(val) {
@@ -450,10 +441,16 @@ window.actualizarPreviewFormulario = function() {
     const prev = document.getElementById('afin-preview');
     if (!prev) return;
 
-    // NPC sistema: afinidades no afectan stats — mostrar aviso en vez de cálculo
     const npcTipo = document.getElementById('f-npc-tipo')?.value || 'sistema';
-    if (!fIsJugador && npcTipo === 'sistema') {
-        prev.innerHTML = `<span style="color:#5a5a78;font-style:italic;">NPC sistema — los stats son fijos (controlados por el trigger de DB, no por fórmulas)</span>`;
+    const esSistema = !fIsJugador && npcTipo === 'sistema';
+
+    if (esSistema) {
+        // NPC sistema: stats fijos — mostrar los valores que el OP puso en el formulario
+        const vr  = parseInt(document.getElementById('f-vida-roja')?.value || 0) || 0;
+        const va  = parseInt(document.getElementById('f-vida-azul')?.value || 0) || 0;
+        const gm  = parseInt(document.getElementById('f-guarda-max')?.value || 0) || 0;
+        const vex = parseInt(document.getElementById('f-vex-max')?.value || 0) || 0;
+        prev.innerHTML = `<span style="color:#7a7a98;font-size:0.85em;">Stats fijos:</span> Vida Roja: <strong>${vr}</strong> &nbsp;·&nbsp; Vida Azul: <strong>${va}</strong> &nbsp;·&nbsp; Guarda: <strong>${gm}</strong> &nbsp;·&nbsp; VEX máx: <strong>${vex}</strong>`;
         return;
     }
 
@@ -485,11 +482,10 @@ window.guardarPersonaje = async function() {
 
     const npcTipo = fIsJugador ? 'jugador' : (document.getElementById('f-npc-tipo')?.value || 'sistema');
 
-    // Para NPC sistema las afinidades base están fijas en DB y no se editan desde el formulario.
-    // Si el usuario pone valores, los ignoramos para no disparar el trigger de recálculo de stats.
-    const esSistema = !fIsJugador && npcTipo === 'sistema';
+    // Afinidades siempre se leen del formulario, incluso para NPC sistema
+    // (el NPC puede tener Física 30 sin que eso suba su vida — eso lo controla el trigger en DB)
     const _afin0 = { fisica:0, energetica:0, espiritual:0, mando:0, psiquica:0, oscura:0 };
-    const afinBase = esSistema ? { ..._afin0 } : (() => {
+    const afinBase = (() => {
         const ab = {};
         ['fisica','energetica','espiritual','mando','psiquica','oscura'].forEach(k => {
             ab[k] = parseInt(document.getElementById(`afin-${k}`)?.value || 0) || 0;
