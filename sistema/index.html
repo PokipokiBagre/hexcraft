@@ -70,7 +70,7 @@
                     <label>Nombre</label>
                     <input class="input-base" id="f-nombre" placeholder="Nombre del personaje">
                 </div>
-                <div class="field">
+                <div class="field" style="display:none;">
                     <label>Ícono (alias de imagen)</label>
                     <input class="input-base" id="f-icono" placeholder="Igual al nombre si coincide">
                 </div>
@@ -86,7 +86,7 @@
                 </div>
                 <div class="toggle-group" id="npc-tipo-row" style="display:none;">
                     <span class="field-label-inline">Tipo NPC:</span>
-                    <select class="input-base input-sm" id="f-npc-tipo">
+                    <select class="input-base input-sm" id="f-npc-tipo" onchange="onNpcTipoChange()">
                         <option value="sistema">Sistema (stats fijos)</option>
                         <option value="jugador">Tipo Jugador (fórmulas reactivas)</option>
                     </select>
@@ -101,7 +101,7 @@
                     <label>HEX</label>
                     <input class="input-base" id="f-hex" type="number" value="1000" min="0">
                 </div>
-                <div class="field">
+                <div class="field" style="display:none;">
                     <label>Asistencia</label>
                     <input class="input-base" id="f-asistencia" type="number" value="1" min="1">
                 </div>
