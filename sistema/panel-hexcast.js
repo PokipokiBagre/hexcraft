@@ -501,30 +501,71 @@ function _renderSlot(pj, grupo, idx) {
     const vex = p?.vex_actual ?? 0;
     const estados = hxState.estadosPorPj[pj.nombre] || [];
 
+    const safePj = pj.nombre.replace(/'/g, "\\'");
+    const turnoIdx = hxState.turnos.findIndex(t => t.id === hxState.turnoActivo?.id);
+    const esHistorico = turnoIdx < hxState.turnos.length - 1;
+
     // Vidas: usar snapshot histórico si existe, si no calcular desde el estado actual
     const snap = hxState._statsSnapshot?.[pj.nombre];
     let vidaRojaAct, vidaRojaMax, vidaAzulTotal, guardaAct, guardaMax;
     if (snap) {
-      vidaRojaAct  = snap.vida_roja_actual;
-      vidaRojaMax  = snap.vida_roja_max;
-      vidaAzulTotal = snap.vida_azul_actual;  // guardado como total (base+mod) en snapshot
-      guardaAct    = snap.guarda_actual;
-      guardaMax    = snap.guarda_max;
+      vidaRojaAct   = snap.vida_roja_actual;
+      vidaRojaMax   = snap.vida_roja_max;
+      vidaAzulTotal = snap.vida_azul_actual;
+      guardaAct     = snap.guarda_actual;
+      guardaMax     = snap.guarda_max;
     } else {
       const s = calcularStats(p || {});
-      vidaRojaAct  = p?.vida_roja_actual   ?? 0;
-      vidaRojaMax  = s.vida_roja_max        ?? 0;
-      vidaAzulTotal = s.vida_azul_total     ?? 0;
-      guardaAct    = p?.guarda_actual       ?? 0;
-      guardaMax    = s.guarda_max           ?? 0;
+      vidaRojaAct   = p?.vida_roja_actual ?? 0;
+      vidaRojaMax   = s.vida_roja_max     ?? 0;
+      vidaAzulTotal = s.vida_azul_total   ?? 0;
+      guardaAct     = p?.guarda_actual    ?? 0;
+      guardaMax     = s.guarda_max        ?? 0;
     }
 
-    const vidasHtml = `
-      <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-top:2px;">
-        <span style="font-size:0.48em;color:#e06060;" title="Vida Roja">❤️ ${vidaRojaAct}/${vidaRojaMax}</span>
-        ${vidaAzulTotal !== 0 ? `<span style="font-size:0.48em;color:#4ab3e8;" title="Vida Azul">💙 ${vidaAzulTotal}</span>` : ''}
-        ${guardaMax > 0 ? `<span style="font-size:0.48em;color:#d4af37;" title="Guarda">🛡 ${guardaAct}/${guardaMax}</span>` : ''}
-      </div>`;
+    // Editor inline de snapshot (visible solo cuando está activo)
+    const editSnap = hxState._editSnap?.[pj.nombre];
+    const vidasHtml = editSnap
+      ? `<div style="display:flex;flex-direction:column;gap:3px;margin-top:4px;width:100%;" onclick="event.stopPropagation()">
+          <div style="display:flex;align-items:center;gap:3px;justify-content:center;">
+            <span style="font-size:0.44em;color:#e06060;">❤️ act</span>
+            <input type="number" value="${vidaRojaAct}" min="0"
+              style="width:36px;background:rgba(220,80,80,0.12);border:1px solid rgba(220,80,80,0.4);border-radius:3px;color:#e06060;font-size:0.6em;text-align:center;padding:1px 2px;outline:none;"
+              oninput="window._hxcSnapEdit('${safePj}','vida_roja_actual',+this.value)">
+            <span style="font-size:0.44em;color:#e06060;">/ máx</span>
+            <input type="number" value="${vidaRojaMax}" min="0"
+              style="width:36px;background:rgba(220,80,80,0.12);border:1px solid rgba(220,80,80,0.4);border-radius:3px;color:#e06060;font-size:0.6em;text-align:center;padding:1px 2px;outline:none;"
+              oninput="window._hxcSnapEdit('${safePj}','vida_roja_max',+this.value)">
+          </div>
+          <div style="display:flex;align-items:center;gap:3px;justify-content:center;">
+            <span style="font-size:0.44em;color:#4ab3e8;">💙</span>
+            <input type="number" value="${vidaAzulTotal}" min="0"
+              style="width:36px;background:rgba(74,179,232,0.12);border:1px solid rgba(74,179,232,0.4);border-radius:3px;color:#4ab3e8;font-size:0.6em;text-align:center;padding:1px 2px;outline:none;"
+              oninput="window._hxcSnapEdit('${safePj}','vida_azul_actual',+this.value)">
+            ${guardaMax > 0 ? `
+            <span style="font-size:0.44em;color:#d4af37;">🛡 act</span>
+            <input type="number" value="${guardaAct}" min="0"
+              style="width:36px;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.4);border-radius:3px;color:#d4af37;font-size:0.6em;text-align:center;padding:1px 2px;outline:none;"
+              oninput="window._hxcSnapEdit('${safePj}','guarda_actual',+this.value)">
+            <span style="font-size:0.44em;color:#d4af37;">/ máx</span>
+            <input type="number" value="${guardaMax}" min="0"
+              style="width:36px;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.4);border-radius:3px;color:#d4af37;font-size:0.6em;text-align:center;padding:1px 2px;outline:none;"
+              oninput="window._hxcSnapEdit('${safePj}','guarda_max',+this.value)">` : ''}
+          </div>
+          <div style="display:flex;gap:3px;justify-content:center;margin-top:2px;">
+            <button onclick="event.stopPropagation();window._hxcSnapGuardar('${safePj}')"
+              style="font-size:0.48em;padding:2px 8px;border-radius:3px;border:1px solid rgba(62,207,110,0.4);background:rgba(62,207,110,0.1);color:#3ecf6e;cursor:pointer;">✓ ok</button>
+            <button onclick="event.stopPropagation();window._hxcSnapCancelar('${safePj}')"
+              style="font-size:0.48em;padding:2px 8px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:#555;cursor:pointer;">cancelar</button>
+          </div>
+        </div>`
+      : `<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-top:2px;align-items:center;">
+          <span style="font-size:0.48em;color:#e06060;" title="Vida Roja">❤️ ${vidaRojaAct}/${vidaRojaMax}</span>
+          ${vidaAzulTotal !== 0 ? `<span style="font-size:0.48em;color:#4ab3e8;" title="Vida Azul">💙 ${vidaAzulTotal}</span>` : ''}
+          ${guardaMax > 0 ? `<span style="font-size:0.48em;color:#d4af37;" title="Guarda">🛡 ${guardaAct}/${guardaMax}</span>` : ''}
+          ${_esAdmin() ? `<button onclick="event.stopPropagation();window._hxcSnapAbrir('${safePj}')"
+            style="font-size:0.42em;padding:1px 5px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:#3a3a58;cursor:pointer;margin-left:2px;" title="Editar stats snapshot">✎</button>` : ''}
+        </div>`;
 
     quit = `<button class="hxc-slot-quit" onclick="event.stopPropagation();window._hxcQuitarPJ('${grupo}',${idx})">×</button>`;
 
@@ -1712,8 +1753,6 @@ window._hxcAplicarEvento = async (stackIdx) => {
     if (item.id && typeof item.id === 'number') {
       await supabase.from('hexcast_lanzamientos').update({ evento_aplicado: true }).eq('id', item.id);
     }
-    // Actualizar snapshot de stats del turno activo (refleja los cambios del evento)
-    if (hxState.turnoActivo?.id) await _guardarStatsSnapshot(hxState.turnoActivo.id);
     if (errores.length) _toast('Errores: ' + errores.join(', '), true);
     else _toast('✦ Evento aplicado');
   } catch(e) { _toast('Error aplicando evento', true); }
@@ -2384,6 +2423,71 @@ async function _cargarStatsSnapshot(turnoId) {
     hxState._statsSnapshot[row.pj_nombre] = row;
   });
 }
+
+// ── Editor inline de snapshot de stats ───────────────────────
+// Abre el editor para un PJ: copia el snap actual a _editSnap para edición temporal
+window._hxcSnapAbrir = (nombre) => {
+  if (!hxState._editSnap) hxState._editSnap = {};
+  const snap = hxState._statsSnapshot?.[nombre];
+  const p    = personajes[nombre];
+  const s    = calcularStats(p || {});
+  hxState._editSnap[nombre] = {
+    vida_roja_actual: snap?.vida_roja_actual ?? p?.vida_roja_actual ?? 0,
+    vida_roja_max:    snap?.vida_roja_max    ?? s.vida_roja_max     ?? 0,
+    vida_azul_actual: snap?.vida_azul_actual ?? s.vida_azul_total   ?? 0,
+    guarda_actual:    snap?.guarda_actual    ?? p?.guarda_actual    ?? 0,
+    guarda_max:       snap?.guarda_max       ?? s.guarda_max        ?? 0,
+  };
+  _render();
+};
+
+// Actualiza un campo del editor temporal mientras el usuario escribe
+window._hxcSnapEdit = (nombre, campo, valor) => {
+  if (!hxState._editSnap?.[nombre]) return;
+  hxState._editSnap[nombre][campo] = isNaN(valor) ? 0 : valor;
+};
+
+// Guarda el snapshot editado en memoria y en DB
+window._hxcSnapGuardar = async (nombre) => {
+  if (!hxState._editSnap?.[nombre]) return;
+  const edits = hxState._editSnap[nombre];
+  const turnoId  = hxState.turnoActivo?.id;
+  const sesionId = hxState.sesionActiva?.id;
+
+  // Actualizar en memoria
+  if (!hxState._statsSnapshot) hxState._statsSnapshot = {};
+  hxState._statsSnapshot[nombre] = {
+    ...(hxState._statsSnapshot[nombre] || {}),
+    ...edits,
+    pj_nombre: nombre,
+    turno_id:  turnoId,
+    sesion_id: sesionId,
+  };
+
+  // Persistir en DB
+  if (turnoId && sesionId) {
+    await supabase.from('hexcast_stats_snapshot')
+      .upsert({
+        turno_id:         turnoId,
+        sesion_id:        sesionId,
+        pj_nombre:        nombre,
+        vida_roja_actual: edits.vida_roja_actual,
+        vida_roja_max:    edits.vida_roja_max,
+        vida_azul_actual: edits.vida_azul_actual,
+        guarda_actual:    edits.guarda_actual,
+        guarda_max:       edits.guarda_max,
+      }, { onConflict: 'turno_id,pj_nombre' });
+  }
+
+  delete hxState._editSnap[nombre];
+  _toast('✦ Snapshot guardado');
+  _render();
+};
+
+window._hxcSnapCancelar = (nombre) => {
+  if (hxState._editSnap) delete hxState._editSnap[nombre];
+  _render();
+};
 
 async function _carryForwardEstados(turnoAnteriorId, nuevoTurnoId, sesionId) {
   if (!turnoAnteriorId || !nuevoTurnoId) return;
