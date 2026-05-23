@@ -5,6 +5,7 @@
 import { supabase } from '../hex-auth.js';
 import { personajes, estadoUI } from './personajes-state.js';
 import { hxState, SLOT_COLORS } from './hexcast-state.js';
+import { calcularStats } from './personajes-logic.js';
 import {
   _norm, imgPj, imgFallback,
   cargarSesiones, crearSesion, seleccionarSesion, crearTurno,
@@ -500,20 +501,30 @@ function _renderSlot(pj, grupo, idx) {
     const vex = p?.vex_actual ?? 0;
     const estados = hxState.estadosPorPj[pj.nombre] || [];
 
-    // Vidas: usar snapshot histórico si existe, si no el estado actual
+    // Vidas: usar snapshot histórico si existe, si no calcular desde el estado actual
     const snap = hxState._statsSnapshot?.[pj.nombre];
-    const vidaRojaAct = snap ? snap.vida_roja_actual : (p?.vida_roja_actual ?? 0);
-    const vidaRojaMax = snap ? snap.vida_roja_max    : (p?.vida_roja_max    ?? 0);
-    const vidaAzulAct = snap ? snap.vida_azul_actual : (p?.vida_azul_actual ?? 0);
-    const guardaAct   = snap ? snap.guarda_actual    : (p?.guarda_actual    ?? 0);
-    const guardaMax   = snap ? snap.guarda_max       : (p?.guarda_max       ?? 0);
+    let vidaRojaAct, vidaRojaMax, vidaAzulTotal, guardaAct, guardaMax;
+    if (snap) {
+      vidaRojaAct  = snap.vida_roja_actual;
+      vidaRojaMax  = snap.vida_roja_max;
+      vidaAzulTotal = snap.vida_azul_actual;  // guardado como total (base+mod) en snapshot
+      guardaAct    = snap.guarda_actual;
+      guardaMax    = snap.guarda_max;
+    } else {
+      const s = calcularStats(p || {});
+      vidaRojaAct  = p?.vida_roja_actual   ?? 0;
+      vidaRojaMax  = s.vida_roja_max        ?? 0;
+      vidaAzulTotal = s.vida_azul_total     ?? 0;
+      guardaAct    = p?.guarda_actual       ?? 0;
+      guardaMax    = s.guarda_max           ?? 0;
+    }
 
-    const vidasHtml = snap ? `
+    const vidasHtml = `
       <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-top:2px;">
         <span style="font-size:0.48em;color:#e06060;" title="Vida Roja">❤️ ${vidaRojaAct}/${vidaRojaMax}</span>
-        ${(vidaAzulAct !== 0) ? `<span style="font-size:0.48em;color:#4ab3e8;" title="Vida Azul">💙 ${vidaAzulAct}</span>` : ''}
+        ${vidaAzulTotal !== 0 ? `<span style="font-size:0.48em;color:#4ab3e8;" title="Vida Azul">💙 ${vidaAzulTotal}</span>` : ''}
         ${guardaMax > 0 ? `<span style="font-size:0.48em;color:#d4af37;" title="Guarda">🛡 ${guardaAct}/${guardaMax}</span>` : ''}
-      </div>` : '';
+      </div>`;
 
     quit = `<button class="hxc-slot-quit" onclick="event.stopPropagation();window._hxcQuitarPJ('${grupo}',${idx})">×</button>`;
 
@@ -1543,7 +1554,13 @@ window._hxcEliminarTurnosSeleccionados = async () => {
   } else {
     _toast(`✦ ${ids.length} turno${ids.length !== 1 ? 's' : ''} eliminado${ids.length !== 1 ? 's' : ''}`);
   }
-  _render();
+
+  // Si el turno activo fue eliminado (no debería, pero por si acaso), o simplemente navegar al último
+  const turnoActivoSigueExistiendo = hxState.turnos.some(t => t.id === hxState.turnoActivo?.id);
+  const idxDestino = turnoActivoSigueExistiendo
+    ? hxState.turnos.findIndex(t => t.id === hxState.turnoActivo?.id)
+    : hxState.turnos.length - 1;
+  await window._hxcIrTurno(Math.max(0, idxDestino));
 };
 
 window._hxcEliminarTurno = async () => {
@@ -2340,15 +2357,16 @@ async function _guardarStatsSnapshot(turnoId) {
   const rows = pjs.map(slot => {
     const p = personajes[slot.nombre];
     if (!p) return null;
+    const s = calcularStats(p);
     return {
       turno_id:         turnoId,
       sesion_id:        sesionId,
       pj_nombre:        slot.nombre,
-      vida_roja_actual: p.vida_roja_actual ?? 0,
-      vida_roja_max:    p.vida_roja_max    ?? 0,
-      vida_azul_actual: p.vida_azul_actual ?? 0,
-      guarda_actual:    p.guarda_actual    ?? 0,
-      guarda_max:       p.guarda_max       ?? 0,
+      vida_roja_actual: p.vida_roja_actual   ?? 0,
+      vida_roja_max:    s.vida_roja_max       ?? 0,   // de calcularStats (fórmula + override)
+      vida_azul_actual: s.vida_azul_total     ?? 0,   // base + mod = valor real mostrado
+      guarda_actual:    p.guarda_actual       ?? 0,
+      guarda_max:       s.guarda_max          ?? 0,   // de calcularStats
     };
   }).filter(Boolean);
   if (!rows.length) return;
