@@ -149,7 +149,15 @@ window.modStat = async function(nombre, campo, delta) {
     if (campo === 'vida_azul_actual') {
         p.vida_azul_actual = (p.vida_azul_actual ?? 0) + delta;
         encolarCambio(nombre, 'vida_azul_actual', p.vida_azul_actual);
-        await persistirCampos(nombre, { vida_azul_actual: p.vida_azul_actual });
+        const ok = await persistirCampos(nombre, { vida_azul_actual: p.vida_azul_actual });
+        if (!ok) { mostrarToast('Error al guardar vida azul', true); return; }
+        // Re-leer el valor real de DB por si el trigger lo modificó
+        try {
+            const { data } = await supabase.from('personajes').select('vida_azul_actual').eq('nombre', nombre).single();
+            if (data && data.vida_azul_actual !== undefined) {
+                p.vida_azul_actual = data.vida_azul_actual;
+            }
+        } catch(e) { /* si falla la re-lectura, usar el valor local */ }
     } else {
         const caps = { vex_actual: s.vex_max, guarda_actual: s.guarda_max, vida_roja_actual: s.vida_roja_max };
         const max = caps[campo] ?? Infinity;
@@ -571,14 +579,22 @@ window.cancelarFormulario = function() {
 // ─────────────────────────────────────────────────────────────
 // ELIMINAR
 // ─────────────────────────────────────────────────────────────
-window.pedirDelete = function(nombre) {
+window.pedirDelete = async function(nombre) {
     if (!estadoUI.esAdmin) return;
     if (!confirm(`¿Eliminar a "${nombre}" permanentemente?`)) return;
     delete personajes[nombre];
     encolarCambio(nombre, '__delete__', true);
-    actualizarBtnSync();
-    mostrarToast(`"${nombre}" eliminado`);
     renderCatalogo();
+    const res = await sincronizarCola();
+    if (res.ok) {
+        mostrarToast(`"${nombre}" eliminado`);
+        actualizarBtnSync();
+    } else {
+        mostrarToast('Error al eliminar: ' + (res.errores || []).join(', '), true);
+        // Recargar datos para restaurar estado real
+        await cargarDatos(null);
+        renderCatalogo();
+    }
 };
 
 // ─────────────────────────────────────────────────────────────
