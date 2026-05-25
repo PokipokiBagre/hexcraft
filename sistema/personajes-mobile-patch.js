@@ -1,11 +1,12 @@
 // ============================================================
-// personajes-mobile-patch.js  v5
+// personajes-mobile-patch.js  v6
 // <script type="module" src="personajes-mobile-patch.js"></script>
 // ============================================================
 
 const _isMob = () => window.innerWidth <= 700;
 const _mob = { tab: 'stats', subtab: 0, pj: null };
 let _touchInstalled = false;
+let _intercepted = false;
 
 const _SUBTABS = {
     stats:    ['Vitalidad', 'HEX & VEX'],
@@ -14,31 +15,65 @@ const _SUBTABS = {
     misiones: ['Mis misiones', 'Catálogo'],
 };
 
-// ── Interceptores ────────────────────────────────────────────
-const _origAbrirDetalle = window.abrirDetalle;
-window.abrirDetalle = function(nombre) {
-    _origAbrirDetalle?.(nombre);
-    if (_isMob()) {
-        _mob.pj = nombre; _mob.tab = 'stats'; _mob.subtab = 0;
-        setTimeout(() => _mobSetup(nombre, 'stats'), 80);
-    }
-};
+// ── Instalar interceptores DESPUÉS de que los módulos carguen ─
+// Los módulos ES se ejecutan en orden pero el window.onload
+// ya pasó — esperamos al siguiente tick tras DOMContentLoaded
+function _instalarInterceptores() {
+    if (_intercepted) return;
+    _intercepted = true;
 
-const _origCambiarTab = window._ppjCambiarTab;
-window._ppjCambiarTab = function(nombre, tab) {
-    _origCambiarTab?.(nombre, tab);
-    if (_isMob()) {
-        _mob.pj = nombre; _mob.tab = tab; _mob.subtab = 0;
-        setTimeout(() => _mobSetup(nombre, tab), 80);
+    // abrirDetalle
+    const _origAbrirDetalle = window.abrirDetalle;
+    window.abrirDetalle = function(nombre) {
+        _origAbrirDetalle?.(nombre);
+        if (_isMob()) {
+            _mob.pj = nombre; _mob.tab = 'stats'; _mob.subtab = 0;
+            setTimeout(() => _mobSetup(nombre, 'stats'), 80);
+        }
+    };
+
+    // _ppjCambiarTab — este es el crítico
+    const _origCambiarTab = window._ppjCambiarTab;
+    window._ppjCambiarTab = function(nombre, tab) {
+        _origCambiarTab?.(nombre, tab);
+        if (_isMob()) {
+            _mob.pj = nombre; _mob.tab = tab; _mob.subtab = 0;
+            setTimeout(() => _mobSetup(nombre, tab), 120);
+        }
+    };
+
+    // refreshPanelPJ
+    const _origRefresh = window.refreshPanelPJ;
+    window.refreshPanelPJ = function() {
+        _origRefresh?.();
+        if (_isMob() && _mob.tab === 'stats' && _mob.subtab === 0) {
+            setTimeout(() => {
+                const ppjBody   = document.getElementById('ppj-body');
+                const statsBody = document.getElementById('ppj-stats-body');
+                if (ppjBody && statsBody?.innerHTML.trim())
+                    ppjBody.innerHTML = statsBody.innerHTML;
+            }, 150);
+        }
+    };
+}
+
+// Esperar a que todos los módulos terminen de ejecutarse
+// window.onload ya pasó en módulos — usamos un poll corto
+const _waitForModules = setInterval(() => {
+    if (typeof window._ppjCambiarTab === 'function' &&
+        typeof window.abrirDetalle === 'function') {
+        clearInterval(_waitForModules);
+        _instalarInterceptores();
     }
-};
+}, 50);
+// Timeout de seguridad: instalar de todas formas a los 3s
+setTimeout(() => { clearInterval(_waitForModules); _instalarInterceptores(); }, 3000);
 
 // ── Setup ─────────────────────────────────────────────────────
 function _mobSetup(nombre, tab) {
     if (!_isMob()) return;
     _ensureFullscreen();
     _renderSubtabs(nombre, tab);
-    // Pequeño delay para que el engine termine de pintar el ppj-body
     setTimeout(() => _renderContent(nombre, tab, 0), 120);
 }
 
@@ -89,7 +124,6 @@ function _renderContent(nombre, tab, subtabIdx) {
 
     if (tab === 'stats') {
         if (subtabIdx === 0) {
-            // Vitalidad: copiar statsBody → ppjBody
             if (ppjBody && statsBody) {
                 if (statsBody.innerHTML.trim()) {
                     ppjBody.innerHTML = statsBody.innerHTML;
@@ -105,7 +139,6 @@ function _renderContent(nombre, tab, subtabIdx) {
                 }
             }
         } else {
-            // HEX & VEX: copiar hexBody → ppjBody
             const hexBody = document.getElementById('ppj-hex-body');
             if (ppjBody && hexBody) {
                 ppjBody.innerHTML = hexBody.innerHTML;
@@ -115,121 +148,72 @@ function _renderContent(nombre, tab, subtabIdx) {
 
     } else if (tab === 'hechizos') {
         if (subtabIdx === 1) {
-            _mobAbrirMapa(nombre);
+            _mobAbrirMapa();
         } else {
             _mobCerrarMapaEnPanel();
-            // ppj-body ya tiene el grimorio cargado por el engine
         }
 
     } else if (tab === 'objetos') {
         if (subtabIdx === 1) {
-            // Catálogo: mover el panel izquierdo de objetos al ppj-body
-            _mobMoverPanelIzqABodyReal('ppj-obj-panel-izq', ppjBody);
+            _mobMoverPanelAlBody('ppj-obj-panel-izq', ppjBody);
         } else {
-            // Inventario: ppj-body ya tiene el contenido del engine
-            // Solo asegurarnos de que el panel izq no está copiado
-            _mobRestaurarPanelIzq('ppj-obj-panel-izq');
+            _mobDevolverPanel('ppj-obj-panel-izq');
         }
 
     } else if (tab === 'misiones') {
         if (subtabIdx === 1) {
-            // Catálogo: mover el panel izquierdo de misiones al ppj-body
-            _mobMoverPanelIzqABodyReal('ppj-mis-panel-izq', ppjBody);
+            _mobMoverPanelAlBody('ppj-mis-panel-izq', ppjBody);
         } else {
-            // Mis misiones: ppj-body ya tiene el contenido
-            _mobRestaurarPanelIzq('ppj-mis-panel-izq');
+            _mobDevolverPanel('ppj-mis-panel-izq');
         }
     }
 }
 
-// ── Mover panel izq al ppj-body ───────────────────────────────
-// En lugar de position:absolute (que requiere el padre correcto),
-// clonamos el contenido del panel izq dentro del ppj-body
-function _mobMoverPanelIzqABodyReal(panelId, ppjBody) {
+// ── Mover panel izq al ppj-body (el elemento real) ───────────
+function _mobMoverPanelAlBody(panelId, ppjBody) {
     if (!ppjBody) return;
-
-    const tryMount = (intentos) => {
+    const try_ = (n) => {
         const panel = document.getElementById(panelId);
         if (!panel) {
-            if (intentos > 0) setTimeout(() => tryMount(intentos - 1), 200);
-            else ppjBody.innerHTML = `<div class="ppj-empty" style="padding:40px 20px;text-align:center;color:#4a4a68;">Sin contenido disponible</div>`;
-            return;
+            if (n > 0) setTimeout(() => try_(n-1), 200); return;
         }
-
-        // Clonar el contenido del panel izq dentro del body
-        // (no lo movemos para no romper el DOM del engine)
-        ppjBody.innerHTML = '';
-        const clone = panel.cloneNode(true);
-        // Ajustar el clone: quitar position fixed, hacerlo fluido
-        Object.assign(clone.style, {
-            position:'relative', width:'100%', height:'auto',
-            display:'flex', flexDirection:'column', flex:'1',
-            border:'none', boxShadow:'none', background:'transparent',
-            maxWidth:'none', minWidth:'0', inset:'auto'
-        });
-        ppjBody.appendChild(clone);
-        // Re-bindear eventos del clone (los onclick en HTML son strings, se re-ejecutan)
-        // Para los listeners addEventListener necesitaríamos el panel real — usar el real directamente
-    };
-
-    tryMount(8);
-}
-
-// Panel izq real como fill del body (sin clonar — mover de verdad temporalmente)
-function _mobMoverPanelIzqABodyReal(panelId, ppjBody) {
-    if (!ppjBody) return;
-    const tryMount = (intentos) => {
-        const panel = document.getElementById(panelId);
-        if (!panel) {
-            if (intentos > 0) setTimeout(() => tryMount(intentos - 1), 200);
-            return;
-        }
-        // Mover el panel dentro del ppj-body
         ppjBody.innerHTML = '';
         Object.assign(panel.style, {
             position:'relative', inset:'auto', width:'100%', height:'auto',
-            minWidth:'0', border:'none', zIndex:'auto', flex:'1'
+            minWidth:'0', maxWidth:'none', border:'none', borderRight:'none',
+            boxShadow:'none', zIndex:'auto', flex:'1', display:'flex'
         });
         ppjBody.appendChild(panel);
     };
-    tryMount(8);
+    try_(8);
 }
 
-function _mobRestaurarPanelIzq(panelId) {
-    // Si el panel está dentro del ppj-body, sacarlo y devolverlo al body del documento
+// Devolver el panel al document.body cuando cambia de subtab
+function _mobDevolverPanel(panelId) {
     const ppjBody = document.getElementById('ppj-body');
     const panel   = document.getElementById(panelId);
     if (panel && ppjBody && ppjBody.contains(panel)) {
-        // Restaurar al DOM raíz
         document.body.appendChild(panel);
         panel.style.display = 'none';
     }
 }
 
 // ── MAPA ─────────────────────────────────────────────────────
-function _mobAbrirMapa(nombre) {
-    const tryMount = (intentos) => {
+function _mobAbrirMapa() {
+    const try_ = (n) => {
         const mapa = document.getElementById('pmh-panel');
-        if (!mapa) {
-            if (intentos > 0) setTimeout(() => tryMount(intentos - 1), 200);
-            return;
-        }
+        if (!mapa) { if (n>0) setTimeout(()=>try_(n-1), 200); return; }
         const cs = document.getElementById('ppj-col-stats');
         if (cs) cs.style.position = 'relative';
-
         Object.assign(mapa.style, {
             position:'absolute', inset:'0', width:'100%', minWidth:'0',
             height:'100%', zIndex:'10', boxShadow:'none',
             borderRight:'none', animation:'none'
         });
-
-        if (!_touchInstalled) {
-            _touchInstalled = true;
-            setTimeout(_addTouchEvents, 150);
-        }
-        setTimeout(() => { window._pmhRedimensionar?.(); }, 120);
+        if (!_touchInstalled) { _touchInstalled=true; setTimeout(_addTouchEvents,150); }
+        setTimeout(()=>{ window._pmhRedimensionar?.(); }, 120);
     };
-    tryMount(8);
+    try_(8);
 }
 
 function _mobCerrarMapaEnPanel() {
@@ -237,92 +221,57 @@ function _mobCerrarMapaEnPanel() {
     if (mapa) mapa.style.zIndex = '-1';
 }
 
-// ── Touch para el mapa ────────────────────────────────────────
+// ── Touch mapa ────────────────────────────────────────────────
 function _addTouchEvents() {
     const wrap = document.getElementById('pmh-canvas-wrap');
-    if (!wrap) { setTimeout(_addTouchEvents, 300); return; }
-
-    let _ltDist = null, _ltX = 0, _ltY = 0;
-    let _stX = 0, _stY = 0, _moved = false, _candNodo = null;
-
-    const _wp = (cx, cy) => {
-        const canvas = document.getElementById('pmh-canvas');
-        if (!canvas || !window._pmhGetCamara) return { x:0, y:0 };
-        const cam = window._pmhGetCamara();
-        const r   = canvas.getBoundingClientRect();
-        return { x:(cx-r.left-cam.x)/cam.zoom, y:(cy-r.top-cam.y)/cam.zoom };
+    if (!wrap) { setTimeout(_addTouchEvents,300); return; }
+    let _ld=null,_lx=0,_ly=0,_sx=0,_sy=0,_mv=false,_cn=null;
+    const _wp=(cx,cy)=>{
+        const c=document.getElementById('pmh-canvas');
+        if(!c||!window._pmhGetCamara) return {x:0,y:0};
+        const cam=window._pmhGetCamara(), r=c.getBoundingClientRect();
+        return {x:(cx-r.left-cam.x)/cam.zoom, y:(cy-r.top-cam.y)/cam.zoom};
     };
-
-    wrap.addEventListener('touchstart', e => {
+    wrap.addEventListener('touchstart',e=>{
         e.preventDefault();
-        if (e.touches.length === 1) {
-            const t = e.touches[0];
-            _ltX=t.clientX; _ltY=t.clientY; _stX=t.clientX; _stY=t.clientY;
-            _moved=false; _ltDist=null;
-            const wp=_wp(t.clientX,t.clientY);
-            _candNodo=window._pmhNodoEn?.(wp.x,wp.y)||null;
-        } else if (e.touches.length===2) {
-            const dx=e.touches[0].clientX-e.touches[1].clientX;
-            const dy=e.touches[0].clientY-e.touches[1].clientY;
-            _ltDist=Math.hypot(dx,dy); _candNodo=null;
+        if(e.touches.length===1){
+            const t=e.touches[0]; _lx=t.clientX;_ly=t.clientY;_sx=t.clientX;_sy=t.clientY;
+            _mv=false;_ld=null; const wp=_wp(t.clientX,t.clientY);
+            _cn=window._pmhNodoEn?.(wp.x,wp.y)||null;
+        } else if(e.touches.length===2){
+            _ld=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+            _cn=null;
         }
-    }, {passive:false});
-
-    wrap.addEventListener('touchmove', e => {
+    },{passive:false});
+    wrap.addEventListener('touchmove',e=>{
         e.preventDefault();
-        if (e.touches.length===1) {
-            const t=e.touches[0];
-            const dx=t.clientX-_ltX, dy=t.clientY-_ltY;
-            if (Math.hypot(t.clientX-_stX,t.clientY-_stY)>6){_moved=true;_candNodo=null;}
-            if (_moved) window._pmhPanCamara?.(dx,dy);
-            _ltX=t.clientX; _ltY=t.clientY;
-        } else if (e.touches.length===2 && _ltDist!==null) {
-            const dx=e.touches[0].clientX-e.touches[1].clientX;
-            const dy=e.touches[0].clientY-e.touches[1].clientY;
-            const dist=Math.hypot(dx,dy);
-            const cx=(e.touches[0].clientX+e.touches[1].clientX)/2;
-            const cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
-            window._pmhZoom?.(dist/_ltDist,cx,cy);
-            _ltDist=dist; _moved=true;
+        if(e.touches.length===1){
+            const t=e.touches[0],dx=t.clientX-_lx,dy=t.clientY-_ly;
+            if(Math.hypot(t.clientX-_sx,t.clientY-_sy)>6){_mv=true;_cn=null;}
+            if(_mv) window._pmhPanCamara?.(dx,dy);
+            _lx=t.clientX;_ly=t.clientY;
+        } else if(e.touches.length===2&&_ld!==null){
+            const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
+            const dist=Math.hypot(dx,dy),cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+            window._pmhZoom?.(dist/_ld,cx,cy); _ld=dist; _mv=true;
         }
-    }, {passive:false});
-
-    wrap.addEventListener('touchend', e => {
+    },{passive:false});
+    wrap.addEventListener('touchend',e=>{
         e.preventDefault();
-        if (!_moved && _candNodo) window._pmhSeleccionar?.(_candNodo);
-        _ltDist=null; _candNodo=null;
-    }, {passive:false});
+        if(!_mv&&_cn) window._pmhSeleccionar?.(_cn);
+        _ld=null;_cn=null;
+    },{passive:false});
 }
 
-// ── Sync vitalidad tras refresh ───────────────────────────────
-const _origRefresh = window.refreshPanelPJ;
-window.refreshPanelPJ = function() {
-    _origRefresh?.();
-    if (_isMob() && _mob.tab==='stats' && _mob.subtab===0) {
-        setTimeout(() => {
-            const ppjBody   = document.getElementById('ppj-body');
-            const statsBody = document.getElementById('ppj-stats-body');
-            if (ppjBody && statsBody?.innerHTML.trim())
-                ppjBody.innerHTML = statsBody.innerHTML;
-        }, 150);
-    }
-};
-
 // ── Resize ────────────────────────────────────────────────────
-window.addEventListener('resize', () => {
-    if (!_isMob()) {
+window.addEventListener('resize',()=>{
+    if(!_isMob()){
         document.getElementById('mob-subtabs')?.remove();
-        _touchInstalled = false;
-        const mapa = document.getElementById('pmh-panel');
-        if (mapa) Object.assign(mapa.style, {
-            position:'fixed', left:'0', top:'0', bottom:'0',
-            width:'50vw', height:'', inset:'', zIndex:'10000'
-        });
-        ['ppj-col-stats','ppj-col-main'].forEach(id => {
-            const el=document.getElementById(id);
-            if (el) el.style.cssText='';
-        });
-    } else if (_mob.pj) {
-        _mobSetup(_mob.pj, _mob.tab);
+        _touchInstalled=false;
+        const mapa=document.getElementById('pmh-panel');
+        if(mapa) Object.assign(mapa.style,{position:'fixed',left:'0',top:'0',bottom:'0',width:'50vw',height:'',inset:'',zIndex:'10000'});
+        ['ppj-col-stats','ppj-col-main'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.cssText='';});
+    } else if(_mob.pj){
+        _mobSetup(_mob.pj,_mob.tab);
     }
-}, {passive:true});
+},{passive:true});
