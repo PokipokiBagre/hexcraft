@@ -1,25 +1,25 @@
 // ============================================================
-// personajes-mobile-patch.js  v12
+// personajes-mobile-patch.js  v13
 //
-// Cambios vs v11:
-//  1) Bug del input "trabado": al buscar en el catálogo de Misiones
-//     el panel se destruye+recrea en cada letra (panel-mis._reRender),
-//     y el input nuevo no tiene foco → el teclado virtual de Android
-//     se cierra después de cada letra.  Ahora el observer captura el
-//     input enfocado ANTES de la destrucción (estado: cls del input,
-//     selectionStart) y lo restaura inmediatamente en el nuevo panel,
-//     manteniendo el teclado abierto.
-//  2) Bug del × que no cierra el panel completo: el cierre ahora
-//     limpia los inline styles que _ensureFullscreen aplicó al
-//     #ppj-col-stats ANTES de llamar a cerrarPanelPJ original.  Sin
-//     esto, el display:flex inline ganaba al display:none del CSS
-//     por defecto y el panel se quedaba abierto.  Resetea también
-//     _mob.pj=null para que un eventual resize event (disparado por
-//     window.scrollTo en _unlockBody → toolbar móvil cambia) no
-//     reactive _mobSetup → _ensureFullscreen.
-//  3) Sin delay entre destrucción y reaplicación de .mob-shown
-//     (antes había 30ms causando flash visual).  El input ya existe
-//     en el DOM cuando el observer dispara, así que es seguro.
+// Cambios vs v12:
+//  Bug del × persiste: las subtabs se cierran pero el panel del PJ
+//  no.  Hipótesis: algo asíncrono (race con resize, microtask)
+//  restaura display:flex después de mi cierre.
+//
+//  Soluciones aplicadas:
+//  1) _forzarCierre() ejecuta TODO el cierre manualmente (vacía
+//     inline styles, quita .open del overlay, quita .hxmob-locked,
+//     borra .mob-shown).  Se invoca antes de _origCerrar?.() y
+//     DESPUÉS también, con timeouts a 50ms y 200ms para vencer
+//     cualquier race condition asíncrona.
+//  2) Delegación de click sobre .ppj-close (el botón ×) en fase de
+//     captura.  Si por cualquier motivo el wrapper de window.cerrarDetalle
+//     no se aplicó (cache, timing, etc.), esta delegación garantiza
+//     que mi cierre limpio se ejecute igual.
+//  3) Logs detallados con prefijo [hxmob] paso a paso.  El usuario
+//     debe abrir la consola del navegador (Chrome → menú → ver
+//     versión escritorio + remote debug, o conectar vía USB) y
+//     compartir los logs si el bug persiste.
 //
 // <script type="module" src="personajes-mobile-patch.js"></script>
 // ============================================================
@@ -259,32 +259,85 @@ function _instalarInterceptores() {
     // styles inline siguen ahí cuando el resize dispara, mi handler
     // puede llamar _ensureFullscreen y re-mostrar el panel.
     function _cierreLimpio() {
+        _log('cierre paso 1: reset estado');
         _mob.pj = null;
         _mob.tab = 'stats';
         _mob.subtab = 0;
-        // Limpiar inline styles que mi _ensureFullscreen aplicó.
-        // Sin ellos, el CSS por defecto (display:none en col-stats)
-        // gana naturalmente cuando cerrarPanelPJ original se ejecuta.
+
+        _log('cierre paso 2: limpiar mob-shown y unlock body');
+        _limpiarMobShown();         // remueve .mob-shown + _unlockBody
+        document.getElementById('mob-subtabs')?.remove();
+
+        _log('cierre paso 3: limpiar inline styles del col-stats/main');
         ['ppj-col-stats','ppj-col-main'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.cssText = '';
         });
-        // Limpiar visibility forzado en ppj-body si quedó pendiente
         const ppjBody = document.getElementById('ppj-body');
         if (ppjBody) ppjBody.style.visibility = '';
-        _limpiarMobShown();         // remueve .mob-shown + _unlockBody
-        document.getElementById('mob-subtabs')?.remove();
     }
+
+    // Forzado posterior: garantiza que el panel realmente desaparezca,
+    // incluso si algo (resize event, race condition) trata de
+    // re-mostrarlo después.  Se aplica con varios timeouts para cubrir
+    // ventanas asíncronas (microtask, RAF, layout).
+    //
+    // IMPORTANTE: usamos cssText='' (vacío) para que el CSS por defecto
+    // (display:none del bloque #ppj-col-stats) gane.  Si usáramos
+    // 'display:none !important' inline, después abrirPanelPJ no podría
+    // mostrar el panel (su style.display='flex' no batiría al !important).
+    function _forzarCierre() {
+        _log('forzarCierre invocado');
+        ['ppj-col-stats','ppj-col-main'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.cssText = '';
+        });
+        document.getElementById('panel-pj-overlay')?.classList.remove('open');
+        document.body.classList.remove('hxmob-locked');
+        document.body.style.top = '';
+        delete document.body.dataset.hxmobScrollY;
+        // Limpiar paneles izq y mapa si quedaron con .mob-shown
+        ['ppj-obj-panel-izq','ppj-mis-panel-izq','pmh-panel'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.remove('mob-shown');
+                el.style.cssText = '';
+            }
+        });
+    }
+
     const _origCerrar = window.cerrarPanelPJ;
     window.cerrarPanelPJ = function() {
+        _log('cerrarPanelPJ invocado (interceptor)');
         _cierreLimpio();
         _origCerrar?.();
+        _forzarCierre();
+        // Refuerzos posteriores para vencer cualquier race con resize
+        setTimeout(_forzarCierre, 50);
+        setTimeout(_forzarCierre, 200);
     };
     const _origCerrarDetalle = window.cerrarDetalle;
     window.cerrarDetalle = function() {
-        _log('cerrarDetalle invocado');
+        _log('cerrarDetalle invocado (interceptor)');
         _cierreLimpio();
         _origCerrarDetalle?.();
+        _forzarCierre();
+        setTimeout(_forzarCierre, 50);
+        setTimeout(_forzarCierre, 200);
+    };
+
+    // Exponer un cierre directo para la delegación del botón ×.
+    // Esto se llama SIEMPRE en el clic del ×, independiente de si
+    // el wrapper de window.cerrarDetalle se instaló o no.
+    window.__hxmobCierre = function() {
+        _log('__hxmobCierre invocado (delegación ×)');
+        _cierreLimpio();
+        // Llamar al cierre original también, por si nuestro wrapper
+        // no se aplicó por algún motivo.
+        (_origCerrarDetalle || _origCerrar)?.();
+        _forzarCierre();
+        setTimeout(_forzarCierre, 50);
+        setTimeout(_forzarCierre, 200);
     };
 
     const _origRefresh = window.refreshPanelPJ;
@@ -404,6 +457,26 @@ document.addEventListener('click', (e) => {
     _limpiarMobShown();
     setTimeout(() => _mobSetup(nombre, tabId), 150);
 }, true);
+
+// Delegación específica para el botón × del header del PJ.
+// Esto se ejecuta SIEMPRE (no solo si _intercepted es false) para
+// garantizar que el cierre del panel funcione incluso si el wrapper
+// de window.cerrarDetalle no se instaló a tiempo o algo lo restaura.
+// Capturamos en fase de captura (true) para correr ANTES del onclick
+// inline del botón, y forzamos nuestro cierre limpio.
+document.addEventListener('click', (e) => {
+    if (!_isMob()) return;
+    const btn = e.target.closest('.ppj-close');
+    if (!btn) return;
+    _log('Click × del header detectado por delegación');
+    // No prevenimos default — dejamos que el onclick inline también
+    // se dispare (que llama cerrarDetalle).  Pero ADEMÁS ejecutamos
+    // nuestro cierre limpio + forzado posterior.
+    if (typeof window.__hxmobCierre === 'function') {
+        window.__hxmobCierre();
+    }
+}, true);
+
 
 // Esperar a que los módulos ES expongan funciones globales
 const _waitForModules = setInterval(() => {
