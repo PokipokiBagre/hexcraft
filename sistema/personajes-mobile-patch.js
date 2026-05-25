@@ -1,170 +1,168 @@
 // ============================================================
-// personajes-mobile-patch.js
-// Añadir al final del <body> DESPUÉS de personajes-main.js:
+// personajes-mobile-patch.js  v3
+// Añadir al final del <body>:
 // <script type="module" src="personajes-mobile-patch.js"></script>
 // ============================================================
 
 const _isMob = () => window.innerWidth <= 700;
 
-// ── Parche al _renderTab original ────────────────────────────
-// Interceptamos window._ppjCambiarTab que ya existe como global
-const _origCambiarTab = window._ppjCambiarTab;
-window._ppjCambiarTab = function(nombre, tab) {
-    _origCambiarTab?.(nombre, tab);
-    if (_isMob()) _mobAjustarLayout(tab);
+// Estado móvil
+const _mob = { tab: 'stats', subtab: 0, pj: null };
+
+// Subtabs por tab principal
+const _SUBTABS = {
+    stats:    ['Vitalidad', 'HEX & VEX'],
+    hechizos: ['Grimorio', 'Mapa'],
+    objetos:  ['Inventario', 'Catálogo'],
+    misiones: ['Misiones'],
 };
 
-// También parcheamos abrirDetalle para ajustar al abrir
+// ── Interceptar apertura de panel ────────────────────────────
 const _origAbrirDetalle = window.abrirDetalle;
 window.abrirDetalle = function(nombre) {
     _origAbrirDetalle?.(nombre);
     if (_isMob()) {
-        // Pequeño delay para que el DOM se pinte primero
-        setTimeout(() => _mobInicializar(nombre), 60);
+        _mob.pj = nombre; _mob.tab = 'stats'; _mob.subtab = 0;
+        setTimeout(() => _mobSetup(nombre, 'stats'), 80);
     }
 };
 
-// ── Inicializar panel en móvil ────────────────────────────────
-function _mobInicializar(nombre) {
-    _mobAjustarLayout('stats');
-    _mobInsertarToggleStatsHex(nombre);
+const _origCambiarTab = window._ppjCambiarTab;
+window._ppjCambiarTab = function(nombre, tab) {
+    _origCambiarTab?.(nombre, tab);
+    if (_isMob()) {
+        _mob.pj = nombre; _mob.tab = tab; _mob.subtab = 0;
+        setTimeout(() => _mobSetup(nombre, tab), 80);
+    }
+};
+
+// ── Setup: insertar subtabs + mostrar contenido correcto ─────
+function _mobSetup(nombre, tab) {
+    if (!_isMob()) return;
+    _ensureColStatsFullscreen();
+    _renderSubtabs(nombre, tab);
+    _renderContent(nombre, tab, 0);
 }
 
-// ── Ajustar layout según la tab activa ───────────────────────
-function _mobAjustarLayout(tab) {
+// col-stats ocupa toda la pantalla
+function _ensureColStatsFullscreen() {
+    const cs = document.getElementById('ppj-col-stats');
+    if (!cs) return;
+    cs.style.cssText = [
+        'position:fixed', 'inset:0', 'width:100vw', 'min-width:0',
+        'height:100dvh', 'border-left:none', 'overflow:hidden',
+        'display:flex', 'flex-direction:column', 'z-index:1200',
+    ].join('!important;') + '!important';
+    // col-main siempre oculto
+    const cm = document.getElementById('ppj-col-main');
+    if (cm) cm.style.cssText = 'display:none!important';
+}
+
+// ── Subtabs ───────────────────────────────────────────────────
+function _renderSubtabs(nombre, tab) {
+    document.getElementById('mob-subtabs')?.remove();
+    const labels = _SUBTABS[tab] || [];
+    if (labels.length <= 1) return;
+
+    const bar = document.createElement('div');
+    bar.id = 'mob-subtabs';
+    bar.innerHTML = labels.map((lbl, i) =>
+        `<button class="mob-subtab${i===0?' active':''}"
+            onclick="window._mobClickSubtab(${i})">${lbl}</button>`
+    ).join('');
+
+    const tabsEl = document.getElementById('ppj-tabs');
+    if (tabsEl) tabsEl.insertAdjacentElement('afterend', bar);
+}
+
+window._mobClickSubtab = function(idx) {
     if (!_isMob()) return;
-    const colStats = document.getElementById('ppj-col-stats');
-    const colMain  = document.getElementById('ppj-col-main');
-    if (!colStats) return;
+    _mob.subtab = idx;
+    document.querySelectorAll('.mob-subtab')
+        .forEach((b, i) => b.classList.toggle('active', i === idx));
+    _renderContent(_mob.pj, _mob.tab, idx);
+};
+
+// ── Contenido según tab + subtab ─────────────────────────────
+function _renderContent(nombre, tab, subtabIdx) {
+    if (!_isMob()) return;
+
+    const ppjBody   = document.getElementById('ppj-body');
+    const statsBody = document.getElementById('ppj-stats-body');
+
+    // Asegurar que ppj-body es scrollable y visible
+    if (ppjBody) {
+        ppjBody.style.cssText = 'display:flex!important;flex-direction:column!important;flex:1!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;padding-bottom:24px!important;';
+    }
+    // statsBody siempre oculto (lo usamos como fuente, no como display)
+    if (statsBody) statsBody.style.display = 'none';
 
     if (tab === 'stats') {
-        // Stats: col-stats arriba (header+tabs+stats), col-main abajo (HEX)
-        colStats.classList.remove('solo-stats');
-        colStats.style.maxHeight = '45vh';
-        colStats.style.bottom    = 'auto';
-        colStats.style.overflowY = 'hidden';
-        if (colMain) {
-            colMain.style.display = 'flex';
-            colMain.style.height  = '55vh';
-            colMain.style.top     = 'auto';
+        if (subtabIdx === 0) {
+            // Vitalidad: copiar desde statsBody (ya renderizado por el engine)
+            if (ppjBody && statsBody) {
+                // Si statsBody está vacío, forzar re-render
+                if (!statsBody.innerHTML.trim()) {
+                    ppjBody.innerHTML = '<div class="ppj-loader">Cargando stats…</div>';
+                    // El engine lo llenará en el próximo tick del refresh
+                    setTimeout(() => {
+                        if (statsBody.innerHTML.trim()) ppjBody.innerHTML = statsBody.innerHTML;
+                    }, 300);
+                } else {
+                    ppjBody.innerHTML = statsBody.innerHTML;
+                }
+            }
+        } else {
+            // HEX & VEX: duplicar el hexBody renderizado
+            const hexBody = document.getElementById('ppj-hex-body');
+            if (ppjBody && hexBody) {
+                ppjBody.innerHTML = hexBody.innerHTML;
+                // Re-adjuntar eventos del canvas: el canvas de partículas
+                // no se puede clonar, así que mostramos un placeholder
+                const canvas = ppjBody.querySelector('.htab-particle-canvas');
+                if (canvas) canvas.style.display = 'none'; // ocultar canvas roto
+            }
         }
-        // Mostrar toggle Stats↔HEX si existe
-        _mobToggleVisibility(true);
 
-    } else {
-        // Hechizos / Objetos / Misiones:
-        // col-stats ocupa todo (contiene la tab cargada en ppj-body)
-        colStats.classList.add('solo-stats');
-        colStats.style.maxHeight = '92vh';
-        colStats.style.bottom    = '0';
-        colStats.style.overflowY = 'auto';
-        if (colMain) colMain.style.display = 'none';
-        // Ocultar toggle
-        _mobToggleVisibility(false);
+    } else if (tab === 'hechizos' && subtabIdx === 1) {
+        // Mapa no disponible en móvil
+        if (ppjBody) ppjBody.innerHTML = `
+            <div style="text-align:center;padding:48px 20px;color:#4a4a68;">
+                <div style="font-size:2em;margin-bottom:14px;opacity:0.35;">🗺️</div>
+                <div style="font-size:0.8em;line-height:1.7;color:#5a5a78;">
+                    El mapa de hechizos no está disponible en móvil.<br>
+                    <span style="color:#d4af37;opacity:0.6;">Usa el Grimorio para navegar tus hechizos.</span>
+                </div>
+            </div>`;
     }
+    // Para hechizos subtab 0, objetos y misiones:
+    // ppj-body ya tiene el contenido cargado por el engine — no tocar.
 }
 
-// ── Toggle Stats ↔ HEX dentro del tab Stats ──────────────────
-let _mobStatsView = 'stats'; // 'stats' | 'hex'
-
-function _mobToggleVisibility(show) {
-    const tog = document.getElementById('mob-stats-hex-toggle');
-    if (tog) tog.style.display = show ? 'flex' : 'none';
-}
-
-function _mobInsertarToggleStatsHex(nombre) {
-    // Quitar toggle anterior si existe
-    document.getElementById('mob-stats-hex-toggle')?.remove();
-
-    const tabs = document.getElementById('ppj-tabs');
-    if (!tabs) return;
-
-    const tog = document.createElement('div');
-    tog.id = 'mob-stats-hex-toggle';
-    tog.className = 'mob-tab-toggle';
-    tog.innerHTML = `
-        <button class="mob-tab-toggle-btn active" id="mob-btn-stats"
-            onclick="window._mobMostrar('stats','${nombre.replace(/'/g,"\\'")}')">
-            Vitalidad
-        </button>
-        <button class="mob-tab-toggle-btn" id="mob-btn-hex"
-            onclick="window._mobMostrar('hex','${nombre.replace(/'/g,"\\'")}')">
-            HEX &amp; VEX
-        </button>`;
-
-    // Insertar DESPUÉS de los tabs principales
-    tabs.insertAdjacentElement('afterend', tog);
-    _mobStatsView = 'stats';
-    _mobMostrarStats();
-}
-
-window._mobMostrar = function(vista, nombre) {
-    if (!_isMob()) return;
-    _mobStatsView = vista;
-    document.getElementById('mob-btn-stats')?.classList.toggle('active', vista === 'stats');
-    document.getElementById('mob-btn-hex')?.classList.toggle('active', vista === 'hex');
-
-    if (vista === 'stats') {
-        _mobMostrarStats();
-    } else {
-        _mobMostrarHex(nombre);
+// ── Sincronizar vitalidad tras refreshPanelPJ ────────────────
+const _origRefresh = window.refreshPanelPJ;
+window.refreshPanelPJ = function() {
+    _origRefresh?.();
+    if (_isMob() && _mob.tab === 'stats' && _mob.subtab === 0) {
+        setTimeout(() => {
+            const ppjBody   = document.getElementById('ppj-body');
+            const statsBody = document.getElementById('ppj-stats-body');
+            if (ppjBody && statsBody?.innerHTML.trim()) {
+                ppjBody.innerHTML = statsBody.innerHTML;
+            }
+        }, 150);
     }
 };
 
-function _mobMostrarStats() {
-    const statsBody = document.getElementById('ppj-stats-body');
-    const colMain   = document.getElementById('ppj-col-main');
-    if (statsBody) statsBody.style.display = '';
-    if (colMain)   colMain.style.display   = 'none';
-
-    // col-stats crece para mostrar stats completos
-    const colStats = document.getElementById('ppj-col-stats');
-    if (colStats) {
-        colStats.style.maxHeight = '92vh';
-        colStats.style.bottom    = '0';
-        colStats.style.overflowY = 'auto';
-    }
-}
-
-function _mobMostrarHex(nombre) {
-    const statsBody = document.getElementById('ppj-stats-body');
-    const colMain   = document.getElementById('ppj-col-main');
-    if (statsBody) statsBody.style.display = 'none';
-    if (colMain) {
-        colMain.style.display = 'flex';
-        colMain.style.height  = '92vh';
-        colMain.style.top     = '0';
-        colMain.style.bottom  = '0';
-    }
-
-    // col-stats se reduce al mínimo (header + tabs + toggle)
-    const colStats = document.getElementById('ppj-col-stats');
-    if (colStats) {
-        colStats.style.maxHeight = 'auto';
-        colStats.style.bottom    = 'auto';
-        colStats.style.overflowY = 'hidden';
-    }
-}
-
-// ── Parche: cuando tab=hechizos, evitar que abrirMinimapa
-//    rompa el layout en móvil (el mapa queda oculto via CSS,
-//    pero el JS puede mover elementos del DOM)
-// ── El minimapa ya se oculta via CSS. No hace falta más. ─────
-
-// ── Re-ajustar en resize (si rotan el teléfono) ──────────────
+// ── Resize ───────────────────────────────────────────────────
 window.addEventListener('resize', () => {
-    const nombre = window._estadoUI?.pjSeleccionado
-                || window.estadoUI?.pjSeleccionado;
-    if (!nombre) return;
-    const tab = window._tabActivo?.[nombre] || 'stats';
-    if (_isMob()) {
-        _mobAjustarLayout(tab);
-    } else {
-        // Restaurar desktop: quitar overrides inline
-        const colStats = document.getElementById('ppj-col-stats');
-        const colMain  = document.getElementById('ppj-col-main');
-        document.getElementById('mob-stats-hex-toggle')?.remove();
-        if (colStats) { colStats.style.cssText = ''; colStats.style.display = 'flex'; }
-        if (colMain  && tab === 'stats') { colMain.style.cssText = ''; colMain.style.display = 'flex'; }
+    if (!_isMob()) {
+        document.getElementById('mob-subtabs')?.remove();
+        ['ppj-col-stats','ppj-col-main'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.cssText = '';
+        });
+    } else if (_mob.pj) {
+        _mobSetup(_mob.pj, _mob.tab);
     }
 }, { passive: true });

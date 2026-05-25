@@ -1,291 +1,179 @@
 /* ============================================================
-   personajes-mobile.css  v2
-   Incluir DESPUÉS de personajes.css en <head>
+   personajes-mobile.css  v3 — reescritura completa
+   Añadir DESPUÉS de personajes.css en <head>
    ============================================================ */
-
-/* ════════════════════════════════════════════════════════════
-   VARIABLES
-════════════════════════════════════════════════════════════ */
-:root { --mob-panel-h: 92vh; }
 
 /* ════════════════════════════════════════════════════════════
    NAV
 ════════════════════════════════════════════════════════════ */
 @media (max-width: 700px) {
     .nav {
-        height: auto;
-        flex-wrap: wrap;
-        padding: 6px 12px;
-        gap: 4px;
+        height: auto; flex-wrap: wrap;
+        padding: 6px 12px; gap: 4px;
     }
-    .nav-left  { flex: 1 1 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-    .nav-right { flex: 1 1 100%; display: flex; justify-content: flex-end; gap: 8px; }
-    .tabs { gap: 0; }
-    .tab-btn { padding: 5px 10px; font-size: 0.78em; }
-    .nav-back { font-size: 0.68em; }
+    .nav-left  { flex: 1 1 100%; justify-content: space-between; gap: 6px; }
+    .nav-right { flex: 1 1 100%; justify-content: flex-end; gap: 8px; }
+    .tab-btn   { padding: 5px 10px; font-size: 0.78em; }
+    .nav-back  { font-size: 0.68em; }
     .btn-cambiar { font-size: 0.68em; padding: 4px 10px; }
 }
 
 /* ════════════════════════════════════════════════════════════
-   CATÁLOGO
+   CATÁLOGO DE PERSONAJES
 ════════════════════════════════════════════════════════════ */
 @media (max-width: 700px) {
-    .page { padding: 10px 10px; }
+    .page { padding: 10px; }
     .page-toolbar { flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 10px; }
     .filtros { flex-wrap: wrap; gap: 4px; }
     .filtro-btn { font-size: 0.72em; padding: 4px 10px; }
     .input-search { max-width: 100%; min-width: 0; font-size: 0.82em; }
     .pj-grid { grid-template-columns: 1fr; gap: 8px; }
+    /* Ocultar fondo de partículas/grid en cards del catálogo */
+    .pjc-detail.open { max-height: 320px; }
 }
 @media (min-width: 701px) and (max-width: 1024px) {
     .pj-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ════════════════════════════════════════════════════════════
-   PANEL PJ — layout completo en móvil
-   Estrategia: una sola columna full-width, full-height
-   col-stats = cabecera fija arriba (header+tabs+stats)
-   col-main  = área de contenido abajo (HEX/hechizos/etc.)
-   En stats: toggle hamburguesa para cambiar entre Stats y HEX
+   PANEL PJ — columna única full-screen en móvil
 ════════════════════════════════════════════════════════════ */
 @media (max-width: 700px) {
 
-    /* ── Overlay cubre todo ── */
-    #panel-pj-overlay { z-index: 1198 !important; }
-
-    /* ── col-stats: header sticky arriba, altura fija compacta ── */
+    /* ── col-stats: ocupa TODO la pantalla — es el panel principal ── */
     #ppj-col-stats {
         position: fixed !important;
-        top: 0 !important; left: 0 !important; right: 0 !important; bottom: auto !important;
+        inset: 0 !important;
         width: 100vw !important;
         min-width: 0 !important;
-        height: auto !important;
-        max-height: 48vh !important;
+        height: 100dvh !important;
         border-left: none !important;
-        border-bottom: 1px solid rgba(212,175,55,0.2) !important;
-        z-index: 1201 !important;
         overflow: hidden !important;
-    }
-
-    /* ── col-main: contenido principal abajo ── */
-    #ppj-col-main {
-        position: fixed !important;
-        top: auto !important;
-        bottom: 0 !important;
-        left: 0 !important; right: 0 !important;
-        width: 100vw !important;
-        height: 55vh !important;
-        border-right: none !important;
-        border-top: 1px solid rgba(212,175,55,0.18) !important;
-        border-radius: 0 !important;
-        box-shadow: 0 -8px 32px rgba(0,0,0,0.6) !important;
+        display: flex !important;
+        flex-direction: column !important;
         z-index: 1200 !important;
-        overflow: hidden !important;
     }
 
-    /* ── Ajuste cuando NO hay col-main visible (hechizos/obj/mis):
-       col-stats ocupa todo el alto ── */
-    #ppj-col-stats.solo-stats {
-        max-height: var(--mob-panel-h) !important;
-        bottom: 0 !important;
-        overflow-y: auto !important;
+    /* ── col-main: SIEMPRE oculto en móvil — el contenido HEX
+       se mueve a ppj-body via JS ── */
+    #ppj-col-main {
+        display: none !important;
     }
 
-    /* ── ppj-body (tab content) scroll interno ── */
-    .ppj-body {
-        -webkit-overflow-scrolling: touch !important;
-        padding-bottom: 20px !important;
-    }
+    /* ── Overlay ── */
+    #panel-pj-overlay { z-index: 1198 !important; }
 
-    /* ── Header más compacto ── */
+    /* ── Header compacto ── */
     .ppj-header {
         padding: 10px 14px 8px !important;
         min-height: 52px !important;
+        flex-shrink: 0 !important;
     }
     .ppj-avatar { width: 36px !important; height: 36px !important; }
     .ppj-nombre { font-size: 0.86em !important; }
-    .ppj-tags   { gap: 3px !important; }
     .ppj-tag    { font-size: 0.58em !important; padding: 1px 6px !important; }
 
-    /* ── Tabs touch-friendly ── */
-    .ppj-tab {
-        font-size: 0.6em !important;
-        padding: 11px 2px 10px !important;
+    /* ── Tabs principales touch-friendly ── */
+    .ppj-tabs { flex-shrink: 0 !important; }
+    .ppj-tab  {
+        font-size: 0.58em !important;
+        padding: 10px 2px 9px !important;
         letter-spacing: 0.2px !important;
     }
 
-    /* ── Stats: body compacto ── */
-    .ppj-section { padding: 8px 12px !important; }
-    .ppj-vida-block { margin-bottom: 8px !important; }
-    .ppj-vida-label { font-size: 0.72em !important; }
-    .ppj-afin-block { padding: 7px 10px !important; margin-bottom: 5px !important; }
-    .ppj-afin-name  { font-size: 0.74em !important; }
-    .ppj-afin-total { font-size: 0.92em !important; }
-    .ppj-push-block { padding: 8px 10px !important; margin-bottom: 6px !important; }
-    .ppj-max-row    { padding: 4px 7px !important; }
-
-    /* ── HEX tab: hero más compacto ── */
-    .htab-hero { padding: 20px 16px 16px !important; }
-    .htab-hex-amount { font-size: 2.6em !important; }
-    .htab-btn-grid {
-        grid-template-columns: repeat(4, 1fr) !important;
-        gap: 4px !important;
-        max-width: 100% !important;
-    }
-    .htab-btn { font-size: 0.66em !important; padding: 7px 2px !important; }
-    .htab-vex-root { padding: 16px 14px 12px !important; }
-    .htab-vex-number { font-size: 2.2em !important; }
-    .htab-energia-root { padding: 12px 14px !important; }
-
-    /* ── Rellenos VEX/Guarda: layout vertical en móvil ── */
-    /* (el bloque ya es flex-row, simplemente reducir padding) */
-    .ppj-hpush-grid {
-        grid-template-columns: 1fr !important;
-        gap: 8px !important;
-    }
-    .ppj-hpush-card { text-align: left !important; padding: 10px 14px !important; }
-
-    /* ── HEX push cards (asistencia / turno / contenido) ── */
-    .hex-push-grid-3,
-    div[style*="grid-template-columns:1fr 1fr 1fr"] {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 8px !important;
-    }
-
-    /* ── Botón toggle Stats↔HEX (se añade via JS) ── */
-    .mob-tab-toggle {
-        display: flex !important;
-        gap: 0;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-        background: #070710;
+    /* ── Sub-tabs móvil (Vitalidad/HEX, Mapa/Grimorio, etc.) ── */
+    #mob-subtabs {
+        display: flex;
         flex-shrink: 0;
+        background: #050510;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
     }
-    .mob-tab-toggle-btn {
+    .mob-subtab {
         flex: 1;
         background: none;
         border: none;
         border-bottom: 2px solid transparent;
         color: #4a4a68;
-        font-size: 0.6em;
+        font-size: 0.62em;
         font-weight: 700;
-        letter-spacing: 0.8px;
+        letter-spacing: 0.6px;
         text-transform: uppercase;
-        padding: 9px 2px 8px;
+        padding: 9px 4px 8px;
         cursor: pointer;
         font-family: 'Inter', system-ui, sans-serif;
         transition: color 0.15s, border-color 0.15s;
     }
-    .mob-tab-toggle-btn.active {
-        color: #d4af37;
-        border-bottom-color: #d4af37;
-    }
+    .mob-subtab.active { color: #d4af37; border-bottom-color: #d4af37; }
 
-    /* ── Scrollbar touch ── */
-    .ppj-body::-webkit-scrollbar { width: 2px !important; }
-    #ppj-col-stats .ppj-body::-webkit-scrollbar { width: 2px !important; }
-}
-
-/* ════════════════════════════════════════════════════════════
-   HECHIZOS — en móvil: ocultar mapa, mostrar solo grimorio
-════════════════════════════════════════════════════════════ */
-@media (max-width: 700px) {
-    /* El mapa de hechizos se monta fuera del panel — ocultarlo */
-    #panel-mapa-hechizos,
-    #pmh-root,
-    [id^="pmh-"],
-    .pmh-root,
-    .panel-mapa-hechizos {
-        display: none !important;
-    }
-
-    /* Cuando está en hz-mode, col-stats ocupa todo el alto */
-    #panel-pj-root.hz-mode #ppj-col-stats,
-    #panel-pj-root.hz-mode #ppj-col-main:not([style*="display: none"]) {
-        max-height: var(--mob-panel-h) !important;
-        bottom: 0 !important;
-    }
-    #panel-pj-root.hz-mode #ppj-col-main {
-        height: var(--mob-panel-h) !important;
-        top: 0 !important;
-    }
-    #panel-pj-root.hz-mode #ppj-col-stats {
-        display: none !important;
-    }
-
-    /* Grimorio: body scroll sin el 50vw */
-    .ppj-hz-modal {
-        max-width: 95vw !important;
-        padding: 14px !important;
-    }
-    .ppj-hz-modal-row { grid-template-columns: 1fr !important; }
-
-    /* Acordeones de hechizos más legibles */
-    .ppj-af-acc-title { font-size: 0.75em !important; }
-    .ppj-hz-nombre    { font-size: 0.84em !important; }
-    .ppj-hz-field     { font-size: 0.68em !important; }
-
-    /* Botón volver al mapa → reemplazar por nada en móvil */
-    .mob-hide { display: none !important; }
-}
-
-/* ════════════════════════════════════════════════════════════
-   OBJETOS — ocultar panel izq, mostrar inventario full
-════════════════════════════════════════════════════════════ */
-@media (max-width: 700px) {
-    #ppj-obj-panel-izq { display: none !important; }
-    #panel-pj-root.obj-mode {
-        width: 100vw !important;
-        min-width: 0 !important;
-    }
-    /* El ppj-body con inventario ocupa todo */
-    #panel-pj-root.obj-mode #ppj-col-stats {
-        max-height: var(--mob-panel-h) !important;
-        bottom: 0 !important;
+    /* ── Body scroll ── */
+    .ppj-body {
+        flex: 1 !important;
         overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding-bottom: 24px !important;
     }
-    #panel-pj-root.obj-mode #ppj-col-main {
-        display: none !important;
-    }
-}
+    .ppj-body::-webkit-scrollbar { width: 2px !important; }
 
-/* ════════════════════════════════════════════════════════════
-   MISIONES — ocultar panel izq, usar el derecho full
-════════════════════════════════════════════════════════════ */
-@media (max-width: 700px) {
+    /* ── Secciones con menos padding ── */
+    .ppj-section  { padding: 10px 14px !important; }
+    .ppj-vida-block { margin-bottom: 9px !important; }
+    .ppj-afin-block { padding: 8px 10px !important; margin-bottom: 5px !important; }
+
+    /* ── HEX hero compacto ── */
+    .htab-hero { padding: 22px 16px 18px !important; }
+    .htab-hex-amount { font-size: 2.8em !important; }
+    .htab-hex-rule  { margin: 10px auto 16px !important; }
+    .htab-btn-grid  {
+        grid-template-columns: repeat(4,1fr) !important;
+        gap: 4px !important; max-width: 100% !important;
+    }
+    .htab-btn { font-size: 0.66em !important; padding: 7px 2px !important; }
+    .htab-vex-root   { padding: 16px 14px 12px !important; }
+    .htab-vex-number { font-size: 2.2em !important; }
+    .htab-energia-root { padding: 12px 14px !important; }
+
+    /* ── Rellenos de energía ── */
+    /* el bloque de push es flex-row, queda bien en móvil */
+
+    /* ── HEX push cards en columna ── */
+    /* se renderizan con inline style grid-template-columns:1fr 1fr 1fr
+       los sobreescribimos forzando columna única */
+    .htab-hpush-outer,
+    div.htab-hpush-outer {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+
+    /* ── Objetos/Misiones: paneles izquierdos ocultos ── */
+    #ppj-obj-panel-izq { display: none !important; }
     #ppj-mis-panel-izq { display: none !important; }
-}
+    #panel-pj-root.obj-mode { width: 100vw !important; min-width: 0 !important; }
 
-/* ════════════════════════════════════════════════════════════
-   FORMULARIO CREAR/EDITAR
-════════════════════════════════════════════════════════════ */
-@media (max-width: 700px) {
-    .form-wrap  { padding: 12px !important; }
-    .form-grid  { grid-template-columns: 1fr !important; gap: 8px !important; }
-    .afin-grid  { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+    /* ── Mapa hechizos: oculto ── */
+    #panel-mapa-hechizos,
+    [id^="pmh-panel"],
+    .pmh-root { display: none !important; }
+
+    /* ── Formulario ── */
+    .form-wrap { padding: 12px !important; }
+    .form-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+    .afin-grid { grid-template-columns: repeat(2,1fr) !important; gap: 8px !important; }
     .toggle-row { flex-wrap: wrap !important; gap: 10px !important; }
-    .form-section { margin-bottom: 12px !important; }
-}
 
-/* ════════════════════════════════════════════════════════════
-   TOAST y BTN-SYNC — reposicionar
-════════════════════════════════════════════════════════════ */
-@media (max-width: 700px) {
+    /* ── Toast y sync encima de teclado ── */
     .toast {
-        left: 12px !important;
-        right: 12px !important;
-        bottom: calc(55vh + 10px) !important;
-        width: auto !important;
-        max-width: none !important;
+        left: 12px !important; right: 12px !important;
+        bottom: 16px !important;
+        width: auto !important; max-width: none !important;
         text-align: center !important;
+        z-index: 9999 !important;
     }
     .btn-sync {
-        left: 50% !important;
-        right: auto !important;
+        left: 50% !important; right: auto !important;
         transform: translateX(-50%) !important;
-        bottom: calc(55vh + 8px) !important;
+        bottom: 60px !important;
         font-size: 0.76em !important;
         padding: 8px 16px !important;
-        white-space: nowrap !important;
     }
 }
