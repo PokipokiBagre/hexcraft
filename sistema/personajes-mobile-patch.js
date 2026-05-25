@@ -1,16 +1,18 @@
 // ============================================================
-// personajes-mobile-patch.js  v8
+// personajes-mobile-patch.js  v9
 //
-// Cambios vs v7:
-//  - Inyecta su propio bloque CSS al final del <head>, garantizando
-//    que las reglas .mob-shown ganan en orden de cascada sobre las
-//    reglas dinámicas inyectadas por panel-pj.js, panel-mis.js y
-//    panel-mapa-hechizos.js.
-//  - Logs de debug con prefijo [hxmob] para diagnóstico.
-//  - Redimensión del canvas del mapa más robusta: espera a que el
-//    wrap tenga clientWidth > 0 antes de pedir redibujar.
-//  - clearAll de inline styles antes de aplicar .mob-shown (por si
-//    una versión previa del patch dejó residuos).
+// Cambios vs v8:
+//  - Panel izq (Obj/Mis) y mapa ya NO usan `top:0; padding-top:132px`.
+//    Ahora usan `top: [altura medida]` (medida en runtime con
+//    _alturaCabecera()), exactamente debajo del header+tabs+subtabs.
+//  - z-index del panel izq y mapa bajó a 1210 (col-stats sigue en
+//    1200, así no tapan el header del col-stats que queda encima
+//    en su propia área).
+//  - ppj-body.visibility = 'hidden' al entrar en subtab "Catálogo"
+//    (Obj/Mis) o "Mapa" (Hechizos).  Esto previene que el grimorio
+//    o el inventario asomen por gaps de píxeles entre subtabs y
+//    el panel/mapa, especialmente cuando scrollIntoView del callback
+//    de selección desplaza una card a posición visible.
 //
 // <script type="module" src="personajes-mobile-patch.js"></script>
 // ============================================================
@@ -46,51 +48,76 @@ function _inyectarCssOverride() {
     st.textContent = `
 @media (max-width: 700px) {
   /* === Paneles izq de objetos / misiones === */
+  /* Ocultos por defecto: las reglas dinámicas inyectadas por
+     panel-pj.js (línea 1818) y panel-mis.js (línea 72) ya hacen
+     display:none — esta es defensa adicional sin !important para
+     que la clase .mob-shown gane por especificidad. */
   #ppj-obj-panel-izq,
   #ppj-mis-panel-izq {
-    display: none !important;
+    display: none;
   }
+  /* IMPORTANTE: el panel izq debe quedar DEBAJO del header+tabs+subtabs.
+     El "top" se setea dinámicamente vía inline style desde JS para
+     ajustarse a la altura real de la cabecera (medida en runtime).
+     Aquí solo configuramos lo invariante. */
   #ppj-obj-panel-izq.mob-shown,
   #ppj-mis-panel-izq.mob-shown {
     display: flex !important;
     position: fixed !important;
     left: 0 !important; right: 0 !important;
-    top: 0 !important; bottom: 0 !important;
+    bottom: 0 !important;
     width: 100vw !important;
     max-width: 100vw !important;
     min-width: 0 !important;
-    height: 100dvh !important;
-    z-index: 1250 !important;
+    z-index: 1210 !important;     /* DEBAJO del col-stats (1200) NO,
+                                     necesitamos que asome bajo el header.
+                                     Pero z-index entre paneles izq:
+                                     1210 < col-stats overlay (1200) sería
+                                     incorrecto. Mejor: 1210 > 1200 = el
+                                     panel está encima en su área. Como
+                                     no comparten área (panel empieza
+                                     bajo el header), no hay solapamiento
+                                     visual. */
     border: none !important;
     border-right: none !important;
     border-left: none !important;
     box-shadow: none !important;
     flex-direction: column !important;
     background: #050510 !important;
-    padding-top: 132px !important;
+    padding-top: 0 !important;
     box-sizing: border-box !important;
   }
 
   /* === Mapa de hechizos === */
   #pmh-panel {
-    display: none !important;
+    display: none;
   }
   #pmh-panel.mob-shown {
     display: flex !important;
     position: fixed !important;
     left: 0 !important; right: 0 !important;
-    top: 132px !important;
     bottom: 0 !important;
     width: 100vw !important;
     min-width: 0 !important;
     max-width: 100vw !important;
     height: auto !important;
-    z-index: 1250 !important;
+    z-index: 1210 !important;
     border-right: none !important;
     box-shadow: none !important;
     flex-direction: column !important;
     animation: none !important;
     transform: none !important;
+    background: #050510 !important;
+  }
+
+  /* La cabecera fija (col-stats con header+tabs+subtabs) debe tener
+     fondo opaco y z-index alto para tapar cualquier contenido detrás
+     en la zona superior. */
+  #ppj-col-stats {
+    background: #050510 !important;
+  }
+  #ppj-header, #ppj-tabs, #mob-subtabs {
+    background: #050510 !important;
   }
 }
 `;
@@ -118,11 +145,31 @@ function _aplicarMobShown(id) {
         if (el.style.cssText) el.style.cssText = '';
         if (targetId === id) {
             el.classList.add('mob-shown');
-            _log('mob-shown +', targetId);
+            // top dinámico: medir la altura real de header+tabs+subtabs
+            const topPx = _alturaCabecera();
+            el.style.top = topPx + 'px';
+            _log('mob-shown +', targetId, '@ top=', topPx);
         } else {
             el.classList.remove('mob-shown');
         }
     });
+}
+
+// Mide la altura efectiva de la cabecera fija (header del PJ + tabs
+// principales + subtabs móvil) para alinear el top del panel izq y
+// del mapa exactamente debajo, sin huecos ni solapamientos.
+function _alturaCabecera() {
+    const cs = document.getElementById('ppj-col-stats');
+    if (!cs) return 132;
+    const header = cs.querySelector('#ppj-header');
+    const tabs   = cs.querySelector('#ppj-tabs');
+    const subs   = document.getElementById('mob-subtabs');
+    let h = 0;
+    if (header) h += header.offsetHeight;
+    if (tabs)   h += tabs.offsetHeight;
+    if (subs)   h += subs.offsetHeight;
+    // Fallback razonable si por algún motivo las medidas son 0
+    return h > 40 ? h : 132;
 }
 
 // ── Instalar interceptores DESPUÉS de que los módulos carguen ─
@@ -255,6 +302,10 @@ function _renderContent(nombre, tab, subtabIdx) {
     const ppjBody   = document.getElementById('ppj-body');
     const statsBody = document.getElementById('ppj-stats-body');
 
+    // Restaurar visibility por defecto (se ocultará si el subtab usa
+    // panel izq o mapa)
+    if (ppjBody) ppjBody.style.visibility = '';
+
     if (tab === 'stats') {
         _limpiarMobShown();
 
@@ -289,24 +340,35 @@ function _renderContent(nombre, tab, subtabIdx) {
 
     } else if (tab === 'hechizos') {
         if (subtabIdx === 1) {
+            // Ocultar el ppj-body (grimorio) para que NADA asome por
+            // detrás del mapa, especialmente cuando scrollIntoView del
+            // callback de selección desplaza la card a una posición que
+            // podría asomar por un gap de píxeles entre subtabs y mapa.
+            if (ppjBody) ppjBody.style.visibility = 'hidden';
             _mobMostrarMapa();
         } else {
+            // Grimorio: restaurar visibilidad del body
+            if (ppjBody) ppjBody.style.visibility = '';
             const mapa = document.getElementById('pmh-panel');
             if (mapa) mapa.classList.remove('mob-shown');
         }
 
     } else if (tab === 'objetos') {
         if (subtabIdx === 1) {
+            if (ppjBody) ppjBody.style.visibility = 'hidden';
             _mobMostrarPanelIzq('ppj-obj-panel-izq');
         } else {
+            if (ppjBody) ppjBody.style.visibility = '';
             const p = document.getElementById('ppj-obj-panel-izq');
             if (p) { p.classList.remove('mob-shown'); if (p.style.cssText) p.style.cssText = ''; }
         }
 
     } else if (tab === 'misiones') {
         if (subtabIdx === 1) {
+            if (ppjBody) ppjBody.style.visibility = 'hidden';
             _mobMostrarPanelIzq('ppj-mis-panel-izq');
         } else {
+            if (ppjBody) ppjBody.style.visibility = '';
             const p = document.getElementById('ppj-mis-panel-izq');
             if (p) { p.classList.remove('mob-shown'); if (p.style.cssText) p.style.cssText = ''; }
         }
@@ -418,3 +480,4 @@ window.addEventListener('resize', () => {
         _mobSetup(_mob.pj, _mob.tab);
     }
 }, { passive: true });
+         
