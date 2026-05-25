@@ -1,23 +1,22 @@
 // ============================================================
-// personajes-mobile-patch.js  v7
+// personajes-mobile-patch.js  v8
 //
-// Cambios clave vs v6:
-//  - Usa la clase CSS `.mob-shown` (definida en personajes-mobile.css)
-//    en vez de inline styles para mostrar los paneles izq de Obj/Mis
-//    y el panel del mapa de hechizos.  Las reglas dinámicas
-//    `@media(max-width:900px){#ppj-obj-panel-izq{display:none}}` que
-//    inyectan panel-pj.js y panel-mis.js NO tienen !important, así
-//    que las reglas del CSS móvil (con !important) ganan.
-//  - Para Hechizos: el subtab "Mapa" sólo añade .mob-shown al panel
-//    ya creado por abrirMinimapa().  El subtab "Grimorio" sólo quita
-//    .mob-shown (no destruye el mapa).
-//  - Para Objetos/Misiones: el subtab "Catálogo" añade .mob-shown al
-//    panel izq que ya existe (insertado en document.body).  El subtab
-//    "Inventario"/"Misiones mías" sólo quita .mob-shown.
-//  - Stats: subtab 0 → mueve HEX body al ppj-body (mismo flujo v6).
+// Cambios vs v7:
+//  - Inyecta su propio bloque CSS al final del <head>, garantizando
+//    que las reglas .mob-shown ganan en orden de cascada sobre las
+//    reglas dinámicas inyectadas por panel-pj.js, panel-mis.js y
+//    panel-mapa-hechizos.js.
+//  - Logs de debug con prefijo [hxmob] para diagnóstico.
+//  - Redimensión del canvas del mapa más robusta: espera a que el
+//    wrap tenga clientWidth > 0 antes de pedir redibujar.
+//  - clearAll de inline styles antes de aplicar .mob-shown (por si
+//    una versión previa del patch dejó residuos).
 //
 // <script type="module" src="personajes-mobile-patch.js"></script>
 // ============================================================
+
+const DBG = true;
+const _log = (...args) => { if (DBG) console.log('[hxmob]', ...args); };
 
 const _isMob = () => window.innerWidth <= 700;
 const _mob = { tab: 'stats', subtab: 0, pj: null };
@@ -34,20 +33,95 @@ const _SUBTABS = {
 // IDs de elementos que el patch controla con .mob-shown
 const _MOB_TARGETS = ['ppj-obj-panel-izq', 'ppj-mis-panel-izq', 'pmh-panel'];
 
+// ────────────────────────────────────────────────────────────
+// CSS de override: inyectado al cargar el patch.  Como se añade
+// al final del <head>, vence a las reglas inyectadas en runtime
+// por panel-pj.js (línea 1818), panel-mis.js (línea 72) y por
+// panel-mapa-hechizos.js (que NO usa !important).
+// ────────────────────────────────────────────────────────────
+function _inyectarCssOverride() {
+    if (document.getElementById('hxmob-overrides')) return;
+    const st = document.createElement('style');
+    st.id = 'hxmob-overrides';
+    st.textContent = `
+@media (max-width: 700px) {
+  /* === Paneles izq de objetos / misiones === */
+  #ppj-obj-panel-izq,
+  #ppj-mis-panel-izq {
+    display: none !important;
+  }
+  #ppj-obj-panel-izq.mob-shown,
+  #ppj-mis-panel-izq.mob-shown {
+    display: flex !important;
+    position: fixed !important;
+    left: 0 !important; right: 0 !important;
+    top: 0 !important; bottom: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    height: 100dvh !important;
+    z-index: 1250 !important;
+    border: none !important;
+    border-right: none !important;
+    border-left: none !important;
+    box-shadow: none !important;
+    flex-direction: column !important;
+    background: #050510 !important;
+    padding-top: 132px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* === Mapa de hechizos === */
+  #pmh-panel {
+    display: none !important;
+  }
+  #pmh-panel.mob-shown {
+    display: flex !important;
+    position: fixed !important;
+    left: 0 !important; right: 0 !important;
+    top: 132px !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    min-width: 0 !important;
+    max-width: 100vw !important;
+    height: auto !important;
+    z-index: 1250 !important;
+    border-right: none !important;
+    box-shadow: none !important;
+    flex-direction: column !important;
+    animation: none !important;
+    transform: none !important;
+  }
+}
+`;
+    document.head.appendChild(st);
+    _log('CSS override inyectado');
+}
+
 function _limpiarMobShown() {
     _MOB_TARGETS.forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.classList.remove('mob-shown');
+        if (el) {
+            el.classList.remove('mob-shown');
+            // Limpiar inline styles que v6 podía haber dejado
+            if (el.style.cssText) el.style.cssText = '';
+        }
     });
 }
 
 function _aplicarMobShown(id) {
-    // Limpia los demás targets y aplica .mob-shown sólo a `id`
     _MOB_TARGETS.forEach(targetId => {
         const el = document.getElementById(targetId);
         if (!el) return;
-        if (targetId === id) el.classList.add('mob-shown');
-        else el.classList.remove('mob-shown');
+        // Limpiar inline styles antes de aplicar la clase, evitando
+        // que estilos viejos de v6 (inline) batan al CSS
+        if (el.style.cssText) el.style.cssText = '';
+        if (targetId === id) {
+            el.classList.add('mob-shown');
+            _log('mob-shown +', targetId);
+        } else {
+            el.classList.remove('mob-shown');
+        }
     });
 }
 
@@ -55,8 +129,8 @@ function _aplicarMobShown(id) {
 function _instalarInterceptores() {
     if (_intercepted) return;
     _intercepted = true;
+    _log('Interceptores instalados');
 
-    // abrirDetalle
     const _origAbrirDetalle = window.abrirDetalle;
     window.abrirDetalle = function(nombre) {
         _origAbrirDetalle?.(nombre);
@@ -67,21 +141,17 @@ function _instalarInterceptores() {
         }
     };
 
-    // _ppjCambiarTab — crítico: aquí cambiamos de tab principal
     const _origCambiarTab = window._ppjCambiarTab;
     window._ppjCambiarTab = function(nombre, tab) {
         _origCambiarTab?.(nombre, tab);
         if (_isMob()) {
+            _log('CambiarTab →', tab);
             _mob.pj = nombre; _mob.tab = tab; _mob.subtab = 0;
-            // Al cambiar de tab principal, todos los paneles izq / mapa
-            // se reinician.  El default es subtab=0 (no mostrar catálogo
-            // ni mapa).
             _limpiarMobShown();
             setTimeout(() => _mobSetup(nombre, tab), 120);
         }
     };
 
-    // cerrarPanelPJ
     const _origCerrar = window.cerrarPanelPJ;
     window.cerrarPanelPJ = function() {
         _limpiarMobShown();
@@ -89,7 +159,6 @@ function _instalarInterceptores() {
         _origCerrar?.();
     };
 
-    // refreshPanelPJ — sólo afecta stats, no toca subtabs
     const _origRefresh = window.refreshPanelPJ;
     if (typeof _origRefresh === 'function') {
         window.refreshPanelPJ = function() {
@@ -106,8 +175,27 @@ function _instalarInterceptores() {
     }
 }
 
-// Esperar a que los módulos ES terminen de exponer funciones globales.
-// window.onload ya pasó en módulos — usamos un poll corto.
+// Inyectar CSS de inmediato
+_inyectarCssOverride();
+
+// Fallback: capturar clics en las tabs principales por delegación
+// SÓLO cuando el interceptor de _ppjCambiarTab aún no se haya
+// instalado.  Esto evita doble setup cuando todo funciona normal.
+document.addEventListener('click', (e) => {
+    if (!_isMob() || _intercepted) return;
+    const tab = e.target.closest('.ppj-tab');
+    if (!tab) return;
+    const onclick = tab.getAttribute('onclick') || '';
+    const m = onclick.match(/_ppjCambiarTab\(['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/);
+    if (!m) return;
+    const [, nombre, tabId] = m;
+    _log('Click tab (delegación fallback) →', tabId);
+    _mob.pj = nombre; _mob.tab = tabId; _mob.subtab = 0;
+    _limpiarMobShown();
+    setTimeout(() => _mobSetup(nombre, tabId), 150);
+}, true);
+
+// Esperar a que los módulos ES expongan funciones globales
 const _waitForModules = setInterval(() => {
     if (typeof window._ppjCambiarTab === 'function' &&
         typeof window.abrirDetalle === 'function') {
@@ -115,7 +203,6 @@ const _waitForModules = setInterval(() => {
         _instalarInterceptores();
     }
 }, 50);
-// Timeout de seguridad: instalar de todas formas a los 3s
 setTimeout(() => { clearInterval(_waitForModules); _instalarInterceptores(); }, 3000);
 
 // ── Setup tras cambio de tab principal ────────────────────────
@@ -154,6 +241,7 @@ function _renderSubtabs(nombre, tab) {
 
 window._mobClickSubtab = function(idx) {
     if (!_isMob()) return;
+    _log('Click subtab', idx, 'tab:', _mob.tab);
     _mob.subtab = idx;
     document.querySelectorAll('.mob-subtab').forEach((b, i) =>
         b.classList.toggle('active', i === idx));
@@ -163,11 +251,11 @@ window._mobClickSubtab = function(idx) {
 // ── Contenido por subtab ──────────────────────────────────────
 function _renderContent(nombre, tab, subtabIdx) {
     if (!_isMob()) return;
+    _log('renderContent', tab, 'subtab:', subtabIdx);
     const ppjBody   = document.getElementById('ppj-body');
     const statsBody = document.getElementById('ppj-stats-body');
 
     if (tab === 'stats') {
-        // En tab Stats nunca queremos paneles izq ni mapa
         _limpiarMobShown();
 
         if (statsBody) statsBody.style.display = 'none';
@@ -177,7 +265,6 @@ function _renderContent(nombre, tab, subtabIdx) {
         });
 
         if (subtabIdx === 0) {
-            // Vitalidad — copiar contenido de stats-body
             if (ppjBody && statsBody) {
                 if (statsBody.innerHTML.trim()) {
                     ppjBody.innerHTML = statsBody.innerHTML;
@@ -193,7 +280,6 @@ function _renderContent(nombre, tab, subtabIdx) {
                 }
             }
         } else {
-            // HEX & VEX
             const hexBody = document.getElementById('ppj-hex-body');
             if (ppjBody && hexBody) {
                 ppjBody.innerHTML = hexBody.innerHTML;
@@ -202,28 +288,19 @@ function _renderContent(nombre, tab, subtabIdx) {
         }
 
     } else if (tab === 'hechizos') {
-        // Por defecto Grimorio: el contenido HTML del grimorio ya está
-        // en ppj-body porque _renderTab lo pintó.  El mapa se controla
-        // sólo con .mob-shown.
         if (subtabIdx === 1) {
-            // Mapa: añadir .mob-shown al panel del mapa.  Espera a que
-            // exista (abrirMinimapa es async).
             _mobMostrarMapa();
         } else {
-            // Grimorio: quitar .mob-shown del mapa (queda invisible en
-            // DOM, no se destruye)
             const mapa = document.getElementById('pmh-panel');
             if (mapa) mapa.classList.remove('mob-shown');
         }
 
     } else if (tab === 'objetos') {
         if (subtabIdx === 1) {
-            // Catálogo: mostrar panel izq
             _mobMostrarPanelIzq('ppj-obj-panel-izq');
         } else {
-            // Inventario: ocultar panel izq (queda en DOM)
             const p = document.getElementById('ppj-obj-panel-izq');
-            if (p) p.classList.remove('mob-shown');
+            if (p) { p.classList.remove('mob-shown'); if (p.style.cssText) p.style.cssText = ''; }
         }
 
     } else if (tab === 'misiones') {
@@ -231,26 +308,24 @@ function _renderContent(nombre, tab, subtabIdx) {
             _mobMostrarPanelIzq('ppj-mis-panel-izq');
         } else {
             const p = document.getElementById('ppj-mis-panel-izq');
-            if (p) p.classList.remove('mob-shown');
+            if (p) { p.classList.remove('mob-shown'); if (p.style.cssText) p.style.cssText = ''; }
         }
     }
 }
 
 // ── Helpers para mostrar paneles con .mob-shown ──────────────
-// Esperan a que el elemento exista (los paneles se crean async tras
-// renderTabMisiones/_tabObjetos/abrirMinimapa)
 function _mobMostrarPanelIzq(panelId) {
     const try_ = (n) => {
         const el = document.getElementById(panelId);
         if (!el) {
             if (n > 0) setTimeout(() => try_(n-1), 200);
+            else _log('Panel no encontrado:', panelId);
             return;
         }
-        // Limpiar inline styles que v6 podía haber puesto
-        el.style.cssText = '';
+        _log('Encontrado', panelId, '— aplicando mob-shown');
         _aplicarMobShown(panelId);
     };
-    try_(10);
+    try_(15);  // 3 segundos de poll
 }
 
 function _mobMostrarMapa() {
@@ -258,15 +333,33 @@ function _mobMostrarMapa() {
         const el = document.getElementById('pmh-panel');
         if (!el) {
             if (n > 0) setTimeout(() => try_(n-1), 200);
+            else _log('pmh-panel no encontrado tras esperar');
             return;
         }
-        el.style.cssText = '';
+        _log('Encontrado pmh-panel — aplicando mob-shown');
         _aplicarMobShown('pmh-panel');
         if (!_touchInstalled) { _touchInstalled = true; setTimeout(_addTouchEvents, 150); }
-        // Forzar redimensión del canvas tras aplicar la nueva geometría
-        setTimeout(() => { window._pmhRedimensionar?.(); }, 120);
+        // Redimensionar canvas: esperar a que el wrap tenga ancho real
+        _redimensionarCanvasMapa();
     };
-    try_(10);
+    try_(15);
+}
+
+function _redimensionarCanvasMapa() {
+    let tries = 0;
+    const intervalo = setInterval(() => {
+        tries++;
+        const wrap = document.getElementById('pmh-canvas-wrap');
+        if (wrap && wrap.clientWidth > 0 && wrap.clientHeight > 0) {
+            _log('Canvas wrap listo:', wrap.clientWidth, 'x', wrap.clientHeight);
+            window._pmhRedimensionar?.();
+            // Centrar y forzar redibujado completo
+            clearInterval(intervalo);
+        } else if (tries > 20) {
+            _log('Canvas wrap nunca tuvo ancho — abandono');
+            clearInterval(intervalo);
+        }
+    }, 100);
 }
 
 // ── Touch handlers para el mapa ───────────────────────────────
@@ -314,7 +407,6 @@ function _addTouchEvents() {
 // ── Resize ────────────────────────────────────────────────────
 window.addEventListener('resize', () => {
     if (!_isMob()) {
-        // Volver a desktop: limpiar todo lo móvil
         document.getElementById('mob-subtabs')?.remove();
         _touchInstalled = false;
         _limpiarMobShown();
