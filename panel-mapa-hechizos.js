@@ -1379,3 +1379,46 @@ window._pmhRecargar = async () => {
     _calcularSetsGlobales();
     _calcularVista(_estado.jugadorPanel);
 };
+
+// ── API MÓVIL: acceso al estado interno para touch ────────────
+// Expone la cámara, pan, zoom y selección de nodo al patch móvil
+
+window._pmhGetCamara = () => ({ ..._estado.camara });
+
+window._pmhNodoEn = (wx, wy) => {
+    for (let i = _estado.nodos.length - 1; i >= 0; i--) {
+        const n = _estado.nodos[i];
+        if (n.esEstado) {
+            const half = n.radio * 0.88;
+            if (Math.abs(n.x - wx) <= half && Math.abs(n.y - wy) <= half) return n;
+        } else {
+            if (Math.hypot(n.x - wx, n.y - wy) <= n.radio) return n;
+        }
+    }
+    return null;
+};
+
+window._pmhPanCamara = (dx, dy) => {
+    _estado.camara.x += dx;
+    _estado.camara.y += dy;
+};
+
+window._pmhZoom = (delta, screenX, screenY) => {
+    const nuevoZoom = Math.max(0.08, Math.min(_estado.camara.zoom * delta, 3));
+    const canvas = _estado.canvas;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = screenX - rect.left;
+    const my = screenY - rect.top;
+    _estado.camara.x = mx - (mx - _estado.camara.x) * (nuevoZoom / _estado.camara.zoom);
+    _estado.camara.y = my - (my - _estado.camara.y) * (nuevoZoom / _estado.camara.zoom);
+    _estado.camara.zoom = nuevoZoom;
+};
+
+window._pmhSeleccionar = (nodo) => {
+    _seleccionarNodo(nodo);
+};
+
+window._pmhRedimensionar = () => {
+    _redimensionar();
+};
