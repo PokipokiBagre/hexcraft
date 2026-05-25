@@ -292,6 +292,14 @@ export function montarOverlay() {
   document.addEventListener('touchmove', e => _onDragMove(e.touches[0]), { passive: true });
   document.addEventListener('touchend',  e => _onDragEnd(e.changedTouches[0]), { passive: true });
 
+  // Resize / rotación: redibujar flechas (el SVG se reajusta a body.offsetWidth/Height)
+  // Sólo añadimos listeners una vez por sesión del drawer
+  if (!window._hxfxResizeBound) {
+    window._hxfxResizeBound = true;
+    window.addEventListener('resize', _scheduleRedraw, { passive: true });
+    window.addEventListener('orientationchange', _scheduleRedraw, { passive: true });
+  }
+
   _actualizarModoCursor();
   _redibujarTodo();
 }
@@ -652,6 +660,11 @@ export function observarStack() {
   const colB = document.querySelector('.hxc-col-b');
   if (colA) colA.addEventListener('scroll', _scheduleRedraw, { passive: true });
   if (colB) colB.addEventListener('scroll', _scheduleRedraw, { passive: true });
+
+  // En móvil, el scroll vertical vive en .hxc-body (no en stack ni cols).
+  // Escuchamos también ahí para redibujar flechas al hacer scroll.
+  const body = document.querySelector('.hxc-body');
+  if (body) body.addEventListener('scroll', _scheduleRedraw, { passive: true });
 }
 
 // ── Modo cursor en el body ─────────────────────────────────────

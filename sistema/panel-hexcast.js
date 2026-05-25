@@ -313,6 +313,188 @@ function _css() {
 .hxc-lat-hz-ofi-btn.mitad:hover   { background: rgba(212,175,55,0.12); }
 .hxc-lat-hz-ofi-btn.completo { border-color: rgba(232,100,60,0.35); color: #e8643c; }
 .hxc-lat-hz-ofi-btn.completo:hover { background: rgba(232,100,60,0.12); }
+
+/* ════════════════════════════════════════════════════════════
+   MÓVIL — apilado vertical: Grupo A → Stack → Grupo B
+   El SVG overlay de flechas adapta automáticamente las
+   posiciones (usa getBoundingClientRect en cada redraw).
+   ════════════════════════════════════════════════════════════ */
+@media (max-width: 700px) {
+  /* Drawer ocupa toda la pantalla en móvil */
+  #hxc-drawer { height: 100dvh !important; border-radius: 0 !important; }
+  .hxc-handle { display: none !important; }
+
+  /* Trigger más compacto */
+  #hxc-trigger { bottom: 12px !important; padding: 8px 20px !important; font-size: 0.74em !important; }
+
+  /* Header compacto */
+  .hxc-header { padding: 6px 10px !important; gap: 6px !important; }
+  .hxc-header-title { font-size: 0.74em !important; letter-spacing: 1.3px !important; }
+  .hxc-header-sub { font-size: 0.6em !important; padding: 2px 5px !important; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Body: pasar de grid 5-col a flex column */
+  .hxc-body {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Canales SVG: ocultos en móvil (las flechas viven en overlay global,
+     no necesitan estos placeholders cuando no hay flancos laterales) */
+  .hxfx-canal { display: none !important; }
+
+  /* Columnas de grupo: pasan a fila horizontal con 3 slots equidistantes.
+     IMPORTANTE: NO ocultarlas — el cálculo de flechas necesita encontrarlas
+     con _slotEl() para resolver origen/destino. */
+  .hxc-col {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    flex-shrink: 0 !important;
+    overflow-y: visible !important;
+    overflow-x: visible !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+    padding: 0 6px 6px !important;
+    gap: 5px;
+    align-content: flex-start;
+  }
+  .hxc-col-b {
+    border-left: none !important;
+    border-top: 1px solid rgba(255,255,255,0.08) !important;
+    border-bottom: none !important;
+    order: 3 !important;
+  }
+  .hxc-col:not(.hxc-col-b) { order: 1 !important; }
+
+  /* Título de columna: full-width tipo subheader */
+  .hxc-col-title {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    padding: 6px 4px 4px !important;
+    font-size: 0.56em !important;
+    letter-spacing: 1.8px !important;
+    position: static !important;
+  }
+
+  /* Slot: 3 por fila compactos */
+  .hxc-slot {
+    flex: 1 1 calc(33.333% - 4px) !important;
+    min-width: 0 !important;
+    min-height: 90px !important;
+    max-width: calc(33.333% - 4px) !important;
+    border-bottom: none !important;
+    border-radius: 6px !important;
+    background: rgba(255,255,255,0.02);
+  }
+  .hxc-slot-inner { padding: 6px 4px !important; gap: 3px !important; }
+  .hxc-slot-avatar { width: 30px !important; height: 30px !important; }
+  .hxc-slot-nombre { font-size: 0.55em !important; }
+  .hxc-slot-hex   { font-size: 0.48em !important; }
+  .hxc-slot-vex   { font-size: 0.46em !important; }
+  .hxc-slot-actions { gap: 2px !important; flex-wrap: wrap; justify-content: center; }
+  .hxc-slot-action-btn { font-size: 0.5em !important; padding: 2px 5px !important; }
+  .hxc-slot-quit { opacity: 0.6 !important; font-size: 0.7em !important; }
+
+  /* Estados bloqueados bajo slot: más compactos */
+  .hxc-estado-block { padding: 3px 5px !important; }
+  .hxc-estado-block-nombre { font-size: 0.52em !important; }
+  .hxc-estado-block-afin { font-size: 0.46em !important; }
+
+  /* Centro (stack) en el medio del flex column */
+  .hxc-center {
+    order: 2 !important;
+    flex: 1 1 auto !important;
+    min-height: 40vh;
+    overflow: visible !important;
+  }
+  .hxc-center-top {
+    padding: 5px 8px !important;
+    gap: 4px !important;
+    flex-wrap: wrap !important;
+  }
+  .hxc-turno-label { font-size: 0.56em !important; }
+  .hxc-turno-nav-btn { width: 26px !important; height: 26px !important; font-size: 0.78em !important; }
+  .hxc-turno-select { font-size: 0.58em !important; max-width: 90px !important; padding: 4px 6px !important; }
+  .hxc-btn-confirmar,
+  .hxc-btn-nuevo-turno,
+  .hxc-btn-guardar-hist,
+  .hxc-btn-op {
+    font-size: 0.56em !important;
+    padding: 5px 8px !important;
+  }
+
+  /* Stack scroll: el body ya scrolea, así que no doblamos scroll */
+  .hxc-stack {
+    overflow-y: visible !important;
+    padding: 6px 8px 10px !important;
+  }
+  .hxc-stack-empty { padding: 22px 10px !important; font-size: 0.65em !important; }
+
+  /* Items del stack: compactos */
+  .hxc-item-row { padding: 6px 8px !important; gap: 5px !important; }
+  .hxc-item-pj { font-size: 0.58em !important; max-width: 56px !important; }
+  .hxc-item-hz { font-size: 0.65em !important; }
+  .hxc-item-mult { font-size: 0.52em !important; }
+  .hxc-item-dado { width: 42px !important; font-size: 0.65em !important; }
+  .hxc-item-resultado { font-size: 0.6em !important; min-width: 48px !important; }
+  .hxc-item-detail { padding: 6px 9px 8px !important; }
+  .hxc-opt-btn { font-size: 0.55em !important; padding: 3px 8px !important; }
+  .hxc-detail-stats { font-size: 0.58em !important; gap: 8px !important; }
+
+  /* Balance panel */
+  .hxc-balance-title { font-size: 0.5em !important; padding: 5px 9px 3px !important; }
+  .hxc-bal-pj { font-size: 0.6em !important; }
+  .hxc-bal-vals { font-size: 0.58em !important; gap: 6px !important; }
+
+  /* ── Panel lateral (inventario/estados/evento desde slot) ──
+     En escritorio se posiciona a left:160px (junto a Col A) o
+     right:160px (junto a Col B). En móvil: modal full-width
+     deslizándose desde abajo, sobre todo el drawer. */
+  #hxc-lateral-panel {
+    position: fixed !important;
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-height: 70dvh !important;
+    border-radius: 12px 12px 0 0 !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.75) !important;
+    z-index: 1300 !important;
+  }
+  #hxc-lateral-panel.lado-izq,
+  #hxc-lateral-panel.lado-der {
+    left: 0 !important;
+    right: 0 !important;
+    border-radius: 12px 12px 0 0 !important;
+  }
+  .hxc-lat-header { padding: 10px 12px !important; }
+  .hxc-lat-titulo { font-size: 0.78em !important; }
+  .hxc-lat-subtitulo { font-size: 0.62em !important; }
+  .hxc-lat-close { font-size: 1.4em !important; padding: 4px 10px !important; }
+  .hxc-lat-search { font-size: 0.78em !important; padding: 7px 9px !important; }
+  .hxc-lat-hz { padding: 8px 10px !important; }
+  .hxc-lat-hz-nombre { font-size: 0.78em !important; }
+  .hxc-lat-hz-afin { font-size: 0.62em !important; }
+  .hxc-lat-hz-cost { font-size: 0.7em !important; }
+
+  /* Sesiones: lista de 1 columna en móvil */
+  .hxc-ses-wrap { padding: 0 14px !important; }
+  .hxc-ses-list { grid-template-columns: 1fr !important; }
+  .hxc-ses-top { padding: 12px 0 8px !important; gap: 8px !important; flex-wrap: wrap; }
+  .hxc-ses-title { font-size: 0.76em !important; }
+  .hxc-btn-nueva-ses { font-size: 0.62em !important; padding: 5px 11px !important; }
+
+  /* Tooltip hechizo: más estrecho en móvil */
+  .hxc-hz-tooltip { width: 200px !important; padding: 8px 10px !important; }
+
+  /* Toolbar de flechas: que envuelva cómodo */
+  .hxfx-toolbar { gap: 5px !important; padding: 6px 8px !important; flex-wrap: wrap !important; }
+}
 `;
   document.head.appendChild(st);
 }
