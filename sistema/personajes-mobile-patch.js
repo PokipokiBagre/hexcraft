@@ -1,21 +1,25 @@
 // ============================================================
-// personajes-mobile-patch.js  v11
+// personajes-mobile-patch.js  v12
 //
-// Cambios vs v10:
-//  1) Interceptamos window.cerrarDetalle (no solo window.cerrarPanelPJ).
-//     El botón × del header llama window.cerrarDetalle(), que es
-//     una referencia directa a cerrarPanelPJ asignada por
-//     personajes-main.js antes de que cargue este patch.  Si solo
-//     interceptamos cerrarPanelPJ, el botón × NO pasa por nuestro
-//     wrapper y el _unlockBody no se llama → body bloqueado +
-//     panel del PJ queda visible.
-//  2) MutationObserver sobre el <body>: cuando panel-mis._reRender
-//     destruye y recrea #ppj-mis-panel-izq (al buscar, filtrar, o
-//     toggle Finalizadas), el nuevo elemento NO tiene .mob-shown,
-//     así que mi CSS lo oculta con display:none → pantalla negra.
-//     El observer detecta la recreación y, si estábamos en subtab
-//     Catálogo, re-aplica .mob-shown automáticamente.  Igual para
-//     #ppj-obj-panel-izq (defensa preventiva).
+// Cambios vs v11:
+//  1) Bug del input "trabado": al buscar en el catálogo de Misiones
+//     el panel se destruye+recrea en cada letra (panel-mis._reRender),
+//     y el input nuevo no tiene foco → el teclado virtual de Android
+//     se cierra después de cada letra.  Ahora el observer captura el
+//     input enfocado ANTES de la destrucción (estado: cls del input,
+//     selectionStart) y lo restaura inmediatamente en el nuevo panel,
+//     manteniendo el teclado abierto.
+//  2) Bug del × que no cierra el panel completo: el cierre ahora
+//     limpia los inline styles que _ensureFullscreen aplicó al
+//     #ppj-col-stats ANTES de llamar a cerrarPanelPJ original.  Sin
+//     esto, el display:flex inline ganaba al display:none del CSS
+//     por defecto y el panel se quedaba abierto.  Resetea también
+//     _mob.pj=null para que un eventual resize event (disparado por
+//     window.scrollTo en _unlockBody → toolbar móvil cambia) no
+//     reactive _mobSetup → _ensureFullscreen.
+//  3) Sin delay entre destrucción y reaplicación de .mob-shown
+//     (antes había 30ms causando flash visual).  El input ya existe
+//     en el DOM cuando el observer dispara, así que es seguro.
 //
 // <script type="module" src="personajes-mobile-patch.js"></script>
 // ============================================================
@@ -247,19 +251,39 @@ function _instalarInterceptores() {
     // así que interceptar window.cerrarPanelPJ no afecta el botón × del
     // header (que llama window.cerrarDetalle).  Por eso interceptamos
     // los dos por separado.
-    const _origCerrar = window.cerrarPanelPJ;
-    window.cerrarPanelPJ = function() {
+    //
+    // IMPORTANTE sobre el orden: hay que resetear _mob.pj = null y
+    // limpiar los inline styles del col-stats ANTES de _limpiarMobShown
+    // (que llama _unlockBody → window.scrollTo → puede disparar resize
+    // event en Chrome móvil cuando se restaura la toolbar).  Si esos
+    // styles inline siguen ahí cuando el resize dispara, mi handler
+    // puede llamar _ensureFullscreen y re-mostrar el panel.
+    function _cierreLimpio() {
+        _mob.pj = null;
+        _mob.tab = 'stats';
+        _mob.subtab = 0;
+        // Limpiar inline styles que mi _ensureFullscreen aplicó.
+        // Sin ellos, el CSS por defecto (display:none en col-stats)
+        // gana naturalmente cuando cerrarPanelPJ original se ejecuta.
+        ['ppj-col-stats','ppj-col-main'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.cssText = '';
+        });
+        // Limpiar visibility forzado en ppj-body si quedó pendiente
+        const ppjBody = document.getElementById('ppj-body');
+        if (ppjBody) ppjBody.style.visibility = '';
         _limpiarMobShown();         // remueve .mob-shown + _unlockBody
         document.getElementById('mob-subtabs')?.remove();
-        if (_mob.pj) _mob.pj = null;
+    }
+    const _origCerrar = window.cerrarPanelPJ;
+    window.cerrarPanelPJ = function() {
+        _cierreLimpio();
         _origCerrar?.();
     };
     const _origCerrarDetalle = window.cerrarDetalle;
     window.cerrarDetalle = function() {
         _log('cerrarDetalle invocado');
-        _limpiarMobShown();
-        document.getElementById('mob-subtabs')?.remove();
-        if (_mob.pj) _mob.pj = null;
+        _cierreLimpio();
         _origCerrarDetalle?.();
     };
 
@@ -288,10 +312,43 @@ function _instalarInterceptores() {
 // Solución: observamos el <body> y, cuando aparece un nuevo
 // #ppj-mis-panel-izq o #ppj-obj-panel-izq, si estábamos en subtab
 // Catálogo (subtab 1), re-aplicamos .mob-shown automáticamente.
+//
+// ADEMÁS, capturamos el estado del input que tenía foco ANTES de
+// la destrucción y lo restauramos en el nuevo panel.  Sin esto,
+// el teclado virtual de Android se cierra después de cada letra
+// porque el input nuevo no tiene foco.
+let _focusSnapshot = null;
 const _panelObserver = new MutationObserver(mutations => {
     if (!_isMob()) return;
     if (_mob.subtab !== 1) return;
     for (const m of mutations) {
+        // 1) Detectar destrucción de panel y capturar input con foco
+        for (const n of m.removedNodes) {
+            if (!(n instanceof HTMLElement)) continue;
+            if (n.id !== 'ppj-obj-panel-izq' && n.id !== 'ppj-mis-panel-izq') continue;
+            // Buscar el input con foco activo justo antes (document.activeElement
+            // ya cambió a body porque el elemento se removió, pero podemos
+            // detectar inputs que coincidan con la búsqueda actual y
+            // restaurar foco en el nuevo)
+            const inputs = n.querySelectorAll('input');
+            for (const input of inputs) {
+                // Solo restauramos foco si el input es un campo de búsqueda
+                // y mantenía algo (esto se detecta por placeholder o clase)
+                if (input.classList.contains('pmis-izq-search') ||
+                    input.classList.contains('pobj-search-izq')) {
+                    _focusSnapshot = {
+                        cls: input.classList.contains('pmis-izq-search')
+                            ? 'pmis-izq-search'
+                            : 'pobj-search-izq',
+                        selectionStart: input.selectionStart,
+                        selectionEnd:   input.selectionEnd,
+                        ts: Date.now()
+                    };
+                    break;
+                }
+            }
+        }
+        // 2) Detectar recreación de panel
         for (const n of m.addedNodes) {
             if (!(n instanceof HTMLElement)) continue;
             const id = n.id;
@@ -299,13 +356,34 @@ const _panelObserver = new MutationObserver(mutations => {
             const matchMis = id === 'ppj-mis-panel-izq' && _mob.tab === 'misiones';
             if (matchObj || matchMis) {
                 _log('Panel recreado, re-aplicando mob-shown a', id);
-                // Diferir para que panel-mis termine de poblar el HTML
-                setTimeout(() => _aplicarMobShown(id), 30);
+                // Aplicar mob-shown INMEDIATAMENTE — sin delay no hay
+                // flash visual entre la destrucción y la reaparición.
+                // El input ya existe en el DOM en este momento porque
+                // el observer dispara después del appendChild.
+                _aplicarMobShown(id);
+                _restaurarFocoInput();
             }
         }
     }
 });
 _panelObserver.observe(document.body, { childList: true });
+
+function _restaurarFocoInput() {
+    if (!_focusSnapshot) return;
+    // Solo restauramos si el snapshot es reciente (<500ms) — evita
+    // restaurar foco erróneamente en recreaciones no relacionadas
+    if (Date.now() - _focusSnapshot.ts > 500) { _focusSnapshot = null; return; }
+    const input = document.querySelector(`.${_focusSnapshot.cls}`);
+    if (!input) { _focusSnapshot = null; return; }
+    input.focus();
+    // Restaurar cursor al final (o donde estaba)
+    try {
+        const len = input.value.length;
+        const pos = Math.min(_focusSnapshot.selectionStart ?? len, len);
+        input.setSelectionRange(pos, pos);
+    } catch (e) { /* algunos browsers no soportan setSelectionRange en algunos types */ }
+    _focusSnapshot = null;
+}
 
 // Inyectar CSS de inmediato
 _inyectarCssOverride();
