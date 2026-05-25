@@ -1,25 +1,21 @@
 // ============================================================
-// personajes-mobile-patch.js  v10
+// personajes-mobile-patch.js  v11
 //
-// Cambios vs v9:
-//  - Bloqueo del scroll del <body> mientras hay un panel .mob-shown
-//    (catálogo o mapa).  Esto previene dos bugs:
-//    1) Scroll chaining: cuando el panel llegaba al final del scroll
-//       interno, el navegador propagaba el scroll al <body>, mostrando
-//       la grid de personajes del index por debajo.
-//    2) Resize por toolbar móvil: al scrollear el body el navegador
-//       mostraba/ocultaba la toolbar, lo cual disparaba un evento
-//       resize que mi handler interpretaba como "recrear setup" y
-//       reseteaba el subtab activo a 0 (el usuario veía "se cerró
-//       el catálogo y cargó el inventario").
-//  - El bloqueo preserva la posición de scroll del body para evitar
-//    saltos al top al activarse.
-//  - Handler de resize ahora ignora cambios que solo afectan altura
-//    (toolbar móvil mostrando/ocultando).  Solo re-setupea cuando
-//    cambia el ancho (rotación, dispositivo).  Si re-setupea,
-//    preserva el subtab activo en vez de resetearlo a 0.
-//  - overscroll-behavior: contain en el panel y sus scrolls internos
-//    (defensa adicional contra scroll chaining a nivel CSS).
+// Cambios vs v10:
+//  1) Interceptamos window.cerrarDetalle (no solo window.cerrarPanelPJ).
+//     El botón × del header llama window.cerrarDetalle(), que es
+//     una referencia directa a cerrarPanelPJ asignada por
+//     personajes-main.js antes de que cargue este patch.  Si solo
+//     interceptamos cerrarPanelPJ, el botón × NO pasa por nuestro
+//     wrapper y el _unlockBody no se llama → body bloqueado +
+//     panel del PJ queda visible.
+//  2) MutationObserver sobre el <body>: cuando panel-mis._reRender
+//     destruye y recrea #ppj-mis-panel-izq (al buscar, filtrar, o
+//     toggle Finalizadas), el nuevo elemento NO tiene .mob-shown,
+//     así que mi CSS lo oculta con display:none → pantalla negra.
+//     El observer detecta la recreación y, si estábamos en subtab
+//     Catálogo, re-aplica .mob-shown automáticamente.  Igual para
+//     #ppj-obj-panel-izq (defensa preventiva).
 //
 // <script type="module" src="personajes-mobile-patch.js"></script>
 // ============================================================
@@ -245,11 +241,26 @@ function _instalarInterceptores() {
         }
     };
 
+    // cerrarPanelPJ Y cerrarDetalle: ambos referencian la función
+    // original, pero personajes-main.js asigna cerrarDetalle a la
+    // referencia directa del módulo ANTES de que cargue nuestro patch,
+    // así que interceptar window.cerrarPanelPJ no afecta el botón × del
+    // header (que llama window.cerrarDetalle).  Por eso interceptamos
+    // los dos por separado.
     const _origCerrar = window.cerrarPanelPJ;
     window.cerrarPanelPJ = function() {
+        _limpiarMobShown();         // remueve .mob-shown + _unlockBody
+        document.getElementById('mob-subtabs')?.remove();
+        if (_mob.pj) _mob.pj = null;
+        _origCerrar?.();
+    };
+    const _origCerrarDetalle = window.cerrarDetalle;
+    window.cerrarDetalle = function() {
+        _log('cerrarDetalle invocado');
         _limpiarMobShown();
         document.getElementById('mob-subtabs')?.remove();
-        _origCerrar?.();
+        if (_mob.pj) _mob.pj = null;
+        _origCerrarDetalle?.();
     };
 
     const _origRefresh = window.refreshPanelPJ;
@@ -267,6 +278,34 @@ function _instalarInterceptores() {
         };
     }
 }
+
+// ── Observer: cuando los paneles izq se DESTRUYEN+RECREAN
+// (por ejemplo, panel-mis._reRender hace remove() + crear nuevo
+// al cambiar búsqueda/filtros/toggle Finalizadas), el nuevo
+// elemento NO tiene la clase .mob-shown.  Sin ella, mi CSS lo
+// oculta con display:none → pantalla negra.
+//
+// Solución: observamos el <body> y, cuando aparece un nuevo
+// #ppj-mis-panel-izq o #ppj-obj-panel-izq, si estábamos en subtab
+// Catálogo (subtab 1), re-aplicamos .mob-shown automáticamente.
+const _panelObserver = new MutationObserver(mutations => {
+    if (!_isMob()) return;
+    if (_mob.subtab !== 1) return;
+    for (const m of mutations) {
+        for (const n of m.addedNodes) {
+            if (!(n instanceof HTMLElement)) continue;
+            const id = n.id;
+            const matchObj = id === 'ppj-obj-panel-izq' && _mob.tab === 'objetos';
+            const matchMis = id === 'ppj-mis-panel-izq' && _mob.tab === 'misiones';
+            if (matchObj || matchMis) {
+                _log('Panel recreado, re-aplicando mob-shown a', id);
+                // Diferir para que panel-mis termine de poblar el HTML
+                setTimeout(() => _aplicarMobShown(id), 30);
+            }
+        }
+    }
+});
+_panelObserver.observe(document.body, { childList: true });
 
 // Inyectar CSS de inmediato
 _inyectarCssOverride();
