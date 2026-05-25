@@ -1,18 +1,25 @@
 // ============================================================
-// personajes-mobile-patch.js  v9
+// personajes-mobile-patch.js  v10
 //
-// Cambios vs v8:
-//  - Panel izq (Obj/Mis) y mapa ya NO usan `top:0; padding-top:132px`.
-//    Ahora usan `top: [altura medida]` (medida en runtime con
-//    _alturaCabecera()), exactamente debajo del header+tabs+subtabs.
-//  - z-index del panel izq y mapa bajó a 1210 (col-stats sigue en
-//    1200, así no tapan el header del col-stats que queda encima
-//    en su propia área).
-//  - ppj-body.visibility = 'hidden' al entrar en subtab "Catálogo"
-//    (Obj/Mis) o "Mapa" (Hechizos).  Esto previene que el grimorio
-//    o el inventario asomen por gaps de píxeles entre subtabs y
-//    el panel/mapa, especialmente cuando scrollIntoView del callback
-//    de selección desplaza una card a posición visible.
+// Cambios vs v9:
+//  - Bloqueo del scroll del <body> mientras hay un panel .mob-shown
+//    (catálogo o mapa).  Esto previene dos bugs:
+//    1) Scroll chaining: cuando el panel llegaba al final del scroll
+//       interno, el navegador propagaba el scroll al <body>, mostrando
+//       la grid de personajes del index por debajo.
+//    2) Resize por toolbar móvil: al scrollear el body el navegador
+//       mostraba/ocultaba la toolbar, lo cual disparaba un evento
+//       resize que mi handler interpretaba como "recrear setup" y
+//       reseteaba el subtab activo a 0 (el usuario veía "se cerró
+//       el catálogo y cargó el inventario").
+//  - El bloqueo preserva la posición de scroll del body para evitar
+//    saltos al top al activarse.
+//  - Handler de resize ahora ignora cambios que solo afectan altura
+//    (toolbar móvil mostrando/ocultando).  Solo re-setupea cuando
+//    cambia el ancho (rotación, dispositivo).  Si re-setupea,
+//    preserva el subtab activo en vez de resetearlo a 0.
+//  - overscroll-behavior: contain en el panel y sus scrolls internos
+//    (defensa adicional contra scroll chaining a nivel CSS).
 //
 // <script type="module" src="personajes-mobile-patch.js"></script>
 // ============================================================
@@ -47,6 +54,16 @@ function _inyectarCssOverride() {
     st.id = 'hxmob-overrides';
     st.textContent = `
 @media (max-width: 700px) {
+  /* Cuando hay un panel .mob-shown abierto, bloquear el scroll del
+     body para que no se vea la grid de personajes del index detrás
+     ni cause re-renders por scroll chaining. */
+  body.hxmob-locked {
+    overflow: hidden !important;
+    position: fixed !important;
+    left: 0; right: 0;
+    width: 100%;
+  }
+
   /* === Paneles izq de objetos / misiones === */
   /* Ocultos por defecto: las reglas dinámicas inyectadas por
      panel-pj.js (línea 1818) y panel-mis.js (línea 72) ya hacen
@@ -69,15 +86,7 @@ function _inyectarCssOverride() {
     width: 100vw !important;
     max-width: 100vw !important;
     min-width: 0 !important;
-    z-index: 1210 !important;     /* DEBAJO del col-stats (1200) NO,
-                                     necesitamos que asome bajo el header.
-                                     Pero z-index entre paneles izq:
-                                     1210 < col-stats overlay (1200) sería
-                                     incorrecto. Mejor: 1210 > 1200 = el
-                                     panel está encima en su área. Como
-                                     no comparten área (panel empieza
-                                     bajo el header), no hay solapamiento
-                                     visual. */
+    z-index: 1210 !important;
     border: none !important;
     border-right: none !important;
     border-left: none !important;
@@ -86,6 +95,16 @@ function _inyectarCssOverride() {
     background: #050510 !important;
     padding-top: 0 !important;
     box-sizing: border-box !important;
+    /* Detener scroll chaining: el scroll interno del panel no
+       propaga al <body> cuando llega al límite. */
+    overscroll-behavior: contain !important;
+  }
+  /* Aplicar overscroll-behavior también al scroll interno real */
+  #ppj-obj-panel-izq.mob-shown .pobj-izq-scroll,
+  #ppj-mis-panel-izq.mob-shown .pmis-izq-list,
+  #ppj-mis-panel-izq.mob-shown .pmis-izq-scroll {
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   /* === Mapa de hechizos === */
@@ -108,6 +127,7 @@ function _inyectarCssOverride() {
     animation: none !important;
     transform: none !important;
     background: #050510 !important;
+    overscroll-behavior: contain !important;
   }
 
   /* La cabecera fija (col-stats con header+tabs+subtabs) debe tener
@@ -134,6 +154,30 @@ function _limpiarMobShown() {
             if (el.style.cssText) el.style.cssText = '';
         }
     });
+    // Desbloquear scroll del body (no hay panel encima)
+    _unlockBody();
+}
+
+// ── Bloqueo del scroll del body ───────────────────────────────
+// Cuando un panel .mob-shown está abierto, el <body> NO debe
+// scrollearse.  Eso previene que la grid de personajes del index
+// aparezca cuando el panel llega al final de su scroll interno
+// (scroll chaining) y previene que el resize por toolbar móvil
+// rompa el estado.
+function _lockBody() {
+    if (document.body.classList.contains('hxmob-locked')) return;
+    // Guardar la posición de scroll actual para restaurarla luego
+    document.body.dataset.hxmobScrollY = String(window.scrollY);
+    document.body.classList.add('hxmob-locked');
+    document.body.style.top = `-${window.scrollY}px`;
+}
+function _unlockBody() {
+    if (!document.body.classList.contains('hxmob-locked')) return;
+    const y = parseInt(document.body.dataset.hxmobScrollY || '0', 10);
+    document.body.classList.remove('hxmob-locked');
+    document.body.style.top = '';
+    delete document.body.dataset.hxmobScrollY;
+    window.scrollTo(0, y);
 }
 
 function _aplicarMobShown(id) {
@@ -153,6 +197,8 @@ function _aplicarMobShown(id) {
             el.classList.remove('mob-shown');
         }
     });
+    // Bloquear scroll del body mientras este panel está visible
+    _lockBody();
 }
 
 // Mide la altura efectiva de la cabecera fija (header del PJ + tabs
@@ -351,6 +397,7 @@ function _renderContent(nombre, tab, subtabIdx) {
             if (ppjBody) ppjBody.style.visibility = '';
             const mapa = document.getElementById('pmh-panel');
             if (mapa) mapa.classList.remove('mob-shown');
+            _unlockBody();
         }
 
     } else if (tab === 'objetos') {
@@ -361,6 +408,7 @@ function _renderContent(nombre, tab, subtabIdx) {
             if (ppjBody) ppjBody.style.visibility = '';
             const p = document.getElementById('ppj-obj-panel-izq');
             if (p) { p.classList.remove('mob-shown'); if (p.style.cssText) p.style.cssText = ''; }
+            _unlockBody();
         }
 
     } else if (tab === 'misiones') {
@@ -371,6 +419,7 @@ function _renderContent(nombre, tab, subtabIdx) {
             if (ppjBody) ppjBody.style.visibility = '';
             const p = document.getElementById('ppj-mis-panel-izq');
             if (p) { p.classList.remove('mob-shown'); if (p.style.cssText) p.style.cssText = ''; }
+            _unlockBody();
         }
     }
 }
@@ -467,17 +516,36 @@ function _addTouchEvents() {
 }
 
 // ── Resize ────────────────────────────────────────────────────
+// Importante: en móvil, mostrar/ocultar la toolbar del navegador
+// dispara un evento "resize" que cambia solo la altura (window.innerHeight).
+// Eso NO debe disparar un re-render porque rompe el subtab activo.
+// Solo recreamos el setup móvil cuando cambia el ancho (orientación
+// o cambio real de dispositivo).
+let _lastInnerWidth = window.innerWidth;
 window.addEventListener('resize', () => {
+    const widthChanged = window.innerWidth !== _lastInnerWidth;
+    _lastInnerWidth = window.innerWidth;
+
     if (!_isMob()) {
+        // Salida a desktop: limpiar todo lo móvil
         document.getElementById('mob-subtabs')?.remove();
         _touchInstalled = false;
         _limpiarMobShown();
+        document.body.classList.remove('hxmob-locked');
         ['ppj-col-stats','ppj-col-main'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.cssText = '';
         });
-    } else if (_mob.pj) {
+    } else if (_mob.pj && widthChanged) {
+        // Cambio real de ancho (rotación o redimensión del navegador):
+        // recrear setup, preservando el subtab actual
+        const prevSubtab = _mob.subtab;
         _mobSetup(_mob.pj, _mob.tab);
+        // Tras el setTimeout de _mobSetup, reactivar el subtab original
+        setTimeout(() => {
+            if (prevSubtab !== 0) window._mobClickSubtab(prevSubtab);
+        }, 200);
     }
+    // Si solo cambió la altura (toolbar móvil mostrando/ocultando),
+    // no hacemos NADA — el subtab activo se preserva intacto.
 }, { passive: true });
-         
